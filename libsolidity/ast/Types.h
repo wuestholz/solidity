@@ -835,7 +835,8 @@ public:
 		strings const& _returnParameterTypes,
 		Location _location = Location::Internal,
 		bool _arbitraryParameters = false,
-		bool _constant = false,
+		bool _view = false,
+		bool _pure = false,
 		bool _payable = false
 	): FunctionType(
 		parseElementaryTypeVector(_parameterTypes),
@@ -845,7 +846,8 @@ public:
 		_location,
 		_arbitraryParameters,
 		nullptr,
-		_constant,
+		_view,
+		_pure,
 		_payable
 	)
 	{
