@@ -6,6 +6,9 @@ Features:
  * Type system: Introduce type identifier strings.
  * Metadata: Do not include platform in the version number.
 
+Bugfixes:
+ * Gas-estimator: reflect the most recent fee schedule.
+
 ### 0.4.8 (2017-01-13)
 
 Features:
