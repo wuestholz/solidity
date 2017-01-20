@@ -96,6 +96,7 @@ public:
 			_sig
 		);
 		BOOST_REQUIRE(!gas.isInfinite);
+		cout << "gas.value " << gas.value << "   m_gasUsed " << m_gasUsed << endl << flush;
 		BOOST_CHECK(gas.value == m_gasUsed);
 	}
 
