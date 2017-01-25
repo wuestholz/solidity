@@ -1310,7 +1310,7 @@ unsigned ArrayType::calldataEncodedSize(bool _padded) const
 		return 32;
 	bigint size = bigint(length()) * (isByteArray() ? 1 : baseType()->calldataEncodedSize(_padded));
 	size = ((size + 31) / 32) * 32;
-	solAssert(size <= numeric_limits<unsigned>::max(), "Array size does not fit unsigned.");
+//	solAssert(size <= numeric_limits<unsigned>::max(), "Array size does not fit unsigned.");
 	return unsigned(size);
 }
 

@@ -486,6 +486,11 @@ bool TypeChecker::visit(VariableDeclaration const& _variable)
 				);
 		}
 	}
+	if (auto arrayType = dynamic_cast<ArrayType const *>(varType.get()))
+	{
+		if (!arrayType->isDynamicallySized() && signed(arrayType->length()) < 0)
+			typeError(_variable.location(), "Array with negative length (" + string(arrayType->length()) + ") specified.");
+	}
 	if (_variable.value())
 		expectType(*_variable.value(), *varType);
 	if (!_variable.isStateVariable())
