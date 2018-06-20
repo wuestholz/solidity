@@ -30,6 +30,7 @@
 #include <libsolidity/parsing/Parser.h>
 #include <libsolidity/ast/ASTPrinter.h>
 #include <libsolidity/ast/ASTJsonConverter.h>
+#include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/interface/CompilerStack.h>
@@ -78,6 +79,7 @@ static string const g_strAssemble = "assemble";
 static string const g_strAst = "ast";
 static string const g_strAstJson = "ast-json";
 static string const g_strAstCompactJson = "ast-compact-json";
+static string const g_strAstBoogie = "boogie";
 static string const g_strBinary = "bin";
 static string const g_strBinaryRuntime = "bin-runtime";
 static string const g_strCloneBinary = "clone-bin";
@@ -131,6 +133,7 @@ static string const g_argBinaryRuntime = g_strBinaryRuntime;
 static string const g_argCloneBinary = g_strCloneBinary;
 static string const g_argCombinedJson = g_strCombinedJson;
 static string const g_argCompactJSON = g_strCompactJSON;
+static string const g_argAstBoogie = g_strAstBoogie;
 static string const g_argGas = g_strGas;
 static string const g_argHelp = g_strHelp;
 static string const g_argInputFile = g_strInputFile;
@@ -626,6 +629,7 @@ Allowed options)",
 		(g_argAst.c_str(), "AST of all source files.")
 		(g_argAstJson.c_str(), "AST of all source files in JSON format.")
 		(g_argAstCompactJson.c_str(), "AST of all source files in a compact JSON format.")
+		(g_argAstBoogie.c_str(), "Boogie IVL representation of all source files.")
 		(g_argAsm.c_str(), "EVM assembly of the contracts.")
 		(g_argAsmJson.c_str(), "EVM assembly of the contracts in JSON format.")
 		(g_argOpcodes.c_str(), "Opcodes of the contracts.")
@@ -1034,6 +1038,28 @@ void CommandLineInterface::handleAst(string const& _argStr)
 	}
 }
 
+void CommandLineInterface::handleBoogie()
+{
+
+	cout << endl << "======= Converting to Boogie IVL =======" << endl;
+	ASTBoogieConverter boogieConverter;
+
+	for (auto const& sourceCode: m_sourceCodes)
+	{
+		cout << endl << "======= " << sourceCode.first << " =======" << endl;
+		boogieConverter.convert(m_compiler->ast(sourceCode.first));
+	}
+
+	if (m_args.count(g_argOutputDir))
+	{
+		// TODO: write to file
+	}
+	else
+	{
+		// TODO: write to console
+	}
+}
+
 bool CommandLineInterface::actOnInput()
 {
 	if (m_args.count(g_argStandardJSON) || m_onlyAssemble)
@@ -1196,6 +1222,7 @@ void CommandLineInterface::outputCompilationResults()
 	handleAst(g_argAst);
 	handleAst(g_argAstJson);
 	handleAst(g_argAstCompactJson);
+	handleBoogie();
 
 	vector<string> contracts = m_compiler->contractNames();
 	for (string const& contract: contracts)
