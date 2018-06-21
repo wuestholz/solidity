@@ -1040,7 +1040,6 @@ void CommandLineInterface::handleAst(string const& _argStr)
 
 void CommandLineInterface::handleBoogie()
 {
-
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ASTBoogieConverter boogieConverter;
 
@@ -1056,7 +1055,7 @@ void CommandLineInterface::handleBoogie()
 	}
 	else
 	{
-		// TODO: write to console
+		boogieConverter.print(cout);
 	}
 }
 
@@ -1222,7 +1221,10 @@ void CommandLineInterface::outputCompilationResults()
 	handleAst(g_argAst);
 	handleAst(g_argAstJson);
 	handleAst(g_argAstCompactJson);
-	handleBoogie();
+	if (m_args.count(g_argAstBoogie))
+	{
+		handleBoogie();
+	}
 
 	vector<string> contracts = m_compiler->contractNames();
 	for (string const& contract: contracts)
