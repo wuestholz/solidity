@@ -12,6 +12,8 @@ class ASTBoogieConverter : public ASTConstVisitor
 {
 private:
 	smack::Program program;
+	smack::Block* currentBlock;
+	const smack::Expr* currentExpr;
 
 	std::string replaceSpecialChars(std::string const& str);
 
