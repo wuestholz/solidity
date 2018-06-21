@@ -1,5 +1,8 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <algorithm>
+#include <libsolidity/interface/Exceptions.h>
+#include <boost/algorithm/string/join.hpp>
 
 using namespace std;
 using namespace dev;
@@ -11,6 +14,27 @@ namespace dev
 namespace solidity
 {
 
+
+string ASTBoogieConverter::replaceSpecialChars(string const& str)
+{
+	string ret = str;
+	replace(ret.begin(), ret.end(), '.', '_');
+	replace(ret.begin(), ret.end(), ':', '_');
+
+	return ret;
+}
+
+string ASTBoogieConverter::mapType(TypePointer tp)
+{
+	string tpStr = tp->toString();
+	// TODO: use some map instead
+	// TODO: option for bit precise types
+	if (tpStr == "uint256" || tpStr == "t_uint256") return "int";
+
+	// TODO: throw some exception class instead of string
+	throw "Unknown type: " + tpStr;
+}
+
 void ASTBoogieConverter::convert(ASTNode const& _node)
 {
 	_node.accept(*this);
@@ -21,15 +45,24 @@ void ASTBoogieConverter::print(ostream& _stream)
 	program.print(_stream);
 }
 
+
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
-    return visitNode(_node);
+	program.getDeclarations().push_back(
+			Decl::comment(
+					"SourceUnit",
+					"Source: " + _node.annotation().path));
+    return true;
 }
 
 
 bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 {
-    return visitNode(_node);
+	program.getDeclarations().push_back(
+			Decl::comment(
+					"PragmaDirective",
+					"Pragma: " + boost::algorithm::join(_node.literals(), "")));
+    return false;
 }
 
 
@@ -41,7 +74,11 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
-    return visitNode(_node);
+	program.getDeclarations().push_back(
+			Decl::comment(
+					"ContractDefinition",
+					"Contract: " + _node.fullyQualifiedName()));
+	return true;
 }
 
 
@@ -83,13 +120,21 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
+	program.getDeclarations().push_back(
+			Decl::comment(
+					"FunctionDefinition",
+					"Function: " + _node.fullyQualifiedName()));
     return visitNode(_node);
 }
 
 
 bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 {
-    return visitNode(_node);
+	// TODO: modifiers?
+	program.getDeclarations().push_back(
+			Decl::variable(replaceSpecialChars(_node.fullyQualifiedName()),
+			mapType(_node.type())));
+    return false;
 }
 
 

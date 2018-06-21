@@ -13,6 +13,9 @@ class ASTBoogieConverter : public ASTConstVisitor
 private:
 	smack::Program program;
 
+	std::string replaceSpecialChars(std::string const& str);
+
+	std::string mapType(TypePointer tp);
 public:
 	void convert(ASTNode const& _node);
 
