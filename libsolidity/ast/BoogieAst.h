@@ -354,7 +354,7 @@ class FuncDecl;
 class Decl {
 public:
   enum Kind {
-    CONSTANT, VARIABLE, PROCEDURE, FUNCTION, TYPE, AXIOM, CODE
+    CONSTANT, VARIABLE, PROCEDURE, FUNCTION, TYPE, AXIOM, CODE, COMMENT
   };
 private:
   const Kind kind;
@@ -395,6 +395,7 @@ public:
     std::list<Block*> blocks = std::list<Block*>());
   static Decl* code(std::string name, std::string s);
   static FuncDecl* code(ProcDecl* P);
+  static Decl* comment(std::string name, std::string str);
 };
 
 class TypeDecl : public Decl {
@@ -547,6 +548,14 @@ public:
   CodeDecl(std::string name, std::string s) : Decl(CODE, name, {}), code(s) {}
   void print(std::ostream& os) const;
   static bool classof(const Decl* D) { return D->getKind() == CODE; }
+};
+
+class CommentDecl : public Decl {
+  std::string str;
+public:
+  CommentDecl(std::string name, std::string str) : Decl(COMMENT, name, {}), str(str) {}
+  void print(std::ostream& os) const;
+  static bool classof(const Decl* D) { return D->getKind() == COMMENT; }
 };
 
 class Program {

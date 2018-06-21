@@ -273,6 +273,9 @@ FuncDecl* Decl::code(ProcDecl* P) {
     {Attr::attr("inline")}
   );
 }
+Decl* Decl::comment(std::string name, std::string str) {
+  return new CommentDecl(name, str);
+}
 
 std::ostream& operator<<(std::ostream& os, const Expr& e) {
   e.print(os);
@@ -637,6 +640,10 @@ void ProcDecl::print(std::ostream& os) const {
 
 void CodeDecl::print(std::ostream& os) const {
   os << code;
+}
+
+void CommentDecl::print(std::ostream& os) const {
+  os << "// " << str;
 }
 
 void Block::print(std::ostream& os) const {
