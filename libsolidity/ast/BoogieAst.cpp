@@ -36,6 +36,10 @@ const Expr* Expr::lt(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::Lt, l, r);
 }
 
+const Expr* Expr::plus(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Plus, l, r);
+}
+
 const Expr* Expr::fn(std::string f, std::list<const Expr*> args) {
   return new FunExpr(f, args);
 }

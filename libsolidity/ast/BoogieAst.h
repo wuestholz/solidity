@@ -22,6 +22,7 @@ public:
   static const Expr* cond(const Expr* c, const Expr* t, const Expr* e);
   static const Expr* eq(const Expr* l, const Expr* r);
   static const Expr* lt(const Expr* l, const Expr* r);
+  static const Expr* plus(const Expr* l, const Expr* r);
   static const Expr* fn(std::string f, const Expr* x);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y, const Expr* z);

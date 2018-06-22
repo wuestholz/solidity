@@ -284,6 +284,7 @@ bool ASTBoogieConverter::visit(Break const& _node)
 bool ASTBoogieConverter::visit(Return const& _node)
 {
 	// Get rhs recursively
+	currentExpr = nullptr;
 	_node.expression()->accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
@@ -330,11 +331,13 @@ bool ASTBoogieConverter::visit(Conditional const& _node)
 
 bool ASTBoogieConverter::visit(Assignment const& _node)
 {
-	// Get rhs recursively
+	// Get lhs recursively
+	currentExpr = nullptr;
 	_node.leftHandSide().accept(*this);
 	const smack::Expr* lhs = currentExpr;
 
-	// Get lhs recursively
+	// Get rhs recursively
+	currentExpr = nullptr;
 	_node.rightHandSide().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
@@ -358,7 +361,23 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 
 bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 {
-    return visitNode(_node);
+	// Get lhs recursively
+	currentExpr = nullptr;
+	_node.leftExpression().accept(*this);
+	const smack::Expr* lhs = currentExpr;
+
+	// Get rhs recursively
+	currentExpr = nullptr;
+	_node.rightExpression().accept(*this);
+	const smack::Expr* rhs = currentExpr;
+
+	switch(_node.getOperator())
+	{
+	case Token::Add: currentExpr = smack::Expr::plus(lhs, rhs); break;
+	default: currentExpr = nullptr; break;
+	}
+
+	return false;
 }
 
 
