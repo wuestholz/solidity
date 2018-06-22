@@ -134,13 +134,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	list<smack::Binding> rets;
+	int anonCounter = 0;
 	for (auto p = _node.returnParameters().begin(); p != _node.returnParameters().end(); ++p)
 	{
-		// TODO: return variables might have no name
+		string retVarName = replaceSpecialChars((*p)->fullyQualifiedName());
+		if ((*p)->name() == "")
+		{
+			retVarName += "_anon_ret_" + to_string(anonCounter);
+			++anonCounter;
+		}
 		rets.push_back(make_pair(
-				replaceSpecialChars((*p)->fullyQualifiedName()),
+				retVarName,
 				mapType((*p)->type())));
 	}
+
+	currentRet = smack::Expr::id(rets.begin()->first); // TODO: handle multiple return values with tuple instead of id
+
 
 	list<smack::Decl*> decls;
 	// TODO: collect all local variables from the function
@@ -266,8 +275,14 @@ bool ASTBoogieConverter::visit(Break const& _node)
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
-	currentBlock->addStmt(smack::Stmt::comment("Return."));
-    return visitNode(_node);
+	_node.expression()->accept(*this);
+	const smack::Expr* rhs = currentExpr;
+
+	const smack::Expr* lhs = currentRet;
+
+	currentBlock->addStmt(smack::Stmt::assign(lhs, rhs));
+
+    return false;
 }
 
 

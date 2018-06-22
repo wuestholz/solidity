@@ -14,6 +14,7 @@ private:
 	smack::Program program;
 	smack::Block* currentBlock;
 	const smack::Expr* currentExpr;
+	const smack::Expr* currentRet;
 
 	std::string replaceSpecialChars(std::string const& str);
 
