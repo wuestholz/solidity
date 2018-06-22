@@ -1,8 +1,8 @@
+#include <algorithm>
+#include <boost/algorithm/string/join.hpp>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/BoogieAst.h>
-#include <algorithm>
 #include <libsolidity/interface/Exceptions.h>
-#include <boost/algorithm/string/join.hpp>
 #include <utility>
 
 using namespace std;
@@ -15,12 +15,11 @@ namespace solidity
 {
 
 
-string ASTBoogieConverter::replaceSpecialChars(string const& str)
+string ASTBoogieConverter::mapSpecChars(string const& str)
 {
 	string ret = str;
 	replace(ret.begin(), ret.end(), '.', '_');
 	replace(ret.begin(), ret.end(), ':', '_');
-
 	return ret;
 }
 
@@ -48,16 +47,19 @@ void ASTBoogieConverter::print(ostream& _stream)
 
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
+	// Boogie programs are flat, source units do not appear explicitly
 	program.getDeclarations().push_back(
 			smack::Decl::comment(
 					"SourceUnit",
 					"Source: " + _node.annotation().path));
-    return true;
+
+	return true; // Simply apply visitor recursively
 }
 
 
 bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 {
+	// Pragmas are only included as comments
 	program.getDeclarations().push_back(
 			smack::Decl::comment(
 					"PragmaDirective",
@@ -74,11 +76,12 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
+	// Boogie programs are flat, contracts do not appear explicitly
 	program.getDeclarations().push_back(
 			smack::Decl::comment(
 					"ContractDefinition",
 					"Contract: " + _node.fullyQualifiedName()));
-	return true;
+	return true; // Simply apply visitor recursively
 }
 
 
@@ -129,7 +132,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	for (auto p = _node.parameters().begin(); p != _node.parameters().end(); ++p)
 	{
 		params.push_back(make_pair(
-				replaceSpecialChars((*p)->fullyQualifiedName()),
+				mapSpecChars((*p)->fullyQualifiedName()),
 				mapType((*p)->type())));
 	}
 
@@ -137,7 +140,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	int anonCounter = 0;
 	for (auto p = _node.returnParameters().begin(); p != _node.returnParameters().end(); ++p)
 	{
-		string retVarName = replaceSpecialChars((*p)->fullyQualifiedName());
+		// Boogie needs a name for each return variable, because the return statement has no
+		// arguments. Instead, return variables are assigned to.
+		string retVarName = mapSpecChars((*p)->fullyQualifiedName());
 		if ((*p)->name() == "")
 		{
 			retVarName += "_anon_ret_" + to_string(anonCounter);
@@ -150,17 +155,17 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	currentRet = smack::Expr::id(rets.begin()->first); // TODO: handle multiple return values with tuple instead of id
 
-
 	list<smack::Decl*> decls;
 	// TODO: collect all local variables from the function
 
+	// Convert function body, collect result
 	_node.body().accept(*this);
 	list<smack::Block*> blocks;
 	blocks.push_back(currentBlock);
 
 	program.getDeclarations().push_back(
 			smack::Decl::procedure(
-					replaceSpecialChars(_node.fullyQualifiedName()), params, rets, decls, blocks));
+					mapSpecChars(_node.fullyQualifiedName()), params, rets, decls, blocks));
     return false;
 }
 
@@ -170,7 +175,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	// TODO: modifiers?
 	// TODO: initializer expression?
 	program.getDeclarations().push_back(
-			smack::Decl::variable(replaceSpecialChars(_node.fullyQualifiedName()),
+			smack::Decl::variable(mapSpecChars(_node.fullyQualifiedName()),
 			mapType(_node.type())));
     return false;
 }
@@ -232,7 +237,10 @@ bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 
 bool ASTBoogieConverter::visit(Block const&)
 {
+	// TODO: handle nested blocks (with e.g. a stack)
+	// Create new empty block
 	currentBlock = smack::Block::block();
+	// Simply apply visitor recursively
     return true;
 }
 
@@ -275,12 +283,16 @@ bool ASTBoogieConverter::visit(Break const& _node)
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
+	// Get rhs recursively
 	_node.expression()->accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
+	// lhs should already be known
 	const smack::Expr* lhs = currentRet;
 
+	// First create an assignment, and then an empty return
 	currentBlock->addStmt(smack::Stmt::assign(lhs, rhs));
+	currentBlock->addStmt(smack::Stmt::return_());
 
     return false;
 }
@@ -318,9 +330,11 @@ bool ASTBoogieConverter::visit(Conditional const& _node)
 
 bool ASTBoogieConverter::visit(Assignment const& _node)
 {
+	// Get rhs recursively
 	_node.leftHandSide().accept(*this);
 	const smack::Expr* lhs = currentExpr;
 
+	// Get lhs recursively
 	_node.rightHandSide().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
@@ -374,7 +388,7 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	string declName = replaceSpecialChars(_node.annotation().referencedDeclaration->fullyQualifiedName());
+	string declName = mapSpecChars(_node.annotation().referencedDeclaration->fullyQualifiedName());
 	currentExpr = smack::Expr::id(declName);
     return false;
 }
@@ -391,9 +405,9 @@ bool ASTBoogieConverter::visit(Literal const& _node)
     return visitNode(_node);
 }
 
-bool ASTBoogieConverter::visitNode(ASTNode const&)
+bool ASTBoogieConverter::visitNode(ASTNode const& _node)
 {
-	cout << "Warning: unhandled node" << endl;
+	cout << "Warning: unhandled node at " << _node.location().start << ":" << _node.location().end << endl;
 	return true;
 }
 

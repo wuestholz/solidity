@@ -8,20 +8,32 @@ namespace dev
 namespace solidity
 {
 
+/**
+ * Converts the AST into Boogie IVL format.
+ */
 class ASTBoogieConverter : public ASTConstVisitor
 {
 private:
+	// Top-level element is a single Boogie program
 	smack::Program program;
+
+	// Helper variables to pass information between the visit methods
 	smack::Block* currentBlock;
 	const smack::Expr* currentExpr;
 	const smack::Expr* currentRet;
 
-	std::string replaceSpecialChars(std::string const& str);
+	std::string mapSpecChars(std::string const& str);
 
 	std::string mapType(TypePointer tp);
 public:
+	/**
+	 * Convert a node and add it to the actual Boogie program
+	 */
 	void convert(ASTNode const& _node);
 
+	/**
+	 * Print the actual Boogie program to an output stream
+	 */
 	void print(std::ostream& _stream);
 
 	bool visit(SourceUnit const& _node) override;
