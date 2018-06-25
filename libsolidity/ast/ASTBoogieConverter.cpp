@@ -33,8 +33,8 @@ string ASTBoogieConverter::mapType(TypePointer tp)
     if (tpStr == "int256") return "int";
     if (tpStr == "bool") return "bool";
 
-    // TODO: throw some exception class instead of string
-    throw "Unknown type: " + tpStr;
+    BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Unknown type " + tpStr));
+    return "";
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -187,7 +187,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 {
-    // TODO: check that it is not a local variable (that should already be handled elsewhere)
+	// Local variables should be handled in the VariableDeclarationStatement
+    if (_node.isLocalOrReturn())
+    {
+    	BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+    	            		errinfo_comment("Local variable appearing in VariableDeclaration") <<
+    	            		errinfo_sourceLocation(_node.location()));
+    }
     // TODO: handle initial value
     program.getDeclarations().push_back(
                         smack::Decl::variable(mapSpecChars(_node.fullyQualifiedName()),
@@ -338,7 +344,10 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
         }
         else
         {
-            // TODO: throw exception, this should be already handled elsewhere
+        	// Non-local variables should be handled as VariableDeclaration
+            BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+            		errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
+            		errinfo_sourceLocation(_node.location()));
         }
     }
 
@@ -410,7 +419,9 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
     switch (_node.getOperator()) {
     case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
     case Token::Sub: currentExpr = smack::Expr::minus(subExpr); break;
-    default: currentExpr = nullptr; break; // TODO: throw exception instead
+    default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+    		errinfo_comment(string("Unknown operator ") + Token::toString(_node.getOperator())) <<
+    		errinfo_sourceLocation(_node.location()));
     }
 
     return false;
@@ -450,7 +461,9 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
     case Token::LessThanOrEqual: currentExpr = smack::Expr::lte(lhs, rhs); break;
     case Token::GreaterThanOrEqual: currentExpr = smack::Expr::gte(lhs, rhs); break;
 
-    default: currentExpr = nullptr; break; // TODO: throw exception instead
+    default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+    		errinfo_comment(string("Unknown operator ") + Token::toString(_node.getOperator())) <<
+    		errinfo_sourceLocation(_node.location()));
     }
 
     return false;
@@ -506,8 +519,8 @@ bool ASTBoogieConverter::visit(Literal const& _node)
         return false;
     }
 
-    // TODO: throw some exception class instead of string
-    throw "Unknown type: " + tpStr;
+    BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Unknown type " + tpStr));
+    return false;
 }
 
 bool ASTBoogieConverter::visitNode(ASTNode const& _node)
