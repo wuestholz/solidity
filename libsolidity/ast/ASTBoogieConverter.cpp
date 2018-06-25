@@ -30,6 +30,8 @@ string ASTBoogieConverter::mapType(TypePointer tp)
 	// TODO: use some map instead
 	// TODO: option for bit precise types
 	if (tpStr == "uint256") return "int";
+	if (tpStr == "int256") return "int";
+	if (tpStr == "bool") return "bool";
 
 	// TODO: throw some exception class instead of string
 	throw "Unknown type: " + tpStr;
@@ -356,7 +358,18 @@ bool ASTBoogieConverter::visit(TupleExpression const& _node)
 
 bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 {
-    return visitNode(_node);
+	// Get operand recursively
+	currentExpr = nullptr;
+	_node.subExpression().accept(*this);
+	const smack::Expr* subExpr = currentExpr;
+
+	switch (_node.getOperator()) {
+	case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
+	case Token::Sub: currentExpr = smack::Expr::minus(subExpr); break;
+	default: currentExpr = nullptr; break; // TODO: throw exception instead
+	}
+
+    return false;
 }
 
 
@@ -374,8 +387,26 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 
 	switch(_node.getOperator())
 	{
+	case Token::And: currentExpr = smack::Expr::and_(lhs, rhs); break;
+	case Token::Or: currentExpr = smack::Expr::or_(lhs, rhs); break;
+
 	case Token::Add: currentExpr = smack::Expr::plus(lhs, rhs); break;
-	default: currentExpr = nullptr; break;
+	case Token::Sub: currentExpr = smack::Expr::minus(lhs, rhs); break;
+	case Token::Mul: currentExpr = smack::Expr::times(lhs, rhs); break;
+	case Token::Div: // Boogie has different division operators for integers and reals
+		if (mapType(_node.annotation().type) == "int") currentExpr = smack::Expr::intdiv(lhs, rhs);
+		else currentExpr = smack::Expr::div(lhs, rhs);
+		break;
+	case Token::Mod: currentExpr = smack::Expr::mod(lhs, rhs); break;
+
+	case Token::Equal: currentExpr = smack::Expr::eq(lhs, rhs); break;
+	case Token::NotEqual: currentExpr = smack::Expr::neq(lhs, rhs); break;
+	case Token::LessThan: currentExpr = smack::Expr::lt(lhs, rhs); break;
+	case Token::GreaterThan: currentExpr = smack::Expr::gt(lhs, rhs); break;
+	case Token::LessThanOrEqual: currentExpr = smack::Expr::lte(lhs, rhs); break;
+	case Token::GreaterThanOrEqual: currentExpr = smack::Expr::gte(lhs, rhs); break;
+
+	default: currentExpr = nullptr; break; // TODO: throw exception instead
 	}
 
 	return false;

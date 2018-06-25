@@ -19,16 +19,26 @@ public:
   static const Expr* exists(std::list<Binding>, const Expr* e);
   static const Expr* forall(std::list<Binding>, const Expr* e);
   static const Expr* and_(const Expr* l, const Expr* r);
+  static const Expr* or_(const Expr* l, const Expr* r);
   static const Expr* cond(const Expr* c, const Expr* t, const Expr* e);
   static const Expr* eq(const Expr* l, const Expr* r);
   static const Expr* lt(const Expr* l, const Expr* r);
+  static const Expr* gt(const Expr* l, const Expr* r);
+  static const Expr* lte(const Expr* l, const Expr* r);
+  static const Expr* gte(const Expr* l, const Expr* r);
   static const Expr* plus(const Expr* l, const Expr* r);
+  static const Expr* minus(const Expr* l, const Expr* r);
+  static const Expr* div(const Expr* l, const Expr* r);
+  static const Expr* intdiv(const Expr* l, const Expr* r);
+  static const Expr* times(const Expr* l, const Expr* r);
+  static const Expr* mod(const Expr* l, const Expr* r);
   static const Expr* fn(std::string f, const Expr* x);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y, const Expr* z);
   static const Expr* fn(std::string f, std::list<const Expr*> args);
   static const Expr* id(std::string x);
   static const Expr* impl(const Expr* l, const Expr* r);
+  static const Expr* iff(const Expr* l, const Expr* r);
   static const Expr* lit(bool b);
   static const Expr* lit(std::string v);
   static const Expr* lit(unsigned v) { return lit((unsigned long) v); }
@@ -39,6 +49,7 @@ public:
   static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
   static const Expr* neq(const Expr* l, const Expr* r);
   static const Expr* not_(const Expr* e);
+  static const Expr* minus(const Expr* e);
   static const Expr* sel(const Expr* b, const Expr* i);
   static const Expr* sel(std::string b, std::string i);
   static const Expr* upd(const Expr* b, const Expr* i, const Expr* v);
@@ -48,7 +59,7 @@ public:
 class BinExpr : public Expr {
 public:
   enum Binary { Iff, Imp, Or, And, Eq, Neq, Lt, Gt, Lte, Gte, Sub, Conc,
-                Plus, Minus, Times, Div, Mod
+                Plus, Minus, Times, Div, IntDiv, Mod
               };
 private:
   const Binary op;
@@ -143,6 +154,13 @@ class NotExpr : public Expr {
   const Expr* expr;
 public:
   NotExpr(const Expr* e) : expr(e) {}
+  void print(std::ostream& os) const;
+};
+
+class MinusExpr : public Expr {
+  const Expr* expr;
+public:
+  MinusExpr(const Expr* e) : expr(e) {}
   void print(std::ostream& os) const;
 };
 

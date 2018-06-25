@@ -24,6 +24,10 @@ const Expr* Expr::and_(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::And, l, r);
 }
 
+const Expr* Expr::or_(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Or, l, r);
+}
+
 const Expr* Expr::cond(const Expr* c, const Expr* t, const Expr* e) {
   return new CondExpr(c,t,e);
 }
@@ -36,8 +40,40 @@ const Expr* Expr::lt(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::Lt, l, r);
 }
 
+const Expr* Expr::gt(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Gt, l, r);
+}
+
+const Expr* Expr::lte(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Lte, l, r);
+}
+
+const Expr* Expr::gte(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Gte, l, r);
+}
+
 const Expr* Expr::plus(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::Plus, l, r);
+}
+
+const Expr* Expr::minus(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Minus, l, r);
+}
+
+const Expr* Expr::div(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Div, l, r);
+}
+
+const Expr* Expr::intdiv(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::IntDiv, l, r);
+}
+
+const Expr* Expr::times(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Times, l, r);
+}
+
+const Expr* Expr::mod(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Mod, l, r);
 }
 
 const Expr* Expr::fn(std::string f, std::list<const Expr*> args) {
@@ -69,6 +105,10 @@ const Expr* Expr::id(std::string s) {
 
 const Expr* Expr::impl(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::Imp, l, r);
+}
+
+const Expr* Expr::iff(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Iff, l, r);
 }
 
 const Expr* Expr::lit(bool b) {
@@ -105,6 +145,10 @@ const Expr* Expr::neq(const Expr* l, const Expr* r) {
 
 const Expr* Expr::not_(const Expr* e) {
   return new NotExpr(e);
+}
+
+const Expr* Expr::minus(const Expr* e) {
+  return new MinusExpr(e);
 }
 
 const Expr* Expr::sel(const Expr* b, const Expr* i) {
@@ -407,8 +451,11 @@ void BinExpr::print(std::ostream& os) const {
   case Div:
     os << "/";
     break;
+  case IntDiv:
+    os << "div";
+    break;
   case Mod:
-    os << "%";
+    os << "mod";
     break;
   }
   os << " " << rhs << ")";
@@ -445,6 +492,10 @@ void NegExpr::print(std::ostream& os) const {
 
 void NotExpr::print(std::ostream& os) const {
   os << "!(" << expr << ")";
+}
+
+void MinusExpr::print(std::ostream& os) const {
+  os << "-(" << expr << ")";
 }
 
 void QuantExpr::print(std::ostream& os) const {
