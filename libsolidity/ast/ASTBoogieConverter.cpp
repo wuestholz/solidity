@@ -192,7 +192,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
     program.getDeclarations().push_back(
                         smack::Decl::variable(mapSpecChars(_node.fullyQualifiedName()),
                         mapType(_node.type())));
-    return visitNode(_node);
+    return false;
 }
 
 
