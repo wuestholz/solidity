@@ -18,6 +18,8 @@ private:
 	smack::Program program;
 
 	// Helper variables to pass information between the visit methods
+	bool insideFunction;
+	std::vector<VariableDeclaration const*> localDecls;
 	smack::Block* currentBlock;
 	const smack::Expr* currentExpr;
 	const smack::Expr* currentRet;

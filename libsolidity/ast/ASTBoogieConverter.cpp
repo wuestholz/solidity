@@ -126,6 +126,8 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
+	insideFunction = true;
+	localDecls.clear();
 	program.getDeclarations().push_back(
 			smack::Decl::comment(
 					"FunctionDefinition",
@@ -158,17 +160,25 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	currentRet = smack::Expr::id(rets.begin()->first); // TODO: handle multiple return values with tuple instead of id
 
-	list<smack::Decl*> decls;
-	// TODO: collect all local variables from the function
-
 	// Convert function body, collect result
 	_node.body().accept(*this);
 	list<smack::Block*> blocks;
 	blocks.push_back(currentBlock);
 
+	list<smack::Decl*> decls;
+	// TODO: collect all local variables from the function
+	for (auto d = localDecls.begin(); d != localDecls.end(); ++d)
+	{
+		decls.push_back(smack::Decl::variable(
+				mapSpecChars((*d)->fullyQualifiedName()),
+				mapType((*d)->type())));
+	}
+
 	program.getDeclarations().push_back(
 			smack::Decl::procedure(
 					mapSpecChars(_node.fullyQualifiedName()), params, rets, decls, blocks));
+    insideFunction = false;
+    localDecls.clear();
     return false;
 }
 
@@ -177,9 +187,16 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 {
 	// TODO: modifiers?
 	// TODO: initializer expression?
-	program.getDeclarations().push_back(
-			smack::Decl::variable(mapSpecChars(_node.fullyQualifiedName()),
-			mapType(_node.type())));
+	if (insideFunction)
+	{
+		localDecls.push_back(&_node);
+	}
+	else
+	{
+		program.getDeclarations().push_back(
+				smack::Decl::variable(mapSpecChars(_node.fullyQualifiedName()),
+				mapType(_node.type())));
+	}
     return false;
 }
 
