@@ -421,7 +421,17 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 
 bool ASTBoogieConverter::visit(TupleExpression const& _node)
 {
-	return visitNode(_node);
+	if (_node.components().size() == 1)
+	{
+		_node.components()[0]->accept(*this);
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+				errinfo_comment("Tuples are not supported yet") <<
+				errinfo_sourceLocation(_node.location()));
+	}
+	return false;
 }
 
 
