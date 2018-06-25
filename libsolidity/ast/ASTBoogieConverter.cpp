@@ -542,7 +542,9 @@ bool ASTBoogieConverter::visit(Literal const& _node)
 
 bool ASTBoogieConverter::visitNode(ASTNode const& _node)
 {
-	cout << "Warning: unhandled node at " << _node.location().start << ":" << _node.location().end << endl;
+	BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+					errinfo_comment("Unhandled node") <<
+					errinfo_sourceLocation(_node.location()));
 	return true;
 }
 
