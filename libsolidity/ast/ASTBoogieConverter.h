@@ -23,8 +23,9 @@ private:
 	// beginning of the function).
 	std::vector<ASTPointer<VariableDeclaration>> localDecls;
 
-	// Current block where statements are appended
-	smack::Block* currentBlock;
+	// Current block(s) where statements are appended, stack is needed
+	// due to nested blocks
+	std::stack<smack::Block*> currentBlocks;
 
 	// Current expression
 	const smack::Expr* currentExpr;

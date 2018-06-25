@@ -261,6 +261,10 @@ const Stmt* Stmt::code(std::string s) {
   return new CodeStmt(s);
 }
 
+const Stmt* Stmt::ifelse(const Expr* cond, const Block* then, const Block* elze) {
+  return new IfElseStmt(cond, then, elze);
+}
+
 Decl* Decl::typee(std::string name, std::string type, std::list<const Attr*> attrs) {
   return new TypeDecl(name,type,attrs);
 }
@@ -607,6 +611,20 @@ void ReturnStmt::print(std::ostream& os) const {
 
 void CodeStmt::print(std::ostream& os) const {
   os << code;
+}
+
+void IfElseStmt::print(std::ostream& os) const {
+  os << "if (";
+  cond->print(os);
+  os << ") {\n";
+  then->print(os);
+  os << "\n}\n";
+
+  if (elze) {
+	os << "  else {\n";
+	elze->print(os);
+	os << "\n}\n";
+  }
 }
 
 void TypeDecl::print(std::ostream& os) const {

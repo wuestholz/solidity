@@ -234,10 +234,12 @@ public:
   static const Attr* attr(std::string s, std::list<const Expr*> vs);
 };
 
+class Block;
+
 class Stmt {
 public:
   enum Kind {
-    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT
+    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE
   };
 private:
   const Kind kind;
@@ -268,6 +270,7 @@ public:
   static const Stmt* return_(const Expr* e);
   static const Stmt* skip();
   static const Stmt* code(std::string s);
+  static const Stmt* ifelse(const Expr* cond, const Block* then, const Block* elze = nullptr);
   virtual void print(std::ostream& os) const = 0;
 };
 
@@ -366,7 +369,17 @@ public:
   static bool classof(const Stmt* S) { return S->getKind() == CODE; }
 };
 
-class Block;
+class IfElseStmt : public Stmt {
+  const Expr* cond;
+  const Block* then;
+  const Block* elze;
+public:
+  IfElseStmt(const Expr* cond, const Block* then, const Block* elze)
+    : Stmt(IFELSE), cond(cond), then(then), elze(elze) {}
+  void print(std::ostream& os) const;
+  static bool classof(const Stmt* S) { return S->getKind() == IFELSE; }
+};
+
 class ProcDecl;
 class FuncDecl;
 

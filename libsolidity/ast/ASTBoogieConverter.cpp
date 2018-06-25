@@ -167,9 +167,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Convert function body, collect result
 	localDecls.clear();
+	// Create new empty block
+	currentBlocks.push(smack::Block::block());
 	_node.body().accept(*this);
 	list<smack::Block*> blocks;
-	blocks.push_back(currentBlock);
+	// TODO: assert stack size 1
+	blocks.push_back(currentBlocks.top());
+	currentBlocks.pop();
 
 	// Local declarations were collected during processing the body
 	list<smack::Decl*> decls;
@@ -267,13 +271,9 @@ bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 
 bool ASTBoogieConverter::visit(Block const&)
 {
-	// TODO: handle nested blocks (with e.g. a stack)
-	// Create new empty block
-	currentBlock = smack::Block::block();
 	// Simply apply visitor recursively
 	return true;
 }
-
 
 bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
@@ -283,7 +283,29 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 
 bool ASTBoogieConverter::visit(IfStatement const& _node)
 {
-	return visitNode(_node);
+	// Get condition recursively
+	currentExpr = nullptr;
+	_node.condition().accept(*this);
+	const smack::Expr* cond = currentExpr;
+
+	// Get if branch recursively
+	currentBlocks.push(smack::Block::block());
+	_node.trueStatement().accept(*this);
+	const smack::Block* then = currentBlocks.top();
+	currentBlocks.pop();
+
+	// Get else branch recursively
+	const smack::Block* elze = nullptr;
+	if (_node.falseStatement())
+	{
+		currentBlocks.push(smack::Block::block());
+		_node.falseStatement()->accept(*this);
+		elze = currentBlocks.top();
+		currentBlocks.pop();
+	}
+
+	currentBlocks.top()->addStmt(smack::Stmt::ifelse(cond, then, elze));
+	return false;
 }
 
 
@@ -322,8 +344,8 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	const smack::Expr* lhs = currentRet;
 
 	// First create an assignment, and then an empty return
-	currentBlock->addStmt(smack::Stmt::assign(lhs, rhs));
-	currentBlock->addStmt(smack::Stmt::return_());
+	currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
+	currentBlocks.top()->addStmt(smack::Stmt::return_());
 
 	return false;
 }
@@ -369,7 +391,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			currentExpr = nullptr;
 			_node.initialValue()->accept(*this);
 
-			currentBlock->addStmt(smack::Stmt::assign(
+			currentBlocks.top()->addStmt(smack::Stmt::assign(
 					smack::Expr::id(mapDeclName(*(_node.declarations()[0]))),
 					currentExpr));
 		}
@@ -413,7 +435,7 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
-	currentBlock->addStmt(smack::Stmt::assign(lhs, rhs));
+	currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
 
 	return false;
 }
