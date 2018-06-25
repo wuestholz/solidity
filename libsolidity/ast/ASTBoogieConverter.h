@@ -18,12 +18,25 @@ private:
 	smack::Program program;
 
 	// Helper variables to pass information between the visit methods
+
+	// Collect local variable declarations (Boogie requires them at the
+	// beginning of the function).
 	std::vector<ASTPointer<VariableDeclaration>> localDecls;
+
+	// Current block where statements are appended
 	smack::Block* currentBlock;
+
+	// Current expression
 	const smack::Expr* currentExpr;
+
+	// Return statement in Solidity is mapped to an assignment to the return
+	// variables in Boogie, which is described by currentRet
 	const smack::Expr* currentRet;
 
-	std::string mapSpecChars(std::string const& str);
+	/**
+	 * Maps a declaration name into a name in Boogie
+	 */
+	std::string mapDeclName(Declaration const& decl);
 
 	std::string mapType(TypePointer tp);
 public:
