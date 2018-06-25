@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
@@ -421,7 +422,17 @@ bool ASTBoogieConverter::visit(ElementaryTypeNameExpression const& _node)
 
 bool ASTBoogieConverter::visit(Literal const& _node)
 {
-    return visitNode(_node);
+	string tpStr = _node.annotation().type->toString();
+	// TODO: use some map instead
+	// TODO: option for bit precise types
+	if (boost::starts_with(tpStr, "int_const"))
+	{
+		currentExpr = smack::Expr::lit(stol(_node.value()));
+		return false;
+	}
+
+	// TODO: throw some exception class instead of string
+	throw "Unknown type: " + tpStr;
 }
 
 bool ASTBoogieConverter::visitNode(ASTNode const& _node)
