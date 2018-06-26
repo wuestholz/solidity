@@ -24,4 +24,17 @@ contract Loops {
         return result;
     }
 
+    function breakLoop(uint param) pure public returns (uint) {
+        uint i = 0;
+        uint result = param;
+
+        while (i < 10) {
+            result = result + 1;
+            if (result > 100) break;
+            i = i + 1;
+        }
+
+        return result;
+    }
+
 }

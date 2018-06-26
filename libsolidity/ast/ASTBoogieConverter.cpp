@@ -379,13 +379,16 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 bool ASTBoogieConverter::visit(Continue const& _node)
 {
+	// TODO: Boogie does not support continue, this must be mapped manually
+	// using labels and gotos
 	return visitNode(_node);
 }
 
 
-bool ASTBoogieConverter::visit(Break const& _node)
+bool ASTBoogieConverter::visit(Break const&)
 {
-	return visitNode(_node);
+	currentBlocks.top()->addStmt(smack::Stmt::break_());
+	return false;
 }
 
 
