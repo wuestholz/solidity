@@ -137,20 +137,20 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Get input parameters
 	list<smack::Binding> params;
-	for (auto p = _node.parameters().begin(); p != _node.parameters().end(); ++p)
+	for (auto p : _node.parameters())
 	{
 		params.push_back(make_pair(
-				mapDeclName(**p),
-				mapType((*p)->type())));
+				mapDeclName(*p),
+				mapType(p->type())));
 	}
 
 	// Get return values
 	list<smack::Binding> rets;
-	for (auto p = _node.returnParameters().begin(); p != _node.returnParameters().end(); ++p)
+	for (auto p : _node.returnParameters())
 	{
 		rets.push_back(make_pair(
-				mapDeclName(**p),
-				mapType((*p)->type())));
+				mapDeclName(*p),
+				mapType(p->type())));
 	}
 
 	if (_node.returnParameters().size() > 1)
@@ -181,11 +181,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Local declarations were collected during processing the body
 	list<smack::Decl*> decls;
-	for (auto d = localDecls.begin(); d != localDecls.end(); ++d)
+	for (auto d : localDecls)
 	{
 		decls.push_back(smack::Decl::variable(
-				mapDeclName(**d),
-				mapType((*d)->type())));
+				mapDeclName(*d),
+				mapType(d->type())));
 	}
 
 	// Create the procedure
@@ -426,12 +426,12 @@ bool ASTBoogieConverter::visit(EmitStatement const& _node)
 bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 {
 	// TODO: modifiers?
-	for (auto decl = _node.declarations().begin(); decl != _node.declarations().end(); decl++)
+	for (auto decl : _node.declarations())
 	{
-		if ((*decl)->isLocalOrReturn())
+		if (decl->isLocalOrReturn())
 		{
 			// Boogie requires local variables to be declared at the beginning of the procedure
-			localDecls.push_back(*decl);
+			localDecls.push_back(decl);
 		}
 		else
 		{
@@ -468,6 +468,9 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 {
+	// Boogie cannot have expressions as statements, therefore
+	// ExpressionStatements have to be checked if they have a corresponding
+	// statement in Boogie
 	if (dynamic_cast<Assignment const*>(&_node.expression())) return true;
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
