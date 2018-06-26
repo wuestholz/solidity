@@ -1043,10 +1043,27 @@ void CommandLineInterface::handleBoogie()
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ASTBoogieConverter boogieConverter;
 
+	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };
+	SourceReferenceFormatter formatter(cerr, scannerFromSourceName);
+
 	for (auto const& sourceCode: m_sourceCodes)
 	{
 		cout << endl << "======= " << sourceCode.first << " =======" << endl;
-		boogieConverter.convert(m_compiler->ast(sourceCode.first));
+		try
+		{
+			boogieConverter.convert(m_compiler->ast(sourceCode.first));
+		}
+		catch (CompilerError const& _exception)
+		{
+			formatter.printExceptionInformation(_exception, "Compiler error");
+			return;
+		}
+		catch (InternalCompilerError const& _exception)
+		{
+			cerr << "Internal compiler error during compilation:" << endl
+				 << boost::diagnostic_information(_exception);
+			return;
+		}
 	}
 
 	if (m_args.count(g_argOutputDir))

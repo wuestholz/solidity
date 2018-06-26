@@ -34,13 +34,15 @@ map<string, string> ASTBoogieConverter::typeMap = {
 		{"bool", "bool"},
 };
 
-string ASTBoogieConverter::mapType(TypePointer tp)
+string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNode)
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
 	if (typeMap.count(tpStr)) return typeMap[tpStr];
 
-	BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Unsupported type: " + tpStr));
+	BOOST_THROW_EXCEPTION(CompilerError() <<
+			errinfo_comment("Unsupported type: " + tpStr) <<
+			errinfo_sourceLocation(_associatedNode.location()));
 	return "";
 }
 
@@ -145,7 +147,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		params.push_back(make_pair(
 				mapDeclName(*p),
-				mapType(p->type())));
+				mapType(p->type(), *p)));
 	}
 
 	// Get return values
@@ -154,13 +156,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		rets.push_back(make_pair(
 				mapDeclName(*p),
-				mapType(p->type())));
+				mapType(p->type(), *p)));
 	}
 
 	if (_node.returnParameters().size() > 1)
 	{
 		// TODO: handle multiple return values with tuple
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+		BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment("Multiple values to return is not yet supported") <<
 				errinfo_sourceLocation(_node.location()));
 	}
@@ -209,7 +211,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 
 	program.getDeclarations().push_back(
 						smack::Decl::variable(mapDeclName(_node),
-						mapType(_node.type())));
+						mapType(_node.type(), _node)));
 	return false;
 }
 
@@ -428,7 +430,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// Boogie requires local variables to be declared at the beginning of the procedure
 			localDecls.push_back(smack::Decl::variable(
 							mapDeclName(*decl),
-							mapType(decl->type())));
+							mapType(decl->type(), *decl)));
 		}
 		else
 		{
@@ -519,12 +521,12 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 	case Token::AssignDiv:
-		if (mapType(_node.annotation().type) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+		if (mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 		else rhs = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
 
-	default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported assignment operator ") + Token::toString(_node.assignmentOperator())) <<
 			errinfo_sourceLocation(_node.location()));
 	}
@@ -563,7 +565,7 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 	case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
 	case Token::Sub: currentExpr = smack::Expr::minus(subExpr); break;
 
-	default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported operator ") + Token::toString(_node.getOperator())) <<
 			errinfo_sourceLocation(_node.location()));
 	}
@@ -593,7 +595,7 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 	case Token::Sub: currentExpr = smack::Expr::minus(lhs, rhs); break;
 	case Token::Mul: currentExpr = smack::Expr::times(lhs, rhs); break;
 	case Token::Div: // Boogie has different division operators for integers and reals
-		if (mapType(_node.annotation().type) == "int") currentExpr = smack::Expr::intdiv(lhs, rhs);
+		if (mapType(_node.annotation().type, _node) == "int") currentExpr = smack::Expr::intdiv(lhs, rhs);
 		else currentExpr = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::Mod: currentExpr = smack::Expr::mod(lhs, rhs); break;
@@ -605,7 +607,7 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 	case Token::LessThanOrEqual: currentExpr = smack::Expr::lte(lhs, rhs); break;
 	case Token::GreaterThanOrEqual: currentExpr = smack::Expr::gte(lhs, rhs); break;
 
-	default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported operator ") + Token::toString(_node.getOperator())) <<
 			errinfo_sourceLocation(_node.location()));
 	}
@@ -655,7 +657,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	if (_node.annotation().type->toString() != "tuple()")
 	{
 		// Create fresh variable to store the result
-		smack::Decl* returnVar = smack::Decl::variable(funcName + "#" + to_string(_node.id()), mapType(_node.annotation().type));
+		smack::Decl* returnVar = smack::Decl::variable(funcName + "#" + to_string(_node.id()), mapType(_node.annotation().type, _node));
 		localDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		currentExpr = smack::Expr::id(returnVar->getName());
@@ -729,7 +731,9 @@ bool ASTBoogieConverter::visit(Literal const& _node)
 		return false;
 	}
 
-	BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Unsupported type: " + tpStr));
+	BOOST_THROW_EXCEPTION(CompilerError() <<
+			errinfo_comment("Unsupported type: " + tpStr) <<
+			errinfo_sourceLocation(_node.location()));
 	return false;
 }
 

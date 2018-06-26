@@ -41,7 +41,7 @@ private:
 
 	static std::map<std::string, std::string> typeMap;
 
-	std::string mapType(TypePointer tp);
+	std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
 public:
 	/**
 	 * Convert a node and add it to the actual Boogie program
