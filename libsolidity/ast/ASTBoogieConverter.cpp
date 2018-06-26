@@ -476,7 +476,23 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 bool ASTBoogieConverter::visit(Conditional const& _node)
 {
-	return visitNode(_node);
+	// Get condition recursively
+	currentExpr = nullptr;
+	_node.condition().accept(*this);
+	const smack::Expr* cond = currentExpr;
+
+	// Get true expression recursively
+	currentExpr = nullptr;
+	_node.trueExpression().accept(*this);
+	const smack::Expr* trueExpr = currentExpr;
+
+	// Get false expression recursively
+	currentExpr = nullptr;
+	_node.falseExpression().accept(*this);
+	const smack::Expr* falseExpr = currentExpr;
+
+	currentExpr = smack::Expr::cond(cond, trueExpr, falseExpr);
+	return false;
 }
 
 

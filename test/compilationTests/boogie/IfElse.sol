@@ -20,4 +20,8 @@ contract IfElse {
 
         return contractVar;
     }
+
+    function conditional(uint param) pure public returns (uint) {
+        return param > 100 ? 100 : param;
+    }
 }
