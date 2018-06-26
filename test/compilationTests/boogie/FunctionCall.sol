@@ -28,7 +28,7 @@ contract FunctionCall {
     }
 
     function compositeCall() public {
-        x = h(f());
+        x = h(f() + f());
     }
 
 }

@@ -628,7 +628,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	if (_node.annotation().type->toString() != "tuple()")
 	{
 		// Create fresh variable to store the result
-		smack::Decl* returnVar = smack::Decl::variable(string("call#") + to_string(_node.id()), mapType(_node.annotation().type));
+		smack::Decl* returnVar = smack::Decl::variable(funcName + "#" + to_string(_node.id()), mapType(_node.annotation().type));
 		localDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		currentExpr = smack::Expr::id(returnVar->getName());
