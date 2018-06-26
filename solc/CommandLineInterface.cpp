@@ -1051,7 +1051,12 @@ void CommandLineInterface::handleBoogie()
 
 	if (m_args.count(g_argOutputDir))
 	{
-		// TODO: write to file
+		stringstream data;
+		boogieConverter.print(data);
+		// TODO: when multiple files are given, output file will have the name
+		// of the first file
+		boost::filesystem::path path(m_sourceCodes.begin()->first);
+		createFile(path.filename().string() + ".bpl", data.str());
 	}
 	else
 	{

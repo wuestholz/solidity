@@ -345,6 +345,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// initExpr; while (cond) { body; loopExpr }
 
 	// Get initialization recursively (adds statement to current block)
+	currentBlocks.top()->addStmt(smack::Stmt::comment("The following while loop was mapped from a for loop"));
 	if (_node.initializationExpression())
 	{
 		_node.initializationExpression()->accept(*this);
