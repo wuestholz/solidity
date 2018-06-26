@@ -28,17 +28,16 @@ string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 	return name + "#" + to_string(decl.id());
 }
 
-map<string, string> ASTBoogieConverter::typeMap = {
-		{"uint256", "int"},
-		{"int256", "int"},
-		{"bool", "bool"},
-};
-
 string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNode)
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
-	if (typeMap.count(tpStr)) return typeMap[tpStr];
+	if (tpStr == "bool") return "bool";
+	for (int i = 8; i <= 256; ++i)
+	{
+		if (tpStr == "int" + to_string(i)) return "int";
+		if (tpStr == "uint" + to_string(i)) return "int";
+	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment("Unsupported type: " + tpStr) <<
