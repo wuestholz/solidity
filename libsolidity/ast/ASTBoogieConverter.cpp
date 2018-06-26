@@ -640,6 +640,13 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 				errinfo_sourceLocation(_node.location()));
 	}
 
+	// Assert is a separate statement in Boogie (instead of a function call)
+	if (funcName == "assert")
+	{
+		currentBlocks.top()->addStmt(smack::Stmt::assert_(*args.begin()));
+		return false;
+	}
+
 	// TODO: check for void return in a more appropriate way
 	if (_node.annotation().type->toString() != "tuple()")
 	{
@@ -683,8 +690,15 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
-	currentExpr = smack::Expr::id(declName);
+	if (_node.name() == "assert")
+	{
+		currentExpr = smack::Expr::id(_node.name());
+	}
+	else
+	{
+		string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
+		currentExpr = smack::Expr::id(declName);
+	}
 	return false;
 }
 
@@ -703,6 +717,12 @@ bool ASTBoogieConverter::visit(Literal const& _node)
 	if (boost::starts_with(tpStr, "int_const"))
 	{
 		currentExpr = smack::Expr::lit(stol(_node.value()));
+		return false;
+	}
+	if (tpStr == "bool")
+	{
+		// TODO: case insensitve?
+		currentExpr = smack::Expr::lit(_node.value() == "true");
 		return false;
 	}
 
