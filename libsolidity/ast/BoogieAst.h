@@ -239,7 +239,7 @@ class Block;
 class Stmt {
 public:
   enum Kind {
-    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE
+    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE
   };
 private:
   const Kind kind;
@@ -271,6 +271,10 @@ public:
   static const Stmt* skip();
   static const Stmt* code(std::string s);
   static const Stmt* ifelse(const Expr* cond, const Block* then, const Block* elze = nullptr);
+  static const Stmt* while_(
+		  const Expr* cond,
+		  const Block* body,
+		  std::list<const Expr*> invars = std::list<const Expr*>());
   virtual void print(std::ostream& os) const = 0;
 };
 
@@ -378,6 +382,17 @@ public:
     : Stmt(IFELSE), cond(cond), then(then), elze(elze) {}
   void print(std::ostream& os) const;
   static bool classof(const Stmt* S) { return S->getKind() == IFELSE; }
+};
+
+class WhileStmt : public Stmt {
+  const Expr* cond;
+  const Block* body;
+  std::list<const Expr*> invars;
+public:
+  WhileStmt(const Expr* cond, const Block* body, std::list<const Expr*> invars)
+    : Stmt(WHILE), cond(cond), body(body), invars(invars) {}
+  void print(std::ostream& os) const;
+  static bool classof(const Stmt* S) { return S->getKind() == WHILE; }
 };
 
 class ProcDecl;

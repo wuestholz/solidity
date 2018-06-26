@@ -265,6 +265,10 @@ const Stmt* Stmt::ifelse(const Expr* cond, const Block* then, const Block* elze)
   return new IfElseStmt(cond, then, elze);
 }
 
+const Stmt* Stmt::while_(const Expr* cond, const Block* body, std::list<const Expr*> invars){
+  return new WhileStmt(cond, body, invars);
+}
+
 Decl* Decl::typee(std::string name, std::string type, std::list<const Attr*> attrs) {
   return new TypeDecl(name,type,attrs);
 }
@@ -625,6 +629,21 @@ void IfElseStmt::print(std::ostream& os) const {
 	elze->print(os);
 	os << "\n}\n";
   }
+}
+
+void WhileStmt::print(std::ostream& os) const {
+  os << "while (";
+  cond->print(os);
+  os << ")";
+
+  if (invars.empty()) {
+    os << " {\n";
+  } else {
+    os << "\n";
+    print_seq<const Expr*>(os, invars, "  invariant ", ";\n  invariant ", ";");
+  }
+  body->print(os);
+  os << "\n}\n";
 }
 
 void TypeDecl::print(std::ostream& os) const {

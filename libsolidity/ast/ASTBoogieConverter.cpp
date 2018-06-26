@@ -316,7 +316,22 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 
 bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
-	return visitNode(_node);
+	// Get condition recursively
+	currentExpr = nullptr;
+	_node.condition().accept(*this);
+	const smack::Expr* cond = currentExpr;
+
+	// Get if branch recursively
+	currentBlocks.push(smack::Block::block());
+	_node.body().accept(*this);
+	const smack::Block* body = currentBlocks.top();
+	currentBlocks.pop();
+
+	// TODO: loop invariants can be added here
+
+	currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+
+	return false;
 }
 
 
