@@ -13,4 +13,15 @@ contract Loops {
 
         return result;
     }
+
+    function forLoopFunc(uint param) pure public returns (uint) {
+        uint result = param;
+
+        for (uint i = 0; i < 10; i = i + 1) {
+            result = result + 1;
+        }
+
+        return result;
+    }
+
 }

@@ -337,7 +337,43 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 bool ASTBoogieConverter::visit(ForStatement const& _node)
 {
-	return visitNode(_node);
+	// Boogie does not have a for statement, therefore it is transformed
+	// into a while statement in the following way:
+	//
+	// for (initExpr; cond; loopExpr) { body }
+	//
+	// initExpr; while (cond) { body; loopExpr }
+
+	// Get initialization recursively (adds statement to current block)
+	if (_node.initializationExpression())
+	{
+		_node.initializationExpression()->accept(*this);
+	}
+
+	// Get condition recursively
+	currentExpr = nullptr;
+	if (_node.condition())
+	{
+		_node.condition()->accept(*this);
+	}
+	const smack::Expr* cond = currentExpr;
+
+	// Get body recursively
+	currentBlocks.push(smack::Block::block());
+	_node.body().accept(*this);
+	// Include loop expression at the end of body
+	if (_node.loopExpression())
+	{
+		_node.loopExpression()->accept(*this);
+	}
+	const smack::Block* body = currentBlocks.top();
+	currentBlocks.pop();
+
+	// TODO: loop invariants can be added here
+
+	currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+
+	return false;
 }
 
 
