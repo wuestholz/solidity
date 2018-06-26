@@ -21,7 +21,7 @@ private:
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
-	std::vector<ASTPointer<VariableDeclaration>> localDecls;
+	std::list<smack::Decl*> localDecls;
 
 	// Current block(s) where statements are appended, stack is needed
 	// due to nested blocks

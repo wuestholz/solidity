@@ -179,19 +179,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				errinfo_comment("Non-empty stack of blocks at the end of function."));
 	}
 
-	// Local declarations were collected during processing the body
-	list<smack::Decl*> decls;
-	for (auto d : localDecls)
-	{
-		decls.push_back(smack::Decl::variable(
-				mapDeclName(*d),
-				mapType(d->type())));
-	}
-
 	// Create the procedure
 	program.getDeclarations().push_back(
 			smack::Decl::procedure(
-					mapDeclName(_node), params, rets, decls, blocks));
+					mapDeclName(_node), params, rets, localDecls, blocks));
 	return false;
 }
 
@@ -431,7 +422,9 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		if (decl->isLocalOrReturn())
 		{
 			// Boogie requires local variables to be declared at the beginning of the procedure
-			localDecls.push_back(decl);
+			localDecls.push_back(smack::Decl::variable(
+							mapDeclName(*decl),
+							mapType(decl->type())));
 		}
 		else
 		{
@@ -472,6 +465,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	// ExpressionStatements have to be checked if they have a corresponding
 	// statement in Boogie
 	if (dynamic_cast<Assignment const*>(&_node.expression())) return true;
+	if (dynamic_cast<FunctionCall const*>(&_node.expression())) return true;
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment(string("Unsupported ExpressionStatement")) <<
@@ -602,7 +596,54 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 
 bool ASTBoogieConverter::visit(FunctionCall const& _node)
 {
-	return visitNode(_node);
+	// In Boogie function calls are statements and cannot be part of
+	// expressions, therefore each function call is given a fresh variable
+	// and a mapped to a call statement
+
+	// Get arguments recursively
+	list<const smack::Expr*> args;
+	for (auto arg : _node.arguments())
+	{
+		currentExpr = nullptr;
+		arg->accept(*this);
+		args.push_back(currentExpr);
+	}
+
+	// Get the name of the called function
+	currentExpr = nullptr;
+	_node.expression().accept(*this);
+	string funcName;
+	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
+	{
+		funcName = v->name();
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+				errinfo_comment(string("Only identifiers are supported as function calls")) <<
+				errinfo_sourceLocation(_node.location()));
+	}
+
+	// TODO: check for void return in a more appropriate way
+	if (_node.annotation().type->toString() != "tuple()")
+	{
+		// Create fresh variable to store the result
+		smack::Decl* returnVar = smack::Decl::variable(string("call#") + to_string(_node.id()), mapType(_node.annotation().type));
+		localDecls.push_back(returnVar);
+		// Result of the function call is the fresh variable
+		currentExpr = smack::Expr::id(returnVar->getName());
+		list<string> rets;
+		rets.push_back(returnVar->getName());
+		// Assign to the fresh variable
+		currentBlocks.top()->addStmt(smack::Stmt::call(funcName, args, rets));
+	}
+	else
+	{
+		currentExpr = nullptr; // No return value for function
+		currentBlocks.top()->addStmt(smack::Stmt::call(funcName, args));
+	}
+
+	return false;
 }
 
 
