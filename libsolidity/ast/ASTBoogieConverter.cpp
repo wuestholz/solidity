@@ -99,7 +99,12 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
-	return visitNode(_node);
+	// Boogie programs are flat, inheritance does not appear explicitly
+	program.getDeclarations().push_back(
+			smack::Decl::comment(
+					"InheritanceSpecifier",
+					"Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#")));
+	return false;
 }
 
 
