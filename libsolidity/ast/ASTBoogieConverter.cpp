@@ -171,9 +171,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	currentBlocks.push(smack::Block::block());
 	_node.body().accept(*this);
 	list<smack::Block*> blocks;
-	// TODO: assert stack size 1
 	blocks.push_back(currentBlocks.top());
 	currentBlocks.pop();
+	if (!currentBlocks.empty())
+	{
+		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+				errinfo_comment("Non-empty stack of blocks at the end of function."));
+	}
 
 	// Local declarations were collected during processing the body
 	list<smack::Decl*> decls;
@@ -271,7 +275,8 @@ bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 
 bool ASTBoogieConverter::visit(Block const&)
 {
-	// Simply apply visitor recursively
+	// Simply apply visitor recursively, compound statements will
+	// handle creating new blocks
 	return true;
 }
 

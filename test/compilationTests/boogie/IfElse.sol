@@ -12,4 +12,12 @@ contract IfElse {
             return contractVar;
         }
     }
+
+    function doSomethingElse(uint param) view public returns (uint) {
+        if (param < 10) {
+            return contractVar + 10;
+        }
+
+        return contractVar;
+    }
 }
