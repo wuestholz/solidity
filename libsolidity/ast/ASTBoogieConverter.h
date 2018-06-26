@@ -39,6 +39,8 @@ private:
 	 */
 	std::string mapDeclName(Declaration const& decl);
 
+	static std::map<std::string, std::string> typeMap;
+
 	std::string mapType(TypePointer tp);
 public:
 	/**

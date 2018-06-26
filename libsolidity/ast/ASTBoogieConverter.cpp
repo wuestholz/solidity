@@ -15,6 +15,8 @@ namespace dev
 namespace solidity
 {
 
+const string ASSERT_NAME = "assert";
+
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
 	string name = decl.name();
@@ -26,15 +28,17 @@ string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 	return name + "#" + to_string(decl.id());
 }
 
+map<string, string> ASTBoogieConverter::typeMap = {
+		{"uint256", "int"},
+		{"int256", "int"},
+		{"bool", "bool"},
+};
 
 string ASTBoogieConverter::mapType(TypePointer tp)
 {
-	string tpStr = tp->toString();
-	// TODO: use some map instead
 	// TODO: option for bit precise types
-	if (tpStr == "uint256") return "int";
-	if (tpStr == "int256") return "int";
-	if (tpStr == "bool") return "bool";
+	string tpStr = tp->toString();
+	if (typeMap.count(tpStr)) return typeMap[tpStr];
 
 	BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Unsupported type: " + tpStr));
 	return "";
@@ -641,7 +645,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	}
 
 	// Assert is a separate statement in Boogie (instead of a function call)
-	if (funcName == "assert")
+	if (funcName == ASSERT_NAME)
 	{
 		currentBlocks.top()->addStmt(smack::Stmt::assert_(*args.begin()));
 		return false;
@@ -690,7 +694,7 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	if (_node.name() == "assert")
+	if (_node.name() == ASSERT_NAME)
 	{
 		currentExpr = smack::Expr::id(_node.name());
 	}
@@ -712,7 +716,6 @@ bool ASTBoogieConverter::visit(ElementaryTypeNameExpression const& _node)
 bool ASTBoogieConverter::visit(Literal const& _node)
 {
 	string tpStr = _node.annotation().type->toString();
-	// TODO: use some map instead
 	// TODO: option for bit precise types
 	if (boost::starts_with(tpStr, "int_const"))
 	{
