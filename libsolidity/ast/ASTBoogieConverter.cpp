@@ -17,12 +17,12 @@ namespace solidity
 
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
-	string name = decl.fullyQualifiedName();
+	string name = decl.name();
 	replace(name.begin(), name.end(), '.', '_');
 	replace(name.begin(), name.end(), ':', '#');
-	// ID is important to append, since (1) fully qualified name can be same
-	// for contract variable and function local variable, (2) return variables
-	// might have no name (Boogie requires a name)
+	// ID is important to append, since (1) even fully qualified names can be
+	// same for contract variable and function local variable, (2) return
+	// variables might have no name (Boogie requires a name)
 	return name + "#" + to_string(decl.id());
 }
 
@@ -598,7 +598,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 {
 	// In Boogie function calls are statements and cannot be part of
 	// expressions, therefore each function call is given a fresh variable
-	// and a mapped to a call statement
+	// and is mapped to a call statement
 
 	// Get arguments recursively
 	list<const smack::Expr*> args;
