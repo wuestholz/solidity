@@ -495,7 +495,25 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
+	// Transform rhs based on the operator, e.g., a += b becomes a := a + b
+	switch (_node.assignmentOperator()) {
+	case Token::Assign: break; // rhs already contains the result
+	case Token::AssignAdd: rhs = smack::Expr::plus(lhs, rhs); break;
+	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
+	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
+	case Token::AssignDiv:
+		if (mapType(_node.annotation().type) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+		else rhs = smack::Expr::div(lhs, rhs);
+		break;
+	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
+
+	default: BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+			errinfo_comment(string("Unsupported assignment operator ") + Token::toString(_node.assignmentOperator())) <<
+			errinfo_sourceLocation(_node.location()));
+	}
+
 	currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
+
 
 	return false;
 }

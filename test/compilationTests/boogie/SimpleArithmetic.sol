@@ -33,6 +33,32 @@ contract SimpleArithmetic {
         return ((a + b) * 1234 / c) % 56;
     }
 
+    function assignAdd(uint a, uint b) pure public returns (uint) {
+        uint result = a;
+        result += b;
+        return result;
+    }
+    function assignSub(uint a, uint b) pure public returns (uint) {
+        uint result = a;
+        result -= b;
+        return result;
+    }
+    function assignMul(uint a, uint b) pure public returns (uint) {
+        uint result = a;
+        result *= b;
+        return result;
+    }
+    function assignDiv(uint a, uint b) pure public returns (uint) {
+        uint result = a;
+        result /= b;
+        return result;
+    }
+    function assignMod(uint a, uint b) pure public returns (uint) {
+        uint result = a;
+        result %= b;
+        return result;
+    }
+
     function eq(uint a, uint b) pure public returns (bool) {
         return a == b;
     }
