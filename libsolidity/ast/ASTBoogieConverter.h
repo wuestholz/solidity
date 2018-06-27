@@ -40,7 +40,10 @@ private:
 	std::string mapDeclName(Declaration const& decl);
 
 	std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
+
 public:
+	ASTBoogieConverter();
+
 	/**
 	 * Convert a node and add it to the actual Boogie program
 	 */

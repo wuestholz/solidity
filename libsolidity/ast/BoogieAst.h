@@ -424,7 +424,7 @@ public:
   std::string getName() const { return name; }
   void addAttr(const Attr* a) { attrs.push_back(a); }
 
-  static Decl* typee(std::string name, std::string type,
+  static Decl* typee(std::string name, std::string type = "",
     std::list<const Attr*> attrs = std::list<const Attr*>());
   static Decl* axiom(const Expr* e, std::string name = "");
   static FuncDecl* function(

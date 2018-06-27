@@ -32,6 +32,7 @@ string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNod
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
+	if (tpStr == "address") return "address";
 	if (tpStr == "bool") return "bool";
 	for (int i = 8; i <= 256; ++i)
 	{
@@ -43,6 +44,15 @@ string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNod
 			errinfo_comment("Unsupported type: " + tpStr) <<
 			errinfo_sourceLocation(_associatedNode.location()));
 	return "";
+}
+
+ASTBoogieConverter::ASTBoogieConverter()
+{
+	currentExpr = nullptr;
+	currentRet = nullptr;
+	program.getDeclarations().push_back(
+			smack::Decl::comment("", "Uninterpreted type for addresses"));
+	program.getDeclarations().push_back(smack::Decl::typee("address"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
