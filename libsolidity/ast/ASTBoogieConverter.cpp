@@ -16,9 +16,12 @@ namespace solidity
 {
 
 const string ASSERT_NAME = "assert";
+const string VERIFIER_MAIN_NAME = "__verifier_main";
 
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
+	if (decl.name() == VERIFIER_MAIN_NAME) return "main";
+
 	string name = decl.name();
 	replace(name.begin(), name.end(), '.', '_');
 	replace(name.begin(), name.end(), ':', '#');
