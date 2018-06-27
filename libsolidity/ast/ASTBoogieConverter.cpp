@@ -213,19 +213,20 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	if (_node.isLocalOrReturn())
 	{
 		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-							errinfo_comment("Local variable appearing in VariableDeclaration") <<
-							errinfo_sourceLocation(_node.location()));
+				errinfo_comment("Local variable appearing in VariableDeclaration") <<
+				errinfo_sourceLocation(_node.location()));
 	}
 	if (_node.value())
 	{
 		BOOST_THROW_EXCEPTION(CompilerError() <<
-							errinfo_comment("Initial values are not supported yet") <<
-							errinfo_sourceLocation(_node.location()));
+				errinfo_comment("Initial values are not supported yet") <<
+				errinfo_sourceLocation(_node.location()));
 	}
 
+	addGlobalComment("Field: " + _node.fullyQualifiedName());
 	program.getDeclarations().push_back(
-						smack::Decl::variable(mapDeclName(_node),
-						mapType(_node.type(), _node)));
+			smack::Decl::variable(mapDeclName(_node),
+			"[" + BOOGIE_ADDRESS_TYPE + "]" + mapType(_node.type(), _node)));
 	return false;
 }
 
@@ -525,36 +526,55 @@ bool ASTBoogieConverter::visit(Conditional const& _node)
 
 bool ASTBoogieConverter::visit(Assignment const& _node)
 {
-	// Get lhs recursively
-	currentExpr = nullptr;
-	_node.leftHandSide().accept(*this);
-	const smack::Expr* lhs = currentExpr;
+	if (Identifier const* lhsId = dynamic_cast<Identifier const*>(&_node.leftHandSide()))
+	{
+		if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
+		{
+			// Get lhs recursively
+			currentExpr = nullptr;
+			_node.leftHandSide().accept(*this);
+			const smack::Expr* lhs = currentExpr;
 
-	// Get rhs recursively
-	currentExpr = nullptr;
-	_node.rightHandSide().accept(*this);
-	const smack::Expr* rhs = currentExpr;
+			// Get rhs recursively
+			currentExpr = nullptr;
+			_node.rightHandSide().accept(*this);
+			const smack::Expr* rhs = currentExpr;
 
-	// Transform rhs based on the operator, e.g., a += b becomes a := a + b
-	switch (_node.assignmentOperator()) {
-	case Token::Assign: break; // rhs already contains the result
-	case Token::AssignAdd: rhs = smack::Expr::plus(lhs, rhs); break;
-	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
-	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
-	case Token::AssignDiv:
-		if (mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
-		else rhs = smack::Expr::div(lhs, rhs);
-		break;
-	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
+			// Transform rhs based on the operator, e.g., a += b becomes a := a + b
+			switch (_node.assignmentOperator()) {
+			case Token::Assign: break; // rhs already contains the result
+			case Token::AssignAdd: rhs = smack::Expr::plus(lhs, rhs); break;
+			case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
+			case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
+			case Token::AssignDiv:
+				if (mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+				else rhs = smack::Expr::div(lhs, rhs);
+				break;
+			case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
 
-	default: BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment(string("Unsupported assignment operator ") + Token::toString(_node.assignmentOperator())) <<
-			errinfo_sourceLocation(_node.location()));
+			default: BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment(string("Unsupported assignment operator ") + Token::toString(_node.assignmentOperator())) <<
+					errinfo_sourceLocation(_node.location()));
+			}
+
+			if (varDecl->isStateVariable())
+			{
+				currentBlocks.top()->addStmt(smack::Stmt::assign(
+						smack::Expr::id(mapDeclName(*varDecl)),
+						smack::Expr::upd(
+								smack::Expr::id(mapDeclName(*varDecl)),
+								smack::Expr::id(BOOGIE_THIS),
+								rhs)));
+			}
+			else
+			{
+				currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
+			}
+			return false;
+		}
 	}
 
-	currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
-
-
+	// TODO: exception
 	return false;
 }
 
@@ -738,7 +758,14 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
 	string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
-	currentExpr = smack::Expr::id(declName);
+	bool global = false;
+	if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
+	{
+		global = varDecl->isStateVariable();
+	}
+
+	if (global) { currentExpr = smack::Expr::sel(declName, BOOGIE_THIS); }
+	else { currentExpr = smack::Expr::id(declName); }
 	return false;
 }
 
