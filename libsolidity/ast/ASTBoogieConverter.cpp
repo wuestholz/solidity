@@ -567,7 +567,7 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 
 	switch (_node.getOperator()) {
 	case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
-	case Token::Sub: currentExpr = smack::Expr::minus(subExpr); break;
+	case Token::Sub: currentExpr = smack::Expr::neg(subExpr); break;
 
 	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported operator ") + Token::toString(_node.getOperator())) <<
@@ -611,6 +611,9 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 	case Token::LessThanOrEqual: currentExpr = smack::Expr::lte(lhs, rhs); break;
 	case Token::GreaterThanOrEqual: currentExpr = smack::Expr::gte(lhs, rhs); break;
 
+	case Token::Exp:
+		// Solidity supports exp only for integers whereas Boogie only
+		// supports it for reals. Could be worked around with casts.
 	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported operator ") + Token::toString(_node.getOperator())) <<
 			errinfo_sourceLocation(_node.location()));

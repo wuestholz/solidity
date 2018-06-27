@@ -76,6 +76,10 @@ const Expr* Expr::mod(const Expr* l, const Expr* r) {
   return new BinExpr(BinExpr::Mod, l, r);
 }
 
+const Expr* Expr::exp(const Expr* l, const Expr* r) {
+  return new BinExpr(BinExpr::Exp, l, r);
+}
+
 const Expr* Expr::fn(std::string f, std::list<const Expr*> args) {
   return new FunExpr(f, args);
 }
@@ -147,8 +151,8 @@ const Expr* Expr::not_(const Expr* e) {
   return new NotExpr(e);
 }
 
-const Expr* Expr::minus(const Expr* e) {
-  return new MinusExpr(e);
+const Expr* Expr::neg(const Expr* e) {
+  return new NegExpr(e);
 }
 
 const Expr* Expr::sel(const Expr* b, const Expr* i) {
@@ -469,6 +473,9 @@ void BinExpr::print(std::ostream& os) const {
   case Mod:
     os << "mod";
     break;
+  case Exp:
+    os << "**";
+    break;
   }
   os << " " << rhs << ")";
 }
@@ -504,10 +511,6 @@ void NegExpr::print(std::ostream& os) const {
 
 void NotExpr::print(std::ostream& os) const {
   os << "!(" << expr << ")";
-}
-
-void MinusExpr::print(std::ostream& os) const {
-  os << "-(" << expr << ")";
 }
 
 void QuantExpr::print(std::ostream& os) const {

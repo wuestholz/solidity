@@ -26,6 +26,9 @@ contract SimpleArithmetic {
     function mod(uint a, uint b) pure public returns (uint) {
         return a % b;
     }
+    function exp(uint a, uint b) pure public returns (uint) {
+        return a ** b;
+    }
     function minus(int a) pure public returns (int) {
         return -a;
     }

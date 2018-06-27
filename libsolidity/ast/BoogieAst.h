@@ -32,6 +32,7 @@ public:
   static const Expr* intdiv(const Expr* l, const Expr* r);
   static const Expr* times(const Expr* l, const Expr* r);
   static const Expr* mod(const Expr* l, const Expr* r);
+  static const Expr* exp(const Expr* l, const Expr* r);
   static const Expr* fn(std::string f, const Expr* x);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y);
   static const Expr* fn(std::string f, const Expr* x, const Expr* y, const Expr* z);
@@ -49,7 +50,7 @@ public:
   static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
   static const Expr* neq(const Expr* l, const Expr* r);
   static const Expr* not_(const Expr* e);
-  static const Expr* minus(const Expr* e);
+  static const Expr* neg(const Expr* e);
   static const Expr* sel(const Expr* b, const Expr* i);
   static const Expr* sel(std::string b, std::string i);
   static const Expr* upd(const Expr* b, const Expr* i, const Expr* v);
@@ -59,7 +60,7 @@ public:
 class BinExpr : public Expr {
 public:
   enum Binary { Iff, Imp, Or, And, Eq, Neq, Lt, Gt, Lte, Gte, Sub, Conc,
-                Plus, Minus, Times, Div, IntDiv, Mod
+                Plus, Minus, Times, Div, IntDiv, Mod, Exp
               };
 private:
   const Binary op;
@@ -154,13 +155,6 @@ class NotExpr : public Expr {
   const Expr* expr;
 public:
   NotExpr(const Expr* e) : expr(e) {}
-  void print(std::ostream& os) const;
-};
-
-class MinusExpr : public Expr {
-  const Expr* expr;
-public:
-  MinusExpr(const Expr* e) : expr(e) {}
   void print(std::ostream& os) const;
 };
 
