@@ -34,6 +34,8 @@ private:
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* currentRet;
 
+	void addGlobalComment(std::string str);
+
 	/**
 	 * Maps a declaration name into a name in Boogie
 	 */

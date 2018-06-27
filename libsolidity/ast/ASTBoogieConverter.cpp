@@ -15,12 +15,21 @@ namespace dev
 namespace solidity
 {
 
+const string BALANCES_NAME = "balances";
+const string SOLIDITY_THIS = "this";
+const string BOOGIE_THIS = "_this";
 const string ASSERT_NAME = "assert";
 const string VERIFIER_MAIN_NAME = "__verifier_main";
+
+void ASTBoogieConverter::addGlobalComment(string str)
+{
+	program.getDeclarations().push_back(smack::Decl::comment("", str));
+}
 
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
 	if (decl.name() == VERIFIER_MAIN_NAME) return "main";
+	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
 
 	string name = decl.name();
 	replace(name.begin(), name.end(), '.', '_');
@@ -53,9 +62,11 @@ ASTBoogieConverter::ASTBoogieConverter()
 {
 	currentExpr = nullptr;
 	currentRet = nullptr;
-	program.getDeclarations().push_back(
-			smack::Decl::comment("", "Uninterpreted type for addresses"));
+	addGlobalComment("Uninterpreted type for addresses");
 	program.getDeclarations().push_back(smack::Decl::typee("address"));
+
+	addGlobalComment("Global map for balances");
+	program.getDeclarations().push_back(smack::Decl::variable(BALANCES_NAME, "[address]int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -72,10 +83,7 @@ void ASTBoogieConverter::print(ostream& _stream)
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
 	// Boogie programs are flat, source units do not appear explicitly
-	program.getDeclarations().push_back(
-			smack::Decl::comment(
-					"SourceUnit",
-					"Source: " + _node.annotation().path));
+	addGlobalComment("Source: " + _node.annotation().path);
 
 	return true; // Simply apply visitor recursively
 }
@@ -84,10 +92,7 @@ bool ASTBoogieConverter::visit(SourceUnit const& _node)
 bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 {
 	// Pragmas are only included as comments
-	program.getDeclarations().push_back(
-			smack::Decl::comment(
-					"PragmaDirective",
-					"Pragma: " + boost::algorithm::join(_node.literals(), "")));
+	addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
 	return false;
 }
 
@@ -101,10 +106,7 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
 	// Boogie programs are flat, contracts do not appear explicitly
-	program.getDeclarations().push_back(
-			smack::Decl::comment(
-					"ContractDefinition",
-					"Contract: " + _node.fullyQualifiedName()));
+	addGlobalComment("Contract: " + _node.fullyQualifiedName());
 	return true; // Simply apply visitor recursively
 }
 
@@ -112,10 +114,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
 	// Boogie programs are flat, inheritance does not appear explicitly
-	program.getDeclarations().push_back(
-			smack::Decl::comment(
-					"InheritanceSpecifier",
-					"Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#")));
+	addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
 	return false;
 }
 
@@ -153,13 +152,12 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
 	// Solidity functions are mapped to Boogie procedures
-	program.getDeclarations().push_back(
-			smack::Decl::comment(
-					"FunctionDefinition",
-					"Function: " + _node.fullyQualifiedName()));
+	addGlobalComment("Function: " + _node.fullyQualifiedName());
 
 	// Get input parameters
 	list<smack::Binding> params;
+	// Add 'this' as first parameter
+	params.push_back(make_pair(BOOGIE_THIS, "address"));
 	for (auto p : _node.parameters())
 	{
 		params.push_back(make_pair(
@@ -644,6 +642,9 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 
 	// Get arguments recursively
 	list<const smack::Expr*> args;
+	// Pass 'this' as first argument
+	// TODO: might be different for member access
+	args.push_back(smack::Expr::id(BOOGIE_THIS));
 	for (auto arg : _node.arguments())
 	{
 		currentExpr = nullptr;
@@ -669,7 +670,8 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == ASSERT_NAME)
 	{
-		currentBlocks.top()->addStmt(smack::Stmt::assert_(*args.begin()));
+		// The parameter is the second argument (the first is 'this')
+		currentBlocks.top()->addStmt(smack::Stmt::assert_(*(++args.begin())));
 		return false;
 	}
 
