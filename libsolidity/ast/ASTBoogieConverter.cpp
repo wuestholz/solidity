@@ -15,11 +15,12 @@ namespace dev
 namespace solidity
 {
 
-const string BALANCES_NAME = "balances";
+const string SOLIDITY_BALANCE = "balance";
+const string BOOGIE_BALANCE = "balance";
 const string SOLIDITY_THIS = "this";
 const string BOOGIE_THIS = "_this";
-const string ASSERT_NAME = "assert";
-const string VERIFIER_MAIN_NAME = "__verifier_main";
+const string SOLIDITY_ASSERT = "assert";
+const string VERIFIER_MAIN = "__verifier_main";
 
 void ASTBoogieConverter::addGlobalComment(string str)
 {
@@ -28,7 +29,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
-	if (decl.name() == VERIFIER_MAIN_NAME) return "main";
+	if (decl.name() == VERIFIER_MAIN) return "main";
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
 
 	string name = decl.name();
@@ -66,7 +67,7 @@ ASTBoogieConverter::ASTBoogieConverter()
 	program.getDeclarations().push_back(smack::Decl::typee("address"));
 
 	addGlobalComment("Global map for balances");
-	program.getDeclarations().push_back(smack::Decl::variable(BALANCES_NAME, "[address]int"));
+	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[address]int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -668,7 +669,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	}
 
 	// Assert is a separate statement in Boogie (instead of a function call)
-	if (funcName == ASSERT_NAME)
+	if (funcName == SOLIDITY_ASSERT)
 	{
 		// The parameter is the second argument (the first is 'this')
 		currentBlocks.top()->addStmt(smack::Stmt::assert_(*(++args.begin())));
@@ -706,7 +707,21 @@ bool ASTBoogieConverter::visit(NewExpression const& _node)
 
 bool ASTBoogieConverter::visit(MemberAccess const& _node)
 {
-	return visitNode(_node);
+	if (_node.memberName() == SOLIDITY_BALANCE)
+	{
+		currentExpr = nullptr;
+		_node.expression().accept(*this);
+		const smack::Expr* expr = currentExpr;
+
+		currentExpr = smack::Expr::sel(smack::Expr::id(BOOGIE_BALANCE), expr);
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+				errinfo_comment("Member access only supported for 'balance'") <<
+				errinfo_sourceLocation(_node.location()));
+	}
+	return false;
 }
 
 
@@ -718,7 +733,7 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	if (_node.name() == ASSERT_NAME)
+	if (_node.name() == SOLIDITY_ASSERT)
 	{
 		currentExpr = smack::Expr::id(_node.name());
 	}
