@@ -15,10 +15,11 @@ namespace dev
 namespace solidity
 {
 
+const string BOOGIE_ADDRESS_TYPE = "address_t";
 const string SOLIDITY_BALANCE = "balance";
 const string BOOGIE_BALANCE = "balance";
 const string SOLIDITY_THIS = "this";
-const string BOOGIE_THIS = "_this";
+const string BOOGIE_THIS = "__this";
 const string SOLIDITY_ASSERT = "assert";
 const string VERIFIER_MAIN = "__verifier_main";
 
@@ -29,23 +30,22 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
+	// Check for special names
 	if (decl.name() == VERIFIER_MAIN) return "main";
+	if (decl.name() == SOLIDITY_ASSERT) return "assert";
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
 
-	string name = decl.name();
-	replace(name.begin(), name.end(), '.', '_');
-	replace(name.begin(), name.end(), ':', '#');
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for contract variable and function local variable, (2) return
 	// variables might have no name (Boogie requires a name)
-	return name + "#" + to_string(decl.id());
+	return decl.name() + "#" + to_string(decl.id());
 }
 
 string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNode)
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
-	if (tpStr == "address") return "address";
+	if (tpStr == "address") return BOOGIE_ADDRESS_TYPE;
 	if (tpStr == "bool") return "bool";
 	for (int i = 8; i <= 256; ++i)
 	{
@@ -63,11 +63,12 @@ ASTBoogieConverter::ASTBoogieConverter()
 {
 	currentExpr = nullptr;
 	currentRet = nullptr;
+	// Initialize global declarations
 	addGlobalComment("Uninterpreted type for addresses");
-	program.getDeclarations().push_back(smack::Decl::typee("address"));
+	program.getDeclarations().push_back(smack::Decl::typee(BOOGIE_ADDRESS_TYPE));
 
 	addGlobalComment("Global map for balances");
-	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[address]int"));
+	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[" + BOOGIE_ADDRESS_TYPE + "]int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -85,7 +86,6 @@ bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
 	// Boogie programs are flat, source units do not appear explicitly
 	addGlobalComment("Source: " + _node.annotation().path);
-
 	return true; // Simply apply visitor recursively
 }
 
@@ -155,36 +155,35 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Solidity functions are mapped to Boogie procedures
 	addGlobalComment("Function: " + _node.fullyQualifiedName());
 
-	// Get input parameters
+	// Input parameters
 	list<smack::Binding> params;
-	// Add 'this' as first parameter
-	params.push_back(make_pair(BOOGIE_THIS, "address"));
-	for (auto p : _node.parameters())
+	params.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // Add 'this' as first parameter
+	for (auto p : _node.parameters()) // Other parameters
 	{
-		params.push_back(make_pair(
-				mapDeclName(*p),
-				mapType(p->type(), *p)));
+		params.push_back(make_pair(mapDeclName(*p), mapType(p->type(), *p)));
 	}
 
-	// Get return values
+	// Return values
 	list<smack::Binding> rets;
 	for (auto p : _node.returnParameters())
 	{
-		rets.push_back(make_pair(
-				mapDeclName(*p),
-				mapType(p->type(), *p)));
+		rets.push_back(make_pair(mapDeclName(*p), mapType(p->type(), *p)));
 	}
 
-	if (_node.returnParameters().size() > 1)
+	// Boogie treats return as an assignment to the return variable(s)
+	if (_node.returnParameters().empty())
 	{
-		// TODO: handle multiple return values with tuple
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Multiple values to return is not yet supported") <<
-				errinfo_sourceLocation(_node.location()));
+		currentRet = nullptr;
+	}
+	else if (_node.returnParameters().size() == 1)
+	{
+		currentRet = smack::Expr::id(rets.begin()->first);
 	}
 	else
 	{
-		currentRet = smack::Expr::id(rets.begin()->first);
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+				errinfo_comment("Multiple values to return is not yet supported") <<
+				errinfo_sourceLocation(_node.location()));
 	}
 
 	// Convert function body, collect result
@@ -203,8 +202,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Create the procedure
 	program.getDeclarations().push_back(
-			smack::Decl::procedure(
-					mapDeclName(_node), params, rets, localDecls, blocks));
+			smack::Decl::procedure(mapDeclName(_node), params, rets, localDecls, blocks));
 	return false;
 }
 
@@ -408,18 +406,25 @@ bool ASTBoogieConverter::visit(Break const&)
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
-	// Get rhs recursively
-	currentExpr = nullptr;
-	_node.expression()->accept(*this);
-	const smack::Expr* rhs = currentExpr;
+	// No return value
+	if (_node.expression() == nullptr)
+	{
+		currentBlocks.top()->addStmt(smack::Stmt::return_());
+	}
+	else
+	{
+		// Get rhs recursively
+		currentExpr = nullptr;
+		_node.expression()->accept(*this);
+		const smack::Expr* rhs = currentExpr;
 
-	// lhs should already be known
-	const smack::Expr* lhs = currentRet;
+		// lhs should already be known
+		const smack::Expr* lhs = currentRet;
 
-	// First create an assignment, and then an empty return
-	currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
-	currentBlocks.top()->addStmt(smack::Stmt::return_());
-
+		// First create an assignment, and then an empty return
+		currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
+		currentBlocks.top()->addStmt(smack::Stmt::return_());
+	}
 	return false;
 }
 
@@ -643,9 +648,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 
 	// Get arguments recursively
 	list<const smack::Expr*> args;
-	// Pass 'this' as first argument
-	// TODO: might be different for member access
-	args.push_back(smack::Expr::id(BOOGIE_THIS));
+	args.push_back(smack::Expr::id(BOOGIE_THIS)); // Pass 'this' as first argument (TODO: member access?)
 	for (auto arg : _node.arguments())
 	{
 		currentExpr = nullptr;
@@ -671,7 +674,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == SOLIDITY_ASSERT)
 	{
-		// The parameter is the second argument (the first is 'this')
+		// The parameter of is the second argument (the first is 'this')
 		currentBlocks.top()->addStmt(smack::Stmt::assert_(*(++args.begin())));
 		return false;
 	}
@@ -707,6 +710,7 @@ bool ASTBoogieConverter::visit(NewExpression const& _node)
 
 bool ASTBoogieConverter::visit(MemberAccess const& _node)
 {
+	// 'balance' is a special member of each contract
 	if (_node.memberName() == SOLIDITY_BALANCE)
 	{
 		currentExpr = nullptr;
@@ -733,15 +737,8 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	if (_node.name() == SOLIDITY_ASSERT)
-	{
-		currentExpr = smack::Expr::id(_node.name());
-	}
-	else
-	{
-		string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
-		currentExpr = smack::Expr::id(declName);
-	}
+	string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
+	currentExpr = smack::Expr::id(declName);
 	return false;
 }
 
