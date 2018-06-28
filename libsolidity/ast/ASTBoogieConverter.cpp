@@ -18,12 +18,12 @@ namespace solidity
 const string SOLIDITY_ADDRESS_TYPE = "address";
 const string BOOGIE_ADDRESS_TYPE = "address_t";
 const string SOLIDITY_BALANCE = "balance";
+const string BOOGIE_BALANCE = "__balance";
 const string SOLIDITY_MSG = "msg";
 const string SOLIDITY_SENDER = "sender";
 const string BOOGIE_MSG_SENDER = "__msg_sender";
-const string BOOGIE_BALANCE = "balance";
 const string SOLIDITY_TRANSFER = "transfer";
-const string BOOGIE_TRANSFER = "transfer";
+const string BOOGIE_TRANSFER = "__transfer";
 const string SOLIDITY_THIS = "this";
 const string BOOGIE_THIS = "__this";
 const string SOLIDITY_ASSERT = "assert";
@@ -71,14 +71,15 @@ ASTBoogieConverter::ASTBoogieConverter()
 	currentRet = nullptr;
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
+	// address type
 	program.getDeclarations().push_back(smack::Decl::typee(BOOGIE_ADDRESS_TYPE));
+	// address.balance
 	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[" + BOOGIE_ADDRESS_TYPE + "]int"));
-
+	// address.transfer()
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // 'this'
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // 'msg.sender'
 	transferParams.push_back(make_pair("amount", "int"));
-
 	smack::Block* transferImpl = smack::Block::block();
 	// balance[this] += amount
 	transferImpl->addStmt(smack::Stmt::assign(
@@ -99,7 +100,6 @@ ASTBoogieConverter::ASTBoogieConverter()
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception"));
 	list<smack::Block*> transferBlocks;
 	transferBlocks.push_back(transferImpl);
-
 	program.getDeclarations().push_back(smack::Decl::procedure(
 			BOOGIE_TRANSFER, transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks));
 }
@@ -677,6 +677,13 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 
 bool ASTBoogieConverter::visit(FunctionCall const& _node)
 {
+	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
+	{
+		// TODO: type conversions are currently omitted, but might be needed
+		// for basic types such as int
+		(*_node.arguments().begin())->accept(*this);
+		return false;
+	}
 	// Function calls in Boogie are statements and cannot be part of
 	// expressions, therefore each function call is given a fresh variable
 	// for its return value and is mapped to a call statement
@@ -828,7 +835,6 @@ bool ASTBoogieConverter::visit(Literal const& _node)
 	}
 	if (tpStr == "bool")
 	{
-		// TODO: case insensitve?
 		currentExpr = smack::Expr::lit(_node.value() == "true");
 		return false;
 	}
