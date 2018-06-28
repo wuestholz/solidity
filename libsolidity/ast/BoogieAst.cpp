@@ -739,6 +739,7 @@ void ProcDecl::print(std::ostream& os) const {
     print_seq<Block*>(os, blocks, "\n");
     os << "\n" << "}";
   }
+  os << "\n";
 }
 
 void CodeDecl::print(std::ostream& os) const {

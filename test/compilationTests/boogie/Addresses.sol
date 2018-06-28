@@ -6,4 +6,9 @@ contract Addresses {
         if (myAddress.balance > x) return true;
         return false;
     }
+
+    function sendMoney(address receiver, uint amount) public {
+        address myAddress = this;
+        if (myAddress.balance >= amount) receiver.transfer(amount);
+    }
 }

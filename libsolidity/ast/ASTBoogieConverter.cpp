@@ -18,6 +18,8 @@ namespace solidity
 const string BOOGIE_ADDRESS_TYPE = "address_t";
 const string SOLIDITY_BALANCE = "balance";
 const string BOOGIE_BALANCE = "balance";
+const string SOLIDITY_TRANSFER = "transfer";
+const string BOOGIE_TRANSFER = "transfer";
 const string SOLIDITY_THIS = "this";
 const string BOOGIE_THIS = "__this";
 const string SOLIDITY_ASSERT = "assert";
@@ -64,11 +66,21 @@ ASTBoogieConverter::ASTBoogieConverter()
 	currentExpr = nullptr;
 	currentRet = nullptr;
 	// Initialize global declarations
-	addGlobalComment("Uninterpreted type for addresses");
+	addGlobalComment("Global declarations and definitions related to the address type");
 	program.getDeclarations().push_back(smack::Decl::typee(BOOGIE_ADDRESS_TYPE));
-
-	addGlobalComment("Global map for balances");
 	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[" + BOOGIE_ADDRESS_TYPE + "]int"));
+
+	list<smack::Binding> transferParams;
+	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // Add 'this' as first parameter
+	transferParams.push_back(make_pair("amount", "int"));
+
+	smack::Block* transferImpl = smack::Block::block();
+	transferImpl->addStmt(smack::Stmt::comment("TODO"));
+	list<smack::Block*> transferBlocks;
+	transferBlocks.push_back(transferImpl);
+
+	program.getDeclarations().push_back(smack::Decl::procedure(
+			BOOGIE_TRANSFER, transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -107,7 +119,7 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
 	// Boogie programs are flat, contracts do not appear explicitly
-	addGlobalComment("Contract: " + _node.fullyQualifiedName());
+	addGlobalComment("Contract: " + _node.fullyQualifiedName() + "\n");
 	return true; // Simply apply visitor recursively
 }
 
@@ -645,18 +657,9 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// expressions, therefore each function call is given a fresh variable
 	// for its return value and is mapped to a call statement
 
-	// Get arguments recursively
-	list<const smack::Expr*> args;
-	args.push_back(smack::Expr::id(BOOGIE_THIS)); // Pass 'this' as first argument (TODO: member access?)
-	for (auto arg : _node.arguments())
-	{
-		currentExpr = nullptr;
-		arg->accept(*this);
-		args.push_back(currentExpr);
-	}
-
-	// Get the name of the called function
+	// Get the name of the called function and the address on which it is called
 	currentExpr = nullptr;
+	currentAddress = smack::Expr::id(BOOGIE_THIS);
 	_node.expression().accept(*this);
 	string funcName;
 	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
@@ -668,6 +671,16 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 		BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment(string("Only identifiers are supported as function calls")) <<
 				errinfo_sourceLocation(_node.location()));
+	}
+
+	// Get arguments recursively
+	list<const smack::Expr*> args;
+	args.push_back(currentAddress); // Pass current address as first argument
+	for (auto arg : _node.arguments())
+	{
+		currentExpr = nullptr;
+		arg->accept(*this);
+		args.push_back(currentExpr);
 	}
 
 	// Assert is a separate statement in Boogie (instead of a function call)
@@ -717,6 +730,15 @@ bool ASTBoogieConverter::visit(MemberAccess const& _node)
 		const smack::Expr* expr = currentExpr;
 
 		currentExpr = smack::Expr::sel(smack::Expr::id(BOOGIE_BALANCE), expr);
+	}
+	else if (_node.memberName() == SOLIDITY_TRANSFER)
+	{
+		// Get the address on which transfer is called
+		currentExpr = nullptr;
+		_node.expression().accept(*this);
+		currentAddress = currentExpr;
+		// Set the name to transfer
+		currentExpr = smack::Expr::id(BOOGIE_TRANSFER);
 	}
 	else
 	{
