@@ -18,4 +18,8 @@ contract Derived is Base {
     function h() public pure returns (uint) {
         return f() + g();
     }
+
+    function __verifier_main() public pure {
+        assert(h() == 5);
+    }
 }

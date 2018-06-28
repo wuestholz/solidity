@@ -30,11 +30,18 @@ contract Loops {
 
         while (i < 10) {
             result = result + 1;
-            if (result > 100) break;
+            if (result >= 100) break;
             i = i + 1;
         }
 
         return result;
+    }
+
+    function __verifier_main() pure public {
+        assert(whileLoopFunc(5) == 15);
+        assert(forLoopFunc(9) == 19);
+        assert(breakLoop(5) == 15);
+        assert(breakLoop(95) == 100);
     }
 
 }

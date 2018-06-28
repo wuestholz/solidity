@@ -7,6 +7,10 @@ contract FunctionCall {
         x = x1;
     }
 
+    function get() view public returns (uint) {
+        return x;
+    }
+
     function addSome() public {
         set(x + 1);
     }
@@ -20,7 +24,7 @@ contract FunctionCall {
     }
 
     function h(uint h1) pure public returns (uint) {
-        return h1;
+        return h1 + 5;
     }
 
     function sequentialCall() public {
@@ -29,6 +33,17 @@ contract FunctionCall {
 
     function compositeCall() public {
         x = h(f() + f());
+    }
+
+    function __verifier_main() public {
+        set(5);
+        assert(get() == 5);
+        addSome();
+        assert(get() == 6);
+        sequentialCall();
+        assert(get() == 3);
+        compositeCall();
+        assert(get() == 7);
     }
 
 }

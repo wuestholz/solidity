@@ -15,7 +15,7 @@ for f in ./output/*.bpl; do
     if [[ "$?" == "0" ]] 
     then
         echo -e "\n======= $f (with main function, running Corral) =======\n"
-        mono $CORRAL "$f" /main:main
+        mono $CORRAL "$f" /main:main /recursionBound:20
     else
         echo -e "\n======= $f (without main function, running Boogie) =======\n"
         mono $BOOGIE "$f" /doModSetAnalysis /nologo /errorTrace:0
