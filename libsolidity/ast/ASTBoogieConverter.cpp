@@ -81,6 +81,9 @@ void ASTBoogieConverter::print(ostream& _stream)
 	program.print(_stream);
 }
 
+// ---------------------------------------------------------------------------
+//         Visitor methods for top-level nodes and declarations
+// ---------------------------------------------------------------------------
 
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
@@ -89,7 +92,6 @@ bool ASTBoogieConverter::visit(SourceUnit const& _node)
 	return true; // Simply apply visitor recursively
 }
 
-
 bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 {
 	// Pragmas are only included as comments
@@ -97,12 +99,10 @@ bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(ImportDirective const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
@@ -111,7 +111,6 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	return true; // Simply apply visitor recursively
 }
 
-
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
 	// Boogie programs are flat, inheritance does not appear explicitly
@@ -119,36 +118,30 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(EnumValue const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(ParameterList const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
@@ -206,14 +199,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 {
-	// Local variables should be handled in the VariableDeclarationStatement
-	if (_node.isLocalOrReturn())
+	// Non-state variables should be handled in the VariableDeclarationStatement
+	if (!_node.isStateVariable())
 	{
 		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-				errinfo_comment("Local variable appearing in VariableDeclaration") <<
+				errinfo_comment("Non-state variable appearing in VariableDeclaration") <<
 				errinfo_sourceLocation(_node.location()));
 	}
 	if (_node.value())
@@ -223,72 +215,67 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 				errinfo_sourceLocation(_node.location()));
 	}
 
-	addGlobalComment("Field: " + _node.fullyQualifiedName());
+	addGlobalComment("State variable: " + _node.fullyQualifiedName());
+	// State variables are represented as maps from address to their type
 	program.getDeclarations().push_back(
 			smack::Decl::variable(mapDeclName(_node),
 			"[" + BOOGIE_ADDRESS_TYPE + "]" + mapType(_node.type(), _node)));
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(ModifierDefinition const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(ElementaryTypeName const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(UserDefinedTypeName const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(FunctionTypeName const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(Mapping const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 {
 	return visitNode(_node);
 }
 
+// ---------------------------------------------------------------------------
+//                     Visitor methods for statements
+// ---------------------------------------------------------------------------
 
 bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(Block const&)
 {
 	// Simply apply visitor recursively, compound statements will
-	// handle creating new blocks
+	// handle creating new blocks when required
 	return true;
 }
 
@@ -297,7 +284,6 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(IfStatement const& _node)
 {
 	// Get condition recursively
@@ -305,26 +291,25 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 	_node.condition().accept(*this);
 	const smack::Expr* cond = currentExpr;
 
-	// Get if branch recursively
+	// Get true branch recursively
 	currentBlocks.push(smack::Block::block());
 	_node.trueStatement().accept(*this);
-	const smack::Block* then = currentBlocks.top();
+	const smack::Block* thenBlock = currentBlocks.top();
 	currentBlocks.pop();
 
-	// Get else branch recursively
-	const smack::Block* elze = nullptr;
+	// Get false branch recursively
+	const smack::Block* elseBlock = nullptr;
 	if (_node.falseStatement())
 	{
 		currentBlocks.push(smack::Block::block());
 		_node.falseStatement()->accept(*this);
-		elze = currentBlocks.top();
+		elseBlock = currentBlocks.top();
 		currentBlocks.pop();
 	}
 
-	currentBlocks.top()->addStmt(smack::Stmt::ifelse(cond, then, elze));
+	currentBlocks.top()->addStmt(smack::Stmt::ifelse(cond, thenBlock, elseBlock));
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
@@ -345,7 +330,6 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(ForStatement const& _node)
 {
@@ -389,7 +373,6 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	// TODO: Boogie does not support continue, this must be mapped manually
@@ -397,13 +380,11 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(Break const&)
 {
 	currentBlocks.top()->addStmt(smack::Stmt::break_());
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
@@ -429,25 +410,21 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(Throw const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(EmitStatement const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 {
-	// TODO: modifiers?
 	for (auto decl : _node.declarations())
 	{
-		if (decl->isLocalOrReturn())
+		if (decl->isLocalVariable())
 		{
 			// Boogie requires local variables to be declared at the beginning of the procedure
 			localDecls.push_back(smack::Decl::variable(
@@ -456,7 +433,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		}
 		else
 		{
-			// Non-local variables should be handled as VariableDeclaration
+			// Non-local variables should be handled elsewhere
 			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
 					errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
 					errinfo_sourceLocation(_node.location()));
@@ -486,7 +463,6 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 {
 	// Boogie cannot have expressions as statements, therefore
@@ -496,11 +472,14 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	if (dynamic_cast<FunctionCall const*>(&_node.expression())) return true;
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment(string("Unsupported ExpressionStatement")) <<
+				errinfo_comment(string("Unsupported expression appearing as statement")) <<
 				errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
+// ---------------------------------------------------------------------------
+//                    Visitor methods for expressions
+// ---------------------------------------------------------------------------
 
 bool ASTBoogieConverter::visit(Conditional const& _node)
 {
@@ -523,14 +502,14 @@ bool ASTBoogieConverter::visit(Conditional const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(Assignment const& _node)
 {
+	// Check if LHS is an identifier referencing a variable
 	if (Identifier const* lhsId = dynamic_cast<Identifier const*>(&_node.leftHandSide()))
 	{
 		if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
 		{
-			// Get lhs recursively
+			// Get lhs recursively (required for +=, *=, etc.)
 			currentExpr = nullptr;
 			_node.leftHandSide().accept(*this);
 			const smack::Expr* lhs = currentExpr;
@@ -557,6 +536,8 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 					errinfo_sourceLocation(_node.location()));
 			}
 
+			// State variables are represented by maps, so x = 5 becomes
+			// an assignment and a map update like x := x[this := 5]
 			if (varDecl->isStateVariable())
 			{
 				currentBlocks.top()->addStmt(smack::Stmt::assign(
@@ -566,7 +547,7 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 								smack::Expr::id(BOOGIE_THIS),
 								rhs)));
 			}
-			else
+			else // Non-state variables can be simply assigned
 			{
 				currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
 			}
@@ -574,10 +555,11 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 		}
 	}
 
-	// TODO: exception
+	BOOST_THROW_EXCEPTION(CompilerError() <<
+			errinfo_comment("Only variable references are supported as LHS in assignment") <<
+			errinfo_sourceLocation(_node.location()));
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(TupleExpression const& _node)
 {
@@ -593,7 +575,6 @@ bool ASTBoogieConverter::visit(TupleExpression const& _node)
 	}
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 {
@@ -613,7 +594,6 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 {
@@ -659,12 +639,11 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(FunctionCall const& _node)
 {
-	// In Boogie function calls are statements and cannot be part of
+	// Function calls in Boogie are statements and cannot be part of
 	// expressions, therefore each function call is given a fresh variable
-	// and is mapped to a call statement
+	// for its return value and is mapped to a call statement
 
 	// Get arguments recursively
 	list<const smack::Expr*> args;
@@ -694,7 +673,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == SOLIDITY_ASSERT)
 	{
-		// The parameter of is the second argument (the first is 'this')
+		// The parameter of assert is the second argument (the first is 'this')
 		currentBlocks.top()->addStmt(smack::Stmt::assert_(*(++args.begin())));
 		return false;
 	}
@@ -703,7 +682,9 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	if (_node.annotation().type->toString() != "tuple()")
 	{
 		// Create fresh variable to store the result
-		smack::Decl* returnVar = smack::Decl::variable(funcName + "#" + to_string(_node.id()), mapType(_node.annotation().type, _node));
+		smack::Decl* returnVar = smack::Decl::variable(
+				funcName + "#" + to_string(_node.id()),
+				mapType(_node.annotation().type, _node));
 		localDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		currentExpr = smack::Expr::id(returnVar->getName());
@@ -721,12 +702,10 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(NewExpression const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(MemberAccess const& _node)
 {
@@ -741,40 +720,40 @@ bool ASTBoogieConverter::visit(MemberAccess const& _node)
 	}
 	else
 	{
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+		BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment("Member access only supported for 'balance'") <<
 				errinfo_sourceLocation(_node.location()));
 	}
 	return false;
 }
 
-
 bool ASTBoogieConverter::visit(IndexAccess const& _node)
 {
 	return visitNode(_node);
 }
 
-
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
 	string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
-	bool global = false;
+
+	// Check if a state variable is referenced
+	bool referencesStateVar = false;
 	if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
 	{
-		global = varDecl->isStateVariable();
+		referencesStateVar = varDecl->isStateVariable();
 	}
 
-	if (global) { currentExpr = smack::Expr::sel(declName, BOOGIE_THIS); }
+	// State variables must be referenced by accessing the map
+	if (referencesStateVar) { currentExpr = smack::Expr::sel(declName, BOOGIE_THIS); }
+	// Other identifiers can be referenced by their name
 	else { currentExpr = smack::Expr::id(declName); }
 	return false;
 }
-
 
 bool ASTBoogieConverter::visit(ElementaryTypeNameExpression const& _node)
 {
 	return visitNode(_node);
 }
-
 
 bool ASTBoogieConverter::visit(Literal const& _node)
 {
