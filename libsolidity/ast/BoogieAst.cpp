@@ -629,12 +629,12 @@ void IfElseStmt::print(std::ostream& os) const {
   cond->print(os);
   os << ") {\n";
   then->print(os);
-  os << "\n}\n";
+  os << "\n  }\n";
 
   if (elze) {
 	os << "  else {\n";
 	elze->print(os);
-	os << "\n}\n";
+	os << "\n  }\n";
   }
 }
 
@@ -650,7 +650,7 @@ void WhileStmt::print(std::ostream& os) const {
     print_seq<const Expr*>(os, invars, "  invariant ", ";\n  invariant ", ";");
   }
   body->print(os);
-  os << "\n}\n";
+  os << "\n  }\n";
 }
 
 void BreakStmt::print(std::ostream& os) const {
