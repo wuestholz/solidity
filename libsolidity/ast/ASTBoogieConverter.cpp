@@ -15,8 +15,12 @@ namespace dev
 namespace solidity
 {
 
+const string SOLIDITY_ADDRESS_TYPE = "address";
 const string BOOGIE_ADDRESS_TYPE = "address_t";
 const string SOLIDITY_BALANCE = "balance";
+const string SOLIDITY_MSG = "msg";
+const string SOLIDITY_SENDER = "sender";
+const string BOOGIE_MSG_SENDER = "__msg_sender";
 const string BOOGIE_BALANCE = "balance";
 const string SOLIDITY_TRANSFER = "transfer";
 const string BOOGIE_TRANSFER = "transfer";
@@ -47,7 +51,7 @@ string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNod
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
-	if (tpStr == "address") return BOOGIE_ADDRESS_TYPE;
+	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
 	if (tpStr == "bool") return "bool";
 	for (int i = 8; i <= 256; ++i)
 	{
@@ -71,7 +75,8 @@ ASTBoogieConverter::ASTBoogieConverter()
 	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[" + BOOGIE_ADDRESS_TYPE + "]int"));
 
 	list<smack::Binding> transferParams;
-	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // Add 'this' as first parameter
+	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // 'this'
+	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // 'msg.sender'
 	transferParams.push_back(make_pair("amount", "int"));
 
 	smack::Block* transferImpl = smack::Block::block();
@@ -162,8 +167,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Input parameters
 	list<smack::Binding> params;
-	params.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // Add 'this' as first parameter
-	for (auto p : _node.parameters()) // Other parameters
+	// Add some extra parameters for globally available variables
+	params.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // this
+	params.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // msg.sender
+	// Add original parameters of the function
+	for (auto p : _node.parameters())
 	{
 		params.push_back(make_pair(mapDeclName(*p), mapType(p->type(), *p)));
 	}
@@ -658,6 +666,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// for its return value and is mapped to a call statement
 
 	// Get the name of the called function and the address on which it is called
+	// By default, it is 'this', but member access expressions can override it
 	currentExpr = nullptr;
 	currentAddress = smack::Expr::id(BOOGIE_THIS);
 	_node.expression().accept(*this);
@@ -675,7 +684,10 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 
 	// Get arguments recursively
 	list<const smack::Expr*> args;
-	args.push_back(currentAddress); // Pass current address as first argument
+	// Pass extra arguments
+	args.push_back(currentAddress); // this
+	args.push_back(smack::Expr::id(BOOGIE_THIS)); // msg.sender
+	// Add normal arguments
 	for (auto arg : _node.arguments())
 	{
 		currentExpr = nullptr;
@@ -686,8 +698,11 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == SOLIDITY_ASSERT)
 	{
-		// The parameter of assert is the second argument (the first is 'this')
-		currentBlocks.top()->addStmt(smack::Stmt::assert_(*(++args.begin())));
+		// The parameter of assert is the first normal argument
+		list<const smack::Expr*>::iterator it = args.begin();
+		std::advance(it, 2);
+		currentExpr = *it;
+		currentBlocks.top()->addStmt(smack::Stmt::assert_(currentExpr));
 		return false;
 	}
 
@@ -722,28 +737,37 @@ bool ASTBoogieConverter::visit(NewExpression const& _node)
 
 bool ASTBoogieConverter::visit(MemberAccess const& _node)
 {
-	// 'balance' is a special member of each contract
-	if (_node.memberName() == SOLIDITY_BALANCE)
-	{
-		currentExpr = nullptr;
-		_node.expression().accept(*this);
-		const smack::Expr* expr = currentExpr;
+	// Get expression recursively
+	currentExpr = nullptr;
+	_node.expression().accept(*this);
+	const smack::Expr* expr = currentExpr;
+	// In case of a function call, the current expression is the address
+	// on which the function is called
+	currentAddress = currentExpr;
+	// Type of the expression
+	string typeStr = _node.expression().annotation().type->toString();
 
+	// Handle special members/functions
+
+	// address.balance
+	if (typeStr == SOLIDITY_ADDRESS_TYPE && _node.memberName() == SOLIDITY_BALANCE)
+	{
 		currentExpr = smack::Expr::sel(smack::Expr::id(BOOGIE_BALANCE), expr);
 	}
-	else if (_node.memberName() == SOLIDITY_TRANSFER)
+	// address.transfer()
+	else if (typeStr == SOLIDITY_ADDRESS_TYPE && _node.memberName() == SOLIDITY_TRANSFER)
 	{
-		// Get the address on which transfer is called
-		currentExpr = nullptr;
-		_node.expression().accept(*this);
-		currentAddress = currentExpr;
-		// Set the name to transfer
 		currentExpr = smack::Expr::id(BOOGIE_TRANSFER);
+	}
+	// msg.sender
+	else if (typeStr == SOLIDITY_MSG && _node.memberName() == SOLIDITY_SENDER)
+	{
+		currentExpr = smack::Expr::id(BOOGIE_MSG_SENDER);
 	}
 	else
 	{
 		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Member access only supported for 'balance'") <<
+				errinfo_comment("Member access not supported yet") <<
 				errinfo_sourceLocation(_node.location()));
 	}
 	return false;
