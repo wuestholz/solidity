@@ -80,7 +80,23 @@ ASTBoogieConverter::ASTBoogieConverter()
 	transferParams.push_back(make_pair("amount", "int"));
 
 	smack::Block* transferImpl = smack::Block::block();
-	transferImpl->addStmt(smack::Stmt::comment("TODO"));
+	// balance[this] += amount
+	transferImpl->addStmt(smack::Stmt::assign(
+			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(BOOGIE_BALANCE),
+					smack::Expr::id(BOOGIE_THIS),
+					smack::Expr::plus(smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS), smack::Expr::id("amount"))
+			)));
+	// balance[msg.sender] -= amount
+	transferImpl->addStmt(smack::Stmt::assign(
+			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(BOOGIE_BALANCE),
+					smack::Expr::id(BOOGIE_MSG_SENDER),
+					smack::Expr::minus(smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER), smack::Expr::id("amount"))
+			)));
+	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception"));
 	list<smack::Block*> transferBlocks;
 	transferBlocks.push_back(transferImpl);
 

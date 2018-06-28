@@ -18,7 +18,7 @@ for f in ./output/*.bpl; do
         mono $CORRAL "$f" /main:main
     else
         echo -e "\n======= $f (without main function, running Boogie) =======\n"
-        mono $BOOGIE "$f" /doModSetAnalysis
+        mono $BOOGIE "$f" /doModSetAnalysis /nologo /errorTrace:0
     fi
 done
 
