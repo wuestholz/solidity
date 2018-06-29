@@ -1,4 +1,4 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.23;
 
 contract SimpleArithmetic {
     function and(bool a, bool b) pure public returns (bool) {
