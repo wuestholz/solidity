@@ -40,11 +40,11 @@ contract Crowdsale {
   event TokenPurchase(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
 
 
-  function Crowdsale(uint256 _startBlock, uint256 _endBlock, uint256 _rate, address _wallet) {
+  constructor(uint256 _startBlock, uint256 _endBlock, uint256 _rate, address _wallet) {
     require(_startBlock >= block.number);
     require(_endBlock >= _startBlock);
     require(_rate > 0);
-    require(_wallet != 0x0);
+    require(_wallet != address(0x0));
 
     token = createTokenContract();
     startBlock = _startBlock;
@@ -61,13 +61,13 @@ contract Crowdsale {
 
 
   // fallback function can be used to buy tokens
-  function () payable {
+  function () external payable {
     buyTokens(msg.sender);
   }
 
   // low level token purchase function
   function buyTokens(address beneficiary) payable {
-    require(beneficiary != 0x0);
+    require(beneficiary != address(0x0));
     require(validPurchase());
 
     uint256 weiAmount = msg.value;
@@ -80,7 +80,7 @@ contract Crowdsale {
     weiRaised = updatedWeiRaised;
 
     token.mint(beneficiary, tokens);
-    TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
+    emit TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
     forwardFunds();
   }

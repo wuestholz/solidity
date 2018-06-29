@@ -599,9 +599,9 @@ MemberList::MemberMap IntegerType::nativeMembers(ContractDefinition const*) cons
 	if (isAddress())
 		return {
 			{"balance", make_shared<IntegerType>(256)},
-			{"call", make_shared<FunctionType>(strings(), strings{"bool"}, FunctionType::Kind::BareCall, true, StateMutability::Payable)},
-			{"callcode", make_shared<FunctionType>(strings(), strings{"bool"}, FunctionType::Kind::BareCallCode, true, StateMutability::Payable)},
-			{"delegatecall", make_shared<FunctionType>(strings(), strings{"bool"}, FunctionType::Kind::BareDelegateCall, true)},
+			{"call", make_shared<FunctionType>(strings{"bytes memory"}, strings{"bool"}, FunctionType::Kind::BareCall, false, StateMutability::Payable)},
+			{"callcode", make_shared<FunctionType>(strings{"bytes memory"}, strings{"bool"}, FunctionType::Kind::BareCallCode, false, StateMutability::Payable)},
+			{"delegatecall", make_shared<FunctionType>(strings{"bytes memory"}, strings{"bool"}, FunctionType::Kind::BareDelegateCall, false)},
 			{"send", make_shared<FunctionType>(strings{"uint"}, strings{"bool"}, FunctionType::Kind::Send)},
 			{"transfer", make_shared<FunctionType>(strings{"uint"}, strings(), FunctionType::Kind::Transfer)}
 		};
@@ -856,43 +856,49 @@ tuple<bool, rational> RationalNumberType::isValidLiteral(Literal const& _literal
 
 bool RationalNumberType::isImplicitlyConvertibleTo(Type const& _convertTo) const
 {
-	if (_convertTo.category() == Category::Integer)
+	switch (_convertTo.category())
 	{
-		if (m_value == rational(0))
-			return true;
+	case Category::Integer:
+	{
 		if (isFractional())
 			return false;
 		IntegerType const& targetType = dynamic_cast<IntegerType const&>(_convertTo);
+		if (targetType.isAddress())
+			return false;
+		if (m_value == rational(0))
+			return true;
 		unsigned forSignBit = (targetType.isSigned() ? 1 : 0);
 		if (m_value > rational(0))
 		{
 			if (m_value.numerator() <= (u256(-1) >> (256 - targetType.numBits() + forSignBit)))
 				return true;
+			return false;
 		}
-		else if (targetType.isSigned() && -m_value.numerator() <= (u256(1) << (targetType.numBits() - forSignBit)))
-			return true;
+		if (targetType.isSigned())
+		{
+			if (-m_value.numerator() <= (u256(1) << (targetType.numBits() - forSignBit)))
+				return true;
+		}
 		return false;
 	}
-	else if (_convertTo.category() == Category::FixedPoint)
+	case Category::FixedPoint:
 	{
 		if (auto fixed = fixedPointType())
 			return fixed->isImplicitlyConvertibleTo(_convertTo);
-		else
-			return false;
+		return false;
 	}
-	else if (_convertTo.category() == Category::FixedBytes)
+	case Category::FixedBytes:
 	{
 		FixedBytesType const& fixedBytes = dynamic_cast<FixedBytesType const&>(_convertTo);
-		if (!isFractional())
-		{
-			if (integerType())
-				return fixedBytes.numBytes() * 8 >= integerType()->numBits();
+		if (isFractional())
 			return false;
-		}
-		else
-			return false;
+		if (integerType())
+			return fixedBytes.numBytes() * 8 >= integerType()->numBits();
+		return false;
 	}
-	return false;
+	default:
+		return false;
+	}
 }
 
 bool RationalNumberType::isExplicitlyConvertibleTo(Type const& _convertTo) const
@@ -2997,6 +3003,25 @@ ASTPointer<ASTString> FunctionType::documentation() const
 		return function->documentation();
 
 	return ASTPointer<ASTString>();
+}
+
+bool FunctionType::padArguments() const
+{
+	// No padding only for hash functions, low-level calls and the packed encoding function.
+	switch (m_kind)
+	{
+	case Kind::BareCall:
+	case Kind::BareCallCode:
+	case Kind::BareDelegateCall:
+	case Kind::SHA256:
+	case Kind::RIPEMD160:
+	case Kind::SHA3:
+	case Kind::ABIEncodePacked:
+		return false;
+	default:
+		return true;
+	}
+	return true;
 }
 
 string MappingType::richIdentifier() const

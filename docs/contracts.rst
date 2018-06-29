@@ -113,7 +113,7 @@ This means that cyclic creation dependencies are impossible.
         {
             // Check some arbitrary condition.
             address tokenAddress = msg.sender;
-            return (keccak256(newOwner) & 0xff) == (bytes20(tokenAddress) & 0xff);
+            return (keccak256(abi.encodePacked(newOwner)) & 0xff) == (bytes20(tokenAddress) & 0xff);
         }
     }
 
@@ -377,7 +377,7 @@ inheritable properties of contracts and may be overridden by derived contracts.
         /// The `return 7` statement assigns 7 to the return value but still
         /// executes the statement `locked = false` in the modifier.
         function f() public noReentrancy returns (uint) {
-            require(msg.sender.call());
+            require(msg.sender.call(""));
             return 7;
         }
     }
@@ -543,7 +543,7 @@ Fallback Function
 =================
 
 A contract can have exactly one unnamed function. This function cannot have
-arguments and cannot return anything.
+arguments, cannot return anything and has to have ``external`` visibility.
 It is executed on a call to the contract if none of the other
 functions match the given function identifier (or if no data was supplied at
 all).
@@ -591,7 +591,7 @@ Like any function, the fallback function can execute complex operations as long 
         // Sending Ether to this contract will cause an exception,
         // because the fallback function does not have the `payable`
         // modifier.
-        function() public { x = 1; }
+        function() external { x = 1; }
         uint x;
     }
 
@@ -599,12 +599,12 @@ Like any function, the fallback function can execute complex operations as long 
     // This contract keeps all Ether sent to it with no way
     // to get it back.
     contract Sink {
-        function() public payable { }
+        function() external payable { }
     }
 
     contract Caller {
         function callTest(Test test) public {
-            test.call(0xabcdef01); // hash does not exist
+            test.call(abi.encodeWithSignature("nonExistingFunction()"));
             // results in test.x becoming == 1.
 
             // The following will not compile, but even
@@ -723,22 +723,18 @@ the contract can only see the last 256 block hashes.
 
 Up to three parameters can
 receive the attribute ``indexed`` which will cause the respective arguments
-to be searched for: It is possible to filter for specific values of
-indexed arguments in the user interface.
-
-If arrays (including ``string`` and ``bytes``) are used as indexed arguments, the
-Keccak-256 hash of it is stored as topic instead.
-
-The hash of the signature of the event is one of the topics except if you
+to be stored in a special data structure as so-called "topics", which allows them to be searched for,
+for example when filtering a sequence of blocks for certain events. Events can always
+be filtered by the address of the contract that emitted the event. Also,
+the hash of the signature of the event is one of the topics except if you
 declared the event with ``anonymous`` specifier. This means that it is
 not possible to filter for specific anonymous events by name.
 
-All non-indexed arguments will be stored in the data part of the log.
+If arrays (including ``string`` and ``bytes``) are used as indexed arguments, the
+Keccak-256 hash of it is stored as topic instead. This is because a topic
+can only hold a single word (32 bytes).
 
-.. note::
-    Indexed arguments will not be stored themselves.  You can only
-    search for the values, but it is impossible to retrieve the
-    values themselves.
+All non-indexed arguments will be :ref:`ABI-encoded <ABI>` into the data part of the log.
 
 ::
 
@@ -1327,6 +1323,7 @@ custom types without the overhead of external function calls:
             if (carry > 0) {
                 // too bad, we have to add a limb
                 uint[] memory newLimbs = new uint[](r.limbs.length + 1);
+                uint i;
                 for (i = 0; i < r.limbs.length; ++i)
                     newLimbs[i] = r.limbs[i];
                 newLimbs[i] = carry;
@@ -1405,24 +1402,25 @@ Using For
 *********
 
 The directive ``using A for B;`` can be used to attach library
-functions (from the library ``A``) to any type (``B``).
+functions (from the library ``A``) to any type (``B``).  
 These functions will receive the object they are called on
-as their first parameter (like the ``self`` variable in
-Python).
+as their first parameter (like the ``self`` variable in Python).
 
 The effect of ``using A for *;`` is that the functions from
-the library ``A`` are attached to any type.
+the library ``A`` are attached to *any* type.
 
-In both situations, all functions, even those where the
-type of the first parameter does not match the type of
-the object, are attached. The type is checked at the
+In both situations, *all* functions in the library are attached,
+even those where the type of the first parameter does not
+match the type of the object. The type is checked at the
 point the function is called and function overload
 resolution is performed.
 
-The ``using A for B;`` directive is active for the current
-scope, which is limited to a contract for now but will
-be lifted to the global scope later, so that by including
-a module, its data types including library functions are
+The ``using A for B;`` directive is active only within the current
+contract, including within all of its functions, and has no effect
+outside of the contract in which it is used. The directive
+may only be used inside a contract, not inside any of its functions.
+
+By including a library, its data types including library functions are
 available without having to add further code.
 
 Let us rewrite the set example from the
