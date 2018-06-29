@@ -35,6 +35,7 @@ private:
 	const smack::Expr* currentRet;
 
 	const smack::Expr* currentAddress;
+	bool isGetter;
 
 	void addGlobalComment(std::string str);
 

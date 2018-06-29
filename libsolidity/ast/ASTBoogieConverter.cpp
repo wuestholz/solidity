@@ -59,6 +59,7 @@ string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNod
 		if (tpStr == "int" + to_string(i)) return "int";
 		if (tpStr == "uint" + to_string(i)) return "int";
 	}
+	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment("Unsupported type: " + tpStr) <<
@@ -696,6 +697,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// By default, it is 'this', but member access expressions can override it
 	currentExpr = nullptr;
 	currentAddress = smack::Expr::id(BOOGIE_THIS);
+	isGetter = false;
 	_node.expression().accept(*this);
 	string funcName;
 	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
@@ -707,6 +709,13 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 		BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment(string("Only identifiers are supported as function calls")) <<
 				errinfo_sourceLocation(_node.location()));
+	}
+
+	if (isGetter && _node.arguments().size() > 0)
+	{
+		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+						errinfo_comment("Getter should not have arguments") <<
+						errinfo_sourceLocation(_node.location()));
 	}
 
 	// Get arguments recursively
@@ -743,10 +752,22 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 		localDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		currentExpr = smack::Expr::id(returnVar->getName());
-		list<string> rets;
-		rets.push_back(returnVar->getName());
-		// Assign to the fresh variable
-		currentBlocks.top()->addStmt(smack::Stmt::call(funcName, args, rets));
+
+		if (isGetter)
+		{
+			// Getters are replaced with map access (instead of function call)
+			currentBlocks.top()->addStmt(smack::Stmt::assign(
+					smack::Expr::id(returnVar->getName()),
+					smack::Expr::sel(smack::Expr::id(funcName), currentAddress)));
+		}
+		else
+		{
+			list<string> rets;
+			rets.push_back(returnVar->getName());
+			// Assign call to the fresh variable
+			currentBlocks.top()->addStmt(smack::Stmt::call(funcName, args, rets));
+		}
+
 	}
 	else
 	{
@@ -791,11 +812,15 @@ bool ASTBoogieConverter::visit(MemberAccess const& _node)
 	{
 		currentExpr = smack::Expr::id(BOOGIE_MSG_SENDER);
 	}
+	// Non-special member access
 	else
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Member access not supported yet") <<
-				errinfo_sourceLocation(_node.location()));
+		currentExpr = smack::Expr::id(mapDeclName(*_node.annotation().referencedDeclaration));
+		isGetter = false;
+		if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
+		{
+			isGetter = true;
+		}
 	}
 	return false;
 }
