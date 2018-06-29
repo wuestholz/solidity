@@ -316,7 +316,7 @@ FuncDecl* Decl::code(ProcDecl* P) {
     for (auto S : *B) {
       const Stmt* SS;
       // Original version was: if (llvm::isa<ReturnStmt>(S))
-      if (const ReturnStmt* RS = dynamic_cast<const ReturnStmt*>(S))
+      if (dynamic_cast<const ReturnStmt*>(S))
         SS = Stmt::return_(Expr::neq(Expr::id(P->getReturns().front().first),Expr::lit(0U)));
       else
         SS = S;
