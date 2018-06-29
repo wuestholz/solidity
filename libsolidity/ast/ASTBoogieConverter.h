@@ -34,7 +34,10 @@ private:
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* currentRet;
 
+	// Current address on which a function is called
 	const smack::Expr* currentAddress;
+
+	// Is the current function called a getter
 	bool isGetter;
 
 	void addGlobalComment(std::string str);

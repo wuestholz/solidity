@@ -43,8 +43,8 @@ string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
 
 	// ID is important to append, since (1) even fully qualified names can be
-	// same for contract variable and function local variable, (2) return
-	// variables might have no name (Boogie requires a name)
+	// same for state variables and local variables in functions, (2) return
+	// variables might have no name (whereas Boogie requires a name)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
@@ -123,7 +123,8 @@ void ASTBoogieConverter::print(ostream& _stream)
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
 	// Boogie programs are flat, source units do not appear explicitly
-	addGlobalComment("Source: " + _node.annotation().path);
+	addGlobalComment("");
+	addGlobalComment("------- Source: " + _node.annotation().path + " -------");
 	return true; // Simply apply visitor recursively
 }
 
@@ -142,7 +143,8 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
 	// Boogie programs are flat, contracts do not appear explicitly
-	addGlobalComment("Contract: " + _node.fullyQualifiedName() + "\n");
+	addGlobalComment("");
+	addGlobalComment("------- Contract: " + _node.name() + " -------");
 	return true; // Simply apply visitor recursively
 }
 
@@ -181,7 +183,8 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
 	// Solidity functions are mapped to Boogie procedures
-	addGlobalComment("Function: " + _node.fullyQualifiedName());
+	addGlobalComment("");
+	addGlobalComment("Function: " + _node.name() + " : " + _node.type()->toString());
 
 	// Input parameters
 	list<smack::Binding> params;
@@ -231,12 +234,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				errinfo_comment("Non-empty stack of blocks at the end of function."));
 	}
 
-	// Get the name
+	// Get the name of the function
 	string funcName = _node.isConstructor() ? BOOGIE_CONSTRUCTOR : mapDeclName(_node);
 
 	// Create the procedure
-	program.getDeclarations().push_back(
-			smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
+	program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
 	return false;
 }
 
@@ -256,7 +258,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 				errinfo_sourceLocation(_node.location()));
 	}
 
-	addGlobalComment("State variable: " + _node.fullyQualifiedName());
+	addGlobalComment("");
+	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	program.getDeclarations().push_back(
 			smack::Decl::variable(mapDeclName(_node),
@@ -328,7 +331,6 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 bool ASTBoogieConverter::visit(IfStatement const& _node)
 {
 	// Get condition recursively
-	currentExpr = nullptr;
 	_node.condition().accept(*this);
 	const smack::Expr* cond = currentExpr;
 
@@ -355,7 +357,6 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
 	// Get condition recursively
-	currentExpr = nullptr;
 	_node.condition().accept(*this);
 	const smack::Expr* cond = currentExpr;
 
@@ -389,12 +390,12 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	}
 
 	// Get condition recursively
-	currentExpr = nullptr;
+	const smack::Expr* cond = nullptr;
 	if (_node.condition())
 	{
 		_node.condition()->accept(*this);
+		cond = currentExpr;
 	}
-	const smack::Expr* cond = currentExpr;
 
 	// Get body recursively
 	currentBlocks.push(smack::Block::block());
@@ -402,7 +403,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// Include loop expression at the end of body
 	if (_node.loopExpression())
 	{
-		_node.loopExpression()->accept(*this);
+		_node.loopExpression()->accept(*this); // Adds statement to current block
 	}
 	const smack::Block* body = currentBlocks.top();
 	currentBlocks.pop();
@@ -437,11 +438,10 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	else
 	{
 		// Get rhs recursively
-		currentExpr = nullptr;
 		_node.expression()->accept(*this);
 		const smack::Expr* rhs = currentExpr;
 
-		// lhs should already be known
+		// lhs should already be known (set by the enclosing FunctionDefinition)
 		const smack::Expr* lhs = currentRet;
 
 		// First create an assignment, and then an empty return
@@ -487,12 +487,12 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		if (_node.declarations().size() == 1)
 		{
 			// Get expression recursively
-			currentExpr = nullptr;
 			_node.initialValue()->accept(*this);
+			const smack::Expr* rhs = currentExpr;
 
 			currentBlocks.top()->addStmt(smack::Stmt::assign(
-					smack::Expr::id(mapDeclName(*(_node.declarations()[0]))),
-					currentExpr));
+					smack::Expr::id(mapDeclName(**_node.declarations().begin())),
+					rhs));
 		}
 		else
 		{
@@ -525,17 +525,14 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 bool ASTBoogieConverter::visit(Conditional const& _node)
 {
 	// Get condition recursively
-	currentExpr = nullptr;
 	_node.condition().accept(*this);
 	const smack::Expr* cond = currentExpr;
 
 	// Get true expression recursively
-	currentExpr = nullptr;
 	_node.trueExpression().accept(*this);
 	const smack::Expr* trueExpr = currentExpr;
 
 	// Get false expression recursively
-	currentExpr = nullptr;
 	_node.falseExpression().accept(*this);
 	const smack::Expr* falseExpr = currentExpr;
 
@@ -551,12 +548,10 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 		if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
 		{
 			// Get lhs recursively (required for +=, *=, etc.)
-			currentExpr = nullptr;
 			_node.leftHandSide().accept(*this);
 			const smack::Expr* lhs = currentExpr;
 
 			// Get rhs recursively
-			currentExpr = nullptr;
 			_node.rightHandSide().accept(*this);
 			const smack::Expr* rhs = currentExpr;
 
@@ -620,7 +615,6 @@ bool ASTBoogieConverter::visit(TupleExpression const& _node)
 bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 {
 	// Get operand recursively
-	currentExpr = nullptr;
 	_node.subExpression().accept(*this);
 	const smack::Expr* subExpr = currentExpr;
 
@@ -639,12 +633,10 @@ bool ASTBoogieConverter::visit(UnaryOperation const& _node)
 bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 {
 	// Get lhs recursively
-	currentExpr = nullptr;
 	_node.leftExpression().accept(*this);
 	const smack::Expr* lhs = currentExpr;
 
 	// Get rhs recursively
-	currentExpr = nullptr;
 	_node.rightExpression().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
@@ -786,7 +778,6 @@ bool ASTBoogieConverter::visit(NewExpression const& _node)
 bool ASTBoogieConverter::visit(MemberAccess const& _node)
 {
 	// Get expression recursively
-	currentExpr = nullptr;
 	_node.expression().accept(*this);
 	const smack::Expr* expr = currentExpr;
 	// In case of a function call, the current expression is the address
