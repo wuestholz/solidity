@@ -28,6 +28,7 @@ const string SOLIDITY_THIS = "this";
 const string BOOGIE_THIS = "__this";
 const string SOLIDITY_ASSERT = "assert";
 const string VERIFIER_MAIN = "__verifier_main";
+const string BOOGIE_CONSTRUCTOR = "__constructor";
 
 void ASTBoogieConverter::addGlobalComment(string str)
 {
@@ -229,9 +230,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				errinfo_comment("Non-empty stack of blocks at the end of function."));
 	}
 
+	// Get the name
+	string funcName = _node.isConstructor() ? BOOGIE_CONSTRUCTOR : mapDeclName(_node);
+
 	// Create the procedure
 	program.getDeclarations().push_back(
-			smack::Decl::procedure(mapDeclName(_node), params, rets, localDecls, blocks));
+			smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
 	return false;
 }
 
