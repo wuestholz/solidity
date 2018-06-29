@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(simple_contract)
 		contract test {
 			bytes32 public shaValue;
 			function f(uint a) {
-				shaValue = keccak256(a);
+				shaValue = keccak256(abi.encodePacked(a));
 			}
 		}
 	)";
@@ -164,8 +164,8 @@ BOOST_AUTO_TEST_CASE(store_keccak256)
 	char const* sourceCode = R"(
 		contract test {
 			bytes32 public shaValue;
-			function test(uint a) {
-				shaValue = keccak256(a);
+			constructor(uint a) {
+				shaValue = keccak256(abi.encodePacked(a));
 			}
 		}
 	)";
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(updating_store)
 		contract test {
 			uint data;
 			uint data2;
-			function test() {
+			constructor() {
 				data = 1;
 				data = 2;
 				data2 = 0;
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(regular_functions_exclude_fallback)
 	char const* sourceCode = R"(
 		contract A {
 			uint public x;
-			function() { x = 2; }
+			function() external { x = 2; }
 		}
 	)";
 	testCreationTimeGas(sourceCode);

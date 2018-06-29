@@ -61,7 +61,7 @@ contract publisher is announcementTypes, module, safeMath {
     
     mapping (address => uint256[]) public opponents;
     
-    function publisher(address moduleHandler) {
+    constructor(address moduleHandler) {
         /*
             Installation function.  The installer will be registered in the admin list automatically
             
@@ -111,7 +111,7 @@ contract publisher is announcementTypes, module, safeMath {
             @success        Opposed or not
         */
         if ( ! oppositable ) { return false; }
-        var (_success, _amount) = moduleHandler(moduleHandlerAddress).totalSupply();
+        (bool _success, uint256 _amount) = moduleHandler(moduleHandlerAddress).totalSupply();
         require( _success );
         return _amount * oppositeRate / 100 > weight;
     }
@@ -148,7 +148,7 @@ contract publisher is announcementTypes, module, safeMath {
         announcements[announcementsLength]._str = _str;
         announcements[announcementsLength]._uint = _uint;
         announcements[announcementsLength]._addr = _addr;
-        ENewAnnouncement(announcementsLength, Type);
+        emit ENewAnnouncement(announcementsLength, Type);
     }
     
     function closeAnnouncement(uint256 id) onlyOwner external {
@@ -229,7 +229,7 @@ contract publisher is announcementTypes, module, safeMath {
                 newArrayID = a;
             }
         }
-        var (_success, _balance) = moduleHandler(moduleHandlerAddress).balanceOf(msg.sender);
+        (bool _success, uint256 _balance) = moduleHandler(moduleHandlerAddress).balanceOf(msg.sender);
         require( _success );
         require( _balance > 0);
         if ( foundEmptyArrayID ) {
@@ -238,7 +238,7 @@ contract publisher is announcementTypes, module, safeMath {
             opponents[msg.sender].push(id);
         }
         announcements[id].oppositionWeight += _balance;
-        EOppositeAnnouncement(id, msg.sender, _balance);
+        emit EOppositeAnnouncement(id, msg.sender, _balance);
     }
     
     function invalidateAnnouncement(uint256 id) onlyOwner external {
@@ -250,7 +250,7 @@ contract publisher is announcementTypes, module, safeMath {
         require( announcements[id].open );
         announcements[id].end = block.number;
         announcements[id].open = false;
-        EInvalidateAnnouncement(id);
+        emit EInvalidateAnnouncement(id);
     }
     
     modifier onlyOwner() {
@@ -266,7 +266,7 @@ contract publisher is announcementTypes, module, safeMath {
             Inner function to check the ICO status.
             @bool       Is the ICO in proccess or not?
         */
-        var (_success, _isICO) = moduleHandler(moduleHandlerAddress).isICO();
+        (bool _success, bool _isICO) = moduleHandler(moduleHandlerAddress).isICO();
         require( _success );
         return _isICO;
     }

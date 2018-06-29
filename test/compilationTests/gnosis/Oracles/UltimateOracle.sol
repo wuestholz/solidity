@@ -46,7 +46,7 @@ contract UltimateOracle is Oracle {
     /// @param _challengePeriod Time to challenge oracle outcome
     /// @param _challengeAmount Amount to challenge the outcome
     /// @param _frontRunnerPeriod Time to overbid the front-runner
-    function UltimateOracle(
+    constructor(
         Oracle _forwardedOracle,
         Token _collateralToken,
         uint8 _spreadMultiplier,
@@ -57,8 +57,8 @@ contract UltimateOracle is Oracle {
         public
     {
         // Validate inputs
-        require(   address(_forwardedOracle) != 0
-                && address(_collateralToken) != 0
+        require(   address(_forwardedOracle) != address(0)
+                && address(_collateralToken) != address(0)
                 && _spreadMultiplier >= 2
                 && _challengePeriod > 0
                 && _challengeAmount > 0
@@ -81,7 +81,7 @@ contract UltimateOracle is Oracle {
                 && forwardedOracle.isOutcomeSet());
         forwardedOutcome = forwardedOracle.getOutcome();
         forwardedOutcomeSetTimestamp = now;
-        ForwardedOracleOutcomeAssignment(forwardedOutcome);
+        emit ForwardedOracleOutcomeAssignment(forwardedOutcome);
     }
 
     /// @dev Allows to challenge the oracle outcome
@@ -98,7 +98,7 @@ contract UltimateOracle is Oracle {
         totalAmount = challengeAmount;
         frontRunner = _outcome;
         frontRunnerSetTimestamp = now;
-        OutcomeChallenge(msg.sender, _outcome);
+        emit OutcomeChallenge(msg.sender, _outcome);
     }
 
     /// @dev Allows to challenge the oracle outcome
@@ -122,7 +122,7 @@ contract UltimateOracle is Oracle {
             frontRunner = _outcome;
             frontRunnerSetTimestamp = now;
         }
-        OutcomeVote(msg.sender, _outcome, amount);
+        emit OutcomeVote(msg.sender, _outcome, amount);
     }
 
     /// @dev Withdraws winnings for user
@@ -137,7 +137,7 @@ contract UltimateOracle is Oracle {
         outcomeAmounts[msg.sender][frontRunner] = 0;
         // Transfer earnings to contributor
         require(collateralToken.transfer(msg.sender, amount));
-        Withdrawal(msg.sender, amount);
+        emit Withdrawal(msg.sender, amount);
     }
 
     /// @dev Checks if time to challenge the outcome is over

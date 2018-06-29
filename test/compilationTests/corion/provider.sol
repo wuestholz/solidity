@@ -12,7 +12,7 @@ contract provider is module, safeMath, announcementTypes {
     function connectModule() external returns (bool success) {
         require( super.isModuleHandler(msg.sender) );
         super._connectModule();
-        var (_success, currentSchellingRound) = moduleHandler(moduleHandlerAddress).getCurrentSchellingRoundID();
+        (bool _success, uint256 currentSchellingRound) = moduleHandler(moduleHandlerAddress).getCurrentSchellingRoundID();
         require( _success );
         return true;
     }
@@ -49,7 +49,7 @@ contract provider is module, safeMath, announcementTypes {
         return true;
     }
     modifier isReady {
-        var (_success, _active) = super.isActive();
+        (bool _success, bool _active) = super.isActive();
         require( _success && _active ); 
         _;
     }
@@ -118,7 +118,7 @@ contract provider is module, safeMath, announcementTypes {
     
     uint256 private currentSchellingRound = 1;
 
-    function provider(address _moduleHandler) {
+    constructor(address _moduleHandler) {
         /*
             Install function.
             
@@ -161,7 +161,7 @@ contract provider is module, safeMath, announcementTypes {
         if ( schellingRound == 0 ) {
             schellingRound = currentSchellingRound;
         }
-        if ( clients[addr].providerAddress != 0 ) {
+        if ( clients[addr].providerAddress != address(0x00) ) {
             ProviderAddress = clients[addr].providerAddress;
             ProviderHeight  = clients[addr].providerHeight;
             ConnectedOn     = clients[addr].providerConnected;
@@ -192,8 +192,8 @@ contract provider is module, safeMath, announcementTypes {
             @newValue       new
             @priv           Is the provider private?
         */
-        var a = rightForInterest(oldValue, priv);
-        var b = rightForInterest(newValue, priv);
+        bool a = rightForInterest(oldValue, priv);
+        bool b = rightForInterest(newValue, priv);
         if ( a && b ) {
             globalFunds[currentSchellingRound].supply = globalFunds[currentSchellingRound].supply - oldValue + newValue;
         } else if ( a && ! b ) {
@@ -233,7 +233,7 @@ contract provider is module, safeMath, announcementTypes {
             @admin          The admin’s address
         */
         require( ! providers[msg.sender].data[providers[msg.sender].currentHeight].valid );
-        require( clients[msg.sender].providerAddress == 0x00 );
+        require( clients[msg.sender].providerAddress == address(0x00) );
         require( ! checkICO() );
         if ( priv ) {
             require( getTokenBalance(msg.sender) >= minFundsForPrivate );
@@ -243,9 +243,9 @@ contract provider is module, safeMath, announcementTypes {
         require( checkCorrectRate(priv, rate) );
         
         providers[msg.sender].currentHeight++;
-        var currHeight = providers[msg.sender].currentHeight;
+        uint256 currHeight = providers[msg.sender].currentHeight;
         providers[msg.sender].data[currHeight].valid           = true;
-        if ( admin == 0x00 ) { 
+        if ( admin == address(0x00) ) {
             providers[msg.sender].data[currHeight].admin      = msg.sender;
         } else {
             providers[msg.sender].data[currHeight].admin      = admin;
@@ -268,7 +268,7 @@ contract provider is module, safeMath, announcementTypes {
         } else {
             delete providers[msg.sender].data[currHeight].supply[currentSchellingRound];
         }
-        EProviderOpen(msg.sender, currHeight);
+        emit EProviderOpen(msg.sender, currHeight);
     }
     function setProviderDetails(address addr, string website, string country, string info, uint8 rate, address admin) isReady external {
         /*
@@ -284,11 +284,11 @@ contract provider is module, safeMath, announcementTypes {
             @info               Short intro.
             @rate               Rate of the emission what will be given to the client.
         */
-        var currHeight = providers[addr].currentHeight;
+        uint256 currHeight = providers[addr].currentHeight;
         require( providers[addr].data[currHeight].valid );
         require( checkCorrectRate(providers[addr].data[currHeight].priv, rate) );
         require( providers[addr].data[currHeight].admin == msg.sender || msg.sender == addr );
-        if ( admin != 0x00 ) {
+        if ( admin != address(0x00) ) {
             require( msg.sender == addr );
             providers[addr].data[currHeight].admin = admin;
         }
@@ -297,7 +297,7 @@ contract provider is module, safeMath, announcementTypes {
         providers[addr].data[currHeight].country         = country;
         providers[addr].data[currHeight].info            = info;
         providers[addr].data[currHeight].currentRate     = rate;
-        EProviderDetailsChanged(addr, currHeight, website, country, info, rate, admin);
+        emit EProviderDetailsChanged(addr, currHeight, website, country, info, rate, admin);
     }
     function getProviderInfo(address addr, uint256 height) public constant returns (string name, string website, string country, string info, uint256 create) {
         /*
@@ -360,14 +360,14 @@ contract provider is module, safeMath, announcementTypes {
             It is only possible to close that active provider which is owned by the sender itself after calling the whole share of the emission.
             Whom were connected to the provider those clients will have to disconnect after they’ve called their share of emission which was not called before.
         */
-        var currHeight = providers[msg.sender].currentHeight;
+        uint256 currHeight = providers[msg.sender].currentHeight;
         require( providers[msg.sender].data[currHeight].valid );
         require( providers[msg.sender].data[currHeight].paidUpTo == currentSchellingRound );
         
         providers[msg.sender].data[currHeight].valid = false;
         providers[msg.sender].data[currHeight].close = currentSchellingRound;
         setRightForInterest(getProviderCurrentSupply(msg.sender), 0, providers[msg.sender].data[currHeight].priv);
-        EProviderClose(msg.sender, currHeight);
+        emit EProviderClose(msg.sender, currHeight);
     }
     function allowUsers(address provider, address[] addr) isReady external {
         /*
@@ -377,7 +377,7 @@ contract provider is module, safeMath, announcementTypes {
             
             @addr       Array of the addresses for whom the connection is allowed.
         */
-        var currHeight = providers[provider].currentHeight;
+        uint256 currHeight = providers[provider].currentHeight;
         require( providers[provider].data[currHeight].valid );
         require( providers[provider].data[currHeight].priv );
         require( providers[provider].data[currHeight].admin == msg.sender );
@@ -395,7 +395,7 @@ contract provider is module, safeMath, announcementTypes {
             
             @addr      Array of the addresses for whom the connection is allowed.
         */
-        var currHeight = providers[provider].currentHeight;
+        uint256 currHeight = providers[provider].currentHeight;
         require( providers[provider].data[currHeight].valid );
         require( providers[provider].data[currHeight].priv );
         require( providers[provider].data[currHeight].admin == msg.sender );
@@ -417,15 +417,15 @@ contract provider is module, safeMath, announcementTypes {
             
             @provider       Address of the provider.
         */
-        var currHeight = providers[provider].currentHeight;
+        uint256 currHeight = providers[provider].currentHeight;
         require( ! providers[msg.sender].data[currHeight].valid );
-        require( clients[msg.sender].providerAddress == 0x00 );
+        require( clients[msg.sender].providerAddress == address(0x00) );
         require( providers[provider].data[currHeight].valid );
         if ( providers[provider].data[currHeight].priv ) {
             require( providers[provider].data[currHeight].allowedUsers[msg.sender] &&
                      providers[provider].data[currHeight].clientsCount < privateProviderLimit );
         }
-        var bal = getTokenBalance(msg.sender);
+        uint256 bal = getTokenBalance(msg.sender);
         require( moduleHandler(moduleHandlerAddress).processTransactionFee(msg.sender, bal) );
         
         checkFloatingSupply(provider, currHeight, false, bal);
@@ -437,7 +437,7 @@ contract provider is module, safeMath, announcementTypes {
         clients[msg.sender].paidUpTo = currentSchellingRound;
         clients[msg.sender].lastRate = providers[provider].data[currHeight].currentRate;
         clients[msg.sender].providerConnected = now;
-        ENewClient(msg.sender, provider, currHeight, bal);
+        emit ENewClient(msg.sender, provider, currHeight, bal);
     }
     function partProvider() isReady external {
         /*
@@ -445,9 +445,9 @@ contract provider is module, safeMath, announcementTypes {
             Before disconnecting we should poll our share from the token emission even if there was nothing factually.
             It is only possible to disconnect those providers who were connected by us before.
         */
-        var provider = clients[msg.sender].providerAddress;
-        require( provider != 0x0 );
-        var currHeight = clients[msg.sender].providerHeight;
+        address provider = clients[msg.sender].providerAddress;
+        require( provider != address(0x00) );
+        uint256 currHeight = clients[msg.sender].providerHeight;
         bool providerHasClosed = false;
         if ( providers[provider].data[currHeight].close > 0 ) {
             providerHasClosed = true;
@@ -456,7 +456,7 @@ contract provider is module, safeMath, announcementTypes {
             require( clients[msg.sender].paidUpTo == currentSchellingRound );
         }
         
-        var bal = getTokenBalance(msg.sender);
+        uint256 bal = getTokenBalance(msg.sender);
         if ( ! providerHasClosed ) {
             providers[provider].data[currHeight].clientsCount--;
             checkFloatingSupply(provider, currHeight, true, bal);
@@ -467,7 +467,7 @@ contract provider is module, safeMath, announcementTypes {
         delete clients[msg.sender].paidUpTo;
         delete clients[msg.sender].lastRate;
         delete clients[msg.sender].providerConnected;
-        EClientLost(msg.sender, provider, currHeight, bal);
+        emit EClientLost(msg.sender, provider, currHeight, bal);
     }
     function checkReward(address addr) public constant returns (uint256 reward) {
         /*
@@ -479,7 +479,7 @@ contract provider is module, safeMath, announcementTypes {
         if ( providers[addr].data[providers[addr].currentHeight].valid ) {
             uint256 a;
             (reward, a) = getProviderReward(addr, 0);
-        } else if ( clients[addr].providerAddress != 0x0 ) {
+        } else if ( clients[addr].providerAddress != address(0x00) ) {
             reward = getClientReward(0);
         }
     }
@@ -500,18 +500,18 @@ contract provider is module, safeMath, announcementTypes {
             @provider           Address of the provider
             @reward             Accumulated amount from the previous rounds.
         */
-        var _limit = limit;
-        var _beneficiary = beneficiary;
-        var _provider = provider;
+        uint256 _limit = limit;
+        address _beneficiary = beneficiary;
+        address _provider = provider;
         if ( _limit == 0 ) { _limit = gasProtectMaxRounds; }
-        if ( _beneficiary == 0x00 ) { _beneficiary = msg.sender; }
-        if ( _provider == 0x00 ) { _provider = msg.sender; }
+        if ( _beneficiary == address(0x00) ) { _beneficiary = msg.sender; }
+        if ( _provider == address(0x00) ) { _provider = msg.sender; }
         uint256 clientReward;
         uint256 providerReward;
         if ( providers[_provider].data[providers[_provider].currentHeight].valid ) {
             require( providers[_provider].data[providers[_provider].currentHeight].admin == msg.sender || msg.sender == _provider );
             (providerReward, clientReward) = getProviderReward(_provider, _limit);
-        } else if ( clients[msg.sender].providerAddress != 0x00 ) {
+        } else if ( clients[msg.sender].providerAddress != address(0x00) ) {
             clientReward = getClientReward(_limit);
         } else {
             throw;
@@ -522,7 +522,7 @@ contract provider is module, safeMath, announcementTypes {
         if ( providerReward > 0 ) {
             require( moduleHandler(moduleHandlerAddress).transfer(address(this), provider, providerReward, false) );
         }
-        EReward(msg.sender, provider, clientReward, providerReward);
+        emit EReward(msg.sender, provider, clientReward, providerReward);
     }
     function getClientReward(uint256 limit) internal returns (uint256 reward) {
         /*
@@ -536,8 +536,9 @@ contract provider is module, safeMath, announcementTypes {
         address provAddr;
         uint256 provHeight;
         bool interest = false;
-        var rate = clients[msg.sender].lastRate;
-        for ( uint256 a = (clients[msg.sender].paidUpTo + 1) ; a <= currentSchellingRound ; a++ ) {
+        uint256 a;
+        uint8 rate = clients[msg.sender].lastRate;
+        for ( a = (clients[msg.sender].paidUpTo + 1) ; a <= currentSchellingRound ; a++ ) {
             if (globalFunds[a].reward > 0 && globalFunds[a].supply > 0) {
                 provAddr = clients[msg.sender].providerAddress;
                 provHeight = clients[msg.sender].providerHeight;
@@ -585,8 +586,9 @@ contract provider is module, safeMath, announcementTypes {
         uint256 steps;
         uint256 currHeight = providers[addr].currentHeight;
         uint256 LTSID = providers[addr].data[currHeight].lastSupplyID;
-        var rate = providers[addr].data[currHeight].lastPaidRate;
-        for ( uint256 a = (providers[addr].data[currHeight].paidUpTo + 1) ; a <= currentSchellingRound ; a++ ) {
+        uint256 a;
+        uint8 rate = providers[addr].data[currHeight].lastPaidRate;
+        for ( a = (providers[addr].data[currHeight].paidUpTo + 1) ; a <= currentSchellingRound ; a++ ) {
             if (globalFunds[a].reward > 0 && globalFunds[a].supply > 0) {
                 if ( providers[addr].data[currHeight].rateHistory[a].valid ) {
                     rate = providers[addr].data[currHeight].rateHistory[a].value;
@@ -743,7 +745,7 @@ contract provider is module, safeMath, announcementTypes {
             @value      Rate of the change.
             @neg        ype of the change. If it is TRUE then the balance has been decreased if it is FALSE then it has been increased.
         */
-        if ( clients[addr].providerAddress != 0 ) {
+        if ( clients[addr].providerAddress != address(0x00) ) {
             checkFloatingSupply(clients[addr].providerAddress, providers[clients[addr].providerAddress].currentHeight, ! neg, value);
             if (clients[addr].lastSupplyID != currentSchellingRound) {
                 clients[addr].supply[currentSchellingRound] = TEMath(clients[addr].supply[clients[addr].lastSupplyID], value, neg);
@@ -752,7 +754,7 @@ contract provider is module, safeMath, announcementTypes {
                 clients[addr].supply[currentSchellingRound] = TEMath(clients[addr].supply[currentSchellingRound], value, neg);
             }
         } else if ( providers[addr].data[providers[addr].currentHeight].valid ) {
-            var currentHeight = providers[addr].currentHeight;
+            uint256 currentHeight = providers[addr].currentHeight;
             if ( neg ) {
                 uint256 balance = getTokenBalance(addr);
                 if ( providers[addr].data[currentHeight].priv ) {
@@ -774,7 +776,7 @@ contract provider is module, safeMath, announcementTypes {
             
             @balance    Balance of the address.
         */
-        var (_success, _balance) = moduleHandler(moduleHandlerAddress).balanceOf(addr);
+        (bool _success, uint256 _balance) = moduleHandler(moduleHandlerAddress).balanceOf(addr);
         require( _success );
         return _balance;
     }
@@ -784,7 +786,7 @@ contract provider is module, safeMath, announcementTypes {
             
             @isICO      Is the ICO in proccess or not?
         */
-        var (_success, _isICO) = moduleHandler(moduleHandlerAddress).isICO();
+        (bool _success, bool _isICO) = moduleHandler(moduleHandlerAddress).isICO();
         require( _success );
         return _isICO;
     }

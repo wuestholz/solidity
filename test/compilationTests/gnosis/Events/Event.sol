@@ -33,18 +33,18 @@ contract Event {
     /// @param _collateralToken Tokens used as collateral in exchange for outcome tokens
     /// @param _oracle Oracle contract used to resolve the event
     /// @param outcomeCount Number of event outcomes
-    function Event(Token _collateralToken, Oracle _oracle, uint8 outcomeCount)
+    constructor(Token _collateralToken, Oracle _oracle, uint8 outcomeCount)
         public
     {
         // Validate input
-        require(address(_collateralToken) != 0 && address(_oracle) != 0 && outcomeCount >= 2);
+        require(address(_collateralToken) != address(0) && address(_oracle) != address(0) && outcomeCount >= 2);
         collateralToken = _collateralToken;
         oracle = _oracle;
         // Create an outcome token for each outcome
         for (uint8 i = 0; i < outcomeCount; i++) {
             OutcomeToken outcomeToken = new OutcomeToken();
             outcomeTokens.push(outcomeToken);
-            OutcomeTokenCreation(outcomeToken, i);
+            emit OutcomeTokenCreation(outcomeToken, i);
         }
     }
 
@@ -58,7 +58,7 @@ contract Event {
         // Issue new outcome tokens to sender
         for (uint8 i = 0; i < outcomeTokens.length; i++)
             outcomeTokens[i].issue(msg.sender, collateralTokenCount);
-        OutcomeTokenSetIssuance(msg.sender, collateralTokenCount);
+        emit OutcomeTokenSetIssuance(msg.sender, collateralTokenCount);
     }
 
     /// @dev Sells equal number of tokens of all outcomes, exchanging collateral tokens and sets of outcome tokens 1:1
@@ -71,7 +71,7 @@ contract Event {
             outcomeTokens[i].revoke(msg.sender, outcomeTokenCount);
         // Transfer collateral tokens to sender
         require(collateralToken.transfer(msg.sender, outcomeTokenCount));
-        OutcomeTokenSetRevocation(msg.sender, outcomeTokenCount);
+        emit OutcomeTokenSetRevocation(msg.sender, outcomeTokenCount);
     }
 
     /// @dev Sets winning event outcome
@@ -83,7 +83,7 @@ contract Event {
         // Set winning outcome
         outcome = oracle.getOutcome();
         isOutcomeSet = true;
-        OutcomeAssignment(outcome);
+        emit OutcomeAssignment(outcome);
     }
 
     /// @dev Returns outcome count

@@ -59,7 +59,7 @@ contract Shareable {
    * @param _owners A list of owners.
    * @param _required The amount required for a transaction to be approved.
    */
-  function Shareable(address[] _owners, uint256 _required) {
+  constructor(address[] _owners, uint256 _required) {
     owners[1] = msg.sender;
     ownerIndex[msg.sender] = 1;
     for (uint256 i = 0; i < _owners.length; ++i) {
@@ -83,11 +83,11 @@ contract Shareable {
       return;
     }
     uint256 ownerIndexBit = 2**index;
-    var pending = pendings[_operation];
+    PendingState memory pending = pendings[_operation];
     if (pending.ownersDone & ownerIndexBit > 0) {
       pending.yetNeeded++;
       pending.ownersDone -= ownerIndexBit;
-      Revoke(msg.sender, _operation);
+      emit Revoke(msg.sender, _operation);
     }
   }
 
@@ -116,7 +116,7 @@ contract Shareable {
    * @return True if the owner has confirmed and false otherwise.
    */
   function hasConfirmed(bytes32 _operation, address _owner) constant returns (bool) {
-    var pending = pendings[_operation];
+    PendingState memory pending = pendings[_operation];
     uint256 index = ownerIndex[_owner];
 
     // make sure they're an owner
@@ -142,7 +142,7 @@ contract Shareable {
       throw;
     }
 
-    var pending = pendings[_operation];
+    PendingState memory pending = pendings[_operation];
     // if we're not yet working on this operation, switch over and reset the confirmation status.
     if (pending.yetNeeded == 0) {
       // reset count of confirmations needed.
@@ -156,7 +156,7 @@ contract Shareable {
     uint256 ownerIndexBit = 2**index;
     // make sure we (the message sender) haven't confirmed this operation previously.
     if (pending.ownersDone & ownerIndexBit == 0) {
-      Confirmation(msg.sender, _operation);
+      emit Confirmation(msg.sender, _operation);
       // ok - check if count is enough to go ahead.
       if (pending.yetNeeded <= 1) {
         // enough confirmations: reset and run interior.

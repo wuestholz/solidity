@@ -90,7 +90,7 @@ contract module {
             @newModuleAddress   New module handler address
         */
         require( moduleStatus != status.New && moduleStatus != status.Disconnected);
-        var (_success, _balance) = abstractModuleHandler(moduleHandlerAddress).balanceOf(address(this));
+        (bool _success, uint256 _balance) = abstractModuleHandler(moduleHandlerAddress).balanceOf(address(this));
         require( _success );
         if ( _balance > 0 ) {
             require( abstractModuleHandler(moduleHandlerAddress).transfer(address(this), newModuleAddress, _balance, false) );
@@ -123,7 +123,7 @@ contract module {
             
             @ret    This is the module handler address or not
         */
-        if ( moduleHandlerAddress == 0x00 ) { return true; }
+        if ( moduleHandlerAddress == address(0x00) ) { return true; }
         if ( moduleStatus != status.Connected ) { return false; }
         return addr == moduleHandlerAddress;
     }
