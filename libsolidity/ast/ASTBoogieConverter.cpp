@@ -2,6 +2,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/ast/ASTBoogieConverter.h>
+#include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <utility>
@@ -15,21 +16,6 @@ namespace dev
 namespace solidity
 {
 
-const string SOLIDITY_ADDRESS_TYPE = "address";
-const string BOOGIE_ADDRESS_TYPE = "address_t";
-const string SOLIDITY_BALANCE = "balance";
-const string BOOGIE_BALANCE = "__balance";
-const string SOLIDITY_MSG = "msg";
-const string SOLIDITY_SENDER = "sender";
-const string BOOGIE_MSG_SENDER = "__msg_sender";
-const string SOLIDITY_TRANSFER = "transfer";
-const string BOOGIE_TRANSFER = "__transfer";
-const string SOLIDITY_THIS = "this";
-const string BOOGIE_THIS = "__this";
-const string SOLIDITY_ASSERT = "assert";
-const string VERIFIER_MAIN = "__verifier_main";
-const string BOOGIE_CONSTRUCTOR = "__constructor";
-
 void ASTBoogieConverter::addGlobalComment(string str)
 {
 	program.getDeclarations().push_back(smack::Decl::comment("", str));
@@ -38,9 +24,9 @@ void ASTBoogieConverter::addGlobalComment(string str)
 string ASTBoogieConverter::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
-	if (decl.name() == VERIFIER_MAIN) return "main";
-	if (decl.name() == SOLIDITY_ASSERT) return "assert";
-	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
+	if (decl.name() == ASTBoogieUtils::VERIFIER_MAIN) return "main";
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_ASSERT) return "assert";
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_THIS) return ASTBoogieUtils::BOOGIE_THIS;
 
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for state variables and local variables in functions, (2) return
@@ -52,14 +38,14 @@ string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNod
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
-	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
+	if (tpStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE) return ASTBoogieUtils::BOOGIE_ADDRESS_TYPE;
 	if (tpStr == "bool") return "bool";
 	for (int i = 8; i <= 256; ++i)
 	{
 		if (tpStr == "int" + to_string(i)) return "int";
 		if (tpStr == "uint" + to_string(i)) return "int";
 	}
-	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
+	if (boost::algorithm::starts_with(tpStr, "contract ")) return ASTBoogieUtils::BOOGIE_ADDRESS_TYPE;
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment("Unsupported type: " + tpStr) <<
@@ -74,59 +60,59 @@ ASTBoogieConverter::ASTBoogieConverter()
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
-	program.getDeclarations().push_back(smack::Decl::typee(BOOGIE_ADDRESS_TYPE));
+	program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
 	// address.balance
-	program.getDeclarations().push_back(smack::Decl::variable(BOOGIE_BALANCE, "[" + BOOGIE_ADDRESS_TYPE + "]int"));
+	program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	// address.transfer()
 	list<smack::Binding> transferParams;
-	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // 'this'
-	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // 'msg.sender'
+	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // 'this'
+	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // 'msg.sender'
 	transferParams.push_back(make_pair("amount", "int"));
 	smack::Block* transferImpl = smack::Block::block();
-	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
-	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
+	const smack::Expr* this_bal = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+	const smack::Expr* sender_bal = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_MSG_SENDER);
 	const smack::Expr* amount = smack::Expr::id("amount");
 
 	// balance[this] += amount
 	transferImpl->addStmt(smack::Stmt::assign(
-			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_THIS),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 					smack::Expr::plus(this_bal, amount)
 			)));
 	// balance[msg.sender] -= amount
 	transferImpl->addStmt(smack::Stmt::assign(
-			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_MSG_SENDER),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER),
 					smack::Expr::minus(sender_bal, amount)
 			)));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
 	list<smack::Block*> transferBlocks;
 	transferBlocks.push_back(transferImpl);
-	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER,
+	smack::ProcDecl* transfer = smack::Decl::procedure(ASTBoogieUtils::BOOGIE_TRANSFER,
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
 	// Precondition: there is enough ether to transfer
 	transfer->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
 	// Postcondition: if sender and receiver is different (ether gets transferred)
 	transfer->getEnsures().push_back(
 			smack::Expr::impl(
-					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::neq(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER)),
 					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount))));
 	transfer->getEnsures().push_back(
 			smack::Expr::impl(
-					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::neq(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER)),
 					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))));
 	// Postcondition: if sender and receiver is the same (nothing happens)
 	transfer->getEnsures().push_back(
 			smack::Expr::impl(
-					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER)),
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal))));
 	transfer->getEnsures().push_back(
 			smack::Expr::impl(
-					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))));
 	program.getDeclarations().push_back(transfer);
 }
@@ -214,8 +200,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Input parameters
 	list<smack::Binding> params;
 	// Add some extra parameters for globally available variables
-	params.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // this
-	params.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // msg.sender
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{
@@ -260,7 +246,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	// Get the name of the function
-	string funcName = _node.isConstructor() ? BOOGIE_CONSTRUCTOR : mapDeclName(_node);
+	string funcName = _node.isConstructor() ? ASTBoogieUtils::BOOGIE_CONSTRUCTOR : mapDeclName(_node);
 
 	// Create the procedure
 	program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
@@ -288,7 +274,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	// State variables are represented as maps from address to their type
 	program.getDeclarations().push_back(
 			smack::Decl::variable(mapDeclName(_node),
-			"[" + BOOGIE_ADDRESS_TYPE + "]" + mapType(_node.type(), _node)));
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + mapType(_node.type(), _node)));
 	return false;
 }
 
@@ -605,7 +591,7 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 						smack::Expr::id(mapDeclName(*varDecl)),
 						smack::Expr::upd(
 								smack::Expr::id(mapDeclName(*varDecl)),
-								smack::Expr::id(BOOGIE_THIS),
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 								rhs)));
 			}
 			else // Non-state variables can be simply assigned
@@ -713,7 +699,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	// Get the name of the called function and the address on which it is called
 	// By default, it is 'this', but member access expressions can override it
 	currentExpr = nullptr;
-	currentAddress = smack::Expr::id(BOOGIE_THIS);
+	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
 	isGetter = false;
 	_node.expression().accept(*this);
 	string funcName;
@@ -739,7 +725,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	list<const smack::Expr*> args;
 	// Pass extra arguments
 	args.push_back(currentAddress); // this
-	args.push_back(smack::Expr::id(BOOGIE_THIS)); // msg.sender
+	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	// Add normal arguments
 	for (auto arg : _node.arguments())
 	{
@@ -749,7 +735,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 	}
 
 	// Assert is a separate statement in Boogie (instead of a function call)
-	if (funcName == SOLIDITY_ASSERT)
+	if (funcName == ASTBoogieUtils::SOLIDITY_ASSERT)
 	{
 		// The parameter of assert is the first normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
@@ -814,19 +800,19 @@ bool ASTBoogieConverter::visit(MemberAccess const& _node)
 	// Handle special members/functions
 
 	// address.balance
-	if (typeStr == SOLIDITY_ADDRESS_TYPE && _node.memberName() == SOLIDITY_BALANCE)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
 	{
-		currentExpr = smack::Expr::sel(smack::Expr::id(BOOGIE_BALANCE), expr);
+		currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
 	}
 	// address.transfer()
-	else if (typeStr == SOLIDITY_ADDRESS_TYPE && _node.memberName() == SOLIDITY_TRANSFER)
+	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
-		currentExpr = smack::Expr::id(BOOGIE_TRANSFER);
+		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
 	}
 	// msg.sender
-	else if (typeStr == SOLIDITY_MSG && _node.memberName() == SOLIDITY_SENDER)
+	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
-		currentExpr = smack::Expr::id(BOOGIE_MSG_SENDER);
+		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER);
 	}
 	// Non-special member access
 	else
@@ -858,7 +844,7 @@ bool ASTBoogieConverter::visit(Identifier const& _node)
 	}
 
 	// State variables must be referenced by accessing the map
-	if (referencesStateVar) { currentExpr = smack::Expr::sel(declName, BOOGIE_THIS); }
+	if (referencesStateVar) { currentExpr = smack::Expr::sel(declName, ASTBoogieUtils::BOOGIE_THIS); }
 	// Other identifiers can be referenced by their name
 	else { currentExpr = smack::Expr::id(declName); }
 	return false;

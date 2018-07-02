@@ -11,7 +11,7 @@ namespace solidity
 /**
  * Converts the AST into Boogie IVL format.
  */
-class ASTBoogieConverter : public ASTConstVisitor
+class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
 	// Top-level element is a single Boogie program
