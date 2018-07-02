@@ -171,6 +171,10 @@ const Expr* Expr::if_then_else(const Expr* c, const Expr* t, const Expr* e) {
   return new IfThenElseExpr(c, t, e);
 }
 
+const Expr* Expr::old(const Expr* expr) {
+  return new OldExpr(expr);
+}
+
 const Attr* Attr::attr(std::string s, std::initializer_list<const Expr*> vs) {
   return new Attr(s,vs);
 }
@@ -540,6 +544,12 @@ void UpdExpr::print(std::ostream& os) const {
 
 void VarExpr::print(std::ostream& os) const {
   os << var;
+}
+
+void OldExpr::print(std::ostream& os) const {
+  os << "old(";
+  expr->print(os);
+  os << ")";
 }
 
 void CodeExpr::print(std::ostream& os) const {

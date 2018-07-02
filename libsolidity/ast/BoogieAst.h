@@ -8,6 +8,9 @@
 #include <string>
 #include <list>
 
+// TODO: these classes are leaking memory, there is no delete. Should be
+// updated to use smart pointers.
+
 namespace smack {
 
 typedef std::pair<std::string, std::string> Binding;
@@ -55,6 +58,7 @@ public:
   static const Expr* sel(std::string b, std::string i);
   static const Expr* upd(const Expr* b, const Expr* i, const Expr* v);
   static const Expr* if_then_else(const Expr* c, const Expr* t, const Expr* e);
+  static const Expr* old(const Expr* expr);
 };
 
 class BinExpr : public Expr {
@@ -196,6 +200,13 @@ class VarExpr : public Expr {
 public:
   VarExpr(std::string v) : var(v) {}
   std::string name() const { return var; }
+  void print(std::ostream& os) const;
+};
+
+class OldExpr : public Expr {
+  const Expr* expr;
+public:
+  OldExpr(const Expr* expr) : expr(expr) {}
   void print(std::ostream& os) const;
 };
 
