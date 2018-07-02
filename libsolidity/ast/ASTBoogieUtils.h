@@ -8,6 +8,10 @@ namespace dev
 {
 namespace solidity
 {
+
+/**
+ * Utility class for the Solidity -> Boogie conversion.
+ */
 class ASTBoogieUtils
 {
 public:
@@ -26,13 +30,19 @@ public:
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
 
+	/**
+	 * Create the procedure corresponding to address.transfer()
+	 */
 	static smack::ProcDecl* createTransferProc();
 
 	/**
-	 * Maps a declaration name into a name in Boogie
+	 * Map a declaration name to a name in Boogie
 	 */
 	static std::string mapDeclName(Declaration const& decl);
 
+	/**
+	 * Map a Solidity type to a Boogie type
+	 */
 	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
 };
 

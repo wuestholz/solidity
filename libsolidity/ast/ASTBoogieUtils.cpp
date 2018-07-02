@@ -27,10 +27,13 @@ const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
+	// Parameters: this, msg.sender, amount
 	list<smack::Binding> transferParams;
-	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE)); // 'this'
-	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE)); // 'msg.sender'
+	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
+	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair("amount", "int"));
+
+	// Body
 	smack::Block* transferImpl = smack::Block::block();
 	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
 	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
@@ -57,6 +60,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 	transferBlocks.push_back(transferImpl);
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER,
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
+
 	// Precondition: there is enough ether to transfer
 	transfer->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
 	// Postcondition: if sender and receiver is different (ether gets transferred)
