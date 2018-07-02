@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <libsolidity/ast/BoogieAst.h>
 
 namespace dev
 {
@@ -23,6 +24,8 @@ public:
 	static const std::string SOLIDITY_ASSERT;
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
+
+	static smack::ProcDecl* createTransferProc();
 };
 
 }
