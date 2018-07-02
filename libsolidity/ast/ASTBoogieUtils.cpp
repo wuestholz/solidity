@@ -111,10 +111,19 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	}
 	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
-	if (tp->category() == Type::Category::Array) {
+	if (tp->category() == Type::Category::Array)
+	{
 		// TODO: is there a better way to cast?
 		ArrayType const* arrType = dynamic_cast<ArrayType const*>(&*tp);
 		return "[int]" + mapType(arrType->baseType(), _associatedNode);
+	}
+
+	if (tp->category() == Type::Category::Mapping)
+	{
+		// TODO: is there a better way to cast?
+		MappingType const* mappingType = dynamic_cast<MappingType const*>(&*tp);
+		return "[" + mapType(mappingType->keyType(), _associatedNode) + "]"
+				+ mapType(mappingType->valueType(), _associatedNode);
 	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
