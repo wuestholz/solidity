@@ -42,13 +42,6 @@ private:
 
 	void addGlobalComment(std::string str);
 
-	/**
-	 * Maps a declaration name into a name in Boogie
-	 */
-	std::string mapDeclName(Declaration const& decl);
-
-	std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
-
 public:
 	ASTBoogieConverter();
 

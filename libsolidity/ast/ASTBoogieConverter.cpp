@@ -21,38 +21,6 @@ void ASTBoogieConverter::addGlobalComment(string str)
 	program.getDeclarations().push_back(smack::Decl::comment("", str));
 }
 
-string ASTBoogieConverter::mapDeclName(Declaration const& decl)
-{
-	// Check for special names
-	if (decl.name() == ASTBoogieUtils::VERIFIER_MAIN) return "main";
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_ASSERT) return "assert";
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_THIS) return ASTBoogieUtils::BOOGIE_THIS;
-
-	// ID is important to append, since (1) even fully qualified names can be
-	// same for state variables and local variables in functions, (2) return
-	// variables might have no name (whereas Boogie requires a name)
-	return decl.name() + "#" + to_string(decl.id());
-}
-
-string ASTBoogieConverter::mapType(TypePointer tp, ASTNode const& _associatedNode)
-{
-	// TODO: option for bit precise types
-	string tpStr = tp->toString();
-	if (tpStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE) return ASTBoogieUtils::BOOGIE_ADDRESS_TYPE;
-	if (tpStr == "bool") return "bool";
-	for (int i = 8; i <= 256; ++i)
-	{
-		if (tpStr == "int" + to_string(i)) return "int";
-		if (tpStr == "uint" + to_string(i)) return "int";
-	}
-	if (boost::algorithm::starts_with(tpStr, "contract ")) return ASTBoogieUtils::BOOGIE_ADDRESS_TYPE;
-
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported type: " + tpStr) <<
-			errinfo_sourceLocation(_associatedNode.location()));
-	return "";
-}
-
 ASTBoogieConverter::ASTBoogieConverter()
 {
 	currentExpr = nullptr;
@@ -155,14 +123,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{
-		params.push_back(make_pair(mapDeclName(*p), mapType(p->type(), *p)));
+		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
 	}
 
 	// Return values
 	list<smack::Binding> rets;
 	for (auto p : _node.returnParameters())
 	{
-		rets.push_back(make_pair(mapDeclName(*p), mapType(p->type(), *p)));
+		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -196,7 +164,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	// Get the name of the function
-	string funcName = _node.isConstructor() ? ASTBoogieUtils::BOOGIE_CONSTRUCTOR : mapDeclName(_node);
+	string funcName = _node.isConstructor() ? ASTBoogieUtils::BOOGIE_CONSTRUCTOR : ASTBoogieUtils::mapDeclName(_node);
 
 	// Create the procedure
 	program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
@@ -223,8 +191,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	program.getDeclarations().push_back(
-			smack::Decl::variable(mapDeclName(_node),
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + mapType(_node.type(), _node)));
+			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node)));
 	return false;
 }
 
@@ -430,8 +398,8 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			// Boogie requires local variables to be declared at the beginning of the procedure
 			localDecls.push_back(smack::Decl::variable(
-							mapDeclName(*decl),
-							mapType(decl->type(), *decl)));
+					ASTBoogieUtils::mapDeclName(*decl),
+					ASTBoogieUtils::mapType(decl->type(), *decl)));
 		}
 		else
 		{
@@ -452,7 +420,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			const smack::Expr* rhs = currentExpr;
 
 			currentBlocks.top()->addStmt(smack::Stmt::assign(
-					smack::Expr::id(mapDeclName(**_node.declarations().begin())),
+					smack::Expr::id(ASTBoogieUtils::mapDeclName(**_node.declarations().begin())),
 					rhs));
 		}
 		else
@@ -523,7 +491,7 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 			case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 			case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 			case Token::AssignDiv:
-				if (mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+				if (ASTBoogieUtils::mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 				else rhs = smack::Expr::div(lhs, rhs);
 				break;
 			case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
@@ -538,9 +506,9 @@ bool ASTBoogieConverter::visit(Assignment const& _node)
 			if (varDecl->isStateVariable())
 			{
 				currentBlocks.top()->addStmt(smack::Stmt::assign(
-						smack::Expr::id(mapDeclName(*varDecl)),
+						smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
 						smack::Expr::upd(
-								smack::Expr::id(mapDeclName(*varDecl)),
+								smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
 								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 								rhs)));
 			}
@@ -610,7 +578,7 @@ bool ASTBoogieConverter::visit(BinaryOperation const& _node)
 	case Token::Sub: currentExpr = smack::Expr::minus(lhs, rhs); break;
 	case Token::Mul: currentExpr = smack::Expr::times(lhs, rhs); break;
 	case Token::Div: // Boogie has different division operators for integers and reals
-		if (mapType(_node.annotation().type, _node) == "int") currentExpr = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node) == "int") currentExpr = smack::Expr::intdiv(lhs, rhs);
 		else currentExpr = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::Mod: currentExpr = smack::Expr::mod(lhs, rhs); break;
@@ -701,7 +669,7 @@ bool ASTBoogieConverter::visit(FunctionCall const& _node)
 		// Create fresh variable to store the result
 		smack::Decl* returnVar = smack::Decl::variable(
 				funcName + "#" + to_string(_node.id()),
-				mapType(_node.annotation().type, _node));
+				ASTBoogieUtils::mapType(_node.annotation().type, _node));
 		localDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		currentExpr = smack::Expr::id(returnVar->getName());
@@ -767,7 +735,7 @@ bool ASTBoogieConverter::visit(MemberAccess const& _node)
 	// Non-special member access
 	else
 	{
-		currentExpr = smack::Expr::id(mapDeclName(*_node.annotation().referencedDeclaration));
+		currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
 		isGetter = false;
 		if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
 		{
@@ -784,7 +752,7 @@ bool ASTBoogieConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieConverter::visit(Identifier const& _node)
 {
-	string declName = mapDeclName(*(_node.annotation().referencedDeclaration));
+	string declName = ASTBoogieUtils::mapDeclName(*(_node.annotation().referencedDeclaration));
 
 	// Check if a state variable is referenced
 	bool referencesStateVar = false;

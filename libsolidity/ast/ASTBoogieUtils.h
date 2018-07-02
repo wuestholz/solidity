@@ -1,7 +1,8 @@
 #pragma once
 
-#include <string>
+#include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <string>
 
 namespace dev
 {
@@ -26,6 +27,13 @@ public:
 	static const std::string BOOGIE_CONSTRUCTOR;
 
 	static smack::ProcDecl* createTransferProc();
+
+	/**
+	 * Maps a declaration name into a name in Boogie
+	 */
+	static std::string mapDeclName(Declaration const& decl);
+
+	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
 };
 
 }
