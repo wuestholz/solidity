@@ -111,6 +111,12 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	}
 	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
+	if (tp->category() == Type::Category::Array) {
+		// TODO: is there a better way to cast?
+		ArrayType const* arrType = dynamic_cast<ArrayType const*>(&*tp);
+		return "[int]" + mapType(arrType->baseType(), _associatedNode);
+	}
+
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment("Unsupported type: " + tpStr) <<
 			errinfo_sourceLocation(_associatedNode.location()));

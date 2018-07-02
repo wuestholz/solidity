@@ -331,7 +331,15 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 
 bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 {
-	return visitNode(_node);
+	_node.baseExpression().accept(*this);
+	const smack::Expr* baseExpr = currentExpr;
+
+	_node.indexExpression()->accept(*this); // TODO: can this be a nullptr?
+	const smack::Expr* indexExpr = currentExpr;
+
+	currentExpr = smack::Expr::sel(baseExpr, indexExpr);
+
+	return false;
 }
 
 bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
