@@ -180,6 +180,8 @@ class SelExpr : public Expr {
 public:
   SelExpr(const Expr* a, std::list<const Expr*> i) : base(a), idxs(i) {}
   SelExpr(const Expr* a, const Expr* i) : base(a), idxs(std::list<const Expr*>(1, i)) {}
+  const Expr* getBase() const { return base; }
+  std::list<const Expr*> getIdxs() const { return idxs; }
   void print(std::ostream& os) const;
 };
 

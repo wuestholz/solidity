@@ -134,12 +134,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	for (auto p : _node.parameters())
 	{
 		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
+		if (p->type()->category() == Type::Category::Array) // Array length
+		{
+			params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p) + ASTBoogieUtils::BOOGIE_LENGTH, "int"));
+		}
 	}
 
 	// Return values
 	list<smack::Binding> rets;
 	for (auto p : _node.returnParameters())
 	{
+		if (p->type()->category() == Type::Category::Array)
+		{
+			BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment(string("Arrays are not yet supported as return values")) <<
+					errinfo_sourceLocation(_node.location()));
+		}
 		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
 	}
 
@@ -203,6 +213,14 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	program.getDeclarations().push_back(
 			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node)));
+
+	// Arrays require an extra variable for their length
+	if (_node.type()->category() == Type::Category::Array)
+	{
+		program.getDeclarations().push_back(
+				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
+				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+	}
 	return false;
 }
 
@@ -447,7 +465,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	else if (dynamic_cast<FunctionCall const*>(&_node.expression())) convertExpression(_node.expression());
 	else
 	{
-	BOOST_THROW_EXCEPTION(CompilerError() <<
+		BOOST_THROW_EXCEPTION(CompilerError() <<
 				errinfo_comment(string("Unsupported expression appearing as statement")) <<
 				errinfo_sourceLocation(_node.location()));
 	}

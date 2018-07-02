@@ -29,6 +29,7 @@ public:
 	static const std::string SOLIDITY_ASSERT;
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
+	static const std::string BOOGIE_LENGTH;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()

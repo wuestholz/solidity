@@ -15,6 +15,24 @@ namespace dev
 namespace solidity
 {
 
+const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr)
+{
+	if (const smack::VarExpr* varArray = dynamic_cast<const smack::VarExpr*>(expr))
+	{
+		return smack::Expr::id(varArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
+	}
+	if (const smack::SelExpr* selArray = dynamic_cast<const smack::SelExpr*>(expr))
+	{
+		const smack::VarExpr* baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase());
+		return smack::Expr::sel(
+				smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
+				*selArray->getIdxs().begin());
+	}
+	BOOST_THROW_EXCEPTION(CompilerError() <<
+						errinfo_comment("Unsupported access to array length"));
+	return nullptr;
+}
+
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter()
 {
 	currentExpr = nullptr;
@@ -231,9 +249,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Add normal arguments
 	for (auto arg : _node.arguments())
 	{
-		currentExpr = nullptr;
 		arg->accept(*this);
 		args.push_back(currentExpr);
+
+		if (arg->annotation().type->category() == Type::Category::Array)
+		{
+			args.push_back(getArrayLength(currentExpr));
+		}
 	}
 
 	// Assert is a separate statement in Boogie (instead of a function call)
@@ -315,6 +337,12 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER);
+	}
+	// array.length
+	else if(_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
+	{
+		// TODO: error handling
+		currentExpr = getArrayLength(expr);
 	}
 	// Non-special member access
 	else

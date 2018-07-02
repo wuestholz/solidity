@@ -24,6 +24,8 @@ private:
 	std::vector<smack::Stmt const*> newStatements;
 	std::list<smack::Decl*> newDecls;
 
+	const smack::Expr* getArrayLength(const smack::Expr* expr);
+
 
 public:
 

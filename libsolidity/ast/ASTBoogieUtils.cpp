@@ -24,6 +24,7 @@ const string ASTBoogieUtils::BOOGIE_THIS = "__this";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
 const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
+const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
