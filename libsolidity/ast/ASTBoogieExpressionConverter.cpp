@@ -38,6 +38,7 @@ ASTBoogieExpressionConverter::ASTBoogieExpressionConverter()
 	currentExpr = nullptr;
 	currentAddress = nullptr;
 	isGetter = false;
+	currentValue = nullptr;
 }
 
 ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const Expression& _node)
@@ -145,7 +146,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 												rhs))));
 						return false;
 					}
-					return false;
 				}
 				// Write local array/map
 				else
@@ -263,7 +263,22 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	currentExpr = nullptr;
 	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
 	isGetter = false;
+	currentValue = smack::Expr::lit((long)0);
+
+	if (const MemberAccess* expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	{
+		if (expMa->memberName() == "value")
+		{
+			(*_node.arguments().begin())->accept(*this);
+			currentValue = currentExpr;
+
+			expMa->expression().accept(*this);
+			return false;
+		}
+	}
+
 	_node.expression().accept(*this);
+
 	string funcName;
 	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
 	{
@@ -288,6 +303,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Pass extra arguments
 	args.push_back(currentAddress); // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
+	args.push_back(currentValue); // msg.value
 	// Add normal arguments
 	for (auto arg : _node.arguments())
 	{
@@ -305,7 +321,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// The parameter of assert is the first normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
-		std::advance(it, 2);
+		std::advance(it, 3);
 		currentExpr = *it;
 		newStatements.push_back(smack::Stmt::assert_(currentExpr));
 		return false;
@@ -379,6 +395,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER);
+	}
+	// msg.value
+	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
+	{
+		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
 	}
 	// array.length
 	else if(_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")

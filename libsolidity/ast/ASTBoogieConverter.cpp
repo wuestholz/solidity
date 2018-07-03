@@ -145,6 +145,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add some extra parameters for globally available variables
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{

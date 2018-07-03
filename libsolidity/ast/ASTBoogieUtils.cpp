@@ -16,7 +16,9 @@ const string ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
 const string ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
 const string ASTBoogieUtils::SOLIDITY_MSG = "msg";
 const string ASTBoogieUtils::SOLIDITY_SENDER = "sender";
+const string ASTBoogieUtils::SOLIDITY_VALUE = "value";
 const string ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
+const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 const string ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
 const string ASTBoogieUtils::BOOGIE_TRANSFER = "__transfer";
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
@@ -32,6 +34,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
+	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
 	transferParams.push_back(make_pair("amount", "int"));
 
 	// Body

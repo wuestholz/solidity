@@ -21,7 +21,9 @@ public:
 	static const std::string BOOGIE_BALANCE;
 	static const std::string SOLIDITY_MSG;
 	static const std::string SOLIDITY_SENDER;
+	static const std::string SOLIDITY_VALUE;
 	static const std::string BOOGIE_MSG_SENDER;
+	static const std::string BOOGIE_MSG_VALUE;
 	static const std::string SOLIDITY_TRANSFER;
 	static const std::string BOOGIE_TRANSFER;
 	static const std::string SOLIDITY_THIS;
