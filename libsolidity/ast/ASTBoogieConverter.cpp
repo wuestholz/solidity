@@ -96,7 +96,11 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 
 bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 {
-	return visitNode(_node);
+	// Nothing to do with using for directives, calls to functions are resolved in the AST
+	string libraryName = _node.libraryName().annotation().type->toString();
+	string typeName = _node.typeName()->annotation().type->toString();
+	addGlobalComment("Using " + libraryName + " for " + typeName);
+	return false;
 }
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
