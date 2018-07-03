@@ -84,6 +84,17 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
+
+	// An extra variable is required for libraries with the same name, because
+	// Library.func(arg) translates to func(Library, arg)
+	if (_node.contractKind() == ContractDefinition::ContractKind::Library)
+	{
+		addGlobalComment("'this' variable for library");
+		program.getDeclarations().push_back(smack::Decl::variable(
+				ASTBoogieUtils::mapDeclName(_node),
+				ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	}
+
 	return true; // Simply apply visitor recursively
 }
 
