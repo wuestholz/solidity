@@ -334,6 +334,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (!isLibraryCall) { args.push_back(currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	args.push_back(currentValue); // msg.value
+	if (isLibraryCall && !isLibraryCallStatic) { args.push_back(currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments
 	for (auto arg : _node.arguments())
 	{
@@ -467,6 +468,18 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		if (const FunctionDefinition *fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
 		{
 			isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
+			if (isLibraryCall)
+			{
+				// Check if library call is static (Math.add(1, 2)) or not (1.add(2))
+				isLibraryCallStatic = false;
+				if (Identifier const* exprId = dynamic_cast<Identifier const *>(&_node.expression()))
+				{
+					if (ContractDefinition const* refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
+					{
+						isLibraryCallStatic = true;
+					}
+				}
+			}
 		}
 
 	}

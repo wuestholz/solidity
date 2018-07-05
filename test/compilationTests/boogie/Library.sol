@@ -11,13 +11,15 @@ contract C {
 
     function someFunc() public pure returns (uint256) {
         uint256 x = 5;
-        //return x.add(10); // Does not work yet
-        return x;
+        return x.add(10); // Does not work yet
     }
-}
 
-contract D {
     function otherFunc() public pure returns (uint256) {
         return MathLib.add(1, 2);
+    }
+
+    function __verifier_main() pure public {
+        assert(someFunc() == 15);
+        assert(otherFunc() == 3);
     }
 }

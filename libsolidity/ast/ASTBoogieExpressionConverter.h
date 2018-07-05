@@ -20,6 +20,7 @@ private:
 	const smack::Expr* currentValue;
 	bool isGetter;
 	bool isLibraryCall;
+	bool isLibraryCallStatic;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
