@@ -265,10 +265,6 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Example: f(z) gives 'f' as the name and 'this' as the address
 	// Example: x.f(z) gives 'f' as the name and 'x' as the address
 	// Example: x.f.value(y)(z) gives 'f' as the name, 'x' as the address and 'y' as the value
-	currentExpr = nullptr;
-	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-	currentValue = smack::Expr::lit((long)0);
-	isGetter = false;
 
 	// Check for the special case of calling the 'value' function
 	// For example x.f.value(y)(z) should be treated as x.f(z), while setting
@@ -293,6 +289,22 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 	}
 
+	// Ignore gas setting, e.g., x.f.gas(y)(z) is just x.f(z)
+	if (const MemberAccess* expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	{
+		if (expMa->memberName() == "gas")
+		{
+			// TODO: show warning using ErrorReporter
+			cerr << "Warning: ignored call to gas() function." << endl;
+			expMa->expression().accept(*this);
+			return false;
+		}
+	}
+
+	currentExpr = nullptr;
+	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
+	currentValue = smack::Expr::lit((long)0);
+	isGetter = false;
 	_node.expression().accept(*this);
 
 	// 'currentExpr' should be an identifier, giving the name of the function

@@ -11,7 +11,7 @@ contract Other {
     PayableFunctions p;
 
     function transfer(uint amount) public returns (uint) {
-        return p.receive.value(amount)(100);
+        return p.receive.gas(1).value(amount)(100);
     }
 
     function transferNested(uint amount) public returns (uint) {
