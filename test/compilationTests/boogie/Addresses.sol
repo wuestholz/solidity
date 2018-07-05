@@ -21,4 +21,8 @@ contract Addresses {
         uint newSum = address(this).balance + msg.sender.balance;
         assert(oldSum == (newSum + 1234)); // This assertion should fail
     }
+
+    function callSomething(address addr, uint param) public returns (bool){
+        return addr.call(param);
+    }
 }

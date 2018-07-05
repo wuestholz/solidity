@@ -43,6 +43,8 @@ ASTBoogieConverter::ASTBoogieConverter()
 	program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	// address.transfer()
 	program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
+	// address.call()
+	program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)

@@ -337,15 +337,18 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	args.push_back(currentValue); // msg.value
 	if (isLibraryCall && !isLibraryCallStatic) { args.push_back(currentAddress); } // Non-static library calls require extra argument
-	// Add normal arguments
-	for (auto arg : _node.arguments())
+	// Add normal arguments (except when calling 'call') TODO: is this ok?
+	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
 	{
-		arg->accept(*this);
-		args.push_back(currentExpr);
-
-		if (arg->annotation().type->category() == Type::Category::Array)
+		for (auto arg : _node.arguments())
 		{
-			args.push_back(getArrayLength(currentExpr));
+			arg->accept(*this);
+			args.push_back(currentExpr);
+
+			if (arg->annotation().type->category() == Type::Category::Array)
+			{
+				args.push_back(getArrayLength(currentExpr));
+			}
 		}
 	}
 
@@ -431,6 +434,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
+	}
+	// address.call()
+	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
+	{
+		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
 	}
 	// msg.sender
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)

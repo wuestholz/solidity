@@ -26,6 +26,8 @@ public:
 	static const std::string BOOGIE_MSG_VALUE;
 	static const std::string SOLIDITY_TRANSFER;
 	static const std::string BOOGIE_TRANSFER;
+	static const std::string SOLIDITY_CALL;
+	static const std::string BOOGIE_CALL;
 	static const std::string SOLIDITY_THIS;
 	static const std::string BOOGIE_THIS;
 	static const std::string SOLIDITY_ASSERT;
@@ -37,6 +39,11 @@ public:
 	 * Create the procedure corresponding to address.transfer()
 	 */
 	static smack::ProcDecl* createTransferProc();
+
+	/**
+	 * Create the procedure corresponding to address.call()
+	 */
+	static smack::ProcDecl* createCallProc();
 
 	/**
 	 * Map a declaration name to a name in Boogie

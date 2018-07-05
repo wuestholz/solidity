@@ -21,6 +21,8 @@ const string ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
 const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 const string ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
 const string ASTBoogieUtils::BOOGIE_TRANSFER = "__transfer";
+const string ASTBoogieUtils::SOLIDITY_CALL = "call";
+const string ASTBoogieUtils::BOOGIE_CALL = "__call";
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
@@ -30,11 +32,11 @@ const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
-	// Parameters: this, msg.sender, amount
+	// Parameters: this, msg.sender, msg.value amount
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
 	transferParams.push_back(make_pair("amount", "int"));
 
 	// Body
@@ -87,6 +89,30 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))));
 
 	return transfer;
+}
+
+smack::ProcDecl* ASTBoogieUtils::createCallProc()
+{
+	// Parameters: this, msg.sender, msg.value
+	list<smack::Binding> callParams;
+	callParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
+	callParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
+	callParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
+
+
+	// Return value
+	list<smack::Binding> callReturns;
+	callReturns.push_back(make_pair("__result", "bool"));
+
+	// Body
+	smack::Block* callImpl = smack::Block::block();
+	callImpl->addStmt(smack::Stmt::comment("TODO: model something nondeterministic here"));
+	list<smack::Block*> callBlocks;
+	callBlocks.push_back(callImpl);
+	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL,
+			callParams, callReturns, list<smack::Decl*>(), callBlocks);
+
+	return callProc;
 }
 
 string ASTBoogieUtils::mapDeclName(Declaration const& decl)
