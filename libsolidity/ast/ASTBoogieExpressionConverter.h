@@ -19,6 +19,7 @@ private:
 	const smack::Expr* currentAddress;
 	const smack::Expr* currentValue;
 	bool isGetter;
+	bool isLibraryCall;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie

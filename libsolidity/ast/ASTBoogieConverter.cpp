@@ -85,16 +85,6 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
-	// An extra variable is required for libraries with the same name, because
-	// Library.func(arg) translates to func(Library, arg)
-	if (_node.contractKind() == ContractDefinition::ContractKind::Library)
-	{
-		addGlobalComment("'this' variable for library");
-		program.getDeclarations().push_back(smack::Decl::variable(
-				ASTBoogieUtils::mapDeclName(_node),
-				ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
-	}
-
 	return true; // Simply apply visitor recursively
 }
 
@@ -143,7 +133,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Input parameters
 	list<smack::Binding> params;
 	// Add some extra parameters for globally available variables
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
+	if (!(_node.inContractKind() == ContractDefinition::ContractKind::Library))
+	{
+		params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
+	}
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
 	// Add original parameters of the function

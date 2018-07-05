@@ -305,6 +305,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
 	currentValue = smack::Expr::lit((long)0);
 	isGetter = false;
+	isLibraryCall = false;
 	_node.expression().accept(*this);
 
 	// 'currentExpr' should be an identifier, giving the name of the function
@@ -330,7 +331,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Get arguments recursively
 	list<const smack::Expr*> args;
 	// Pass extra arguments
-	args.push_back(currentAddress); // this
+	if (!isLibraryCall) { args.push_back(currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	args.push_back(currentValue); // msg.value
 	// Add normal arguments
@@ -444,7 +445,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		// TODO: error handling
 		currentExpr = getArrayLength(expr);
 	}
-	// Non-special member access
+	// Non-special member access: 'referencedDeclaration' should point to the
+	// declaration corresponding to 'memberName'
 	else
 	{
 		if (_node.annotation().referencedDeclaration == nullptr)
@@ -454,11 +456,19 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 								errinfo_sourceLocation(_node.location()));
 		}
 		currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
+		// Check for getter
 		isGetter = false;
 		if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
 		{
 			isGetter = true;
 		}
+		// Check for library call
+		isLibraryCall = false;
+		if (const FunctionDefinition *fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
+		{
+			isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
+		}
+
 	}
 	return false;
 }
