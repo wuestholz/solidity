@@ -258,20 +258,36 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// expressions, therefore each function call is given a fresh variable
 	// for its return value and is mapped to a call statement
 
-	// Get the name of the called function and the address on which it is called
-	// By default, it is 'this', but member access expressions can override it
+	// First, process the expression of the function call, which should give:
+	// - The name of the called function in 'currentExpr'
+	// - The address on which the function is called in 'currentAddress'
+	// - The msg.value in 'currentValue'
+	// Example: f(z) gives 'f' as the name and 'this' as the address
+	// Example: x.f(z) gives 'f' as the name and 'x' as the address
+	// Example: x.f.value(y)(z) gives 'f' as the name, 'x' as the address and 'y' as the value
 	currentExpr = nullptr;
 	currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-	isGetter = false;
 	currentValue = smack::Expr::lit((long)0);
+	isGetter = false;
 
+	// Check for the special case of calling the 'value' function
+	// For example x.f.value(y)(z) should be treated as x.f(z), while setting
+	// 'currentValue' to 'y'.
 	if (const MemberAccess* expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
 	{
 		if (expMa->memberName() == "value")
 		{
+			// Process the argument
+			if (_node.arguments().size() != 1)
+			{
+				BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+								errinfo_comment("Call to the value function should have exactly one argument") <<
+								errinfo_sourceLocation(_node.location()));
+			}
 			(*_node.arguments().begin())->accept(*this);
 			currentValue = currentExpr;
 
+			// Continue with the rest of the AST
 			expMa->expression().accept(*this);
 			return false;
 		}
@@ -279,6 +295,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	_node.expression().accept(*this);
 
+	// 'currentExpr' should be an identifier, giving the name of the function
 	string funcName;
 	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
 	{
@@ -319,11 +336,16 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == ASTBoogieUtils::SOLIDITY_ASSERT)
 	{
+		if (_node.arguments().size() != 1)
+		{
+			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+							errinfo_comment("Assert should have exactly one argument") <<
+							errinfo_sourceLocation(_node.location()));
+		}
 		// The parameter of assert is the first normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, 3);
-		currentExpr = *it;
-		newStatements.push_back(smack::Stmt::assert_(currentExpr));
+		newStatements.push_back(smack::Stmt::assert_(*it));
 		return false;
 	}
 
@@ -370,11 +392,14 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 
 bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 {
+	// Normally, the expression of the MemberAccess will give the address and
+	// the memberName will give the name. For example, x.f() will have address
+	// 'x' and name 'f'.
+
 	// Get expression recursively
 	_node.expression().accept(*this);
 	const smack::Expr* expr = currentExpr;
-	// In case of a function call, the current expression is the address
-	// on which the function is called
+	// The current expression gives the address on which something is done
 	currentAddress = currentExpr;
 	// Type of the expression
 	string typeStr = _node.expression().annotation().type->toString();
