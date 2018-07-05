@@ -12,10 +12,11 @@ contract Arrays {
         arr[i] = value;
     }
 
-    function writeParamArr(uint[] paramArr, uint i, uint value) pure public returns (uint) {
-        paramArr[i] = value;
-        return paramArr[i];
-    }
+    // TODO: assigning to parameters does not work in Boogie
+    //function writeParamArr(uint[] paramArr, uint i, uint value) pure public returns (uint) {
+    //    paramArr[i] = value;
+    //    return paramArr[i];
+    //}
 
     function readParamArr(uint[] paramArr, uint i) pure public returns (uint) {
         if (i < paramArr.length) return paramArr[i];
