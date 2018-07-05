@@ -344,7 +344,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		// The parameter of assert is the first normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
-		std::advance(it, 3);
+		std::advance(it, args.size() - _node.arguments().size());
 		newStatements.push_back(smack::Stmt::assert_(*it));
 		return false;
 	}
