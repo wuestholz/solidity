@@ -17,13 +17,13 @@ namespace solidity
 
 const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr)
 {
-	if (const smack::VarExpr* varArray = dynamic_cast<const smack::VarExpr*>(expr))
+	if (auto varArray = dynamic_cast<const smack::VarExpr*>(expr))
 	{
 		return smack::Expr::id(varArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
 	}
-	if (const smack::SelExpr* selArray = dynamic_cast<const smack::SelExpr*>(expr))
+	if (auto selArray = dynamic_cast<const smack::SelExpr*>(expr))
 	{
-		const smack::VarExpr* baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase());
+		auto baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase());
 		return smack::Expr::sel(
 				smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
 				*selArray->getIdxs().begin());
@@ -38,6 +38,8 @@ ASTBoogieExpressionConverter::ASTBoogieExpressionConverter()
 	currentExpr = nullptr;
 	currentAddress = nullptr;
 	isGetter = false;
+	isLibraryCall = false;
+	isLibraryCallStatic = false;
 	currentValue = nullptr;
 }
 
@@ -100,9 +102,9 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	}
 
 	// Check if LHS is an identifier referencing a variable
-	if (Identifier const* lhsId = dynamic_cast<Identifier const*>(&_node.leftHandSide()))
+	if (auto lhsId = dynamic_cast<Identifier const*>(&_node.leftHandSide()))
 	{
-		if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
+		if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
 		{
 			// State variables are represented by maps, so x = 5 becomes
 			// an assignment and a map update like x := x[this := 5]
@@ -124,18 +126,18 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	}
 
 	// Check if LHS is an indexer (arrays or maps)
-	if (IndexAccess const* lhsIdx = dynamic_cast<IndexAccess const*>(&_node.leftHandSide()))
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&_node.leftHandSide()))
 	{
-		if (Identifier const* lhsBase = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
+		if (auto lhsBase = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
-			if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(lhsBase->annotation().referencedDeclaration))
+			if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsBase->annotation().referencedDeclaration))
 			{
 				// Write state array/map
 				if (varDecl->isStateVariable())
 				{
 					// LHS should be a select expression that has to be rewritten to an update
 					// E.g., arr[i] = v is converted to arr := arr[this := arr[this][i := v]]
-					if (const smack::SelExpr* lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
+					if (auto lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
 					{
 						newStatements.push_back(smack::Stmt::assign(
 								smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
@@ -152,7 +154,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 				{
 					// LHS should be a select expression that has to be rewritten to an update
 					// E.g., arr[i] = v is converted to arr := arr[i := v]
-					if (const smack::SelExpr* lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
+					if (auto lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
 					{
 						newStatements.push_back(smack::Stmt::assign(
 								lhsSel->getBase(),
@@ -269,7 +271,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Check for the special case of calling the 'value' function
 	// For example x.f.value(y)(z) should be treated as x.f(z), while setting
 	// 'currentValue' to 'y'.
-	if (const MemberAccess* expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	if (auto expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
 	{
 		if (expMa->memberName() == "value")
 		{
@@ -290,7 +292,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Ignore gas setting, e.g., x.f.gas(y)(z) is just x.f(z)
-	if (const MemberAccess* expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	if (auto expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
 	{
 		if (expMa->memberName() == "gas")
 		{
@@ -310,7 +312,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	// 'currentExpr' should be an identifier, giving the name of the function
 	string funcName;
-	if (smack::VarExpr const * v = dynamic_cast<smack::VarExpr const*>(currentExpr))
+	if (auto v = dynamic_cast<smack::VarExpr const*>(currentExpr))
 	{
 		funcName = v->name();
 	}
@@ -465,16 +467,16 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 		// Check for library call
 		isLibraryCall = false;
-		if (const FunctionDefinition *fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
+		if (auto fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
 		{
 			isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
 			if (isLibraryCall)
 			{
 				// Check if library call is static (Math.add(1, 2)) or not (1.add(2))
 				isLibraryCallStatic = false;
-				if (Identifier const* exprId = dynamic_cast<Identifier const *>(&_node.expression()))
+				if (auto exprId = dynamic_cast<Identifier const *>(&_node.expression()))
 				{
-					if (ContractDefinition const* refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
+					if (auto refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
 					{
 						isLibraryCallStatic = true;
 					}
@@ -505,7 +507,7 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 	// Check if a state variable is referenced
 	bool referencesStateVar = false;
-	if (const VariableDeclaration* varDecl = dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
+	if (auto varDecl = dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
 	{
 		referencesStateVar = varDecl->isStateVariable();
 	}
