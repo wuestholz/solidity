@@ -45,6 +45,8 @@ ASTBoogieConverter::ASTBoogieConverter()
 	program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
 	// address.call()
 	program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
+	// address.send()
+	program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)

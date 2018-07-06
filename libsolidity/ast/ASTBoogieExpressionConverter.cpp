@@ -361,7 +361,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_comment("Assert should have exactly one argument") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		// The parameter of assert is the first normal argument
+		// The parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
 		newStatements.push_back(smack::Stmt::assert_(*it));
@@ -377,7 +377,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_comment("Require should have one or two argument(s)") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		// The parameter of assume is the first normal argument
+		// The parameter of assume is the first normal argument (the second is
+		// an message optional message that is omitted in Boogie)
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
 		newStatements.push_back(smack::Stmt::assume(*it));
@@ -385,6 +386,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Revert is mapped to assume(false) statement in Boogie (instead of a function call)
+	// Its argument is an optional message that is omitted in Boogie
 	if (funcName == ASTBoogieUtils::SOLIDITY_REVERT)
 	{
 		if (_node.arguments().size() > 1)
@@ -463,6 +465,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
+	}
+	// address.send()
+	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
+	{
+		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
 	}
 	// address.call()
 	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
