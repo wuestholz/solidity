@@ -207,30 +207,37 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
 	case Token::Sub: currentExpr = smack::Expr::neg(subExpr); break;
 	case Token::Inc:
-		if (_node.isPrefixOperation())
+		if (_node.isPrefixOperation()) // ++x
 		{
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
 					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
 			newDecls.push_back(tempVar);
+			// First do the assignment x := x + 1
 			createAssignment(_node.subExpression(), lhs, rhs);
+			// Then the assignment tmp := x
 			newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
+			// Result is the tmp variable (if the assignment is part of an expression)
 			currentExpr = smack::Expr::id(tempVar->getName());
 		}
-		else
+		else // x++
 		{
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
 							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
 			newDecls.push_back(tempVar);
+			// First do the assignment tmp := x
 			newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+			// Then the assignment x := x + 1
 			createAssignment(_node.subExpression(), lhs, rhs);
+			// Result is the tmp variable (if the assignment is part of an expression)
 			currentExpr = smack::Expr::id(tempVar->getName());
 		}
 		break;
 	case Token::Dec:
+		// Same as ++ but with minus
 		if (_node.isPrefixOperation())
 		{
 			const smack::Expr* lhs = subExpr;
