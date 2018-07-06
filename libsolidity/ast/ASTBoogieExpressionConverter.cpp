@@ -368,19 +368,32 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
-	// Rquire is mapped to assume statement in Boogie (instead of a function call)
+	// Require is mapped to assume statement in Boogie (instead of a function call)
 	if (funcName == ASTBoogieUtils::SOLIDITY_REQUIRE)
 	{
-		if (_node.arguments().size() != 1)
+		if (2 < _node.arguments().size() || _node.arguments().size() < 1)
 		{
 			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-							errinfo_comment("Require should have exactly one argument") <<
+							errinfo_comment("Require should have one or two argument(s)") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		// The parameter of assert is the first normal argument
+		// The parameter of assume is the first normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
 		newStatements.push_back(smack::Stmt::assume(*it));
+		return false;
+	}
+
+	// Revert is mapped to assume(false) statement in Boogie (instead of a function call)
+	if (funcName == ASTBoogieUtils::SOLIDITY_REVERT)
+	{
+		if (_node.arguments().size() > 1)
+		{
+			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+							errinfo_comment("Revert should have at most one argument") <<
+							errinfo_sourceLocation(_node.location()));
+		}
+		newStatements.push_back(smack::Stmt::assume(smack::Expr::lit(false)));
 		return false;
 	}
 

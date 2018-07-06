@@ -32,6 +32,7 @@ public:
 	static const std::string BOOGIE_THIS;
 	static const std::string SOLIDITY_ASSERT;
 	static const std::string SOLIDITY_REQUIRE;
+	static const std::string SOLIDITY_REVERT;
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;

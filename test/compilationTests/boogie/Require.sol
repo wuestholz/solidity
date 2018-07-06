@@ -9,4 +9,12 @@ contract Assertion {
         assert(result > y);
         return result;
     }
+
+    function add2(int x, int y) pure public returns (int) {
+        if (x <= 0 || y <= 0) revert();
+        int result = x + y;
+        assert(result > x);
+        assert(result > y);
+        return result;
+    }
 }
