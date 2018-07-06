@@ -26,6 +26,7 @@ const string ASTBoogieUtils::BOOGIE_CALL = "__call";
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
+const string ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
 const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
@@ -119,7 +120,8 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
 	if (decl.name() == VERIFIER_MAIN) return "main";
-	if (decl.name() == SOLIDITY_ASSERT) return "assert";
+	if (decl.name() == SOLIDITY_ASSERT) return SOLIDITY_ASSERT;
+	if (decl.name() == SOLIDITY_REQUIRE) return SOLIDITY_REQUIRE;
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
 
 	// ID is important to append, since (1) even fully qualified names can be

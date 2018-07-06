@@ -368,6 +368,22 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
+	// Rquire is mapped to assume statement in Boogie (instead of a function call)
+	if (funcName == ASTBoogieUtils::SOLIDITY_REQUIRE)
+	{
+		if (_node.arguments().size() != 1)
+		{
+			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+							errinfo_comment("Require should have exactly one argument") <<
+							errinfo_sourceLocation(_node.location()));
+		}
+		// The parameter of assert is the first normal argument
+		list<const smack::Expr*>::iterator it = args.begin();
+		std::advance(it, args.size() - _node.arguments().size());
+		newStatements.push_back(smack::Stmt::assume(*it));
+		return false;
+	}
+
 	// TODO: check for void return in a more appropriate way
 	if (_node.annotation().type->toString() != "tuple()")
 	{
