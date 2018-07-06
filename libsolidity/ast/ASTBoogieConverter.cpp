@@ -80,7 +80,8 @@ bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 
 bool ASTBoogieConverter::visit(ImportDirective const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
@@ -110,22 +111,26 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: StructDefinition") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EnumDefinition") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumValue const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EnumValue") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(ParameterList const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ParameterList") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
@@ -239,42 +244,50 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 
 bool ASTBoogieConverter::visit(ModifierDefinition const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierDefinition") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierInvocation") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EventDefinition") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(ElementaryTypeName const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ElementaryTypeName") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(UserDefinedTypeName const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: UserDefinedTypeName") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(FunctionTypeName const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: FunctionTypeName") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(Mapping const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Mapping") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ArrayTypeName") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,9 +515,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 bool ASTBoogieConverter::visitNode(ASTNode const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-					errinfo_comment("Unhandled node") <<
-					errinfo_sourceLocation(_node.location()));
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node (unknown)") << errinfo_sourceLocation(_node.location()));
 	return true;
 }
 

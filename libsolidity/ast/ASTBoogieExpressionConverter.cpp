@@ -502,7 +502,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: NewExpression") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
@@ -630,7 +631,8 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ElementaryTypeNameExpression") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)

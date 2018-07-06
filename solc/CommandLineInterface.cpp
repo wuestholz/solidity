@@ -1055,13 +1055,13 @@ void CommandLineInterface::handleBoogie()
 		}
 		catch (CompilerError const& _exception)
 		{
-			formatter.printExceptionInformation(_exception, "Compiler error");
+			formatter.printExceptionInformation(_exception, "Boogie compiler error");
 			return;
 		}
 		catch (InternalCompilerError const& _exception)
 		{
-			cerr << "Internal compiler error during compilation:" << endl
-				 << boost::diagnostic_information(_exception);
+			formatter.printExceptionInformation(_exception, "Boogie internal compiler error");
+			cerr << "Details:" << endl << boost::diagnostic_information(_exception);
 			return;
 		}
 	}
