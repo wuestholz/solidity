@@ -28,7 +28,7 @@ private:
 	std::list<smack::Decl*> newDecls;
 
 	const smack::Expr* getArrayLength(const smack::Expr* expr);
-
+	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
 
 public:
 

@@ -104,8 +104,15 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			errinfo_sourceLocation(_node.location()));
 	}
 
+	createAssignment(_node.leftHandSide(), lhs, rhs);
+
+	return false;
+}
+
+void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs)
+{
 	// Check if LHS is an identifier referencing a variable
-	if (auto lhsId = dynamic_cast<Identifier const*>(&_node.leftHandSide()))
+	if (auto lhsId = dynamic_cast<Identifier const*>(&originalLhs))
 	{
 		if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
 		{
@@ -124,12 +131,12 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			{
 				newStatements.push_back(smack::Stmt::assign(lhs, rhs));
 			}
-			return false;
+			return;
 		}
 	}
 
 	// Check if LHS is an indexer (arrays or maps)
-	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&_node.leftHandSide()))
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
 	{
 		if (auto lhsBase = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
@@ -149,7 +156,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 										smack::Expr::upd(lhsSel->getBase(),
 												*lhsSel->getIdxs().begin(),
 												rhs))));
-						return false;
+						return;
 					}
 				}
 				// Write local array/map
@@ -162,7 +169,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 						newStatements.push_back(smack::Stmt::assign(
 								lhsSel->getBase(),
 								smack::Expr::upd(lhsSel->getBase(), *lhsSel->getIdxs().begin(), rhs)));
-						return false;
+						return;
 					}
 				}
 			}
@@ -171,8 +178,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment("Unsupported assignment (only variables/indexers are supported as LHS)") <<
-			errinfo_sourceLocation(_node.location()));
-	return false;
+			errinfo_sourceLocation(originalLhs.location()));
+	return;
 }
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
@@ -199,6 +206,46 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	switch (_node.getOperator()) {
 	case Token::Not: currentExpr = smack::Expr::not_(subExpr); break;
 	case Token::Sub: currentExpr = smack::Expr::neg(subExpr); break;
+	case Token::Inc:
+		if (_node.isPrefixOperation())
+		{
+			const smack::Expr* lhs = subExpr;
+			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
+			createAssignment(_node.subExpression(), lhs, rhs);
+			currentExpr = lhs;
+		}
+		else
+		{
+			const smack::Expr* lhs = subExpr;
+			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
+			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+			newDecls.push_back(tempVar);
+			newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+			createAssignment(_node.subExpression(), lhs, rhs);
+			currentExpr = smack::Expr::id(tempVar->getName());
+		}
+		break;
+	case Token::Dec:
+		if (_node.isPrefixOperation())
+		{
+			const smack::Expr* lhs = currentExpr;
+			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
+			createAssignment(_node.subExpression(), lhs, rhs);
+			currentExpr = lhs;
+		}
+		else
+		{
+			const smack::Expr* lhs = subExpr;
+			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
+			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+			newDecls.push_back(tempVar);
+			newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+			createAssignment(_node.subExpression(), lhs, rhs);
+			currentExpr = smack::Expr::id(tempVar->getName());
+		}
+		break;
 
 	default: BOOST_THROW_EXCEPTION(CompilerError() <<
 			errinfo_comment(string("Unsupported operator ") + Token::toString(_node.getOperator())) <<

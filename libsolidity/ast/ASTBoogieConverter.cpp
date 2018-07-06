@@ -474,14 +474,28 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	// Boogie cannot have expressions as statements, therefore
 	// ExpressionStatements have to be checked if they have a corresponding
 	// statement in Boogie
-	if (dynamic_cast<Assignment const*>(&_node.expression())) convertExpression(_node.expression());
-	else if (dynamic_cast<FunctionCall const*>(&_node.expression())) convertExpression(_node.expression());
-	else
+	if (dynamic_cast<Assignment const*>(&_node.expression()))
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment(string("Unsupported expression appearing as statement")) <<
-				errinfo_sourceLocation(_node.location()));
+		convertExpression(_node.expression());
+		return false;
 	}
+	if (dynamic_cast<FunctionCall const*>(&_node.expression()))
+	{
+		convertExpression(_node.expression());
+		return false;
+	}
+	if (auto unaryExpr = dynamic_cast<UnaryOperation const*>(&_node.expression()))
+	{
+		if (unaryExpr->getOperator() == Token::Inc || unaryExpr->getOperator() == Token::Dec)
+		{
+			convertExpression(_node.expression());
+			return false;
+		}
+	}
+
+	BOOST_THROW_EXCEPTION(CompilerError() <<
+			errinfo_comment(string("Unsupported expression appearing as statement")) <<
+			errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
