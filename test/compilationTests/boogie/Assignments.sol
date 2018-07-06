@@ -47,6 +47,11 @@ contract LocalVars {
         return contractVar;
     }
 
+    function complexStuff(uint param) pure public returns (uint) {
+        uint x = param;
+        return (++x) + (x++);
+    }
+
     function __verifier_main() public {
         init();
         assert(doSomething(20) == 35);
@@ -56,5 +61,6 @@ contract LocalVars {
         assert(incrDecr(5) == 5);
         init();
         assert(incrContractVar() == 12);
+        assert(complexStuff(0) == 2);
     }
 }
