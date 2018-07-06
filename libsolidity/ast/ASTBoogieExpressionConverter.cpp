@@ -84,6 +84,9 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	const smack::Expr* rhs = currentExpr;
 
+	// Result will be the LHS (for chained assignments like x = y = 5)
+	currentExpr = lhs;
+
 	// Transform rhs based on the operator, e.g., a += b becomes a := a + b
 	switch (_node.assignmentOperator()) {
 	case Token::Assign: break; // rhs already contains the result
