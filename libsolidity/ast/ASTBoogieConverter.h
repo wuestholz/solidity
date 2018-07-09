@@ -9,9 +9,9 @@ namespace solidity
 {
 
 /**
- * Converts the AST into Boogie IVL format.
+ * Converter from Solidity AST to Boogie AST.
  */
-class ASTBoogieConverter : public ASTConstVisitor
+class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
 	// Top-level element is a single Boogie program
@@ -23,27 +23,31 @@ private:
 	// beginning of the function).
 	std::list<smack::Decl*> localDecls;
 
+	// Collect initializer for state variables to be added to the beginning
+	// of the constructor
+	std::list<smack::Stmt const*> stateVarInitializers;
+
 	// Current block(s) where statements are appended, stack is needed
 	// due to nested blocks
 	std::stack<smack::Block*> currentBlocks;
-
-	// Current expression
-	const smack::Expr* currentExpr;
 
 	// Return statement in Solidity is mapped to an assignment to the return
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* currentRet;
 
-	const smack::Expr* currentAddress;
-
+	/**
+	 * Add a top-level comment
+	 */
 	void addGlobalComment(std::string str);
 
 	/**
-	 * Maps a declaration name into a name in Boogie
+	 * Helper method to convert an expression using the dedicated expression
+	 * converter class. It also handles the statements and declarations
+	 * returned by the conversion.
 	 */
-	std::string mapDeclName(Declaration const& decl);
+	const smack::Expr* convertExpression(Expression const& _node);
 
-	std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
+	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:
 	ASTBoogieConverter();
@@ -91,18 +95,8 @@ public:
 	bool visit(EmitStatement const& _node) override;
 	bool visit(VariableDeclarationStatement const& _node) override;
 	bool visit(ExpressionStatement const& _node) override;
-	bool visit(Conditional const& _node) override;
-	bool visit(Assignment const& _node) override;
-	bool visit(TupleExpression const& _node) override;
-	bool visit(UnaryOperation const& _node) override;
-	bool visit(BinaryOperation const& _node) override;
-	bool visit(FunctionCall const& _node) override;
-	bool visit(NewExpression const& _node) override;
-	bool visit(MemberAccess const& _node) override;
-	bool visit(IndexAccess const& _node) override;
-	bool visit(Identifier const& _node) override;
-	bool visit(ElementaryTypeNameExpression const& _node) override;
-	bool visit(Literal const& _node) override;
+
+	// Conversion of expressions is implemented by a separate class
 
 	bool visitNode(ASTNode const&) override;
 
