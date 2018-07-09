@@ -565,7 +565,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		if (_node.annotation().referencedDeclaration == nullptr)
 		{
 			BOOST_THROW_EXCEPTION(CompilerError() <<
-								errinfo_comment("Member does not have a corresponding declaration (probably an unsupported special member)") <<
+								errinfo_comment("Member " + _node.memberName() + " does not have a corresponding declaration (probably an unsupported special member)") <<
 								errinfo_sourceLocation(_node.location()));
 		}
 		currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));

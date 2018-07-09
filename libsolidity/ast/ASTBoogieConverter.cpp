@@ -256,7 +256,8 @@ bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EventDefinition") << errinfo_sourceLocation(_node.location()));
+	// TODO: show warning using ErrorReporter
+	cerr << "Warning: ignored event definition: " << _node.name() << endl;
 	return false;
 }
 
@@ -296,7 +297,8 @@ bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 
 bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: InlineAssembly") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(Block const&)
@@ -308,7 +310,8 @@ bool ASTBoogieConverter::visit(Block const&)
 
 bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: PlaceholderStatement") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(IfStatement const& _node)
@@ -399,7 +402,8 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	// TODO: Boogie does not support continue, this must be mapped manually
 	// using labels and gotos
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Continue") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
 bool ASTBoogieConverter::visit(Break const&)
@@ -432,12 +436,15 @@ bool ASTBoogieConverter::visit(Return const& _node)
 
 bool ASTBoogieConverter::visit(Throw const& _node)
 {
-	return visitNode(_node);
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Throw") << errinfo_sourceLocation(_node.location()));
+	return false;
 }
 
-bool ASTBoogieConverter::visit(EmitStatement const& _node)
+bool ASTBoogieConverter::visit(EmitStatement const&)
 {
-	return visitNode(_node);
+	// TODO: show warning using ErrorReporter
+	cerr << "Warning: ignored emit statement" << endl;
+	return false;
 }
 
 bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
