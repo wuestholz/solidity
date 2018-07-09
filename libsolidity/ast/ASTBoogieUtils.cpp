@@ -226,17 +226,22 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 
 	if (tp->category() == Type::Category::Array)
 	{
-		// TODO: is there a better way to cast?
-		ArrayType const* arrType = dynamic_cast<ArrayType const*>(&*tp);
+		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
 		return "[int]" + mapType(arrType->baseType(), _associatedNode);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
 	{
-		// TODO: is there a better way to cast?
-		MappingType const* mappingType = dynamic_cast<MappingType const*>(&*tp);
+		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
 		return "[" + mapType(mappingType->keyType(), _associatedNode) + "]"
 				+ mapType(mappingType->valueType(), _associatedNode);
+	}
+
+	if (tp->category() == Type::Category::FixedBytes)
+	{
+		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
+		if (fbType->numBytes() == 1) return "int";
+		else return "[int]int";
 	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<

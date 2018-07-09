@@ -553,10 +553,16 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
 	}
 	// array.length
-	else if(_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
+	else if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
 	{
 		// TODO: error handling
 		currentExpr = getArrayLength(expr);
+	}
+	// fixed size byte array length
+	else if (_node.expression().annotation().type->category() == Type::Category::FixedBytes && _node.memberName() == "length")
+	{
+		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.expression().annotation().type);
+		currentExpr = smack::Expr::lit(fbType->numBytes());
 	}
 	// Non-special member access: 'referencedDeclaration' should point to the
 	// declaration corresponding to 'memberName'
@@ -565,7 +571,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		if (_node.annotation().referencedDeclaration == nullptr)
 		{
 			BOOST_THROW_EXCEPTION(CompilerError() <<
-								errinfo_comment("Member " + _node.memberName() + " does not have a corresponding declaration (probably an unsupported special member)") <<
+								errinfo_comment("Member '" + _node.memberName() + "' does not have a corresponding declaration (probably an unsupported special member)") <<
 								errinfo_sourceLocation(_node.location()));
 		}
 		currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
@@ -605,6 +611,19 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 
 	_node.indexExpression()->accept(*this); // TODO: can this be a nullptr?
 	const smack::Expr* indexExpr = currentExpr;
+
+	// The type bytes1 is represented as a scalar value in Boogie, therefore
+	// indexing is not required, but an assertion is added to check the index
+	if (_node.baseExpression().annotation().type->category() == Type::Category::FixedBytes)
+	{
+		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.baseExpression().annotation().type);
+		if (fbType->numBytes() == 1)
+		{
+			newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0))));
+			currentExpr = baseExpr;
+			return false;
+		}
+	}
 
 	currentExpr = smack::Expr::sel(baseExpr, indexExpr);
 
