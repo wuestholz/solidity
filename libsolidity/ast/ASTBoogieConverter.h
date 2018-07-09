@@ -23,6 +23,10 @@ private:
 	// beginning of the function).
 	std::list<smack::Decl*> localDecls;
 
+	// Collect initializer for state variables to be added to the beginning
+	// of the constructor
+	std::list<smack::Stmt const*> stateVarInitializers;
+
 	// Current block(s) where statements are appended, stack is needed
 	// due to nested blocks
 	std::stack<smack::Block*> currentBlocks;
@@ -42,6 +46,8 @@ private:
 	 * returned by the conversion.
 	 */
 	const smack::Expr* convertExpression(Expression const& _node);
+
+	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:
 	ASTBoogieConverter();

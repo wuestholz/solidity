@@ -32,6 +32,31 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 	return result.expr;
 }
 
+void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _node)
+{
+	addGlobalComment("");
+	addGlobalComment("Default constructor");
+
+	// Input parameters
+	list<smack::Binding> params;
+	// Add some extra parameters for globally available variables
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+
+	list<smack::Block*> blocks;
+	blocks.push_back(smack::Block::block());
+	// State variable initializers should go to the beginning of the constructor
+	for (auto i : stateVarInitializers) (*blocks.begin())->addStmt(i);
+	stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+
+	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
+
+	// Create the procedure
+	program.getDeclarations().push_back(smack::Decl::procedure(funcName,
+			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
+}
+
 ASTBoogieConverter::ASTBoogieConverter()
 {
 	currentRet = nullptr;
@@ -89,12 +114,32 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
+	stateVarInitializers.clear();
 
-	return true; // Simply apply visitor recursively
+	// Process state variables first (to get initializer expressions)
+	for (auto sn : _node.subNodes())
+	{
+		if (dynamic_cast<VariableDeclaration const*>(&*sn)) sn->accept(*this);
+	}
+
+	// Process other elements
+	for (auto sn : _node.subNodes())
+	{
+		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) sn->accept(*this);
+	}
+
+	// If there are still initializers left, there was no constructor
+	if (!stateVarInitializers.empty())
+	{
+		createDefaultConstructor(_node);
+	}
+
+	return false;
 }
 
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
+	// TODO: calling constructor of superclass?
 	// Boogie programs are flat, inheritance does not appear explicitly
 	addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
 	return false;
@@ -191,6 +236,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	localDecls.clear();
 	// Create new empty block
 	currentBlocks.push(smack::Block::block());
+	// State variable initializers should go to the beginning of the constructor
+	if (_node.isConstructor())
+	{
+		for (auto i : stateVarInitializers) currentBlocks.top()->addStmt(i);
+		stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+	}
 	_node.body().accept(*this);
 	list<smack::Block*> blocks;
 	blocks.push_back(currentBlocks.top());
@@ -202,7 +253,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	// Get the name of the function
-	string funcName = _node.isConstructor() ? ASTBoogieUtils::BOOGIE_CONSTRUCTOR : ASTBoogieUtils::mapDeclName(_node);
+	string funcName = _node.isConstructor() ?
+			ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id()) : // TODO: we should use the ID of the contract (the default constructor can only use that)
+			ASTBoogieUtils::mapDeclName(_node);
 
 	// Create the procedure
 	program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
@@ -220,9 +273,13 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	}
 	if (_node.value())
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Initial values are not supported yet") <<
-				errinfo_sourceLocation(_node.location()));
+		// Initialization is saved for the constructor
+		smack::Expr const* initExpr = convertExpression(*_node.value());
+		stateVarInitializers.push_back(smack::Stmt::assign(smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
+				smack::Expr::upd(
+						smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+						initExpr)));
 	}
 
 	addGlobalComment("");

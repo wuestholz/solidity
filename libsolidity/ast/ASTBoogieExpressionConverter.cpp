@@ -670,7 +670,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported type: " + tpStr) <<
+			errinfo_comment("Unsupported literal for type: " + tpStr) <<
 			errinfo_sourceLocation(_node.location()));
 	return false;
 }
