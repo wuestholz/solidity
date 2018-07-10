@@ -245,7 +245,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported type: " + tpStr) <<
+			errinfo_comment("Unsupported type: " + tpStr.substr(0, tpStr.find(' '))) <<
 			errinfo_sourceLocation(_associatedNode.location()));
 	return "";
 }

@@ -2,6 +2,11 @@ pragma solidity ^0.4.23;
 
 contract Addresses {
     
+    function thisBalance(uint amount) public returns (bool) {
+        // 'this.balance' is deprecated but some older contracts use it
+        return this.balance > amount;
+    }
+
     function testTransfer(uint amount) public {
         uint oldSum = address(this).balance + msg.sender.balance;
         if (address(this).balance >= amount) msg.sender.transfer(amount);

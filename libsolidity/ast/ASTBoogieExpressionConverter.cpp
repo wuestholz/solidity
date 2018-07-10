@@ -522,85 +522,101 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 
 	// Handle special members/functions
 
-	// address.balance
-	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
+	// address.balance / this.balance
+	if (_node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
 	{
-		currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
+		if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
+		{
+			currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
+			return false;
+		}
+		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+		{
+			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
+			{
+				currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+				return false;
+			}
+		}
 	}
 	// address.transfer()
-	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
+		return false;
 	}
 	// address.send()
-	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
+		return false;
 	}
 	// address.call()
-	else if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
+		return false;
 	}
 	// msg.sender
-	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER);
+		return false;
 	}
 	// msg.value
-	else if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
+	if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
 		currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+		return false;
 	}
 	// array.length
-	else if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
+	if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
 	{
 		// TODO: handle null return value
 		currentExpr = getArrayLength(expr);
+		return false;
 	}
 	// fixed size byte array length
-	else if (_node.expression().annotation().type->category() == Type::Category::FixedBytes && _node.memberName() == "length")
+	if (_node.expression().annotation().type->category() == Type::Category::FixedBytes && _node.memberName() == "length")
 	{
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.expression().annotation().type);
 		currentExpr = smack::Expr::lit(fbType->numBytes());
+		return false;
 	}
 	// Non-special member access: 'referencedDeclaration' should point to the
 	// declaration corresponding to 'memberName'
-	else
+	if (_node.annotation().referencedDeclaration == nullptr)
 	{
-		if (_node.annotation().referencedDeclaration == nullptr)
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+							errinfo_comment("Member '" + _node.memberName() + "' does not have a corresponding declaration (probably an unsupported special member)") <<
+							errinfo_sourceLocation(_node.location()));
+	}
+	currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
+	// Check for getter
+	isGetter = false;
+	if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
+	{
+		isGetter = true;
+	}
+	// Check for library call
+	isLibraryCall = false;
+	if (auto fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
+	{
+		isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
+		if (isLibraryCall)
 		{
-			BOOST_THROW_EXCEPTION(CompilerError() <<
-								errinfo_comment("Member '" + _node.memberName() + "' does not have a corresponding declaration (probably an unsupported special member)") <<
-								errinfo_sourceLocation(_node.location()));
-		}
-		currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
-		// Check for getter
-		isGetter = false;
-		if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
-		{
-			isGetter = true;
-		}
-		// Check for library call
-		isLibraryCall = false;
-		if (auto fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
-		{
-			isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
-			if (isLibraryCall)
+			// Check if library call is static (Math.add(1, 2)) or not (1.add(2))
+			isLibraryCallStatic = false;
+			if (auto exprId = dynamic_cast<Identifier const *>(&_node.expression()))
 			{
-				// Check if library call is static (Math.add(1, 2)) or not (1.add(2))
-				isLibraryCallStatic = false;
-				if (auto exprId = dynamic_cast<Identifier const *>(&_node.expression()))
+				if (auto refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
 				{
-					if (auto refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
-					{
-						isLibraryCallStatic = true;
-					}
+					isLibraryCallStatic = true;
 				}
 			}
 		}
-
 	}
+
 	return false;
 }
 
@@ -670,7 +686,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	}
 
 	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported literal for type: " + tpStr) <<
+			errinfo_comment("Unsupported literal for type: " + tpStr.substr(0, tpStr.find(' '))) <<
 			errinfo_sourceLocation(_node.location()));
 	return false;
 }
