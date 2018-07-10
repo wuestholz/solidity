@@ -19,6 +19,9 @@ private:
 
 	// Helper variables to pass information between the visit methods
 
+	FunctionDefinition const* currentFunc;
+
+
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
 	std::list<smack::Decl*> localDecls;
@@ -34,6 +37,7 @@ private:
 	// Return statement in Solidity is mapped to an assignment to the return
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* currentRet;
+	std::string currentReturnLabel;
 
 	/**
 	 * Add a top-level comment

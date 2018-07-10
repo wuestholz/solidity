@@ -247,7 +247,7 @@ class Block;
 class Stmt {
 public:
   enum Kind {
-    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK
+    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK, LABEL
   };
 private:
   const Kind kind;
@@ -284,6 +284,7 @@ public:
 		  const Block* body,
 		  std::list<const Expr*> invars = std::list<const Expr*>());
   static const Stmt* break_();
+  static const Stmt* label(std::string name);
   virtual void print(std::ostream& os) const = 0;
 };
 
@@ -409,6 +410,14 @@ public:
   BreakStmt() : Stmt(BREAK) {}
   void print(std::ostream& os) const;
   static bool classof(const Stmt* S) { return S->getKind() == BREAK; }
+};
+
+class LabelStmt : public Stmt {
+  std::string str;
+public:
+  LabelStmt(std::string s) : Stmt(LABEL), str(s) {}
+  void print(std::ostream& os) const;
+  static bool classof(const Stmt* S) { return S->getKind() == LABEL; }
 };
 
 class ProcDecl;

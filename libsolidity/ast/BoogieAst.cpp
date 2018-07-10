@@ -281,6 +281,10 @@ const Stmt* Stmt::break_() {
   return new BreakStmt();
 }
 
+const Stmt* Stmt::label(std::string s) {
+  return new LabelStmt(s);
+}
+
 Decl* Decl::typee(std::string name, std::string type, std::list<const Attr*> attrs) {
   return new TypeDecl(name,type,attrs);
 }
@@ -665,6 +669,10 @@ void WhileStmt::print(std::ostream& os) const {
 
 void BreakStmt::print(std::ostream& os) const {
   os << "break;";
+}
+
+void LabelStmt::print(std::ostream& os) const {
+  os << str << ":";
 }
 
 void TypeDecl::print(std::ostream& os) const {

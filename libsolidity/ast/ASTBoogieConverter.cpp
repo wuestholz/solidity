@@ -194,6 +194,7 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
+	currentFunc = &_node;
 	// Solidity functions are mapped to Boogie procedures
 	addGlobalComment("");
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
@@ -257,7 +258,40 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		for (auto i : stateVarInitializers) currentBlocks.top()->addStmt(i);
 		stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 	}
-	if (_node.isImplemented()) { _node.body().accept(*this); }
+	if (_node.modifiers().empty())
+	{
+		if (_node.isImplemented())
+		{
+			string retLabel = "$" + to_string(_node.id()) + "end";
+			currentReturnLabel = retLabel;
+			_node.body().accept(*this);
+			currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+		}
+	}
+	else if (_node.modifiers().size() == 1)
+	{
+		auto modifier = _node.modifiers()[0];
+		if (modifier->arguments() && modifier->arguments()->size() > 0)
+		{
+			BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment("Modifier arguments are not supported yet") <<
+					errinfo_sourceLocation(_node.location()));
+		}
+		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+
+		string retLabel = "$" + to_string(modifier->id()) + "end";
+		currentReturnLabel = retLabel;
+		modifierDecl->body().accept(*this);
+		currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+				errinfo_comment("Multiple modifiers are not supported yet") <<
+				errinfo_sourceLocation(_node.location()));
+	}
+
 	list<smack::Block*> blocks;
 	if (!currentBlocks.top()->getStatements().empty()) { blocks.push_back(currentBlocks.top()); }
 	currentBlocks.pop();
@@ -314,9 +348,9 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(ModifierDefinition const& _node)
+bool ASTBoogieConverter::visit(ModifierDefinition const&)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierDefinition") << errinfo_sourceLocation(_node.location()));
+	//BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierDefinition") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
@@ -382,7 +416,15 @@ bool ASTBoogieConverter::visit(Block const&)
 
 bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: PlaceholderStatement") << errinfo_sourceLocation(_node.location()));
+	//BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: PlaceholderStatement") << errinfo_sourceLocation(_node.location()));
+	if (currentFunc->isImplemented())
+	{
+		string oldReturnLabel = currentReturnLabel;
+		currentReturnLabel = "$" + to_string(_node.id()) + "end";
+		currentFunc->body().accept(*this);
+		currentBlocks.top()->addStmt(smack::Stmt::label(currentReturnLabel));
+		currentReturnLabel = oldReturnLabel;
+	}
 	return false;
 }
 
@@ -487,11 +529,7 @@ bool ASTBoogieConverter::visit(Break const&)
 bool ASTBoogieConverter::visit(Return const& _node)
 {
 	// No return value
-	if (_node.expression() == nullptr)
-	{
-		currentBlocks.top()->addStmt(smack::Stmt::return_());
-	}
-	else
+	if (_node.expression() != nullptr)
 	{
 		// Get rhs recursively
 		const smack::Expr* rhs = convertExpression(*_node.expression());
@@ -501,8 +539,10 @@ bool ASTBoogieConverter::visit(Return const& _node)
 
 		// First create an assignment, and then an empty return
 		currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
-		currentBlocks.top()->addStmt(smack::Stmt::return_());
 	}
+	list<string> label;
+	label.push_back(currentReturnLabel);
+	currentBlocks.top()->addStmt(smack::Stmt::goto_(label));
 	return false;
 }
 
