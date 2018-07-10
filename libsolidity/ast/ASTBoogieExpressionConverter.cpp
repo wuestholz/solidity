@@ -111,82 +111,41 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs)
 {
-	// Check if LHS is an identifier referencing a variable
-	if (auto lhsId = dynamic_cast<Identifier const*>(&originalLhs))
+	// If LHS is simply an identifier, we can assign to it
+	if (dynamic_cast<smack::VarExpr const*>(lhs))
 	{
-		if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsId->annotation().referencedDeclaration))
+		newStatements.push_back(smack::Stmt::assign(lhs, rhs));
+		return;
+	}
+
+	// If LHS is an indexer (arrays/maps), it needs to be transformed to an update
+	if (auto lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
+	{
+		if (auto lhsUpd = dynamic_cast<const smack::UpdExpr*>(selectToUpdate(lhsSel, rhs)))
 		{
-			// State variables are represented by maps, so x = 5 becomes
-			// an assignment and a map update like x := x[this := 5]
-			if (varDecl->isStateVariable())
-			{
-				newStatements.push_back(smack::Stmt::assign(
-						smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
-						smack::Expr::upd(
-								smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
-								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-								rhs)));
-			}
-			else // Non-state variables can be simply assigned
-			{
-				newStatements.push_back(smack::Stmt::assign(lhs, rhs));
-			}
+			newStatements.push_back(smack::Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
 		}
 	}
 
-	// Check if LHS is an indexer (arrays or maps)
-	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
-	{
-		if (dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
-		{
-			BOOST_THROW_EXCEPTION(CompilerError() <<
-					errinfo_comment("Assignment to nested arrays/mappings is not supported yet") <<
-					errinfo_sourceLocation(originalLhs.location()));
-		}
-		if (auto lhsBase = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
-		{
-			if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsBase->annotation().referencedDeclaration))
-			{
-				// Write state array/map
-				if (varDecl->isStateVariable())
-				{
-					// LHS should be a select expression that has to be rewritten to an update
-					// E.g., arr[i] = v is converted to arr := arr[this := arr[this][i := v]]
-					if (auto lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
-					{
-						newStatements.push_back(smack::Stmt::assign(
-								smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
-								smack::Expr::upd(smack::Expr::id(ASTBoogieUtils::mapDeclName(*varDecl)),
-										smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-										smack::Expr::upd(lhsSel->getBase(),
-												*lhsSel->getIdxs().begin(),
-												rhs))));
-						return;
-					}
-				}
-				// Write local array/map
-				else
-				{
-					// LHS should be a select expression that has to be rewritten to an update
-					// E.g., arr[i] = v is converted to arr := arr[i := v]
-					if (auto lhsSel = dynamic_cast<const smack::SelExpr*>(lhs))
-					{
-						newStatements.push_back(smack::Stmt::assign(
-								lhsSel->getBase(),
-								smack::Expr::upd(lhsSel->getBase(), *lhsSel->getIdxs().begin(), rhs)));
-						return;
-					}
-				}
-			}
-		}
-	}
-
 	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported assignment (only variables/indexers are supported as LHS)") <<
+			errinfo_comment("Unsupported assignment (only identifiers/indexers are supported as LHS)") <<
 			errinfo_sourceLocation(originalLhs.location()));
 	return;
 }
+
+smack::Expr const* ASTBoogieExpressionConverter::selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value)
+{
+	if (auto base = dynamic_cast<smack::SelExpr const*>(sel->getBase()))
+	{
+		return selectToUpdate(base, smack::Expr::upd(base, *sel->getIdxs().begin(), value));
+	}
+	else
+	{
+		return smack::Expr::upd(sel->getBase(), *sel->getIdxs().begin(), value);
+	}
+}
+
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 {

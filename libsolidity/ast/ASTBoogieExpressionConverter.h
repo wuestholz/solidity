@@ -29,6 +29,7 @@ private:
 
 	const smack::Expr* getArrayLength(const smack::Expr* expr);
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
+	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
 
 public:
 

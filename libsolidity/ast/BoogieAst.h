@@ -194,6 +194,7 @@ public:
     : base(a), idxs(i), val(v) {}
   UpdExpr(const Expr* a, const Expr* i, const Expr* v)
     : base(a), idxs(std::list<const Expr*>(1, i)), val(v) {}
+  const Expr* getBase() const { return base; }
   void print(std::ostream& os) const;
 };
 
