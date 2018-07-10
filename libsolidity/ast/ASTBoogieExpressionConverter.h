@@ -26,6 +26,7 @@ private:
 	// due to differences between Solidity and Boogie
 	std::vector<smack::Stmt const*> newStatements;
 	std::list<smack::Decl*> newDecls;
+	std::list<smack::Decl*> newConstants;
 
 	const smack::Expr* getArrayLength(const smack::Expr* expr);
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
@@ -43,9 +44,11 @@ public:
 		const smack::Expr* expr;
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
+		std::list<smack::Decl*> newConstants;
 
-		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements, std::list<smack::Decl*> newDecls)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls) {}
+		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants) {}
 	};
 
 

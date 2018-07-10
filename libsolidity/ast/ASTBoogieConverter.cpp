@@ -28,6 +28,20 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 
 	for (auto d : result.newDecls) { localDecls.push_back(d); }
 	for (auto s : result.newStatements) { currentBlocks.top()->addStmt(s); }
+	for (auto c : result.newConstants)
+	{
+		bool alreadyDefined = false;
+		for (auto d : program.getDeclarations())
+		{
+			if (d->getName() == c->getName())
+			{
+				// TODO: check that other fields are equal
+				alreadyDefined = true;
+				break;
+			}
+		}
+		if (!alreadyDefined) program.getDeclarations().push_back(c);
+	}
 
 	return result.expr;
 }

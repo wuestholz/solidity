@@ -53,7 +53,7 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 
 	_node.accept(*this);
 
-	return Result(currentExpr, newStatements, newDecls);
+	return Result(currentExpr, newStatements, newDecls, newConstants);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -647,6 +647,13 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	if (tpStr == "bool")
 	{
 		currentExpr = smack::Expr::lit(_node.value() == "true");
+		return false;
+	}
+	if (tpStr == "address")
+	{
+		string name = "address_" + _node.value();
+		newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+		currentExpr = smack::Expr::id(name);
 		return false;
 	}
 
