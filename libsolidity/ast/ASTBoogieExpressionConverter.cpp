@@ -138,6 +138,12 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	// Check if LHS is an indexer (arrays or maps)
 	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
 	{
+		if (dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
+		{
+			BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment("Assignment to nested arrays/mappings is not supported yet") <<
+					errinfo_sourceLocation(originalLhs.location()));
+		}
 		if (auto lhsBase = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
 			if (auto varDecl = dynamic_cast<const VariableDeclaration*>(lhsBase->annotation().referencedDeclaration))
