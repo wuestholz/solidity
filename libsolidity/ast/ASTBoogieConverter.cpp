@@ -182,7 +182,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
 	// Solidity functions are mapped to Boogie procedures
 	addGlobalComment("");
-	addGlobalComment("Function: " + _node.name() + " : " + _node.type()->toString());
+	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
+	addGlobalComment("Function: " + _node.name() + funcType);
 
 	// Input parameters
 	list<smack::Binding> params;
@@ -242,9 +243,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		for (auto i : stateVarInitializers) currentBlocks.top()->addStmt(i);
 		stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 	}
-	_node.body().accept(*this);
+	if (_node.isImplemented()) { _node.body().accept(*this); }
 	list<smack::Block*> blocks;
-	blocks.push_back(currentBlocks.top());
+	if (!currentBlocks.top()->getStatements().empty()) { blocks.push_back(currentBlocks.top()); }
 	currentBlocks.pop();
 	if (!currentBlocks.empty())
 	{

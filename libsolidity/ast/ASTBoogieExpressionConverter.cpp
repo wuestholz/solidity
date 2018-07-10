@@ -555,7 +555,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// array.length
 	else if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
 	{
-		// TODO: error handling
+		// TODO: handle null return value
 		currentExpr = getArrayLength(expr);
 	}
 	// fixed size byte array length
