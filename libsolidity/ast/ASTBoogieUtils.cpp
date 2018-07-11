@@ -219,6 +219,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	string tpStr = tp->toString();
 	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
 	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
+	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
 	for (int i = 8; i <= 256; ++i)
 	{
