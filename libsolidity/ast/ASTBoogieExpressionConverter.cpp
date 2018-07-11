@@ -282,8 +282,10 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
+	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
+		// Nothing to do when converting to address
 		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
 		{
 			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
@@ -292,6 +294,16 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				return false;
 			}
 		}
+		// Nothing to do when converting to other kind of contract
+		if (auto expr = dynamic_cast<Identifier const*>(&_node.expression()))
+		{
+			if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
+			{
+				(*_node.arguments().begin())->accept(*this);
+				return false;
+			}
+		}
+
 		BOOST_THROW_EXCEPTION(CompilerError() <<
 					errinfo_comment("Unsupported type conversion") <<
 					errinfo_sourceLocation(_node.location()));
