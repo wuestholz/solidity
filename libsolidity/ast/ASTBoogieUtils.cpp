@@ -30,6 +30,7 @@ const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
 const string ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
 const string ASTBoogieUtils::SOLIDITY_REVERT = "revert";
+// no constant required for 'throw' because it is a separate statement
 
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";

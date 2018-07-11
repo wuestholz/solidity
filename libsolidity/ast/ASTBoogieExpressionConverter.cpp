@@ -17,16 +17,18 @@ namespace solidity
 
 const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr)
 {
+	// Array is a local variable
 	if (auto varArray = dynamic_cast<const smack::VarExpr*>(expr))
 	{
 		return smack::Expr::id(varArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
 	}
+	// Array is state variable
 	if (auto selArray = dynamic_cast<const smack::SelExpr*>(expr))
 	{
 		auto baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase());
 		return smack::Expr::sel(
 				smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
-				*selArray->getIdxs().begin());
+				selArray->getIdxs());
 	}
 	BOOST_THROW_EXCEPTION(CompilerError() <<
 						errinfo_comment("Unsupported access to array length"));
@@ -50,6 +52,7 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	isGetter = false;
 	newStatements.clear();
 	newDecls.clear();
+	newConstants.clear();
 
 	_node.accept(*this);
 
@@ -76,7 +79,7 @@ bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
 
 bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 {
-	// Get lhs recursively (required for +=, *=, etc.)
+	// Get lhs recursively
 	_node.leftHandSide().accept(*this);
 	const smack::Expr* lhs = currentExpr;
 
@@ -138,11 +141,11 @@ smack::Expr const* ASTBoogieExpressionConverter::selectToUpdate(smack::SelExpr c
 {
 	if (auto base = dynamic_cast<smack::SelExpr const*>(sel->getBase()))
 	{
-		return selectToUpdate(base, smack::Expr::upd(base, *sel->getIdxs().begin(), value));
+		return selectToUpdate(base, smack::Expr::upd(base, sel->getIdxs(), value));
 	}
 	else
 	{
-		return smack::Expr::upd(sel->getBase(), *sel->getIdxs().begin(), value);
+		return smack::Expr::upd(sel->getBase(), sel->getIdxs(), value);
 	}
 }
 
@@ -570,7 +573,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
 		if (isLibraryCall)
 		{
-			// Check if library call is static (Math.add(1, 2)) or not (1.add(2))
+			// Check if library call is static (e.g., Math.add(1, 2)) or not (e.g., 1.add(2))
 			isLibraryCallStatic = false;
 			if (auto exprId = dynamic_cast<Identifier const *>(&_node.expression()))
 			{
@@ -605,7 +608,9 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 			return false;
 		}
 	}
-
+	// Index access is simply converted to a select in Boogie, which is fine
+	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
+	// that case is handled when converting assignments
 	currentExpr = smack::Expr::sel(baseExpr, indexExpr);
 
 	return false;
@@ -649,7 +654,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 		currentExpr = smack::Expr::lit(_node.value() == "true");
 		return false;
 	}
-	if (tpStr == "address")
+	if (tpStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
 	{
 		string name = "address_" + _node.value();
 		newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));

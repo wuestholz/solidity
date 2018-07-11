@@ -28,8 +28,11 @@ private:
 	std::list<smack::Decl*> newDecls;
 	std::list<smack::Decl*> newConstants;
 
+	// Helper method to get the length of an array
 	const smack::Expr* getArrayLength(const smack::Expr* expr);
+	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
+	// Helper method to transform a select to an update
 	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
 
 public:

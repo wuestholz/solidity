@@ -19,8 +19,8 @@ private:
 
 	// Helper variables to pass information between the visit methods
 
+	// Function currently being processed
 	FunctionDefinition const* currentFunc;
-
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
@@ -51,6 +51,9 @@ private:
 	 */
 	const smack::Expr* convertExpression(Expression const& _node);
 
+	/**
+	 * Create default constructor for a contract
+	 */
 	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:

@@ -163,7 +163,15 @@ const Expr* Expr::sel(std::string b, std::string i) {
   return new SelExpr(id(b), id(i));
 }
 
+const Expr* Expr::sel(const Expr* b, std::list<const Expr*> i) {
+  return new SelExpr(b, i);
+}
+
 const Expr* Expr::upd(const Expr* b, const Expr* i, const Expr* v) {
+  return new UpdExpr(b, i, v);
+}
+
+const Expr* Expr::upd(const Expr* b, std::list<const Expr*> i, const Expr* v) {
   return new UpdExpr(b, i, v);
 }
 
