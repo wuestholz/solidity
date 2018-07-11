@@ -350,7 +350,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 
 bool ASTBoogieConverter::visit(ModifierDefinition const&)
 {
-	//BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierDefinition") << errinfo_sourceLocation(_node.location()));
+	// Modifier definitions do not appear explicitly, but are instead inlined to functions
 	return false;
 }
 
@@ -546,7 +546,7 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(Throw const& _node)
+bool ASTBoogieConverter::visit(Throw const&)
 {
 	currentBlocks.top()->addStmt(smack::Stmt::assume(smack::Expr::lit(false)));
 	return false;
