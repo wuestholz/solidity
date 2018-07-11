@@ -674,7 +674,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	// TODO: option for bit precise types
 	if (boost::starts_with(tpStr, "int_const"))
 	{
-		currentExpr = smack::Expr::lit(stol(_node.value()));
+		currentExpr = smack::Expr::lit(smack::bigint(_node.value()));
 		return false;
 	}
 	if (tpStr == "bool")

@@ -131,6 +131,10 @@ const Expr* Expr::lit(long v) {
   return new IntLit(v);
 }
 
+const Expr* Expr::lit(bigint v) {
+  return new IntLit(v);
+}
+
 const Expr* Expr::lit(std::string v, unsigned w) {
   return w ? (const Expr*) new BvLit(v,w) : (const Expr*) new IntLit(v);
 }

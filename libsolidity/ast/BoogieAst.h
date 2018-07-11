@@ -7,11 +7,14 @@
 #include <sstream>
 #include <string>
 #include <list>
+#include <boost/multiprecision/cpp_int.hpp>
 
 // TODO: these classes are leaking memory, there is no delete. Should be
 // updated to use smart pointers.
 
 namespace smack {
+
+using bigint = boost::multiprecision::number<boost::multiprecision::cpp_int_backend<1024, 1024, boost::multiprecision::signed_magnitude, boost::multiprecision::unchecked, void>>;
 
 typedef std::pair<std::string, std::string> Binding;
 
@@ -48,6 +51,7 @@ public:
   static const Expr* lit(unsigned v) { return lit((unsigned long) v); }
   static const Expr* lit(unsigned long v);
   static const Expr* lit(long v);
+  static const Expr* lit(bigint v);
   static const Expr* lit(std::string v, unsigned w);
   static const Expr* lit(unsigned long v, unsigned w);
   static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
@@ -112,6 +116,11 @@ public:
     val = s.str();
   }
   IntLit(long v) {
+    std::stringstream s;
+    s << v;
+    val = s.str();
+  }
+  IntLit(bigint v) {
     std::stringstream s;
     s << v;
     val = s.str();
