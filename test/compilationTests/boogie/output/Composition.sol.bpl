@@ -40,56 +40,49 @@ procedure __send(__this: address_t, __msg_sender: address_t, __msg_value: int, a
 }
 
 // 
-// ------- Source: Initializers.sol -------
+// ------- Source: Composition.sol -------
 // Pragma: solidity^0.4.23
 // 
-// ------- Contract: Initializers -------
+// ------- Contract: A -------
 // 
-// State variable: b : int256
-var b#3: [address_t]int;
+// State variable: myVar : uint256
+var myVar#3: [address_t]int;
 // 
-// State variable: c : int256
-var c#5: [address_t]int;
-// 
-// State variable: a : int256
-var a#26: [address_t]int;
-// 
-// Function:  : function (int256)
-procedure __constructor#15(__this: address_t, __msg_sender: address_t, __msg_value: int, b0#7: int)
+// Function: someFunc : function (uint256) view returns (uint256)
+procedure someFunc#15(__this: address_t, __msg_sender: address_t, __msg_value: int, param#5: int)
+  returns (#8: int)
 {
-  a#26 := a#26[__this := 5];
-  b#3 := b#3[__this := b0#7];
+  #8 := (myVar#3[__this] + param#5);
+  goto $15end;
+  $15end:
 }
 
 // 
-// Function: getA : function () view returns (int256)
-procedure getA#23(__this: address_t, __msg_sender: address_t, __msg_value: int)
-  returns (#18: int)
+// ------- Contract: B -------
+// 
+// State variable: other : contract A
+var other#18: [address_t]address_t;
+// 
+// Function: callOtherFunc : function () view returns (uint256)
+procedure callOtherFunc#29(__this: address_t, __msg_sender: address_t, __msg_value: int)
+  returns (#21: int)
 {
-  #18 := a#26[__this];
-  return;
+  var someFunc#15#26: int;
+  call someFunc#15#26 := someFunc#15(other#18[__this], __this, 0, 10);
+  #21 := someFunc#15#26;
+  goto $29end;
+  $29end:
 }
 
 // 
-// ------- Contract: NoConstructorButNeeded -------
-// 
-// State variable: a : int256
-var a#30: [address_t]int;
-// 
-// State variable: b : int256
-var b#32: [address_t]int;
-// 
-// Default constructor
-procedure __constructor#33(__this: address_t, __msg_sender: address_t, __msg_value: int)
+// Function: accessOtherMember : function () view returns (uint256)
+procedure accessOtherMember#39(__this: address_t, __msg_sender: address_t, __msg_value: int)
+  returns (#32: int)
 {
-  a#30 := a#30[__this := 5];
+  var myVar#3#36: int;
+  myVar#3#36 := myVar#3[other#18[__this]];
+  #32 := myVar#3#36;
+  goto $39end;
+  $39end:
 }
 
-// 
-// ------- Contract: NoConstructorNeeded -------
-// 
-// State variable: a : int256
-var a#35: [address_t]int;
-// 
-// State variable: b : int256
-var b#37: [address_t]int;

@@ -548,7 +548,7 @@ bool ASTBoogieConverter::visit(Return const& _node)
 
 bool ASTBoogieConverter::visit(Throw const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Throw") << errinfo_sourceLocation(_node.location()));
+	currentBlocks.top()->addStmt(smack::Stmt::assume(smack::Expr::lit(false)));
 	return false;
 }
 
