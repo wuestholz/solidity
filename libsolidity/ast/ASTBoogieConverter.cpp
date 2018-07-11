@@ -86,6 +86,9 @@ ASTBoogieConverter::ASTBoogieConverter()
 	program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
 	// address.send()
 	program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
+
+	// Uninterpreted type for strings
+	program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)

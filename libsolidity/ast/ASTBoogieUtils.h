@@ -45,6 +45,7 @@ public:
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
+	static const std::string BOOGIE_STRING_TYPE;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()

@@ -284,10 +284,18 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
-		// TODO: type conversions are currently omitted, but might be needed
-		// for basic types such as int
-		(*_node.arguments().begin())->accept(*this);
-		return false;
+		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
+		{
+			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
+			{
+				(*_node.arguments().begin())->accept(*this);
+				return false;
+			}
+		}
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment("Unsupported type conversion") <<
+					errinfo_sourceLocation(_node.location()));
+
 	}
 	// Function calls in Boogie are statements and cannot be part of
 	// expressions, therefore each function call is given a fresh variable
@@ -658,6 +666,13 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	{
 		string name = "address_" + _node.value();
 		newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+		currentExpr = smack::Expr::id(name);
+		return false;
+	}
+	if (boost::starts_with(tpStr, "literal_string"))
+	{
+		string name = "literal_string#" + to_string(_node.id());
+		newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_STRING_TYPE, true));
 		currentExpr = smack::Expr::id(name);
 		return false;
 	}
