@@ -270,6 +270,18 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::GreaterThanOrEqual: currentExpr = smack::Expr::gte(lhs, rhs); break;
 
 	case Token::Exp:
+		if (auto rhsLit = dynamic_cast<smack::IntLit const *>(rhs))
+		{
+			if (auto lhsLit = dynamic_cast<smack::IntLit const *>(lhs))
+			{
+				currentExpr = smack::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
+				break;
+			}
+		}
+		BOOST_THROW_EXCEPTION(CompilerError() <<
+					errinfo_comment("Unsupported exponentiation") <<
+					errinfo_sourceLocation(_node.location()));
+		break;
 		// Solidity supports exp only for integers whereas Boogie only
 		// supports it for reals. Could be worked around with casts.
 	default: BOOST_THROW_EXCEPTION(CompilerError() <<

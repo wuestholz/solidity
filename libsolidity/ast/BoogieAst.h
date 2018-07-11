@@ -12,9 +12,11 @@
 // TODO: these classes are leaking memory, there is no delete. Should be
 // updated to use smart pointers.
 
+
+
 namespace smack {
 
-using bigint = boost::multiprecision::number<boost::multiprecision::cpp_int_backend<1024, 1024, boost::multiprecision::signed_magnitude, boost::multiprecision::unchecked, void>>;
+using bigint = boost::multiprecision::int1024_t;
 
 typedef std::pair<std::string, std::string> Binding;
 
@@ -107,24 +109,13 @@ public:
 };
 
 class IntLit : public Expr {
-  std::string val;
+  bigint val;
 public:
   IntLit(std::string v) : val(v) {}
-  IntLit(unsigned long v) {
-    std::stringstream s;
-    s << v;
-    val = s.str();
-  }
-  IntLit(long v) {
-    std::stringstream s;
-    s << v;
-    val = s.str();
-  }
-  IntLit(bigint v) {
-    std::stringstream s;
-    s << v;
-    val = s.str();
-  }
+  IntLit(unsigned long v) : val(v) {}
+  IntLit(long v) : val(v) {}
+  IntLit(bigint v) : val(v) {}
+  bigint getVal() const { return val; }
   void print(std::ostream& os) const;
 };
 
