@@ -7,7 +7,7 @@ contract A {
     modifier onlyOwner {
         require(msg.sender == owner);
         _;
-        assert(true);
+        assert(msg.sender == owner);
     }
 
     modifier onlyOwner2 {
@@ -15,6 +15,7 @@ contract A {
             return;
         }
         _;
+        assert(msg.sender == owner);
     }
 
     function someFunc(uint y) public onlyOwner returns (uint) {
