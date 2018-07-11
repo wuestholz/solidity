@@ -303,6 +303,14 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				return false;
 			}
 		}
+		// Nothing to do when the two types are mapped to same type in Boogie,
+		// e.g., conversion from uint256 to int256 if both are mapped to int
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node) ==
+			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin()))
+		{
+			(*_node.arguments().begin())->accept(*this);
+			return false;
+		}
 
 		BOOST_THROW_EXCEPTION(CompilerError() <<
 					errinfo_comment("Unsupported type conversion") <<
