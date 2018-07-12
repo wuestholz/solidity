@@ -24,7 +24,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter().convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(errorReporter).convert(_node);
 
 	for (auto d : result.newDecls) { localDecls.push_back(d); }
 	for (auto s : result.newStatements) { currentBlocks.top()->addStmt(s); }
@@ -71,7 +71,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
 }
 
-ASTBoogieConverter::ASTBoogieConverter()
+ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : errorReporter(errorReporter)
 {
 	currentRet = nullptr;
 	// Initialize global declarations
@@ -365,8 +365,7 @@ bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
-	// TODO: show warning using ErrorReporter
-	cerr << "Warning: ignored event definition: " << _node.name() << endl;
+	errorReporter.warning(_node.location(), "Ignored event definition");
 	return false;
 }
 
@@ -555,10 +554,9 @@ bool ASTBoogieConverter::visit(Throw const&)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(EmitStatement const&)
+bool ASTBoogieConverter::visit(EmitStatement const& _node)
 {
-	// TODO: show warning using ErrorReporter
-	cerr << "Warning: ignored emit statement" << endl;
+	errorReporter.warning(_node.location(), "Ignored emit statement");
 	return false;
 }
 

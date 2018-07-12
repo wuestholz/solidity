@@ -2,6 +2,7 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <libsolidity/interface/ErrorReporter.h>
 
 namespace dev
 {
@@ -14,6 +15,8 @@ namespace solidity
 class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
+	ErrorReporter& errorReporter;
+
 	// Top-level element is a single Boogie program
 	smack::Program program;
 
@@ -57,7 +60,7 @@ private:
 	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:
-	ASTBoogieConverter();
+	ASTBoogieConverter(ErrorReporter& errorReporter);
 
 	/**
 	 * Convert a node and add it to the actual Boogie program

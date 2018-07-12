@@ -35,7 +35,8 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	return nullptr;
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter()
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter) :
+		errorReporter(errorReporter)
 {
 	currentExpr = nullptr;
 	currentAddress = nullptr;
@@ -369,8 +370,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		if (expMa->memberName() == "gas")
 		{
-			// TODO: show warning using ErrorReporter
-			cerr << "Warning: ignored call to gas() function." << endl;
+			errorReporter.warning(expMa->location(), "Ignored call to gas() function.");
 			expMa->expression().accept(*this);
 			return false;
 		}

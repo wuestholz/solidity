@@ -2,6 +2,7 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <libsolidity/interface/ErrorReporter.h>
 
 namespace dev
 {
@@ -14,6 +15,8 @@ namespace solidity
 class ASTBoogieExpressionConverter : private ASTConstVisitor
 {
 private:
+	ErrorReporter& errorReporter;
+
 	// Helper variables to pass information between the visit methods
 	const smack::Expr* currentExpr;
 	const smack::Expr* currentAddress;
@@ -55,7 +58,7 @@ public:
 	};
 
 
-	ASTBoogieExpressionConverter();
+	ASTBoogieExpressionConverter(ErrorReporter& errorReporter);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side
