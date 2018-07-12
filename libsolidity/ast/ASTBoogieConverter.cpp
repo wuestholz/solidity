@@ -19,19 +19,19 @@ namespace solidity
 
 void ASTBoogieConverter::addGlobalComment(string str)
 {
-	program.getDeclarations().push_back(smack::Decl::comment("", str));
+	m_program.getDeclarations().push_back(smack::Decl::comment("", str));
 }
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(errorReporter).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter).convert(_node);
 
-	for (auto d : result.newDecls) { localDecls.push_back(d); }
-	for (auto s : result.newStatements) { currentBlocks.top()->addStmt(s); }
+	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
+	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
 	for (auto c : result.newConstants)
 	{
 		bool alreadyDefined = false;
-		for (auto d : program.getDeclarations())
+		for (auto d : m_program.getDeclarations())
 		{
 			if (d->getName() == c->getName())
 			{
@@ -40,7 +40,7 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 				break;
 			}
 		}
-		if (!alreadyDefined) program.getDeclarations().push_back(c);
+		if (!alreadyDefined) m_program.getDeclarations().push_back(c);
 	}
 
 	return result.expr;
@@ -61,34 +61,34 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	list<smack::Block*> blocks;
 	blocks.push_back(smack::Block::block());
 	// State variable initializers should go to the beginning of the constructor
-	for (auto i : stateVarInitializers) (*blocks.begin())->addStmt(i);
-	stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+	for (auto i : m_stateVarInitializers) (*blocks.begin())->addStmt(i);
+	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 
 	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
 
 	// Create the procedure
-	program.getDeclarations().push_back(smack::Decl::procedure(funcName,
+	m_program.getDeclarations().push_back(smack::Decl::procedure(funcName,
 			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
 }
 
-ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : errorReporter(errorReporter)
+ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : m_errorReporter(errorReporter)
 {
-	currentRet = nullptr;
+	m_currentRet = nullptr;
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
-	program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
 	// address.balance
-	program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	// address.transfer()
-	program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
 	// address.call()
-	program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
 	// address.send()
-	program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
 
 	// Uninterpreted type for strings
-	program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -98,7 +98,7 @@ void ASTBoogieConverter::convert(ASTNode const& _node)
 
 void ASTBoogieConverter::print(ostream& _stream)
 {
-	program.print(_stream);
+	m_program.print(_stream);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
-	stateVarInitializers.clear();
+	m_stateVarInitializers.clear();
 
 	// Process state variables first (to get initializer expressions)
 	for (auto sn : _node.subNodes())
@@ -146,7 +146,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	}
 
 	// If there are still initializers left, there was no constructor
-	if (!stateVarInitializers.empty())
+	if (!m_stateVarInitializers.empty())
 	{
 		createDefaultConstructor(_node);
 	}
@@ -173,13 +173,13 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: StructDefinition") << errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support struct definitions");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EnumDefinition") << errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support enum definitions");
 	return false;
 }
 
@@ -197,7 +197,7 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
-	currentFunc = &_node;
+	m_currentFunc = &_node;
 	// Solidity functions are mapped to Boogie procedures
 	addGlobalComment("");
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
@@ -228,9 +228,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (p->type()->category() == Type::Category::Array)
 		{
-			BOOST_THROW_EXCEPTION(CompilerError() <<
-					errinfo_comment(string("Arrays are not yet supported as return values")) <<
-					errinfo_sourceLocation(_node.location()));
+			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support arrays as return values");
+			return false;
 		}
 		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
 	}
@@ -238,37 +237,36 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Boogie treats return as an assignment to the return variable(s)
 	if (_node.returnParameters().empty())
 	{
-		currentRet = nullptr;
+		m_currentRet = nullptr;
 	}
 	else if (_node.returnParameters().size() == 1)
 	{
-		currentRet = smack::Expr::id(rets.begin()->first);
+		m_currentRet = smack::Expr::id(rets.begin()->first);
 	}
 	else
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Multiple values to return is not yet supported") <<
-				errinfo_sourceLocation(_node.location()));
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support multiple return values");
+		return false;
 	}
 
 	// Convert function body, collect result
-	localDecls.clear();
+	m_localDecls.clear();
 	// Create new empty block
-	currentBlocks.push(smack::Block::block());
+	m_currentBlocks.push(smack::Block::block());
 	// State variable initializers should go to the beginning of the constructor
 	if (_node.isConstructor())
 	{
-		for (auto i : stateVarInitializers) currentBlocks.top()->addStmt(i);
-		stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
+		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 	}
 	if (_node.modifiers().empty())
 	{
 		if (_node.isImplemented())
 		{
 			string retLabel = "$" + to_string(_node.id()) + "end";
-			currentReturnLabel = retLabel;
+			m_currentReturnLabel = retLabel;
 			_node.body().accept(*this);
-			currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
 		}
 	}
 	else if (_node.modifiers().size() == 1)
@@ -276,29 +274,27 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		auto modifier = _node.modifiers()[0];
 		if (modifier->arguments() && modifier->arguments()->size() > 0)
 		{
-			BOOST_THROW_EXCEPTION(CompilerError() <<
-					errinfo_comment("Modifier arguments are not supported yet") <<
-					errinfo_sourceLocation(_node.location()));
+			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support modifier arguments");
 		}
-		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+		else
+		{
+			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
 
-		string retLabel = "$" + to_string(modifier->id()) + "end";
-		currentReturnLabel = retLabel;
-		modifierDecl->body().accept(*this);
-		currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
-
+			string retLabel = "$" + to_string(modifier->id()) + "end";
+			m_currentReturnLabel = retLabel;
+			modifierDecl->body().accept(*this);
+			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+		}
 	}
 	else
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment("Multiple modifiers are not supported yet") <<
-				errinfo_sourceLocation(_node.location()));
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support multiple modifiers");
 	}
 
 	list<smack::Block*> blocks;
-	if (!currentBlocks.top()->getStatements().empty()) { blocks.push_back(currentBlocks.top()); }
-	currentBlocks.pop();
-	if (!currentBlocks.empty())
+	if (!m_currentBlocks.top()->getStatements().empty()) { blocks.push_back(m_currentBlocks.top()); }
+	m_currentBlocks.pop();
+	if (!m_currentBlocks.empty())
 	{
 		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
 				errinfo_comment("Non-empty stack of blocks at the end of function."));
@@ -310,7 +306,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			ASTBoogieUtils::mapDeclName(_node);
 
 	// Create the procedure
-	program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, localDecls, blocks));
+	m_program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks));
 	return false;
 }
 
@@ -327,7 +323,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	{
 		// Initialization is saved for the constructor
 		smack::Expr const* initExpr = convertExpression(*_node.value());
-		stateVarInitializers.push_back(smack::Stmt::assign(smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
+		m_stateVarInitializers.push_back(smack::Stmt::assign(smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
 				smack::Expr::upd(
 						smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
@@ -337,14 +333,14 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	addGlobalComment("");
 	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
-	program.getDeclarations().push_back(
+	m_program.getDeclarations().push_back(
 			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node)));
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
 	{
-		program.getDeclarations().push_back(
+		m_program.getDeclarations().push_back(
 				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
 				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	}
@@ -365,7 +361,7 @@ bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
-	errorReporter.warning(_node.location(), "Ignored event definition");
+	m_errorReporter.warning(_node.location(), "Ignored event definition");
 	return false;
 }
 
@@ -405,7 +401,7 @@ bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 
 bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: InlineAssembly") << errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support inline assembly");
 	return false;
 }
 
@@ -419,13 +415,13 @@ bool ASTBoogieConverter::visit(Block const&)
 bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
 	//BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: PlaceholderStatement") << errinfo_sourceLocation(_node.location()));
-	if (currentFunc->isImplemented())
+	if (m_currentFunc->isImplemented())
 	{
-		string oldReturnLabel = currentReturnLabel;
-		currentReturnLabel = "$" + to_string(_node.id()) + "end";
-		currentFunc->body().accept(*this);
-		currentBlocks.top()->addStmt(smack::Stmt::label(currentReturnLabel));
-		currentReturnLabel = oldReturnLabel;
+		string oldReturnLabel = m_currentReturnLabel;
+		m_currentReturnLabel = "$" + to_string(_node.id()) + "end";
+		m_currentFunc->body().accept(*this);
+		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
+		m_currentReturnLabel = oldReturnLabel;
 	}
 	return false;
 }
@@ -436,22 +432,22 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 	const smack::Expr* cond = convertExpression(_node.condition());
 
 	// Get true branch recursively
-	currentBlocks.push(smack::Block::block());
+	m_currentBlocks.push(smack::Block::block());
 	_node.trueStatement().accept(*this);
-	const smack::Block* thenBlock = currentBlocks.top();
-	currentBlocks.pop();
+	const smack::Block* thenBlock = m_currentBlocks.top();
+	m_currentBlocks.pop();
 
 	// Get false branch recursively
 	const smack::Block* elseBlock = nullptr;
 	if (_node.falseStatement())
 	{
-		currentBlocks.push(smack::Block::block());
+		m_currentBlocks.push(smack::Block::block());
 		_node.falseStatement()->accept(*this);
-		elseBlock = currentBlocks.top();
-		currentBlocks.pop();
+		elseBlock = m_currentBlocks.top();
+		m_currentBlocks.pop();
 	}
 
-	currentBlocks.top()->addStmt(smack::Stmt::ifelse(cond, thenBlock, elseBlock));
+	m_currentBlocks.top()->addStmt(smack::Stmt::ifelse(cond, thenBlock, elseBlock));
 	return false;
 }
 
@@ -461,14 +457,14 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	const smack::Expr* cond = convertExpression(_node.condition());
 
 	// Get if branch recursively
-	currentBlocks.push(smack::Block::block());
+	m_currentBlocks.push(smack::Block::block());
 	_node.body().accept(*this);
-	const smack::Block* body = currentBlocks.top();
-	currentBlocks.pop();
+	const smack::Block* body = m_currentBlocks.top();
+	m_currentBlocks.pop();
 
 	// TODO: loop invariants can be added here
 
-	currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
 
 	return false;
 }
@@ -483,7 +479,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// initExpr; while (cond) { body; loopExpr }
 
 	// Get initialization recursively (adds statement to current block)
-	currentBlocks.top()->addStmt(smack::Stmt::comment("The following while loop was mapped from a for loop"));
+	m_currentBlocks.top()->addStmt(smack::Stmt::comment("The following while loop was mapped from a for loop"));
 	if (_node.initializationExpression())
 	{
 		_node.initializationExpression()->accept(*this);
@@ -497,19 +493,19 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	}
 
 	// Get body recursively
-	currentBlocks.push(smack::Block::block());
+	m_currentBlocks.push(smack::Block::block());
 	_node.body().accept(*this);
 	// Include loop expression at the end of body
 	if (_node.loopExpression())
 	{
 		_node.loopExpression()->accept(*this); // Adds statement to current block
 	}
-	const smack::Block* body = currentBlocks.top();
-	currentBlocks.pop();
+	const smack::Block* body = m_currentBlocks.top();
+	m_currentBlocks.pop();
 
 	// TODO: loop invariants can be added here
 
-	currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
 
 	return false;
 }
@@ -518,13 +514,13 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	// TODO: Boogie does not support continue, this must be mapped manually
 	// using labels and gotos
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Continue") << errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support continue statement");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(Break const&)
 {
-	currentBlocks.top()->addStmt(smack::Stmt::break_());
+	m_currentBlocks.top()->addStmt(smack::Stmt::break_());
 	return false;
 }
 
@@ -537,26 +533,26 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		const smack::Expr* rhs = convertExpression(*_node.expression());
 
 		// lhs should already be known (set by the enclosing FunctionDefinition)
-		const smack::Expr* lhs = currentRet;
+		const smack::Expr* lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
-		currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
+		m_currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
 	}
 	list<string> label;
-	label.push_back(currentReturnLabel);
-	currentBlocks.top()->addStmt(smack::Stmt::goto_(label));
+	label.push_back(m_currentReturnLabel);
+	m_currentBlocks.top()->addStmt(smack::Stmt::goto_(label));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(Throw const&)
 {
-	currentBlocks.top()->addStmt(smack::Stmt::assume(smack::Expr::lit(false)));
+	m_currentBlocks.top()->addStmt(smack::Stmt::assume(smack::Expr::lit(false)));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EmitStatement const& _node)
 {
-	errorReporter.warning(_node.location(), "Ignored emit statement");
+	m_errorReporter.warning(_node.location(), "Ignored emit statement");
 	return false;
 }
 
@@ -567,7 +563,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		if (decl->isLocalVariable())
 		{
 			// Boogie requires local variables to be declared at the beginning of the procedure
-			localDecls.push_back(smack::Decl::variable(
+			m_localDecls.push_back(smack::Decl::variable(
 					ASTBoogieUtils::mapDeclName(*decl),
 					ASTBoogieUtils::mapType(decl->type(), *decl)));
 		}
@@ -588,7 +584,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// Get expression recursively
 			const smack::Expr* rhs = convertExpression(*_node.initialValue());
 
-			currentBlocks.top()->addStmt(smack::Stmt::assign(
+			m_currentBlocks.top()->addStmt(smack::Stmt::assign(
 					smack::Expr::id(ASTBoogieUtils::mapDeclName(**_node.declarations().begin())),
 					rhs));
 		}
@@ -626,9 +622,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 		}
 	}
 
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment(string("Unsupported expression appearing as statement")) <<
-			errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "ExpressionStatement not supported by Boogie compiler");
 	return false;
 }
 

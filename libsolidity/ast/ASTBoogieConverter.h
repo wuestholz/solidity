@@ -15,32 +15,32 @@ namespace solidity
 class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
-	ErrorReporter& errorReporter;
+	ErrorReporter& m_errorReporter;
 
 	// Top-level element is a single Boogie program
-	smack::Program program;
+	smack::Program m_program;
 
 	// Helper variables to pass information between the visit methods
 
 	// Function currently being processed
-	FunctionDefinition const* currentFunc;
+	FunctionDefinition const* m_currentFunc;
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
-	std::list<smack::Decl*> localDecls;
+	std::list<smack::Decl*> m_localDecls;
 
 	// Collect initializer for state variables to be added to the beginning
 	// of the constructor
-	std::list<smack::Stmt const*> stateVarInitializers;
+	std::list<smack::Stmt const*> m_stateVarInitializers;
 
 	// Current block(s) where statements are appended, stack is needed
 	// due to nested blocks
-	std::stack<smack::Block*> currentBlocks;
+	std::stack<smack::Block*> m_currentBlocks;
 
 	// Return statement in Solidity is mapped to an assignment to the return
 	// variables in Boogie, which is described by currentRet
-	const smack::Expr* currentRet;
-	std::string currentReturnLabel;
+	const smack::Expr* m_currentRet;
+	std::string m_currentReturnLabel;
 
 	/**
 	 * Add a top-level comment

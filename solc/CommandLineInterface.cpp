@@ -1074,6 +1074,11 @@ void CommandLineInterface::handleBoogie()
 				(error->type() == Error::Type::Warning) ? "Warning" : "Error");
 	}
 
+	if (!Error::containsOnlyWarnings(errorReporter.errors()))
+	{
+		return;
+	}
+
 	if (m_args.count(g_argOutputDir))
 	{
 		stringstream data;

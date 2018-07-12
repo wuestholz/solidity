@@ -15,21 +15,24 @@ namespace solidity
 class ASTBoogieExpressionConverter : private ASTConstVisitor
 {
 private:
-	ErrorReporter& errorReporter;
+	// Return this expression as an identifier when something cannot be evaluated
+	static const std::string ERR_EXPR;
+
+	ErrorReporter& m_errorReporter;
 
 	// Helper variables to pass information between the visit methods
-	const smack::Expr* currentExpr;
-	const smack::Expr* currentAddress;
-	const smack::Expr* currentValue;
-	bool isGetter;
-	bool isLibraryCall;
-	bool isLibraryCallStatic;
+	const smack::Expr* m_currentExpr;
+	const smack::Expr* m_currentAddress;
+	const smack::Expr* m_currentValue;
+	bool m_isGetter;
+	bool m_isLibraryCall;
+	bool m_isLibraryCallStatic;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
-	std::vector<smack::Stmt const*> newStatements;
-	std::list<smack::Decl*> newDecls;
-	std::list<smack::Decl*> newConstants;
+	std::vector<smack::Stmt const*> m_newStatements;
+	std::list<smack::Decl*> m_newDecls;
+	std::list<smack::Decl*> m_newConstants;
 
 	// Helper method to get the length of an array
 	const smack::Expr* getArrayLength(const smack::Expr* expr);
