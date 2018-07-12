@@ -221,6 +221,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
 	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
+	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int";
 	for (int i = 8; i <= 256; ++i)
 	{
 		if (tpStr == "int" + to_string(i)) return "int";
