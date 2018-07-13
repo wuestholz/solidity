@@ -17,7 +17,7 @@ namespace solidity
 
 const string ASTBoogieExpressionConverter::ERR_EXPR = "__ERROR";
 
-const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr)
+const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode)
 {
 	// Array is a local variable
 	if (auto varArray = dynamic_cast<const smack::VarExpr*>(expr))
@@ -32,9 +32,9 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 				smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
 				selArray->getIdxs());
 	}
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-						errinfo_comment("Unsupported access to array length"));
-	return nullptr;
+
+	m_errorReporter.error(Error::Type::ParserError, associatedNode.location(), "Array length access not supported by Boogie compiler");
+	return smack::Expr::id(ERR_EXPR);
 }
 
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter) :
@@ -100,7 +100,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 	case Token::AssignDiv:
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 		else rhs = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
@@ -179,7 +179,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment x := x + 1
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -193,7 +193,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment tmp := x
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -210,7 +210,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
 			m_newDecls.push_back(tempVar);
 			createAssignment(_node.subExpression(), lhs, rhs);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -221,7 +221,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
 			m_newDecls.push_back(tempVar);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -257,7 +257,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::Sub: m_currentExpr = smack::Expr::minus(lhs, rhs); break;
 	case Token::Mul: m_currentExpr = smack::Expr::times(lhs, rhs); break;
 	case Token::Div: // Boogie has different division operators for integers and reals
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
 		else m_currentExpr = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::Mod: m_currentExpr = smack::Expr::mod(lhs, rhs); break;
@@ -315,16 +315,16 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node) ==
-			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin()))
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) ==
+			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_errorReporter))
 		{
 			(*_node.arguments().begin())->accept(*this);
 			return false;
 		}
 
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-					errinfo_comment("Unsupported type conversion") <<
-					errinfo_sourceLocation(_node.location()));
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Type conversion not supported by Boogie compiler");
+		m_currentExpr = smack::Expr::id(ERR_EXPR);
+		return false;
 
 	}
 	// Function calls in Boogie are statements and cannot be part of
@@ -388,16 +388,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 	else
 	{
-		BOOST_THROW_EXCEPTION(CompilerError() <<
-				errinfo_comment(string("Only identifiers are supported as function calls")) <<
-				errinfo_sourceLocation(_node.location()));
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler only supports identifiers as function calls");
+		funcName = ERR_EXPR;
 	}
 
 	if (m_isGetter && _node.arguments().size() > 0)
 	{
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-						errinfo_comment("Getter should not have arguments") <<
-						errinfo_sourceLocation(_node.location()));
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support getter arguments");
 	}
 
 	// Get arguments recursively
@@ -417,7 +414,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 			if (arg->annotation().type->category() == Type::Category::Array)
 			{
-				args.push_back(getArrayLength(m_currentExpr));
+				args.push_back(getArrayLength(m_currentExpr, *arg));
 			}
 		}
 	}
@@ -475,7 +472,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Create fresh variable to store the result
 		smack::Decl* returnVar = smack::Decl::variable(
 				funcName + "#" + to_string(_node.id()),
-				ASTBoogieUtils::mapType(_node.annotation().type, _node));
+				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter));
 		m_newDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		m_currentExpr = smack::Expr::id(returnVar->getName());
@@ -508,7 +505,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 {
 	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support new expression");
-	m_currentExpr = smack::Expr::lit(ERR_EXPR);
+	m_currentExpr = smack::Expr::id(ERR_EXPR);
 	return false;
 }
 
@@ -578,8 +575,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// array.length
 	if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
 	{
-		// TODO: handle null return value
-		m_currentExpr = getArrayLength(expr);
+		m_currentExpr = getArrayLength(expr, _node);
 		return false;
 	}
 	// fixed size byte array length
@@ -594,7 +590,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (_node.annotation().referencedDeclaration == nullptr)
 	{
 		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support member without corresponding declaration (probably an unsupported special member)");
-		m_currentExpr = smack::Expr::lit(ERR_EXPR);
+		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		return false;
 	}
 	m_currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
@@ -707,9 +703,8 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 		return false;
 	}
 
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported literal for type: " + tpStr.substr(0, tpStr.find(' '))) <<
-			errinfo_sourceLocation(_node.location()));
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support literals for type " + tpStr.substr(0, tpStr.find(' ')));
+	m_currentExpr = smack::Expr::id(ERR_EXPR);
 	return false;
 }
 

@@ -38,6 +38,7 @@ const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
+const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
@@ -213,7 +214,7 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
+string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter)
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
@@ -232,14 +233,14 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	if (tp->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[int]" + mapType(arrType->baseType(), _associatedNode);
+		return "[int]" + mapType(arrType->baseType(), _associatedNode, errorReporter);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
 	{
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
-		return "[" + mapType(mappingType->keyType(), _associatedNode) + "]"
-				+ mapType(mappingType->valueType(), _associatedNode);
+		return "[" + mapType(mappingType->keyType(), _associatedNode, errorReporter) + "]"
+				+ mapType(mappingType->valueType(), _associatedNode, errorReporter);
 	}
 
 	if (tp->category() == Type::Category::FixedBytes)
@@ -248,10 +249,8 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 		if (fbType->numBytes() == 1) return "int";
 		else return "[int]int";
 	}
+	errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Boogie compiler does not support type '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported type: " + tpStr.substr(0, tpStr.find(' '))) <<
-			errinfo_sourceLocation(_associatedNode.location()));
 	return "";
 }
 

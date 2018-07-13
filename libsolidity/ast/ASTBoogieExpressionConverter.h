@@ -35,7 +35,7 @@ private:
 	std::list<smack::Decl*> m_newConstants;
 
 	// Helper method to get the length of an array
-	const smack::Expr* getArrayLength(const smack::Expr* expr);
+	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
 	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
 	// Helper method to transform a select to an update

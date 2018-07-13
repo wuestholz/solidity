@@ -215,7 +215,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{
-		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
+		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_errorReporter)));
 		if (p->type()->category() == Type::Category::Array) // Array length
 		{
 			params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p) + ASTBoogieUtils::BOOGIE_LENGTH, "int"));
@@ -231,7 +231,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support arrays as return values");
 			return false;
 		}
-		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p)));
+		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_errorReporter)));
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -335,7 +335,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	// State variables are represented as maps from address to their type
 	m_program.getDeclarations().push_back(
 			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node)));
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_errorReporter)));
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
@@ -565,7 +565,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// Boogie requires local variables to be declared at the beginning of the procedure
 			m_localDecls.push_back(smack::Decl::variable(
 					ASTBoogieUtils::mapDeclName(*decl),
-					ASTBoogieUtils::mapType(decl->type(), *decl)));
+					ASTBoogieUtils::mapType(decl->type(), *decl, m_errorReporter)));
 		}
 		else
 		{
@@ -590,9 +590,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		}
 		else
 		{
-			BOOST_THROW_EXCEPTION(CompilerError() <<
-					errinfo_comment("Assignment to multiple variables is not supported yet") <<
-					errinfo_sourceLocation(_node.location()));
+			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support assignment to multiple variables");
 		}
 	}
 	return false;
