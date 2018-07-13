@@ -249,9 +249,18 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 		if (fbType->numBytes() == 1) return "int";
 		else return "[int]int";
 	}
-	errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Boogie compiler does not support type '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 
-	return "";
+	// Unsupported types
+	if (boost::algorithm::starts_with(tpStr, "tuple("))
+	{
+		errorReporter.error(Error::Type::ParserError, _associatedNode.location(),
+				"Boogie compiler does not support tuples");
+	}
+	else
+	{
+		errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Boogie compiler does not support type '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+	}
+	return ERR_TYPE;
 }
 
 
