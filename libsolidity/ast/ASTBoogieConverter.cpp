@@ -269,9 +269,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
 		}
 	}
-	else if (_node.modifiers().size() == 1)
+	else
 	{
-		auto modifier = _node.modifiers()[0];
+		m_currentModifier = 0;
+		auto modifier = _node.modifiers()[m_currentModifier];
 		if (modifier->arguments() && modifier->arguments()->size() > 0)
 		{
 			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support modifier arguments");
@@ -285,10 +286,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			modifierDecl->body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
 		}
-	}
-	else
-	{
-		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support multiple modifiers");
 	}
 
 	list<smack::Block*> blocks;
@@ -414,8 +411,26 @@ bool ASTBoogieConverter::visit(Block const&)
 
 bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
-	//BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: PlaceholderStatement") << errinfo_sourceLocation(_node.location()));
-	if (m_currentFunc->isImplemented())
+	m_currentModifier++;
+
+	if (m_currentModifier < m_currentFunc->modifiers().size())
+	{
+		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
+		if (modifier->arguments() && modifier->arguments()->size() > 0)
+		{
+		    m_errorReporter.error(Error::Type::ParserError, m_currentFunc->location(), "Boogie compiler does not support modifier arguments");
+		}
+		else
+		{
+			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+			string oldReturnLabel = m_currentReturnLabel;
+			m_currentReturnLabel = "$" + to_string(_node.id()) + "end";
+			modifierDecl->body().accept(*this);
+			m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
+			m_currentReturnLabel = oldReturnLabel;
+		}
+	}
+	else if (m_currentFunc->isImplemented())
 	{
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$" + to_string(_node.id()) + "end";
@@ -423,6 +438,9 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
 		m_currentReturnLabel = oldReturnLabel;
 	}
+
+	m_currentModifier--;
+
 	return false;
 }
 

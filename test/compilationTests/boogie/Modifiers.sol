@@ -27,4 +27,9 @@ contract A {
         x += y;
         return x;
     }
+
+    function twoModifiers(uint y) public onlyOwner onlyOwner2 returns (uint) {
+        x += y;
+        return x;
+    }
 }

@@ -106,7 +106,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
 
 	default:
-		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Assignment operator not supported by Boogie compiler");
+		m_errorReporter.error(Error::Type::ParserError, _node.location(),
+				string("Assignment operator ") + Token::toString(_node.assignmentOperator()) + " not supported by Boogie compiler");
 		return false;
 	}
 

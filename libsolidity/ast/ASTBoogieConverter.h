@@ -24,6 +24,7 @@ private:
 
 	// Function currently being processed
 	FunctionDefinition const* m_currentFunc;
+	unsigned long m_currentModifier;
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
