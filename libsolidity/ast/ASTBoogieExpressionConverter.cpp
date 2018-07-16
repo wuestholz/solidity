@@ -27,10 +27,12 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	// Array is state variable
 	if (auto selArray = dynamic_cast<const smack::SelExpr*>(expr))
 	{
-		auto baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase());
-		return smack::Expr::sel(
-				smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
-				selArray->getIdxs());
+		if (auto baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase()))
+		{
+			return smack::Expr::sel(
+							smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
+							selArray->getIdxs());
+		}
 	}
 
 	m_errorReporter.error(Error::Type::ParserError, associatedNode.location(), "Array length access not supported by Boogie compiler");
