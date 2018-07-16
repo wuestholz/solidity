@@ -71,7 +71,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
 }
 
-ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : m_errorReporter(errorReporter)
+ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : m_errorReporter(errorReporter), nextReturnLabelId(0)
 {
 	m_currentRet = nullptr;
 	// Initialize global declarations
@@ -263,7 +263,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (_node.isImplemented())
 		{
-			string retLabel = "$" + to_string(_node.id()) + "end";
+			string retLabel = "$return" + to_string(nextReturnLabelId);
+			++nextReturnLabelId;
 			m_currentReturnLabel = retLabel;
 			_node.body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
@@ -281,7 +282,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		{
 			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
 
-			string retLabel = "$" + to_string(modifier->id()) + "end";
+			string retLabel = "$return" + to_string(nextReturnLabelId);
+			++nextReturnLabelId;
 			m_currentReturnLabel = retLabel;
 			modifierDecl->body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
@@ -409,7 +411,7 @@ bool ASTBoogieConverter::visit(Block const&)
 	return true;
 }
 
-bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
+bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 {
 	m_currentModifier++;
 
@@ -424,7 +426,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 		{
 			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
 			string oldReturnLabel = m_currentReturnLabel;
-			m_currentReturnLabel = "$" + to_string(_node.id()) + "end";
+			m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
+			++nextReturnLabelId;
 			modifierDecl->body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
 			m_currentReturnLabel = oldReturnLabel;
@@ -433,7 +436,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 	else if (m_currentFunc->isImplemented())
 	{
 		string oldReturnLabel = m_currentReturnLabel;
-		m_currentReturnLabel = "$" + to_string(_node.id()) + "end";
+		m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
+		++nextReturnLabelId;
 		m_currentFunc->body().accept(*this);
 		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
 		m_currentReturnLabel = oldReturnLabel;

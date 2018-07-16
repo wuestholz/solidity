@@ -15,6 +15,7 @@ contract A {
             return;
         }
         _;
+        _; // Who does this?? Anyway, it works...
         assert(msg.sender == owner);
     }
 

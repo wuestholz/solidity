@@ -42,6 +42,7 @@ private:
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* m_currentRet;
 	std::string m_currentReturnLabel;
+	int nextReturnLabelId;
 
 	/**
 	 * Add a top-level comment
