@@ -33,4 +33,13 @@ contract A {
         x += y;
         return x;
     }
+
+    modifier priced(uint price) {
+        if (msg.value < price) return;
+        _;
+    }
+
+    function costs(uint y) priced(x) public {
+        x += y;
+    }
 }

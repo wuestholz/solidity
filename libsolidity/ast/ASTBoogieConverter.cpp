@@ -274,22 +274,28 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		m_currentModifier = 0;
 		auto modifier = _node.modifiers()[m_currentModifier];
-		if (modifier->arguments() && modifier->arguments()->size() > 0)
-		{
-			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support modifier arguments");
-		}
-		else
-		{
-			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
 
-			string retLabel = "$return" + to_string(nextReturnLabelId);
-			++nextReturnLabelId;
-			m_currentReturnLabel = retLabel;
-			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
-			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
+		string retLabel = "$return" + to_string(nextReturnLabelId);
+		++nextReturnLabelId;
+		m_currentReturnLabel = retLabel;
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+
+		if (modifier->arguments())
+		{
+			for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
+			{
+				smack::Decl* modifierParam = smack::Decl::variable(ASTBoogieUtils::mapDeclName(*(modifierDecl->parameters()[i])),
+						ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_errorReporter));
+				m_localDecls.push_back(modifierParam);
+				smack::Expr const* modifierArg = convertExpression(*modifier->arguments()->at(i));
+				m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(modifierParam->getName()), modifierArg));
+			}
 		}
+
+		modifierDecl->body().accept(*this);
+		m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 	}
 
 	list<smack::Block*> blocks;
@@ -420,22 +426,36 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 	if (m_currentModifier < m_currentFunc->modifiers().size())
 	{
 		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
-		if (modifier->arguments() && modifier->arguments()->size() > 0)
+		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+
+		// Duplicated modifiers currently do not work, because they will introduce
+		// local variables for their parameters with the same name
+		for (unsigned long i = 0; i < m_currentModifier; ++i)
 		{
-		    m_errorReporter.error(Error::Type::ParserError, m_currentFunc->location(), "Boogie compiler does not support modifier arguments");
+			if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id()) {
+				m_errorReporter.error(Error::Type::ParserError, m_currentFunc->location(), "Boogie compiler does not support duplicated modifiers");
+			}
 		}
-		else
+
+		string oldReturnLabel = m_currentReturnLabel;
+		m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
+		++nextReturnLabelId;
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+		if (modifier->arguments())
 		{
-			auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
-			string oldReturnLabel = m_currentReturnLabel;
-			m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
-			++nextReturnLabelId;
-			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
-			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
-			m_currentReturnLabel = oldReturnLabel;
+			for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
+			{
+				smack::Decl* modifierParam = smack::Decl::variable(ASTBoogieUtils::mapDeclName(*(modifierDecl->parameters()[i])),
+						ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_errorReporter));
+				m_localDecls.push_back(modifierParam);
+				smack::Expr const* modifierArg = convertExpression(*modifier->arguments()->at(i));
+				m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(modifierParam->getName()), modifierArg));
+			}
 		}
+		modifierDecl->body().accept(*this);
+		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
+		m_currentReturnLabel = oldReturnLabel;
 	}
 	else if (m_currentFunc->isImplemented())
 	{
