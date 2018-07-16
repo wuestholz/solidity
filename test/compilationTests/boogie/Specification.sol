@@ -1,7 +1,7 @@
 pragma solidity ^0.4.23;
 
 /**
- * @invariant x == y
+ * @notice invariant x == y
  */
 contract SomeContract {
     uint x;
