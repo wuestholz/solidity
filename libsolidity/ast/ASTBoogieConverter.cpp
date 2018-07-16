@@ -285,8 +285,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			string retLabel = "$return" + to_string(nextReturnLabelId);
 			++nextReturnLabelId;
 			m_currentReturnLabel = retLabel;
+			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 			modifierDecl->body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
+			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 		}
 	}
 
@@ -428,8 +430,10 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
 			++nextReturnLabelId;
+			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 			modifierDecl->body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
+			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 			m_currentReturnLabel = oldReturnLabel;
 		}
 	}
@@ -438,8 +442,10 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
 		++nextReturnLabelId;
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Function body starts here"));
 		m_currentFunc->body().accept(*this);
 		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Function body ends here"));
 		m_currentReturnLabel = oldReturnLabel;
 	}
 
