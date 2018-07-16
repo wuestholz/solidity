@@ -341,7 +341,11 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	if (_node.value())
 	{
 		// Initialization is saved for the constructor
+		// A new block is introduced to collect side effects of the expression
+		m_currentBlocks.push(smack::Block::block());
 		smack::Expr const* initExpr = convertExpression(*_node.value());
+		for (auto stmt : *m_currentBlocks.top()) { m_stateVarInitializers.push_back(stmt); }
+		m_currentBlocks.pop();
 		m_stateVarInitializers.push_back(smack::Stmt::assign(smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
 				smack::Expr::upd(
 						smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
