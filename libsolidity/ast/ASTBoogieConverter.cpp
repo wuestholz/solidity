@@ -626,19 +626,23 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 {
-	// Boogie cannot have expressions as statements, therefore
-	// ExpressionStatements have to be checked if they have a corresponding
-	// statement in Boogie
+	// Some expressions have specific statements in Boogie
+
+	// Assignment
 	if (dynamic_cast<Assignment const*>(&_node.expression()))
 	{
 		convertExpression(_node.expression());
 		return false;
 	}
+
+	// Function call
 	if (dynamic_cast<FunctionCall const*>(&_node.expression()))
 	{
 		convertExpression(_node.expression());
 		return false;
 	}
+
+	// Increment, decrement
 	if (auto unaryExpr = dynamic_cast<UnaryOperation const*>(&_node.expression()))
 	{
 		if (unaryExpr->getOperator() == Token::Inc || unaryExpr->getOperator() == Token::Dec)
@@ -648,7 +652,15 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 		}
 	}
 
-	m_errorReporter.error(Error::Type::ParserError, _node.location(), "ExpressionStatement not supported by Boogie compiler");
+	// Other statements are assigned to a temp variable because Boogie
+	// does not allow stand alone expressions
+
+	smack::Expr const* expr = convertExpression(_node.expression());
+	smack::Decl* tmpVar = smack::Decl::variable("tmpVar" + to_string(_node.id()),
+			ASTBoogieUtils::mapType(_node.expression().annotation().type, _node, m_errorReporter));
+	m_localDecls.push_back(tmpVar);
+	m_currentBlocks.top()->addStmt(smack::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
+	m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(tmpVar->getName()), expr));
 	return false;
 }
 
