@@ -171,7 +171,7 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 {
 	// Nothing to do with using for directives, calls to functions are resolved in the AST
 	string libraryName = _node.libraryName().annotation().type->toString();
-	string typeName = _node.typeName()->annotation().type->toString();
+	string typeName = _node.typeName() ? _node.typeName()->annotation().type->toString() : "*";
 	addGlobalComment("Using " + libraryName + " for " + typeName);
 	return false;
 }
