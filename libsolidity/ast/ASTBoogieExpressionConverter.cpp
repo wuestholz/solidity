@@ -174,6 +174,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	switch (_node.getOperator()) {
 	case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
 	case Token::Sub: m_currentExpr = smack::Expr::neg(subExpr); break;
+	case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
 	case Token::Inc:
 		if (_node.isPrefixOperation()) // ++x
 		{
