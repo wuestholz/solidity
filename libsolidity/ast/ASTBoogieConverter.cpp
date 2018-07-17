@@ -2,6 +2,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
+#include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
@@ -76,10 +77,11 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 }
 
 ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
-		std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes) :
+		std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion) :
 				m_errorReporter(errorReporter),
 				m_globalContext(globalContext),
 				m_scopes(scopes),
+				m_evmVersion(evmVersion),
 				m_currentRet(nullptr),
 				nextReturnLabelId(0)
 {
@@ -142,6 +144,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
 	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, m_errorReporter);
+	TypeChecker typeChecker(m_evmVersion, m_errorReporter, &_node);
 
 	m_currentInvars.clear();
 	for (auto dt : _node.annotation().docTags)
@@ -155,9 +158,11 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
+			typeChecker.checkTypeRequirements(*invar);
+
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 
 			m_currentInvars.push_back(ASTBoogieExpressionConverter(m_errorReporter).convert(*invar).expr);
-			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 		}
 	}
 

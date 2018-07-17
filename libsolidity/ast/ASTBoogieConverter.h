@@ -6,6 +6,7 @@
 #include <map>
 #include <libsolidity/analysis/DeclarationContainer.h>
 #include <libsolidity/analysis/GlobalContext.h>
+#include <libsolidity/interface/EVMVersion.h>
 
 namespace dev
 {
@@ -21,6 +22,8 @@ private:
 	ErrorReporter& m_errorReporter;
 	std::shared_ptr<GlobalContext> m_globalContext;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
+	EVMVersion m_evmVersion;
+
 
 	// Top-level element is a single Boogie program
 	smack::Program m_program;
@@ -70,7 +73,7 @@ private:
 
 public:
 	ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes);
+			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
 
 	/**
 	 * Convert a node and add it to the actual Boogie program
