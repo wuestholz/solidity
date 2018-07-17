@@ -1,12 +1,12 @@
 #pragma once
 
+#include <libsolidity/analysis/DeclarationContainer.h>
+#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
-#include <map>
-#include <libsolidity/analysis/DeclarationContainer.h>
-#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/interface/EVMVersion.h>
+#include <map>
 
 namespace dev
 {
@@ -20,27 +20,27 @@ class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
 	ErrorReporter& m_errorReporter;
+
+	// Some members required to parse invariants. (Invariants can be found
+	// in comments, so they are not parsed when the contract is parsed.)
 	std::shared_ptr<GlobalContext> m_globalContext;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	EVMVersion m_evmVersion;
 
-
-	// Top-level element is a single Boogie program
+	// Result of the conversion is a single Boogie program (top-level node)
 	smack::Program m_program;
 
+
 	// Helper variables to pass information between the visit methods
-
-	std::vector<smack::Expr const*> m_currentInvars;
-
-	// Function currently being processed
-	FunctionDefinition const* m_currentFunc;
-	unsigned long m_currentModifier;
+	std::vector<smack::Expr const*> m_currentInvars; // List of invariants for the current contract
+	FunctionDefinition const* m_currentFunc; // Function currently being processed
+	unsigned long m_currentModifier; // Index of the current modifier being processed
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
 	std::list<smack::Decl*> m_localDecls;
 
-	// Collect initializer for state variables to be added to the beginning
+	// Collect initializers for state variables to be added to the beginning
 	// of the constructor
 	std::list<smack::Stmt const*> m_stateVarInitializers;
 
@@ -52,7 +52,7 @@ private:
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* m_currentRet;
 	std::string m_currentReturnLabel;
-	int nextReturnLabelId;
+	int m_nextReturnLabelId;
 
 	/**
 	 * Add a top-level comment

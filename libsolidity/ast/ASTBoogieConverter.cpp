@@ -83,7 +83,7 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 				m_scopes(scopes),
 				m_evmVersion(evmVersion),
 				m_currentRet(nullptr),
-				nextReturnLabelId(0)
+				m_nextReturnLabelId(0)
 {
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
@@ -143,10 +143,11 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
+	// Process invariants
+	m_currentInvars.clear();
 	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, m_errorReporter);
 	TypeChecker typeChecker(m_evmVersion, m_errorReporter, &_node);
 
-	m_currentInvars.clear();
 	for (auto dt : _node.annotation().docTags)
 	{
 		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
@@ -159,13 +160,10 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
 			typeChecker.checkTypeRequirements(*invar);
-
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
-
 			m_currentInvars.push_back(ASTBoogieExpressionConverter(m_errorReporter).convert(*invar).expr);
 		}
 	}
-
 
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
@@ -300,8 +298,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (_node.isImplemented())
 		{
-			string retLabel = "$return" + to_string(nextReturnLabelId);
-			++nextReturnLabelId;
+			string retLabel = "$return" + to_string(m_nextReturnLabelId);
+			++m_nextReturnLabelId;
 			m_currentReturnLabel = retLabel;
 			_node.body().accept(*this);
 			m_currentBlocks.top()->addStmt(smack::Stmt::label(retLabel));
@@ -315,8 +313,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 		if (modifierDecl)
 		{
-			string retLabel = "$return" + to_string(nextReturnLabelId);
-			++nextReturnLabelId;
+			string retLabel = "$return" + to_string(m_nextReturnLabelId);
+			++m_nextReturnLabelId;
 			m_currentReturnLabel = retLabel;
 			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 
@@ -358,6 +356,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
+
+	// Add invariants as pre and postconditions
 	for (auto invar : m_currentInvars)
 	{
 		if (!_node.isConstructor()) {procDecl->getRequires().push_back(invar); }
@@ -494,8 +494,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 			}
 
 			string oldReturnLabel = m_currentReturnLabel;
-			m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
-			++nextReturnLabelId;
+			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+			++m_nextReturnLabelId;
 			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 			if (modifier->arguments())
 			{
@@ -521,8 +521,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 	else if (m_currentFunc->isImplemented())
 	{
 		string oldReturnLabel = m_currentReturnLabel;
-		m_currentReturnLabel = "$return" + to_string(nextReturnLabelId);
-		++nextReturnLabelId;
+		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+		++m_nextReturnLabelId;
 		m_currentBlocks.top()->addStmt(smack::Stmt::comment("Function body starts here"));
 		m_currentFunc->body().accept(*this);
 		m_currentBlocks.top()->addStmt(smack::Stmt::label(m_currentReturnLabel));
