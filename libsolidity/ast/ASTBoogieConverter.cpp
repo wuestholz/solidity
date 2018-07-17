@@ -4,8 +4,11 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
+#include <libsolidity/ast/ASTPrinter.h> // TODO: just for debugging, remove later
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
+#include <libsolidity/parsing/Parser.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <utility>
 
 using namespace std;
@@ -131,25 +134,39 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
-	m_stateVarInitializers.clear();
+
+	vector<ASTPointer<Expression>> invars;
+	for (auto dt : _node.annotation().docTags)
+	{
+		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
+		{
+			string invarStr = dt.second.content.substr(dt.second.content.find(" ") + 1);
+			addGlobalComment("Contract invariant: " + invarStr);
+			ASTPointer<Expression> invar = Parser(m_errorReporter)
+					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr)));
+			invars.push_back(invar);
+			//ASTPrinter(*invar).print(cerr);
+		}
+	}
+
+	Parser parser(m_errorReporter);
+
 
 	// Process state variables first (to get initializer expressions)
+	m_stateVarInitializers.clear();
 	for (auto sn : _node.subNodes())
 	{
-		if (dynamic_cast<VariableDeclaration const*>(&*sn)) sn->accept(*this);
+		if (dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
 	}
 
 	// Process other elements
 	for (auto sn : _node.subNodes())
 	{
-		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) sn->accept(*this);
+		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
 	}
 
 	// If there are still initializers left, there was no constructor
-	if (!m_stateVarInitializers.empty())
-	{
-		createDefaultConstructor(_node);
-	}
+	if (!m_stateVarInitializers.empty()) { createDefaultConstructor(_node); }
 
 	return false;
 }
