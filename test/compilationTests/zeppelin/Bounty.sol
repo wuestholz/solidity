@@ -18,7 +18,7 @@ contract Bounty is PullPayment, Destructible {
   /**
    * @dev Fallback function allowing the contract to recieve funds, if they haven't already been claimed.
    */
-  function() payable {
+  function() external payable {
     if (claimed) {
       throw;
     }
@@ -32,7 +32,7 @@ contract Bounty is PullPayment, Destructible {
   function createTarget() returns(Target) {
     Target target = Target(deployContract());
     researchers[target] = msg.sender;
-    TargetCreated(target);
+    emit TargetCreated(target);
     return target;
   }
 
@@ -48,7 +48,7 @@ contract Bounty is PullPayment, Destructible {
    */
   function claim(Target target) {
     address researcher = researchers[target];
-    if (researcher == 0) {
+    if (researcher == address(0)) {
       throw;
     }
     // Check Target contract invariants

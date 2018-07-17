@@ -108,7 +108,7 @@ contract MilestoneTracker {
     /// @param _arbitrator Address assigned to be the arbitrator
     /// @param _donor Address assigned to be the donor
     /// @param _recipient Address assigned to be the recipient
-    function MilestoneTracker (
+    constructor (
         address _arbitrator,
         address _donor,
         address _recipient
@@ -179,7 +179,7 @@ contract MilestoneTracker {
     ) onlyRecipient campaignNotCanceled {
         proposedMilestones = _newMilestones;
         changingMilestones = true;
-        NewMilestoneListProposed();
+        emit NewMilestoneListProposed();
     }
 
 
@@ -192,7 +192,7 @@ contract MilestoneTracker {
     function unproposeMilestones() onlyRecipient campaignNotCanceled {
         delete proposedMilestones;
         changingMilestones = false;
-        NewMilestoneListUnproposed();
+        emit NewMilestoneListUnproposed();
     }
 
     /// @notice `onlyDonor` Approves the proposed milestone list
@@ -216,22 +216,22 @@ contract MilestoneTracker {
         // Decode the RLP encoded milestones and add them to the milestones list
         bytes memory mProposedMilestones = proposedMilestones;
 
-        var itmProposals = mProposedMilestones.toRLPItem(true);
+        RLP.RLPItem memory itmProposals = mProposedMilestones.toRLPItem(true);
 
         if (!itmProposals.isList()) throw;
 
-        var itrProposals = itmProposals.iterator();
+        RLP.Iterator memory itrProposals = itmProposals.iterator();
 
         while(itrProposals.hasNext()) {
 
 
-            var itmProposal = itrProposals.next();
+            RLP.RLPItem memory itmProposal = itrProposals.next();
 
             Milestone milestone = milestones[milestones.length ++];
 
             if (!itmProposal.isList()) throw;
 
-            var itrProposal = itmProposal.iterator();
+            RLP.Iterator memory itrProposal = itmProposal.iterator();
 
             milestone.description = itrProposal.next().toAscii();
             milestone.url = itrProposal.next().toAscii();
@@ -249,7 +249,7 @@ contract MilestoneTracker {
 
         delete proposedMilestones;
         changingMilestones = false;
-        NewMilestoneListAccepted();
+        emit NewMilestoneListAccepted();
     }
 
     /// @notice `onlyRecipientOrLeadLink`Marks a milestone as DONE and
@@ -268,7 +268,7 @@ contract MilestoneTracker {
         if (now > milestone.maxCompletionDate) throw;
         milestone.status = MilestoneStatus.Completed;
         milestone.doneTime = now;
-        ProposalStatusChanged(_idMilestone, milestone.status);
+        emit ProposalStatusChanged(_idMilestone, milestone.status);
     }
 
     /// @notice `onlyReviewer` Approves a specific milestone
@@ -297,7 +297,7 @@ contract MilestoneTracker {
             (milestone.status != MilestoneStatus.Completed)) throw;
 
         milestone.status = MilestoneStatus.AcceptedAndInProgress;
-        ProposalStatusChanged(_idMilestone, milestone.status);
+        emit ProposalStatusChanged(_idMilestone, milestone.status);
     }
 
     /// @notice `onlyRecipientOrLeadLink` Sends the milestone payment as
@@ -330,7 +330,7 @@ contract MilestoneTracker {
             throw;
 
         milestone.status = MilestoneStatus.Canceled;
-        ProposalStatusChanged(_idMilestone, milestone.status);
+        emit ProposalStatusChanged(_idMilestone, milestone.status);
     }
 
     /// @notice `onlyArbitrator` Forces a milestone to be paid out as long as it
@@ -350,7 +350,7 @@ contract MilestoneTracker {
     ///  milestones.
     function arbitrateCancelCampaign() onlyArbitrator campaignNotCanceled {
         campaignCanceled = true;
-        CampaignCanceled();
+        emit CampaignCanceled();
     }
 
     // @dev This internal function is executed when the milestone is paid out
@@ -362,6 +362,6 @@ contract MilestoneTracker {
         milestone.status = MilestoneStatus.AuthorizedForPayment;
         if (!milestone.paymentSource.call.value(0)(milestone.payData))
             throw;
-        ProposalStatusChanged(_idMilestone, milestone.status);
+        emit ProposalStatusChanged(_idMilestone, milestone.status);
     }
 }

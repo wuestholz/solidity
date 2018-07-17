@@ -16,14 +16,14 @@ contract MajorityOracle is Oracle {
      */
     /// @dev Allows to create an oracle for a majority vote based on other oracles
     /// @param _oracles List of oracles taking part in the majority vote
-    function MajorityOracle(Oracle[] _oracles)
+    constructor(Oracle[] _oracles)
         public
     {
         // At least 2 oracles should be defined
         require(_oracles.length > 2);
         for (uint i = 0; i < _oracles.length; i++)
             // Oracle address cannot be null
-            require(address(_oracles[i]) != 0);
+            require(address(_oracles[i]) != address(0));
         oracles = _oracles;
     }
 
@@ -72,7 +72,7 @@ contract MajorityOracle is Oracle {
         constant
         returns (bool)
     {
-        var (outcomeSet, ) = getStatusAndOutcome();
+        (bool outcomeSet, ) = getStatusAndOutcome();
         return outcomeSet;
     }
 
@@ -83,7 +83,7 @@ contract MajorityOracle is Oracle {
         constant
         returns (int)
     {
-        var (, winningOutcome) = getStatusAndOutcome();
+        (, int winningOutcome) = getStatusAndOutcome();
         return winningOutcome;
     }
 }

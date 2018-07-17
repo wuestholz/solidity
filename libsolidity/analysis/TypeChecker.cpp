@@ -41,15 +41,13 @@ bool typeSupportedByOldABIEncoder(Type const& _type)
 {
 	if (_type.dataStoredIn(DataLocation::Storage))
 		return true;
-	else if (_type.category() == Type::Category::Struct)
+	if (_type.category() == Type::Category::Struct)
 		return false;
-	else if (_type.category() == Type::Category::Array)
+	if (_type.category() == Type::Category::Array)
 	{
 		auto const& arrayType = dynamic_cast<ArrayType const&>(_type);
 		auto base = arrayType.baseType();
-		if (!typeSupportedByOldABIEncoder(*base))
-			return false;
-		else if (base->category() == Type::Category::Array && base->isDynamicallySized())
+		if (!typeSupportedByOldABIEncoder(*base) || (base->category() == Type::Category::Array && base->isDynamicallySized()))
 			return false;
 	}
 	return true;
@@ -931,7 +929,7 @@ bool TypeChecker::visit(InlineAssembly const& _inlineAssembly)
 			}
 			else if (var->type()->dataStoredIn(DataLocation::Storage))
 			{
-				m_errorReporter.typeError(_identifier.location, "You have to use the _slot or _offset prefix to access storage reference variables.");
+				m_errorReporter.typeError(_identifier.location, "You have to use the _slot or _offset suffix to access storage reference variables.");
 				return size_t(-1);
 			}
 			else if (var->type()->sizeOnStack() != 1)
@@ -1714,12 +1712,7 @@ bool TypeChecker::visit(FunctionCall const& _functionCall)
 			m_errorReporter.typeError(_functionCall.location(), "\"suicide\" has been deprecated in favour of \"selfdestruct\"");
 	}
 	if (!m_insideEmitStatement && functionType->kind() == FunctionType::Kind::Event)
-	{
-		if (m_scope->sourceUnit().annotation().experimentalFeatures.count(ExperimentalFeature::V050))
-			m_errorReporter.typeError(_functionCall.location(), "Event invocations have to be prefixed by \"emit\".");
-		else
-			m_errorReporter.warning(_functionCall.location(), "Invoking events without \"emit\" prefix is deprecated.");
-	}
+		m_errorReporter.typeError(_functionCall.location(), "Event invocations have to be prefixed by \"emit\".");
 
 	TypePointers parameterTypes = functionType->parameterTypes();
 
@@ -1749,35 +1742,6 @@ bool TypeChecker::visit(FunctionCall const& _functionCall)
 						);
 				}
 			}
-		}
-	}
-
-	if (functionType->takesSinglePackedBytesParameter())
-	{
-		if (
-			(arguments.size() > 1) ||
-			(arguments.size() == 1 && !type(*arguments.front())->isImplicitlyConvertibleTo(ArrayType(DataLocation::Memory)))
-		)
-		{
-			string msg =
-				"This function only accepts a single \"bytes\" argument. Please use "
-				"\"abi.encodePacked(...)\" or a similar function to encode the data.";
-			if (v050)
-				m_errorReporter.typeError(_functionCall.location(), msg);
-			else
-				m_errorReporter.warning(_functionCall.location(), msg);
-		}
-
-		if (arguments.size() == 1 && !type(*arguments.front())->isImplicitlyConvertibleTo(ArrayType(DataLocation::Memory)))
-		{
-			string msg =
-				"The provided argument of type " +
-				type(*arguments.front())->toString() +
-				" is not implicitly convertible to expected type bytes memory.";
-			if (v050)
-				m_errorReporter.typeError(_functionCall.location(), msg);
-			else
-				m_errorReporter.warning(_functionCall.location(), msg);
 		}
 	}
 
@@ -1812,6 +1776,26 @@ bool TypeChecker::visit(FunctionCall const& _functionCall)
 			for (auto const& member: membersRemovedForStructConstructor)
 				msg += " " + member;
 		}
+		else if (
+			functionType->kind() == FunctionType::Kind::BareCall ||
+			functionType->kind() == FunctionType::Kind::BareCallCode ||
+			functionType->kind() == FunctionType::Kind::BareDelegateCall
+		)
+		{
+			if (arguments.empty())
+				msg += " This function requires a single bytes argument. Use \"\" as argument to provide empty calldata.";
+			else
+				msg += " This function requires a single bytes argument. If all your arguments are value types, you can use abi.encode(...) to properly generate it.";
+		}
+		else if (
+			functionType->kind() == FunctionType::Kind::SHA3 ||
+			functionType->kind() == FunctionType::Kind::SHA256 ||
+			functionType->kind() == FunctionType::Kind::RIPEMD160
+		)
+			msg +=
+				" This function requires a single bytes argument."
+				" Use abi.encodePacked(...) to obtain the pre-0.5.0 behaviour"
+				" or abi.encode(...) to use ABI encoding.";
 		m_errorReporter.typeError(_functionCall.location(), msg);
 	}
 	else if (isPositionalCall)
@@ -1848,15 +1832,31 @@ bool TypeChecker::visit(FunctionCall const& _functionCall)
 				}
 			}
 			else if (!type(*arguments[i])->isImplicitlyConvertibleTo(*parameterTypes[i]))
-				m_errorReporter.typeError(
-					arguments[i]->location(),
+			{
+				string msg =
 					"Invalid type for argument in function call. "
 					"Invalid implicit conversion from " +
 					type(*arguments[i])->toString() +
 					" to " +
 					parameterTypes[i]->toString() +
-					" requested."
-				);
+					" requested.";
+				if (
+					functionType->kind() == FunctionType::Kind::BareCall ||
+					functionType->kind() == FunctionType::Kind::BareCallCode ||
+					functionType->kind() == FunctionType::Kind::BareDelegateCall
+				)
+					msg += " This function requires a single bytes argument. If all your arguments are value types, you can use abi.encode(...) to properly generate it.";
+				else if (
+					functionType->kind() == FunctionType::Kind::SHA3 ||
+					functionType->kind() == FunctionType::Kind::SHA256 ||
+					functionType->kind() == FunctionType::Kind::RIPEMD160
+				)
+					msg +=
+						" This function requires a single bytes argument."
+						" Use abi.encodePacked(...) to obtain the pre-0.5.0 behaviour"
+						" or abi.encode(...) to use ABI encoding.";
+				m_errorReporter.typeError(arguments[i]->location(), msg);
+			}
 		}
 	}
 	else
@@ -2289,14 +2289,28 @@ void TypeChecker::endVisit(Literal const& _literal)
 
 	if (_literal.looksLikeAddress())
 	{
-		if (_literal.passesAddressChecksum())
-			_literal.annotation().type = make_shared<IntegerType>(160, IntegerType::Modifier::Address);
-		else
-			m_errorReporter.warning(
+		// Assign type here if it even looks like an address. This prevents double error in 050 mode for invalid address
+		_literal.annotation().type = make_shared<IntegerType>(160, IntegerType::Modifier::Address);
+
+		string msg;
+		if (_literal.value().length() != 42) // "0x" + 40 hex digits
+			// looksLikeAddress enforces that it is a hex literal starting with "0x"
+			msg =
+				"This looks like an address but is not exactly 40 hex digits. It is " +
+				to_string(_literal.value().length() - 2) +
+				" hex digits.";
+		else if (!_literal.passesAddressChecksum())
+		{
+			msg = "This looks like an address but has an invalid checksum.";
+			if (!_literal.getChecksummedAddress().empty())
+				msg += " Correct checksummed address: \"" + _literal.getChecksummedAddress() + "\".";
+		}
+
+		if (!msg.empty())
+			m_errorReporter.syntaxError(
 				_literal.location(),
-				"This looks like an address but has an invalid checksum. "
-				"If this is not used as an address, please prepend '00'. " +
-				(!_literal.getChecksummedAddress().empty() ? "Correct checksummed address: '" + _literal.getChecksummedAddress() + "'. " : "") +
+				msg +
+				" If this is not used as an address, please prepend '00'. " +
 				"For more information please see https://solidity.readthedocs.io/en/develop/types.html#address-literals"
 			);
 	}
@@ -2318,18 +2332,10 @@ void TypeChecker::endVisit(Literal const& _literal)
 	}
 
 	if (_literal.subDenomination() == Literal::SubDenomination::Year)
-	{
-		if (v050)
-			m_errorReporter.typeError(
-				_literal.location(),
-				"Using \"years\" as a unit denomination is deprecated."
-			);
-		else
-			m_errorReporter.warning(
-				_literal.location(),
-				"Using \"years\" as a unit denomination is deprecated."
-			);
-	}
+		m_errorReporter.typeError(
+			_literal.location(),
+			"Using \"years\" as a unit denomination is deprecated."
+		);
 
 	if (!_literal.annotation().type)
 		_literal.annotation().type = Type::forLiteral(_literal);

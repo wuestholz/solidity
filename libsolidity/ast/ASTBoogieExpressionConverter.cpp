@@ -615,7 +615,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 			m_isLibraryCallStatic = false;
 			if (auto exprId = dynamic_cast<Identifier const *>(&_node.expression()))
 			{
-				if (auto refContr = dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
+				if (dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
 				{
 					m_isLibraryCallStatic = true;
 				}
