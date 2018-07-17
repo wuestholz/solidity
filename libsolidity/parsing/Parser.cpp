@@ -103,6 +103,23 @@ ASTPointer<SourceUnit> Parser::parse(shared_ptr<Scanner> const& _scanner)
 	}
 }
 
+ASTPointer<Expression> Parser::parseExpression(shared_ptr<Scanner> const& _scanner)
+{
+	try
+	{
+		m_recursionDepth = 0;
+		m_scanner = _scanner;
+		solAssert(m_recursionDepth == 0, "");
+		return parseExpression();
+	}
+	catch (FatalError const&)
+	{
+		if (m_errorReporter.errors().empty())
+			throw; // Something is weird here, rather throw again.
+		return nullptr;
+	}
+}
+
 ASTPointer<PragmaDirective> Parser::parsePragmaDirective()
 {
 	RecursionGuard recursionGuard(*this);
