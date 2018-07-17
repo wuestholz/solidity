@@ -2,6 +2,7 @@
 
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <libsolidity/interface/ErrorReporter.h>
 #include <string>
 
 namespace dev
@@ -45,6 +46,8 @@ public:
 	static const std::string VERIFIER_MAIN;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
+	static const std::string BOOGIE_STRING_TYPE;
+	static const std::string ERR_TYPE;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()
@@ -70,7 +73,7 @@ public:
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode);
+	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter);
 };
 
 }

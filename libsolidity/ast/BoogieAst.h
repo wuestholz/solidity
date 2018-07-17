@@ -7,11 +7,16 @@
 #include <sstream>
 #include <string>
 #include <list>
+#include <boost/multiprecision/cpp_int.hpp>
 
 // TODO: these classes are leaking memory, there is no delete. Should be
 // updated to use smart pointers.
 
+
+
 namespace smack {
+
+using bigint = boost::multiprecision::int1024_t;
 
 typedef std::pair<std::string, std::string> Binding;
 
@@ -48,6 +53,7 @@ public:
   static const Expr* lit(unsigned v) { return lit((unsigned long) v); }
   static const Expr* lit(unsigned long v);
   static const Expr* lit(long v);
+  static const Expr* lit(bigint v);
   static const Expr* lit(std::string v, unsigned w);
   static const Expr* lit(unsigned long v, unsigned w);
   static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
@@ -56,7 +62,9 @@ public:
   static const Expr* neg(const Expr* e);
   static const Expr* sel(const Expr* b, const Expr* i);
   static const Expr* sel(std::string b, std::string i);
+  static const Expr* sel(const Expr* a, std::list<const Expr*> i);
   static const Expr* upd(const Expr* b, const Expr* i, const Expr* v);
+  static const Expr* upd(const Expr* a, std::list<const Expr*> i, const Expr* v);
   static const Expr* if_then_else(const Expr* c, const Expr* t, const Expr* e);
   static const Expr* old(const Expr* expr);
 };
@@ -101,19 +109,13 @@ public:
 };
 
 class IntLit : public Expr {
-  std::string val;
+  bigint val;
 public:
   IntLit(std::string v) : val(v) {}
-  IntLit(unsigned long v) {
-    std::stringstream s;
-    s << v;
-    val = s.str();
-  }
-  IntLit(long v) {
-    std::stringstream s;
-    s << v;
-    val = s.str();
-  }
+  IntLit(unsigned long v) : val(v) {}
+  IntLit(long v) : val(v) {}
+  IntLit(bigint v) : val(v) {}
+  bigint getVal() const { return val; }
   void print(std::ostream& os) const;
 };
 
@@ -194,6 +196,7 @@ public:
     : base(a), idxs(i), val(v) {}
   UpdExpr(const Expr* a, const Expr* i, const Expr* v)
     : base(a), idxs(std::list<const Expr*>(1, i)), val(v) {}
+  const Expr* getBase() const { return base; }
   void print(std::ostream& os) const;
 };
 
@@ -246,7 +249,7 @@ class Block;
 class Stmt {
 public:
   enum Kind {
-    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK
+    ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK, LABEL
   };
 private:
   const Kind kind;
@@ -283,6 +286,7 @@ public:
 		  const Block* body,
 		  std::list<const Expr*> invars = std::list<const Expr*>());
   static const Stmt* break_();
+  static const Stmt* label(std::string name);
   virtual void print(std::ostream& os) const = 0;
 };
 
@@ -408,6 +412,14 @@ public:
   BreakStmt() : Stmt(BREAK) {}
   void print(std::ostream& os) const;
   static bool classof(const Stmt* S) { return S->getKind() == BREAK; }
+};
+
+class LabelStmt : public Stmt {
+  std::string str;
+public:
+  LabelStmt(std::string s) : Stmt(LABEL), str(s) {}
+  void print(std::ostream& os) const;
+  static bool classof(const Stmt* S) { return S->getKind() == LABEL; }
 };
 
 class ProcDecl;

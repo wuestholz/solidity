@@ -1041,7 +1041,9 @@ void CommandLineInterface::handleAst(string const& _argStr)
 void CommandLineInterface::handleBoogie()
 {
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
-	ASTBoogieConverter boogieConverter;
+	ErrorList errorList;
+	ErrorReporter errorReporter(errorList);
+	ASTBoogieConverter boogieConverter(errorReporter);
 
 	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };
 	SourceReferenceFormatter formatter(cerr, scannerFromSourceName);
@@ -1064,6 +1066,17 @@ void CommandLineInterface::handleBoogie()
 			cerr << "Details:" << endl << boost::diagnostic_information(_exception);
 			return;
 		}
+	}
+
+	for (auto const& error: errorReporter.errors())
+	{
+		formatter.printExceptionInformation(*error,
+				(error->type() == Error::Type::Warning) ? "Warning" : "Error");
+	}
+
+	if (!Error::containsOnlyWarnings(errorReporter.errors()))
+	{
+		return;
 	}
 
 	if (m_args.count(g_argOutputDir))

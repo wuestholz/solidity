@@ -30,12 +30,15 @@ const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
 const string ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
 const string ASTBoogieUtils::SOLIDITY_REVERT = "revert";
+// no constant required for 'throw' because it is a separate statement
 
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";
 const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
+const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
+const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
@@ -211,12 +214,15 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
+string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter)
 {
 	// TODO: option for bit precise types
 	string tpStr = tp->toString();
 	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
+	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
+	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
+	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int";
 	for (int i = 8; i <= 256; ++i)
 	{
 		if (tpStr == "int" + to_string(i)) return "int";
@@ -227,14 +233,14 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 	if (tp->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[int]" + mapType(arrType->baseType(), _associatedNode);
+		return "[int]" + mapType(arrType->baseType(), _associatedNode, errorReporter);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
 	{
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
-		return "[" + mapType(mappingType->keyType(), _associatedNode) + "]"
-				+ mapType(mappingType->valueType(), _associatedNode);
+		return "[" + mapType(mappingType->keyType(), _associatedNode, errorReporter) + "]"
+				+ mapType(mappingType->valueType(), _associatedNode, errorReporter);
 	}
 
 	if (tp->category() == Type::Category::FixedBytes)
@@ -244,10 +250,17 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode)
 		else return "[int]int";
 	}
 
-	BOOST_THROW_EXCEPTION(CompilerError() <<
-			errinfo_comment("Unsupported type: " + tpStr) <<
-			errinfo_sourceLocation(_associatedNode.location()));
-	return "";
+	// Unsupported types
+	if (boost::algorithm::starts_with(tpStr, "tuple("))
+	{
+		errorReporter.error(Error::Type::ParserError, _associatedNode.location(),
+				"Boogie compiler does not support tuples");
+	}
+	else
+	{
+		errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Boogie compiler does not support type '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+	}
+	return ERR_TYPE;
 }
 
 

@@ -2,6 +2,7 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <libsolidity/interface/ErrorReporter.h>
 
 namespace dev
 {
@@ -14,21 +15,31 @@ namespace solidity
 class ASTBoogieExpressionConverter : private ASTConstVisitor
 {
 private:
+	// Return this expression as an identifier when something cannot be evaluated
+	static const std::string ERR_EXPR;
+
+	ErrorReporter& m_errorReporter;
+
 	// Helper variables to pass information between the visit methods
-	const smack::Expr* currentExpr;
-	const smack::Expr* currentAddress;
-	const smack::Expr* currentValue;
-	bool isGetter;
-	bool isLibraryCall;
-	bool isLibraryCallStatic;
+	const smack::Expr* m_currentExpr;
+	const smack::Expr* m_currentAddress;
+	const smack::Expr* m_currentValue;
+	bool m_isGetter;
+	bool m_isLibraryCall;
+	bool m_isLibraryCallStatic;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
-	std::vector<smack::Stmt const*> newStatements;
-	std::list<smack::Decl*> newDecls;
+	std::vector<smack::Stmt const*> m_newStatements;
+	std::list<smack::Decl*> m_newDecls;
+	std::list<smack::Decl*> m_newConstants;
 
-	const smack::Expr* getArrayLength(const smack::Expr* expr);
+	// Helper method to get the length of an array
+	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
+	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
+	// Helper method to transform a select to an update
+	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
 
 public:
 
@@ -42,13 +53,15 @@ public:
 		const smack::Expr* expr;
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
+		std::list<smack::Decl*> newConstants;
 
-		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements, std::list<smack::Decl*> newDecls)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls) {}
+		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants) {}
 	};
 
 
-	ASTBoogieExpressionConverter();
+	ASTBoogieExpressionConverter(ErrorReporter& errorReporter);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side

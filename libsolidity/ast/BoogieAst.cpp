@@ -131,6 +131,10 @@ const Expr* Expr::lit(long v) {
   return new IntLit(v);
 }
 
+const Expr* Expr::lit(bigint v) {
+  return new IntLit(v);
+}
+
 const Expr* Expr::lit(std::string v, unsigned w) {
   return w ? (const Expr*) new BvLit(v,w) : (const Expr*) new IntLit(v);
 }
@@ -163,7 +167,15 @@ const Expr* Expr::sel(std::string b, std::string i) {
   return new SelExpr(id(b), id(i));
 }
 
+const Expr* Expr::sel(const Expr* b, std::list<const Expr*> i) {
+  return new SelExpr(b, i);
+}
+
 const Expr* Expr::upd(const Expr* b, const Expr* i, const Expr* v) {
+  return new UpdExpr(b, i, v);
+}
+
+const Expr* Expr::upd(const Expr* b, std::list<const Expr*> i, const Expr* v) {
   return new UpdExpr(b, i, v);
 }
 
@@ -279,6 +291,10 @@ const Stmt* Stmt::while_(const Expr* cond, const Block* body, std::list<const Ex
 
 const Stmt* Stmt::break_() {
   return new BreakStmt();
+}
+
+const Stmt* Stmt::label(std::string s) {
+  return new LabelStmt(s);
 }
 
 Decl* Decl::typee(std::string name, std::string type, std::list<const Attr*> attrs) {
@@ -665,6 +681,10 @@ void WhileStmt::print(std::ostream& os) const {
 
 void BreakStmt::print(std::ostream& os) const {
   os << "break;";
+}
+
+void LabelStmt::print(std::ostream& os) const {
+  os << str << ":";
 }
 
 void TypeDecl::print(std::ostream& os) const {
