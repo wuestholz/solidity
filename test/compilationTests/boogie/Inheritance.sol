@@ -10,7 +10,7 @@ contract Base {
     }
 }
 
-contract Derived is Base {
+contract Inheritance is Base {
     function f() public pure returns (uint) {
         return 3;
     }

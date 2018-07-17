@@ -2,6 +2,7 @@
 
 BOOGIE=~/Workspace/boogie/Binaries/Boogie.exe
 CORRAL=~/Workspace/corral/bin/Debug/corral.exe
+SOLC=~/Workspace/solidity-sri/build/solc/solc
 
 total=0
 passed=0

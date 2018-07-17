@@ -1,6 +1,6 @@
 pragma solidity ^0.4.23;
 
-contract LocalVars {
+contract Assignments {
     uint contractVar;
 
     function init() public {

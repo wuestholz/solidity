@@ -7,7 +7,7 @@ contract PayableFunctions {
     }
 }
 
-contract Other {
+contract Payable {
     PayableFunctions p;
 
     function transfer(uint amount) public returns (uint) {

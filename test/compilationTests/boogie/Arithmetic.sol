@@ -1,6 +1,6 @@
 pragma solidity ^0.4.23;
 
-contract SimpleArithmetic {
+contract Arithmetic {
     function and(bool a, bool b) pure public returns (bool) {
         return a && b;
     }

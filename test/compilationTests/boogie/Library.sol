@@ -6,7 +6,7 @@ library MathLib {
     }
 }
 
-contract C {
+contract Library {
     using MathLib for uint256;
 
     function someFunc() public pure returns (uint256) {
