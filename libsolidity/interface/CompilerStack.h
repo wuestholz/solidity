@@ -239,6 +239,12 @@ public:
 	/// @returns a JSON representing the estimated gas usage for contract creation, internal and external functions
 	Json::Value gasEstimates(std::string const& _contractName) const;
 
+	std::shared_ptr<GlobalContext> getGlobalContext() const { return m_globalContext; }
+
+	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> getScopes() const { return m_scopes; }
+
+
+
 private:
 	/**
 	 * Information pertaining to one source unit, filled gradually during parsing and compilation.

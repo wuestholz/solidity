@@ -1043,7 +1043,7 @@ void CommandLineInterface::handleBoogie()
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-	ASTBoogieConverter boogieConverter(errorReporter);
+	ASTBoogieConverter boogieConverter(errorReporter, m_compiler->getGlobalContext(), m_compiler->getScopes());
 
 	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };
 	SourceReferenceFormatter formatter(cerr, scannerFromSourceName);

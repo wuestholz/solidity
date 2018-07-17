@@ -3,6 +3,9 @@
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
+#include <map>
+#include <libsolidity/analysis/DeclarationContainer.h>
+#include <libsolidity/analysis/GlobalContext.h>
 
 namespace dev
 {
@@ -16,12 +19,13 @@ class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
 	ErrorReporter& m_errorReporter;
+	std::shared_ptr<GlobalContext> m_globalContext;
+	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 
 	// Top-level element is a single Boogie program
 	smack::Program m_program;
 
 	// Helper variables to pass information between the visit methods
-
 	// Function currently being processed
 	FunctionDefinition const* m_currentFunc;
 	unsigned long m_currentModifier;
@@ -62,7 +66,8 @@ private:
 	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:
-	ASTBoogieConverter(ErrorReporter& errorReporter);
+	ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
+			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes);
 
 	/**
 	 * Convert a node and add it to the actual Boogie program

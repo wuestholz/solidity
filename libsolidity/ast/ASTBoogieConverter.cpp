@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
@@ -74,9 +75,14 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
 }
 
-ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter) : m_errorReporter(errorReporter), nextReturnLabelId(0)
+ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
+		std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes) :
+				m_errorReporter(errorReporter),
+				m_globalContext(globalContext),
+				m_scopes(scopes),
+				m_currentRet(nullptr),
+				nextReturnLabelId(0)
 {
-	m_currentRet = nullptr;
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
@@ -135,7 +141,9 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
-	vector<ASTPointer<Expression>> invars;
+	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, m_errorReporter);
+
+	vector<smack::Expr const *> invars;
 	for (auto dt : _node.annotation().docTags)
 	{
 		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
@@ -144,12 +152,14 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			addGlobalComment("Contract invariant: " + invarStr);
 			ASTPointer<Expression> invar = Parser(m_errorReporter)
 					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr)));
-			invars.push_back(invar);
-			//ASTPrinter(*invar).print(cerr);
+
+			m_scopes[&*invar] = m_scopes[&_node];
+			resolver.resolveNamesAndTypes(*invar);
+
+			invars.push_back(ASTBoogieExpressionConverter(m_errorReporter).convert(*invar).expr);
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 		}
 	}
-
-	Parser parser(m_errorReporter);
 
 
 	// Process state variables first (to get initializer expressions)
