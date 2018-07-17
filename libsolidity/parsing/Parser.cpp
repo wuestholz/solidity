@@ -109,8 +109,9 @@ ASTPointer<Expression> Parser::parseExpression(shared_ptr<Scanner> const& _scann
 	{
 		m_recursionDepth = 0;
 		m_scanner = _scanner;
+		auto result = parseExpression();
 		solAssert(m_recursionDepth == 0, "");
-		return parseExpression();
+		return result;
 	}
 	catch (FatalError const&)
 	{
