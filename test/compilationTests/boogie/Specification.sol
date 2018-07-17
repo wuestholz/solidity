@@ -16,4 +16,9 @@ contract SomeContract {
         x += amount;
         y += amount;
     }
+
+    function add_incorrect(uint amount) public {
+        x += amount;
+        y -= amount;
+    }
 }
