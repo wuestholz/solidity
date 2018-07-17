@@ -165,12 +165,12 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			if (!result.newStatements.empty())
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(),
-						"Invariant introduceing intermediate statements not supported by Boogie compiler");
+						"Invariant introducing intermediate statements not supported by Boogie compiler");
 			}
 			if (!result.newDecls.empty())
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(),
-						"Invariant introduceing intermediate declarations not supported by Boogie compiler");
+						"Invariant introducing intermediate declarations not supported by Boogie compiler");
 			}
 			m_currentInvars.push_back(result.expr);
 		}
