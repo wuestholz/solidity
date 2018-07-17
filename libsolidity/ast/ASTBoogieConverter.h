@@ -26,6 +26,9 @@ private:
 	smack::Program m_program;
 
 	// Helper variables to pass information between the visit methods
+
+	std::vector<smack::Expr const*> m_currentInvars;
+
 	// Function currently being processed
 	FunctionDefinition const* m_currentFunc;
 	unsigned long m_currentModifier;

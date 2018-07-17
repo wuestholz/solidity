@@ -84,8 +84,8 @@ contract Addresses {
         assert(oldSum == (newSum + 1234)); // This assertion should fail
     }
 
-    function testCall(address addr, uint param) public returns (bool){
-        return addr.call(param);
+    function testCall(address addr) public returns (bool){
+        return addr.call("");
     }
 
     function literals() public pure {

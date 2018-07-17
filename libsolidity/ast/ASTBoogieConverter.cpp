@@ -143,7 +143,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, m_errorReporter);
 
-	vector<smack::Expr const *> invars;
+	m_currentInvars.clear();
 	for (auto dt : _node.annotation().docTags)
 	{
 		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
@@ -156,7 +156,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
 
-			invars.push_back(ASTBoogieExpressionConverter(m_errorReporter).convert(*invar).expr);
+			m_currentInvars.push_back(ASTBoogieExpressionConverter(m_errorReporter).convert(*invar).expr);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 		}
 	}
@@ -352,7 +352,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			ASTBoogieUtils::mapDeclName(_node);
 
 	// Create the procedure
-	m_program.getDeclarations().push_back(smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks));
+	auto procDecl = smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
+	for (auto invar : m_currentInvars)
+	{
+		if (!_node.isConstructor()) {procDecl->getRequires().push_back(invar); }
+		procDecl->getEnsures().push_back(invar);
+	}
+	m_program.getDeclarations().push_back(procDecl);
 	return false;
 }
 
