@@ -72,8 +72,9 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
 
 	// Create the procedure
-	m_program.getDeclarations().push_back(smack::Decl::procedure(funcName,
-			params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks));
+	auto procDecl = smack::Decl::procedure(funcName, params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks);
+	for (auto invar : m_currentInvars) { procDecl->getEnsures().push_back(invar); }
+	m_program.getDeclarations().push_back(procDecl);
 }
 
 ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
