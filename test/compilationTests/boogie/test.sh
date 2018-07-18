@@ -1,8 +1,14 @@
 #!/bin/bash
 
-BOOGIE=~/Workspace/boogie/Binaries/Boogie.exe
-CORRAL=~/Workspace/corral/bin/Debug/corral.exe
-SOLC=~/Workspace/solidity-sri/build/solc/solc
+# directory of the script
+BOOGIE_TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd $BOOGIE_TEST_DIR
+BASE_DIR=$BOOGIE_TEST_DIR/../../..
+
+
+BOOGIE=$BASE_DIR/../boogie/Binaries/Boogie.exe
+CORRAL=$BASE_DIR/../corral/bin/Debug/corral.exe
+SOLC=$BASE_DIR/build/solc/solc
 
 total=0
 passed=0
@@ -13,7 +19,7 @@ for sol in *.sol; do
     total=$((total+1))
     echo "======= $sol ======="
     echo "- Compiling"
-    solc --boogie "$sol" -o ./output --overwrite > /dev/null
+    $SOLC --boogie "$sol" -o ./output --overwrite > /dev/null
     bpl="./output/$sol.bpl"
     out="$bpl.out"
     exp="$sol.expected"
