@@ -19,6 +19,7 @@ private:
 	static const std::string ERR_EXPR;
 
 	ErrorReporter& m_errorReporter;
+	SourceLocation const* m_defaultLocation;
 
 	// Helper variables to pass information between the visit methods
 	const smack::Expr* m_currentExpr;
@@ -41,6 +42,9 @@ private:
 	// Helper method to transform a select to an update
 	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
 
+	void reportError(SourceLocation const& location, std::string const& description);
+	void reportWarning(SourceLocation const& location, std::string const& description);
+
 public:
 
 	/**
@@ -61,7 +65,7 @@ public:
 	};
 
 
-	ASTBoogieExpressionConverter(ErrorReporter& errorReporter);
+	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, SourceLocation const* defaultLocation = nullptr);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side
