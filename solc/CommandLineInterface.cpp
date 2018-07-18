@@ -1057,12 +1057,12 @@ void CommandLineInterface::handleBoogie()
 		}
 		catch (CompilerError const& _exception)
 		{
-			formatter.printExceptionInformation(_exception, "Boogie compiler error");
+			formatter.printExceptionInformation(_exception, "Boogie exception");
 			return;
 		}
 		catch (InternalCompilerError const& _exception)
 		{
-			formatter.printExceptionInformation(_exception, "Boogie internal compiler error");
+			formatter.printExceptionInformation(_exception, "Boogie internal exception");
 			cerr << "Details:" << endl << boost::diagnostic_information(_exception);
 			return;
 		}
@@ -1071,7 +1071,7 @@ void CommandLineInterface::handleBoogie()
 	for (auto const& error: errorReporter.errors())
 	{
 		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "Error");
+				(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
 	}
 
 	if (!Error::containsOnlyWarnings(errorReporter.errors()))

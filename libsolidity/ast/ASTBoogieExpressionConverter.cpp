@@ -35,7 +35,7 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 		}
 	}
 
-	reportError(associatedNode.location(), "Array length access not supported by Boogie compiler");
+	reportError(associatedNode.location(), "Unsupported access to array length");
 	return smack::Expr::id(ERR_EXPR);
 }
 
@@ -118,8 +118,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
 
 	default:
-		reportError(_node.location(), string("Assignment operator ") +
-				Token::toString(_node.assignmentOperator()) + " not supported by Boogie compiler");
+		reportError(_node.location(), string("Unsupported assignment operator: ") +
+				Token::toString(_node.assignmentOperator()));
 		return false;
 	}
 
@@ -147,7 +147,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 		}
 	}
 
-	reportError(originalLhs.location(), "Assignment not supported by Boogie compiler (LHS must be identifier/indexer)");
+	reportError(originalLhs.location(), "Unsupported assignment (LHS must be identifier/indexer)");
 }
 
 smack::Expr const* ASTBoogieExpressionConverter::selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value)
@@ -171,7 +171,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 	}
 	else
 	{
-		reportError(_node.location(), "Boogie compiler does not support tuples");
+		reportError(_node.location(), "Tuples are not supported");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 	}
 	return false;
@@ -244,7 +244,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 		break;
 
 	default:
-		reportError(_node.location(), string("Boogie compiler does not support unary operator ") + Token::toString(_node.getOperator()));
+		reportError(_node.location(), string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		break;
 	}
@@ -292,11 +292,11 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 				break;
 			}
 		}
-		reportError(_node.location(), "Exponentiation not supported by Boogie compiler");
+		reportError(_node.location(), "Exponentiation is not supported");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		break;
 	default:
-		reportError(_node.location(), string("Boogie compiler does not support binary operator ") + Token::toString(_node.getOperator()));
+		reportError(_node.location(), string("Unsupported binary operator ") + Token::toString(_node.getOperator()));
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		break;
 	}
@@ -336,7 +336,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			return false;
 		}
 
-		reportError(_node.location(), "Type conversion not supported by Boogie compiler");
+		reportError(_node.location(), "Unsupported type conversion");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		return false;
 
@@ -402,13 +402,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 	else
 	{
-		reportError(_node.location(), "Boogie compiler only supports identifiers as function calls");
+		reportError(_node.location(), "Only identifiers are supported as function calls");
 		funcName = ERR_EXPR;
 	}
 
 	if (m_isGetter && _node.arguments().size() > 0)
 	{
-		reportError(_node.location(), "Boogie compiler does not support getter arguments");
+		reportError(_node.location(), "Getter arguments are not supported");
 	}
 
 	// Get arguments recursively
@@ -528,7 +528,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 {
-	reportError(_node.location(), "Boogie compiler does not support new expression");
+	reportError(_node.location(), "New expression is not supported");
 	m_currentExpr = smack::Expr::id(ERR_EXPR);
 	return false;
 }
@@ -613,7 +613,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// declaration corresponding to 'memberName'
 	if (_node.annotation().referencedDeclaration == nullptr)
 	{
-		reportError(_node.location(), "Boogie compiler does not support member without corresponding declaration (probably an unsupported special member)");
+		reportError(_node.location(), "Member without corresponding declaration (probably an unsupported special member)");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		return false;
 	}
@@ -684,7 +684,7 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 	if (!_node.annotation().referencedDeclaration)
 	{
-		reportError(_node.location(), "Boogie compiler found an identifier without matching declaration");
+		reportError(_node.location(), "Identifier '" + _node.name() + "' has no matching declaration");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		return false;
 	}
@@ -739,7 +739,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 		return false;
 	}
 
-	reportError(_node.location(), "Boogie compiler does not support literals for type " + tpStr.substr(0, tpStr.find(' ')));
+	reportError(_node.location(), "Unsupported literal for type " + tpStr.substr(0, tpStr.find(' ')));
 	m_currentExpr = smack::Expr::id(ERR_EXPR);
 	return false;
 }

@@ -172,13 +172,11 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty())
 			{
-				m_errorReporter.error(Error::Type::ParserError, _node.location(),
-						"Invariant introducing intermediate statements not supported by Boogie compiler");
+				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
 			}
 			if (!result.newDecls.empty())
 			{
-				m_errorReporter.error(Error::Type::ParserError, _node.location(),
-						"Invariant introducing intermediate declarations not supported by Boogie compiler");
+				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
 			m_currentInvars.push_back(result.expr);
 		}
@@ -211,7 +209,7 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 	if (_node.arguments() && _node.arguments()->size() > 0)
 	{
 		m_errorReporter.error(Error::Type::ParserError, _node.location(),
-				"Boogie compiler does not support arguments for base constructor in inheritance list");
+				"Arguments for base constructor in inheritance list is not supported");
 	}
 	return false;
 }
@@ -227,13 +225,13 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
-	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support struct definitions");
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Struct definitions are not supported");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
-	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support enum definitions");
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Enum definitions are not supported");
 	return false;
 }
 
@@ -282,7 +280,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (p->type()->category() == Type::Category::Array)
 		{
-			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support arrays as return values");
+			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Arrays are not supported as return values");
 			return false;
 		}
 		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_errorReporter)));
@@ -299,7 +297,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 	else
 	{
-		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support multiple return values");
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Multiple return values are not supported");
 		return false;
 	}
 
@@ -355,7 +353,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 		else
 		{
-			m_errorReporter.error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation by Boogie compiler");
+			m_errorReporter.error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation");
 		}
 	}
 
@@ -481,7 +479,7 @@ bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 
 bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
-	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support inline assembly");
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Inline assembly is not supported");
 	return false;
 }
 
@@ -508,7 +506,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 			for (unsigned long i = 0; i < m_currentModifier; ++i)
 			{
 				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id()) {
-					m_errorReporter.error(Error::Type::ParserError, m_currentFunc->location(), "Boogie compiler does not support duplicated modifiers");
+					m_errorReporter.error(Error::Type::ParserError, m_currentFunc->location(), "Duplicated modifiers are not supported");
 				}
 			}
 
@@ -534,7 +532,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 		}
 		else
 		{
-			m_errorReporter.error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation by Boogie compiler");
+			m_errorReporter.error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation");
 		}
 	}
 	else if (m_currentFunc->isImplemented())
@@ -642,7 +640,7 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	// TODO: Boogie does not support continue, this must be mapped manually
 	// using labels and gotos
-	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support continue statement");
+	m_errorReporter.error(Error::Type::ParserError, _node.location(), "Continue statement is not supported");
 	return false;
 }
 
@@ -718,7 +716,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		}
 		else
 		{
-			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler does not support assignment to multiple variables");
+			m_errorReporter.error(Error::Type::ParserError, _node.location(), "Assignment to multiple variables is not supported");
 		}
 	}
 	return false;
