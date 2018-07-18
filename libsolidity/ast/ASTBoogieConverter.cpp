@@ -165,10 +165,10 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
-			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			try { typeChecker.checkTypeRequirements(*invar);}
 			catch(std::exception const&) { cerr << "Error while type checking" << endl; }
-			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, true).convert(*invar);
 			if (!result.newStatements.empty())
 			{

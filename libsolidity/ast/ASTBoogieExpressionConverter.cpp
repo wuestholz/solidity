@@ -39,8 +39,8 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	return smack::Expr::id(ERR_EXPR);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, bool isInvariant) :
-		m_errorReporter(errorReporter), m_isInvariant(isInvariant)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter) :
+		m_errorReporter(errorReporter)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -470,7 +470,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
-	if (m_isInvariant && funcName == ASTBoogieUtils::VERIFIER_SUM)
+	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
 	{
 		if (auto sumBase = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
@@ -702,7 +702,7 @@ bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _no
 
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 {
-	if (m_isInvariant && !_node.annotation().type)
+	if (!_node.annotation().type)
 	{
 
 	}
