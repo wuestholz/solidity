@@ -35,6 +35,7 @@ const string ASTBoogieUtils::SOLIDITY_REVERT = "revert";
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";
 const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
+const string ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";

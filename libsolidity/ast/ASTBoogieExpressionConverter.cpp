@@ -39,8 +39,8 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	return smack::Expr::id(ERR_EXPR);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter) :
-		m_errorReporter(errorReporter)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, bool isInvariant) :
+		m_errorReporter(errorReporter), m_isInvariant(isInvariant)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -416,7 +416,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			arg->accept(*this);
 			args.push_back(m_currentExpr);
 
-			if (arg->annotation().type->category() == Type::Category::Array)
+			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)
 			{
 				args.push_back(getArrayLength(m_currentExpr, *arg));
 			}
@@ -468,6 +468,16 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		m_newStatements.push_back(smack::Stmt::assume(smack::Expr::lit(false)));
 		return false;
+	}
+
+	if (m_isInvariant && funcName == ASTBoogieUtils::VERIFIER_SUM)
+	{
+		if (auto sumBase = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
+		{
+			m_currentExpr = smack::Expr::sel(smack::Expr::id(sumBase->name() + "#sum"), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+			return false;
+		}
+
 	}
 
 	// TODO: check for void return in a more appropriate way
@@ -656,6 +666,18 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 
 bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 {
+	if (_node.name() == ASTBoogieUtils::VERIFIER_SUM)
+	{
+		m_currentExpr = smack::Expr::id(ASTBoogieUtils::VERIFIER_SUM);
+		return false;
+	}
+
+	if (!_node.annotation().referencedDeclaration)
+	{
+		m_errorReporter.error(Error::Type::ParserError, _node.location(), "Boogie compiler found an identifier without matching declaration");
+		m_currentExpr = smack::Expr::id(ERR_EXPR);
+		return false;
+	}
 	string declName = ASTBoogieUtils::mapDeclName(*(_node.annotation().referencedDeclaration));
 
 	// Check if a state variable is referenced
@@ -680,6 +702,11 @@ bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _no
 
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 {
+	if (m_isInvariant && !_node.annotation().type)
+	{
+
+	}
+
 	string tpStr = _node.annotation().type->toString();
 	// TODO: option for bit precise types
 	if (boost::starts_with(tpStr, "int_const"))

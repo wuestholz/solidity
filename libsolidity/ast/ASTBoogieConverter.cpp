@@ -29,7 +29,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter, false).convert(_node);
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
@@ -146,8 +146,13 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process invariants
 	m_currentInvars.clear();
-	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, m_errorReporter);
-	TypeChecker typeChecker(m_evmVersion, m_errorReporter, &_node);
+
+	// Use different error reporters so that we can ignore missing special functions
+	ErrorList errList;
+	ErrorReporter invarErrReporter(errList);
+
+	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, invarErrReporter);
+	TypeChecker typeChecker(m_evmVersion, invarErrReporter, &_node);
 
 	for (auto dt : _node.annotation().docTags)
 	{
@@ -156,13 +161,15 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			string invarStr = dt.second.content.substr(dt.second.content.find(" ") + 1);
 			addGlobalComment("Contract invariant: " + invarStr);
 			ASTPointer<Expression> invar = Parser(m_errorReporter)
-					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr)));
+					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
 
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
-			typeChecker.checkTypeRequirements(*invar);
-			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
-			auto result = ASTBoogieExpressionConverter(m_errorReporter).convert(*invar);
+			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			try { typeChecker.checkTypeRequirements(*invar);}
+			catch(std::exception const&) { cerr << "Error while type checking" << endl; }
+			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			auto result = ASTBoogieExpressionConverter(m_errorReporter, true).convert(*invar);
 			if (!result.newStatements.empty())
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(),

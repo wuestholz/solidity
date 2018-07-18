@@ -19,6 +19,7 @@ private:
 	static const std::string ERR_EXPR;
 
 	ErrorReporter& m_errorReporter;
+	bool m_isInvariant;
 
 	// Helper variables to pass information between the visit methods
 	const smack::Expr* m_currentExpr;
@@ -61,7 +62,7 @@ public:
 	};
 
 
-	ASTBoogieExpressionConverter(ErrorReporter& errorReporter);
+	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, bool isInvariant);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side

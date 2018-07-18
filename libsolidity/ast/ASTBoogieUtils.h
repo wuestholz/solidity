@@ -44,6 +44,7 @@ public:
 	static const std::string SOLIDITY_THIS;
 	static const std::string BOOGIE_THIS;
 	static const std::string VERIFIER_MAIN;
+	static const std::string VERIFIER_SUM;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
 	static const std::string BOOGIE_STRING_TYPE;
