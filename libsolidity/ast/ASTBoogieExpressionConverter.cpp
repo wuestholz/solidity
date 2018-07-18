@@ -702,11 +702,6 @@ bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _no
 
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 {
-	if (!_node.annotation().type)
-	{
-
-	}
-
 	string tpStr = _node.annotation().type->toString();
 	// TODO: option for bit precise types
 	if (boost::starts_with(tpStr, "int_const"))
