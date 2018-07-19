@@ -148,6 +148,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process invariants
 	m_currentInvars.clear();
+	m_currentSumDecls.clear();
 
 	// TODO: we use a different error reporter for the type checker to ignore
 	// error messages related to our special functions like the __verifier_sum
@@ -159,28 +160,45 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	for (auto dt : _node.annotation().docTags)
 	{
+		// Find invariants
 		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
 		{
+			// Parse
 			string invarStr = dt.second.content.substr(dt.second.content.find(" ") + 1);
 			addGlobalComment("Contract invariant: " + invarStr);
 			ASTPointer<Expression> invar = Parser(m_errorReporter)
 					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
 
+			// Resolve references, using the scope of the contract
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			// Do type checking
 			typeChecker.checkTypeRequirements(*invar);
 			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			// Convert invariant to Boogie representation
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty())
+			if (!result.newStatements.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
 			}
-			if (!result.newDecls.empty())
+			if (!result.newDecls.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
 			m_currentInvars.push_back(result.expr);
+			// Add new shadow variables for sum
+			for (auto sumDecl : result.newSumDecls)
+			{
+				if (find(m_currentSumDecls.begin(), m_currentSumDecls.end(), sumDecl) == m_currentSumDecls.end())
+				{
+					m_currentSumDecls.push_back(sumDecl);
+					addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
+					m_program.getDeclarations().push_back(
+								smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
+								"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+				}
+			}
 		}
 	}
 

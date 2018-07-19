@@ -34,6 +34,7 @@ private:
 	std::vector<smack::Stmt const*> m_newStatements;
 	std::list<smack::Decl*> m_newDecls;
 	std::list<smack::Decl*> m_newConstants;
+	std::list<const Declaration*> m_newSumDecls;
 
 	// Helper method to get the length of an array
 	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
@@ -60,10 +61,12 @@ public:
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
 		std::list<smack::Decl*> newConstants;
+		std::list<const Declaration*> newSumDecls;
 
 		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
-				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants) {}
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants,
+				std::list<const Declaration*> newSumDecls)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants), newSumDecls(newSumDecls) {}
 	};
 
 

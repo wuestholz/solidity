@@ -43,7 +43,13 @@ const smack::Expr* ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* 
 {
 	if (auto sumBase = dynamic_cast<Identifier const*>(node))
 	{
-		return smack::Expr::sel(smack::Expr::id(sumBase->name() + ASTBoogieUtils::BOOGIE_SUM), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+		auto sumBaseDecl = sumBase->annotation().referencedDeclaration;
+		if (sumBaseDecl != nullptr)
+		{
+			return smack::Expr::sel(
+					smack::Expr::id(ASTBoogieUtils::mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+		}
 	}
 	reportError(node->location(), "Unsupported identifier for sum function");
 	return smack::Expr::id(ERR_EXPR);
@@ -78,10 +84,11 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
+	m_newSumDecls.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_newSumDecls);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -492,6 +499,14 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
 	{
+		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
+		{
+			m_newSumDecls.push_back(id->annotation().referencedDeclaration);
+		}
+		else
+		{
+			reportError(_node.location(), "Argument of sum must be an identifier");
+		}
 		m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
 		return false;
 	}
