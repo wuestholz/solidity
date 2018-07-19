@@ -80,12 +80,15 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
 		std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion) :
 				m_errorReporter(errorReporter),
-				m_globalContext(globalContext),
+				m_globalDecls(globalContext->declarations()),
+				m_verifierSum(ASTBoogieUtils::VERIFIER_SUM, make_shared<FunctionType>(strings{}, strings{"int"}, FunctionType::Kind::Internal, true, StateMutability::Pure)),
 				m_scopes(scopes),
 				m_evmVersion(evmVersion),
 				m_currentRet(nullptr),
 				m_nextReturnLabelId(0)
 {
+	m_globalDecls.push_back(&m_verifierSum);
+
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
@@ -98,7 +101,6 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
 	// address.send()
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
-
 	// Uninterpreted type for strings
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 }
@@ -147,12 +149,13 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Process invariants
 	m_currentInvars.clear();
 
-	// Use different error reporters so that we can ignore missing special functions
-	ErrorList errList;
-	ErrorReporter invarErrReporter(errList);
+	// TODO: we use a different error reporter for the type checker to ignore
+	// error messages related to our special functions like the __verifier_sum
+	ErrorList typeCheckerErrList;
+	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
 
-	NameAndTypeResolver resolver(m_globalContext->declarations(), m_scopes, invarErrReporter);
-	TypeChecker typeChecker(m_evmVersion, invarErrReporter, &_node);
+	NameAndTypeResolver resolver(m_globalDecls, m_scopes, m_errorReporter);
+	TypeChecker typeChecker(m_evmVersion, typeCheckerErrReporter, &_node);
 
 	for (auto dt : _node.annotation().docTags)
 	{
@@ -166,9 +169,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
-			try { typeChecker.checkTypeRequirements(*invar);}
-			catch(std::exception const&) { cerr << "Error while type checking" << endl; }
-			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			typeChecker.checkTypeRequirements(*invar);
+			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty())
 			{

@@ -23,7 +23,8 @@ private:
 
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
-	std::shared_ptr<GlobalContext> m_globalContext;
+	std::vector<Declaration const*> m_globalDecls;
+	MagicVariableDeclaration m_verifierSum;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	EVMVersion m_evmVersion;
 
