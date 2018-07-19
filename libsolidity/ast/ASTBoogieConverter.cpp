@@ -175,7 +175,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Do type checking
 			typeChecker.checkTypeRequirements(*invar);
-			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Convert invariant to Boogie representation
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, list<Declaration const*>(), &_node.location()).convert(*invar);
 			if (!result.newStatements.empty()) // Make sure that there are no side effects
