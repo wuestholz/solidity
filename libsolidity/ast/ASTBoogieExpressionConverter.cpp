@@ -65,8 +65,8 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 	m_errorReporter.warning(m_defaultLocation ? *m_defaultLocation : location, description);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, SourceLocation const* defaultLocation) :
-		m_errorReporter(errorReporter), m_defaultLocation(defaultLocation)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, std::list<const Declaration*> sumRequired, SourceLocation const* defaultLocation) :
+		m_errorReporter(errorReporter), m_defaultLocation(defaultLocation), m_sumRequired(sumRequired)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -147,6 +147,26 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs)
 {
+	// First check if shadow variables need to be updated
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
+	{
+		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
+		{
+			if (find(m_sumRequired.begin(), m_sumRequired.end(), lhsId->annotation().referencedDeclaration) != m_sumRequired.end())
+			{
+				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
+				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
+				m_newStatements.push_back(smack::Stmt::assign(
+						sumId,
+						smack::Expr::upd(
+								sumId,
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+								smack::Expr::plus(smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)), smack::Expr::minus(rhs, lhs)))));
+			}
+		}
+	}
+
+
 	// If LHS is simply an identifier, we can assign to it
 	if (dynamic_cast<smack::VarExpr const*>(lhs))
 	{

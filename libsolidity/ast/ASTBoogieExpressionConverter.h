@@ -28,6 +28,7 @@ private:
 	bool m_isGetter;
 	bool m_isLibraryCall;
 	bool m_isLibraryCallStatic;
+	std::list<const Declaration*> m_sumRequired;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
@@ -70,7 +71,8 @@ public:
 	};
 
 
-	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, SourceLocation const* defaultLocation = nullptr);
+	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, std::list<const Declaration*> sumRequired = std::list<const Declaration*>(),
+			SourceLocation const* defaultLocation = nullptr);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side
