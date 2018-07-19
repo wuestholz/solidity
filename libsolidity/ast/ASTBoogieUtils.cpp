@@ -48,7 +48,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
+	transferParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
 	transferParams.push_back(make_pair("amount", "int"));
 
 	// Body
@@ -100,7 +100,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	list<smack::Binding> callParams;
 	callParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	callParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	callParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
+	callParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
 
 	// Return value
 	list<smack::Binding> callReturns;
@@ -110,8 +110,9 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	smack::Block* callImpl = smack::Block::block();
 	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
 	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
-	const smack::Expr* msg_val = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+	const smack::Expr* msg_val = smack::Expr::id(BOOGIE_MSG_VALUE);
 
+	// balance[this] += msg.value
 	callImpl->addStmt(smack::Stmt::assign(
 				smack::Expr::id(BOOGIE_BALANCE),
 				smack::Expr::upd(
@@ -119,7 +120,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 						smack::Expr::id(BOOGIE_THIS),
 						smack::Expr::plus(this_bal, msg_val)
 				)));
-	// balance[msg.sender] -= amount
+	// balance[msg.sender] -= msg.value
 	callImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
