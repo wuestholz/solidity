@@ -47,6 +47,7 @@ public:
 	static const std::string VERIFIER_SUM;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
+	static const std::string BOOGIE_SUM;
 	static const std::string BOOGIE_STRING_TYPE;
 	static const std::string ERR_TYPE;
 

@@ -38,6 +38,7 @@ const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
+const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
 const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 

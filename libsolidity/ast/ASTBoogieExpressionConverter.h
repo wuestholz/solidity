@@ -41,6 +41,8 @@ private:
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
 	// Helper method to transform a select to an update
 	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
+	// Helper method to get the length of an array
+	const smack::Expr* getSumShadowVar(ASTNode const* node);
 
 	void reportError(SourceLocation const& location, std::string const& description);
 	void reportWarning(SourceLocation const& location, std::string const& description);

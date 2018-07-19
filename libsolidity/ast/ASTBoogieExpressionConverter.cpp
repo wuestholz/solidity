@@ -39,6 +39,16 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	return smack::Expr::id(ERR_EXPR);
 }
 
+const smack::Expr* ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
+{
+	if (auto sumBase = dynamic_cast<Identifier const*>(node))
+	{
+		return smack::Expr::sel(smack::Expr::id(sumBase->name() + ASTBoogieUtils::BOOGIE_SUM), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+	}
+	reportError(node->location(), "Unsupported identifier for sum function");
+	return smack::Expr::id(ERR_EXPR);
+}
+
 void ASTBoogieExpressionConverter::reportError(SourceLocation const& location, std::string const& description)
 {
 	m_errorReporter.error(Error::Type::ParserError, m_defaultLocation ? *m_defaultLocation : location, description);
@@ -482,12 +492,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
 	{
-		if (auto sumBase = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
-		{
-			m_currentExpr = smack::Expr::sel(smack::Expr::id(sumBase->name() + "#sum"), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
-			return false;
-		}
-
+		m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
+		return false;
 	}
 
 	// TODO: check for void return in a more appropriate way
