@@ -688,19 +688,24 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 {
 	for (auto decl : _node.declarations())
 	{
-		if (decl->isLocalVariable())
+		// Decl can be null, e.g., var (x,,) = (1,2,3)
+		// In this case we just ignore it
+		if (decl != nullptr)
 		{
-			// Boogie requires local variables to be declared at the beginning of the procedure
-			m_localDecls.push_back(smack::Decl::variable(
-					ASTBoogieUtils::mapDeclName(*decl),
-					ASTBoogieUtils::mapType(decl->type(), *decl, m_errorReporter)));
-		}
-		else
-		{
-			// Non-local variables should be handled elsewhere
-			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-					errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
-					errinfo_sourceLocation(_node.location()));
+			if (decl->isLocalVariable())
+			{
+				// Boogie requires local variables to be declared at the beginning of the procedure
+				m_localDecls.push_back(smack::Decl::variable(
+						ASTBoogieUtils::mapDeclName(*decl),
+						ASTBoogieUtils::mapType(decl->type(), *decl, m_errorReporter)));
+			}
+			else
+			{
+				// Non-local variables should be handled elsewhere
+				BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+						errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
+						errinfo_sourceLocation(_node.location()));
+			}
 		}
 	}
 
