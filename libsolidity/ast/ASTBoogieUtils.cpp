@@ -117,12 +117,50 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 
 	// Body
 	smack::Block* callImpl = smack::Block::block();
+	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
+	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
+	const smack::Expr* msg_val = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+
+	callImpl->addStmt(smack::Stmt::assign(
+				smack::Expr::id(BOOGIE_BALANCE),
+				smack::Expr::upd(
+						smack::Expr::id(BOOGIE_BALANCE),
+						smack::Expr::id(BOOGIE_THIS),
+						smack::Expr::plus(this_bal, msg_val)
+				)));
+	// balance[msg.sender] -= amount
+	callImpl->addStmt(smack::Stmt::assign(
+			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(BOOGIE_BALANCE),
+					smack::Expr::id(BOOGIE_MSG_SENDER),
+					smack::Expr::minus(sender_bal, msg_val)
+			)));
 	callImpl->addStmt(smack::Stmt::comment("TODO: model something nondeterministic here"));
 	list<smack::Block*> callBlocks;
 	callBlocks.push_back(callImpl);
 	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL,
 			callParams, callReturns, list<smack::Decl*>(), callBlocks);
-
+	// Precondition: there is enough ether to transfer
+	callProc->getRequires().push_back(smack::Expr::or_(smack::Expr::gte(sender_bal, msg_val), smack::Expr::eq(msg_val, smack::Expr::lit((long)0))));
+	// Postcondition: if sender and receiver is different (ether gets transferred)
+	callProc->getEnsures().push_back(
+			smack::Expr::impl(
+					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), msg_val))));
+	callProc->getEnsures().push_back(
+			smack::Expr::impl(
+					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), msg_val))));
+	// Postcondition: if sender and receiver is the same (nothing happens)
+	callProc->getEnsures().push_back(
+			smack::Expr::impl(
+					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal))));
+	callProc->getEnsures().push_back(
+			smack::Expr::impl(
+					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))));
 	return callProc;
 }
 
