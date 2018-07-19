@@ -502,6 +502,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
 			m_newSumDecls.push_back(id->annotation().referencedDeclaration);
+			auto declCategory = id->annotation().type->category();
+			if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
+			{
+				reportError(_node.location(), "Argument of sum must be an array or a mapping");
+			}
 		}
 		else
 		{
