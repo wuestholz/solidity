@@ -18,4 +18,14 @@ contract SimpleBank {
             user_balances[msg.sender] = 0;
         }
     }
+
+    function withdraw2() public {
+        require(this != msg.sender);
+        if (user_balances[msg.sender] > 0 && address(this).balance > user_balances[msg.sender]) {
+            if (!msg.sender.call.value(user_balances[msg.sender])("")) {
+                revert();
+            }
+            user_balances[msg.sender] = 0;
+        }
+    }
 }

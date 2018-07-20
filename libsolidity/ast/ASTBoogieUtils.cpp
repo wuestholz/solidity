@@ -107,37 +107,48 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	callReturns.push_back(make_pair("__result", "bool"));
 
 	// Body
-	smack::Block* callImpl = smack::Block::block();
+	// Successful transfer
+	smack::Block* thenBlock = smack::Block::block();
 	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
 	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
 	const smack::Expr* msg_val = smack::Expr::id(BOOGIE_MSG_VALUE);
+	const smack::Expr* result = smack::Expr::id("__result");
 
 	// balance[this] += msg.value
-	callImpl->addStmt(smack::Stmt::assign(
-				smack::Expr::id(BOOGIE_BALANCE),
-				smack::Expr::upd(
-						smack::Expr::id(BOOGIE_BALANCE),
-						smack::Expr::id(BOOGIE_THIS),
-						smack::Expr::plus(this_bal, msg_val)
-				)));
+	thenBlock->addStmt(smack::Stmt::assign(
+			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(BOOGIE_BALANCE),
+					smack::Expr::id(BOOGIE_THIS),
+					smack::Expr::plus(this_bal, msg_val)
+			)));
 	// balance[msg.sender] -= msg.value
-	callImpl->addStmt(smack::Stmt::assign(
+	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
 					smack::Expr::minus(sender_bal, msg_val)
 			)));
-	callImpl->addStmt(smack::Stmt::comment("TODO: model something nondeterministic here"));
+	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
+	// Unsuccessful transfer
+	smack::Block* elseBlock = smack::Block::block();
+	elseBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(false)));
+	// Nondeterministic choice between success and failure
+	smack::Block* callBlock = smack::Block::block();
+	callBlock->addStmt(smack::Stmt::comment("TODO: call fallback"));
+	callBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
+
 	list<smack::Block*> callBlocks;
-	callBlocks.push_back(callImpl);
+	callBlocks.push_back(callBlock);
 	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL,
 			callParams, callReturns, list<smack::Decl*>(), callBlocks);
 	// Precondition: there is enough ether to transfer
 	callProc->getRequires().push_back(smack::Expr::or_(smack::Expr::gte(sender_bal, msg_val), smack::Expr::eq(msg_val, smack::Expr::lit((long)0))));
-	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
+	// Postcondition: if result is true and sender/receiver is different ether gets transferred
+	// otherwise nothing happens
 	callProc->getEnsures().push_back(smack::Expr::cond(
-			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), msg_val)),
 					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), msg_val))),
