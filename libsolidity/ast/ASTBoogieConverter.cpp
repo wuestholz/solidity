@@ -72,7 +72,11 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks);
-	for (auto invar : m_currentInvars) { procDecl->getEnsures().push_back(invar); }
+	for (auto invar : m_currentInvars)
+	{
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant", *m_currentScanner)));
+	}
 	m_program.getDeclarations().push_back(procDecl);
 }
 
@@ -411,8 +415,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add invariants as pre and postconditions
 	for (auto invar : m_currentInvars)
 	{
-		if (!_node.isConstructor()) {procDecl->getRequires().push_back(invar); }
-		procDecl->getEnsures().push_back(invar);
+		if (!_node.isConstructor())
+		{
+			procDecl->getRequires().push_back(smack::Specification::spec(invar,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold when entering function", *m_currentScanner)));
+		}
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold at end of function", *m_currentScanner)));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 	return false;

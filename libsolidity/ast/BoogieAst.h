@@ -581,10 +581,21 @@ public:
   void print(std::ostream& os) const;
 };
 
+class Specification {
+  const Expr* expr;
+  std::list<const Attr*> attrs;
+public:
+  Specification(const Expr* e, std::list<const Attr*> ax)
+    : expr(e), attrs(ax) {}
+  void print(std::ostream& os, std::string kind) const;
+  static Specification const* spec(const Expr* e, std::list<const Attr*> ax);
+  static Specification const* spec(const Expr* e);
+};
+
 class ProcDecl : public Decl, public CodeContainer {
   typedef Binding Parameter;
   typedef std::list<Parameter> ParameterList;
-  typedef std::list<const Expr*> SpecificationList;
+  typedef std::list<const Specification*> SpecificationList;
 
   ParameterList params;
   ParameterList rets;

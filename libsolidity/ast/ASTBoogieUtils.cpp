@@ -81,16 +81,16 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	transfer->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
+	transfer->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
 	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
-	transfer->getEnsures().push_back(smack::Expr::cond(
+	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
 					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal)))));
+					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
 
 	return transfer;
 }
@@ -135,8 +135,8 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	callBlocks.push_back(callBlock);
 	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL, callParams, callReturns, list<smack::Decl*>(), callBlocks);
 	// Postcondition: if result is false nothing happens
-	callProc->getEnsures().push_back(smack::Expr::or_(result,
-			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE)))));
+	callProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::or_(result,
+			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE))))));
 	return callProc;
 }
 
@@ -192,17 +192,17 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc()
 			sendParams, sendReturns, list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	sendProc->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
+	sendProc->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
 	// Postcondition: if result is true and sender/receiver is different ether gets transferred
 	// otherwise nothing happens
-	sendProc->getEnsures().push_back(smack::Expr::cond(
+	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
 					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal)))));
+					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
 	return sendProc;
 }
 
