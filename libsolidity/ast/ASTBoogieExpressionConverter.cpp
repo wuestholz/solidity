@@ -65,8 +65,9 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 	m_errorReporter.warning(m_defaultLocation ? *m_defaultLocation : location, description);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, std::list<const Declaration*> sumRequired, SourceLocation const* defaultLocation) :
-		m_errorReporter(errorReporter), m_defaultLocation(defaultLocation), m_sumRequired(sumRequired)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter,
+		vector<smack::Expr const*> currentInvars, list<const Declaration*> sumRequired, SourceLocation const* defaultLocation) :
+		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired), m_defaultLocation(defaultLocation)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;

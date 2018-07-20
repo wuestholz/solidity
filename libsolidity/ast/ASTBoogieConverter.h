@@ -31,7 +31,6 @@ private:
 	// Result of the conversion is a single Boogie program (top-level node)
 	smack::Program m_program;
 
-
 	// Helper variables to pass information between the visit methods
 	std::vector<smack::Expr const*> m_currentInvars; // List of invariants for the current contract
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum

@@ -11,7 +11,7 @@ contract SimpleBank {
         user_balances[msg.sender] += msg.value;
     }
 
-    function withdraw() public {
+    function withdraw_transfer() public {
         require(this != msg.sender);
         if (user_balances[msg.sender] > 0 && address(this).balance > user_balances[msg.sender]) {
             msg.sender.transfer(user_balances[msg.sender]);
@@ -19,13 +19,25 @@ contract SimpleBank {
         }
     }
 
-    function withdraw2() public {
+    function withdraw_call_incorrect() public {
         require(this != msg.sender);
-        if (user_balances[msg.sender] > 0 && address(this).balance > user_balances[msg.sender]) {
-            if (!msg.sender.call.value(user_balances[msg.sender])("")) {
+        uint amount = user_balances[msg.sender];
+        if (amount > 0 && address(this).balance > amount) {
+            if (!msg.sender.call.value(amount)("")) {
                 revert();
             }
             user_balances[msg.sender] = 0;
+        }
+    }
+
+    function withdraw_call_correct() public {
+        require(this != msg.sender);
+        uint amount = user_balances[msg.sender];
+        if (amount > 0 && address(this).balance > amount) {
+            user_balances[msg.sender] = 0;
+            if (!msg.sender.call.value(amount)("")) {
+                revert();
+            }
         }
     }
 }

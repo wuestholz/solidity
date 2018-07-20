@@ -19,6 +19,8 @@ private:
 	static const std::string ERR_EXPR;
 
 	ErrorReporter& m_errorReporter;
+	std::vector<smack::Expr const*> m_currentInvars;
+	std::list<const Declaration*> m_sumRequired;
 	SourceLocation const* m_defaultLocation;
 
 	// Helper variables to pass information between the visit methods
@@ -28,7 +30,6 @@ private:
 	bool m_isGetter;
 	bool m_isLibraryCall;
 	bool m_isLibraryCallStatic;
-	std::list<const Declaration*> m_sumRequired;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
@@ -71,7 +72,10 @@ public:
 	};
 
 
-	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, std::list<const Declaration*> sumRequired = std::list<const Declaration*>(),
+	ASTBoogieExpressionConverter(
+			ErrorReporter& errorReporter,
+			std::vector<smack::Expr const*> currentInvars = std::vector<smack::Expr const*>(),
+			std::list<const Declaration*> sumRequired = std::list<const Declaration*>(),
 			SourceLocation const* defaultLocation = nullptr);
 
 	/**
