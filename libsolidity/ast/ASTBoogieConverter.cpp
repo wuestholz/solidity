@@ -10,7 +10,6 @@
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/parsing/Parser.h>
-#include <libsolidity/parsing/Scanner.h>
 #include <utility>
 
 using namespace std;
@@ -29,7 +28,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter, m_currentInvars, m_currentSumDecls).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter, m_currentInvars, m_currentSumDecls, m_currentScanner).convert(_node);
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
@@ -105,8 +104,9 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 }
 
-void ASTBoogieConverter::convert(ASTNode const& _node)
+void ASTBoogieConverter::convert(ASTNode const& _node, Scanner const* scanner)
 {
+	m_currentScanner = scanner;
 	_node.accept(*this);
 }
 
@@ -177,7 +177,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			typeChecker.checkTypeRequirements(*invar);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_errorReporter, vector<smack::Expr const*>(), list<Declaration const*>(), &_node.location()).convert(*invar);
+			auto result = ASTBoogieExpressionConverter(m_errorReporter, vector<smack::Expr const*>(), list<Declaration const*>(), m_currentScanner, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");

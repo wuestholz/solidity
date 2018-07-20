@@ -3,6 +3,7 @@
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <string>
 
 namespace dev
@@ -76,6 +77,8 @@ public:
 	 * Map a Solidity type to a Boogie type
 	 */
 	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter);
+
+	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 };
 
 }

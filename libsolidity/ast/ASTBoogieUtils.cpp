@@ -1,6 +1,7 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/AST.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <libsolidity/parsing/Scanner.h>
 
 using namespace std;
 using namespace dev;
@@ -268,6 +269,16 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 	return ERR_TYPE;
 }
 
+
+list<const smack::Attr*> ASTBoogieUtils::createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
+{
+	list<const smack::Attr*> attrs;
+	int srcLine, srcCol;
+	tie(srcLine, srcCol) = scanner.translatePositionToLineColumn(loc.start);
+	attrs.push_back(smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1));
+	attrs.push_back(smack::Attr::attr("message", message));
+	return attrs;
+}
 
 
 }

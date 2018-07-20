@@ -1053,7 +1053,7 @@ void CommandLineInterface::handleBoogie()
 		cout << endl << "======= " << sourceCode.first << " =======" << endl;
 		try
 		{
-			boogieConverter.convert(m_compiler->ast(sourceCode.first));
+			boogieConverter.convert(m_compiler->ast(sourceCode.first), &m_compiler->scanner(sourceCode.first));
 		}
 		catch (CompilerError const& _exception)
 		{

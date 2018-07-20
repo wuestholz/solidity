@@ -6,6 +6,7 @@
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
 #include <libsolidity/interface/EVMVersion.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <map>
 
 namespace dev
@@ -36,6 +37,7 @@ private:
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
+	Scanner const* m_currentScanner;
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
@@ -79,7 +81,7 @@ public:
 	/**
 	 * Convert a node and add it to the actual Boogie program
 	 */
-	void convert(ASTNode const& _node);
+	void convert(ASTNode const& _node, Scanner const* scanner);
 
 	/**
 	 * Print the actual Boogie program to an output stream

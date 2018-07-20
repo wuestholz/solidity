@@ -4,7 +4,9 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <utility>
+#include <tuple>
 
 using namespace std;
 using namespace dev;
@@ -66,8 +68,10 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 }
 
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter,
-		vector<smack::Expr const*> currentInvars, list<const Declaration*> sumRequired, SourceLocation const* defaultLocation) :
-		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired), m_defaultLocation(defaultLocation)
+		vector<smack::Expr const*> currentInvars, list<const Declaration*> sumRequired,
+		Scanner const* scanner, SourceLocation const* defaultLocation) :
+		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired),
+		m_scanner(scanner), m_defaultLocation(defaultLocation)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -483,7 +487,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// The parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it));
+		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold", *m_scanner)));
 		return false;
 	}
 
@@ -553,7 +557,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assert_(invar));
+		for (auto invar : m_currentInvars)
+		{
+			m_newStatements.push_back(smack::Stmt::assert_(invar,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold before external call", *m_scanner)));
+		}
 	}
 
 	// TODO: check for void return in a more appropriate way
