@@ -427,7 +427,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	m_currentExpr = nullptr;
 	m_currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-	m_currentValue = smack::Expr::lit((long)0);
+	m_currentValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
 	_node.expression().accept(*this);
@@ -454,7 +454,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Pass extra arguments
 	if (!m_isLibraryCall) { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	args.push_back(m_currentValue); // msg.value
+	args.push_back(m_currentValue ? m_currentValue : smack::Expr::lit((long)0)); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
 	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
@@ -537,6 +537,25 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
+	// If we set msg.value, we should reduce our own balance
+	if (m_currentValue)
+	{
+		// balance[this] -= msg.value
+		m_newStatements.push_back(smack::Stmt::assign(
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+				smack::Expr::upd(
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+						smack::Expr::minus(
+								smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+								m_currentValue))));
+	}
+
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+	{
+		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assert_(invar));
+	}
+
 	// TODO: check for void return in a more appropriate way
 	if (_node.annotation().type->toString() != "tuple()")
 	{
@@ -561,6 +580,21 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			rets.push_back(returnVar->getName());
 			// Assign call to the fresh variable
 			m_newStatements.push_back(smack::Stmt::call(funcName, args, rets));
+
+			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentValue)
+			{
+				smack::Block* revert = smack::Block::block();
+				// balance[this] -= msg.value
+				revert->addStmt(smack::Stmt::assign(
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+						smack::Expr::upd(
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+								smack::Expr::plus(
+										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+										m_currentValue))));
+				m_newStatements.push_back(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
+			}
 		}
 
 	}
@@ -568,6 +602,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		m_currentExpr = nullptr; // No return value for function
 		m_newStatements.push_back(smack::Stmt::call(funcName, args));
+	}
+
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+	{
+		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assume(invar));
 	}
 
 	return false;

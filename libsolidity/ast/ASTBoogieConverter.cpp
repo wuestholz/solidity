@@ -321,10 +321,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		return false;
 	}
 
-	const smack::Expr* this_bal = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-	const smack::Expr* sender_bal = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_MSG_SENDER);
-	const smack::Expr* msg_val = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
-
 	// Convert function body, collect result
 	m_localDecls.clear();
 	// Create new empty block
@@ -344,14 +340,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					smack::Expr::upd(
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							smack::Expr::plus(this_bal, msg_val))));
-		// balance[msg.sender] -= msg.value
-		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
-				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-				smack::Expr::upd(
-						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-						smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER),
-						smack::Expr::minus(sender_bal, msg_val))));
+							smack::Expr::plus(
+									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
 	}
 
 	if (_node.modifiers().empty())
@@ -423,20 +414,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		if (!_node.isConstructor()) {procDecl->getRequires().push_back(invar); }
 		procDecl->getEnsures().push_back(invar);
 	}
-
-	// Payable functions should handle msg.value
-	if (_node.isPayable())
-	{
-		procDecl->getEnsures().push_back(smack::Expr::cond(
-				smack::Expr::neq(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER)),
-				smack::Expr::and_(
-						smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), msg_val)),
-						smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), msg_val))),
-				smack::Expr::and_(
-						smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
-						smack::Expr::eq(this_bal, smack::Expr::old(this_bal)))));
-	}
-
 	m_program.getDeclarations().push_back(procDecl);
 	return false;
 }
