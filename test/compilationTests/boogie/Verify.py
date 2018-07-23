@@ -38,6 +38,9 @@ def main():
             errLinePrev = getRelatedLineFromBpl(outputLine, -1) # Location is in the line before
             print(getSourceLineAndCol(errLinePrev) + ": " + getMessage(errLine))
 
+    if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[0])):
+        print("No errors found.")
+
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
     errFileLineCol = outputLine.split(":")[0]
