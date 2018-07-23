@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import re
 import subprocess
@@ -5,37 +7,52 @@ import subprocess
 solc = "~/Workspace/solidity-sri/build/solc/solc"
 boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
 
-parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
-parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
-args = parser.parse_args()
+def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
+    parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
+    args = parser.parse_args()
 
-solFile = args.file
-bplFile = solFile + ".bpl"
+    solFile = args.file
+    bplFile = solFile + ".bpl"
 
-convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite"
-subprocess.check_output(convertCommand, shell = True)
+    # First convert .sol to .bpl
+    convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite"
+    subprocess.check_output(convertCommand, shell = True, )
 
-verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
-output = subprocess.check_output(verifyCommand, shell = True)
-outputLines = list(filter(None, output.decode("utf-8").split("\n")))
+    # Run verification, get result
+    verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
+    output = subprocess.check_output(verifyCommand, shell = True)
+    outputLines = list(filter(None, output.decode("utf-8").split("\n")))
 
-for line, nextLine in zip(outputLines, outputLines[1:]):
-    errFileLineCol = line.split(":")[0]
+    # Map results back to .sol file
+    for outputLine, nextOutputLine in zip(outputLines, outputLines[1:]):
+        if "This assertion might not hold." in outputLine:
+            errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
+            print(getSourceLineAndCol(errLine) + ": " + getMessage(errLine))
+        if "A postcondition might not hold on this return path." in outputLine:
+            errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Info is in the next line
+            print(getSourceLineAndCol(errLine) + ": " + getMessage(errLine))
+        if "A precondition for this call might not hold." in outputLine:
+            errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Message is in the next line
+            errLinePrev = getRelatedLineFromBpl(outputLine, -1) # Location is in the line before
+            print(getSourceLineAndCol(errLinePrev) + ": " + getMessage(errLine))
+
+# Gets the line related to an error in the output
+def getRelatedLineFromBpl(outputLine, offset):
+    errFileLineCol = outputLine.split(":")[0]
     errFile = errFileLineCol[:errFileLineCol.rfind("(")]
     errLineNo = int(errFileLineCol[errFileLineCol.rfind("(")+1:errFileLineCol.rfind(",")]) - 1
-    errLine = open(errFile).readlines()[errLineNo]
-    if "This assertion might not hold." in line:
-        print(re.search("{:sourceloc ([^}]*)}", errLine).group(1) + ": " + re.search("{:message \"([^}]*)\"}", errLine).group(1))
-    if "A postcondition might not hold on this return path." in line:
-        nextErrFileLineCol = nextLine.split(":")[0]
-        nextErrFile = nextErrFileLineCol[:nextErrFileLineCol.rfind("(")]
-        nextErrLineNo = int(nextErrFileLineCol[nextErrFileLineCol.rfind("(")+1:nextErrFileLineCol.rfind(",")]) - 1
-        nextErrLine = open(nextErrFile).readlines()[nextErrLineNo]
-        print(re.search("{:sourceloc ([^}]*)}", nextErrLine).group(1) + ": " + re.search("{:message \"([^}]*)\"}", nextErrLine).group(1))
-    if "A precondition for this call might not hold." in line:
-        nextErrFileLineCol = nextLine.split(":")[0]
-        nextErrFile = nextErrFileLineCol[:nextErrFileLineCol.rfind("(")]
-        nextErrLineNo = int(nextErrFileLineCol[nextErrFileLineCol.rfind("(")+1:nextErrFileLineCol.rfind(",")]) - 1
-        errLinePrev = open(errFile).readlines()[errLineNo-1]
-        nextErrLine = open(nextErrFile).readlines()[nextErrLineNo]
-        print(re.search("{:sourceloc ([^}]*)}", errLinePrev).group(1) + ": " + re.search("{:message \"([^}]*)\"}", nextErrLine).group(1))
+    return open(errFile).readlines()[errLineNo + offset]
+
+# Gets the original (.sol) line and column number from an annotated line in the .bpl
+def getSourceLineAndCol(line):
+    match = re.search("{:sourceloc \"([^}]*)\", (\\d+), (\\d+)}", line)
+    return match.group(1) + ", line " + match.group(2) + ", col " + match.group(3)
+
+# Gets the message from an annotated line in the .bpl
+def getMessage(line):
+    return re.search("{:message \"([^}]*)\"}", line).group(1)
+
+if __name__== "__main__":
+    main()

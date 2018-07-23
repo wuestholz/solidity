@@ -487,7 +487,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// The parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold", *m_scanner)));
+		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold.", *m_scanner)));
 		return false;
 	}
 
@@ -560,7 +560,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		for (auto invar : m_currentInvars)
 		{
 			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call", *m_scanner)));
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_scanner)));
 		}
 	}
 
