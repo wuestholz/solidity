@@ -587,6 +587,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			list<string> rets;
 			rets.push_back(returnVar->getName());
 			// Assign call to the fresh variable
+			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
 			m_newStatements.push_back(smack::Stmt::call(funcName, args, rets));
 
 			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentValue)
@@ -609,6 +610,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else
 	{
 		m_currentExpr = nullptr; // No return value for function
+		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
 		m_newStatements.push_back(smack::Stmt::call(funcName, args));
 	}
 
