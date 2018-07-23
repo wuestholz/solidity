@@ -75,7 +75,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	for (auto invar : m_currentInvars)
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant", *m_currentScanner)));
+				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_currentScanner)));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 }
@@ -418,10 +418,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		if (!_node.isConstructor())
 		{
 			procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function", *m_currentScanner)));
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_currentScanner)));
 		}
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function", *m_currentScanner)));
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_currentScanner)));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 	return false;

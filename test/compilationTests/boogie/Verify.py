@@ -26,7 +26,16 @@ for line, nextLine in zip(outputLines, outputLines[1:]):
     errLine = open(errFile).readlines()[errLineNo]
     if "This assertion might not hold." in line:
         print(re.search("{:sourceloc ([^}]*)}", errLine).group(1) + ": " + re.search("{:message \"([^}]*)\"}", errLine).group(1))
-#    if "A postcondition might not hold on this return path." in line:
-#        print(line)
-#    if "A precondition for this call might not hold." in line:
-#        print(line)
+    if "A postcondition might not hold on this return path." in line:
+        nextErrFileLineCol = nextLine.split(":")[0]
+        nextErrFile = nextErrFileLineCol[:nextErrFileLineCol.rfind("(")]
+        nextErrLineNo = int(nextErrFileLineCol[nextErrFileLineCol.rfind("(")+1:nextErrFileLineCol.rfind(",")]) - 1
+        nextErrLine = open(nextErrFile).readlines()[nextErrLineNo]
+        print(re.search("{:sourceloc ([^}]*)}", nextErrLine).group(1) + ": " + re.search("{:message \"([^}]*)\"}", nextErrLine).group(1))
+    if "A precondition for this call might not hold." in line:
+        nextErrFileLineCol = nextLine.split(":")[0]
+        nextErrFile = nextErrFileLineCol[:nextErrFileLineCol.rfind("(")]
+        nextErrLineNo = int(nextErrFileLineCol[nextErrFileLineCol.rfind("(")+1:nextErrFileLineCol.rfind(",")]) - 1
+        errLinePrev = open(errFile).readlines()[errLineNo-1]
+        nextErrLine = open(nextErrFile).readlines()[nextErrLineNo]
+        print(re.search("{:sourceloc ([^}]*)}", errLinePrev).group(1) + ": " + re.search("{:message \"([^}]*)\"}", nextErrLine).group(1))
