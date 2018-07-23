@@ -18,12 +18,14 @@ def main():
 
     # First convert .sol to .bpl
     convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite"
-    subprocess.check_output(convertCommand, shell = True, )
+    compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+
+    # TODO: check compiler output
 
     # Run verification, get result
     verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
-    output = subprocess.check_output(verifyCommand, shell = True)
-    outputLines = list(filter(None, output.decode("utf-8").split("\n")))
+    verifierOutput = subprocess.check_output(verifyCommand, shell = True)
+    outputLines = list(filter(None, verifierOutput.decode("utf-8").split("\n")))
 
     # Map results back to .sol file
     for outputLine, nextOutputLine in zip(outputLines, outputLines[1:]):
