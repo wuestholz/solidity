@@ -68,7 +68,7 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 }
 
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter,
-		vector<smack::Expr const*> currentInvars, list<const Declaration*> sumRequired,
+		map<smack::Expr const*, string> currentInvars, list<const Declaration*> sumRequired,
 		Scanner const* scanner, SourceLocation const* defaultLocation) :
 		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired),
 		m_scanner(scanner), m_defaultLocation(defaultLocation)
@@ -559,8 +559,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		for (auto invar : m_currentInvars)
 		{
-			m_newStatements.push_back(smack::Stmt::assert_(invar,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold before external call", *m_scanner)));
+			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call", *m_scanner)));
 		}
 	}
 
@@ -616,7 +616,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assume(invar));
+		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assume(invar.first));
 	}
 
 	return false;

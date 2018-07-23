@@ -74,7 +74,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	auto procDecl = smack::Decl::procedure(funcName, params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks);
 	for (auto invar : m_currentInvars)
 	{
-		procDecl->getEnsures().push_back(smack::Specification::spec(invar,
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
 				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant", *m_currentScanner)));
 	}
 	m_program.getDeclarations().push_back(procDecl);
@@ -181,7 +181,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			typeChecker.checkTypeRequirements(*invar);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_errorReporter, vector<smack::Expr const*>(), list<Declaration const*>(), m_currentScanner, &_node.location()).convert(*invar);
+			auto result = ASTBoogieExpressionConverter(m_errorReporter, map<smack::Expr const*, string>(), list<Declaration const*>(), m_currentScanner, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
@@ -190,7 +190,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
-			m_currentInvars.push_back(result.expr);
+			m_currentInvars[result.expr] = invarStr;
 			// Add new shadow variables for sum
 			for (auto sumDecl : result.newSumDecls)
 			{
@@ -417,11 +417,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (!_node.isConstructor())
 		{
-			procDecl->getRequires().push_back(smack::Specification::spec(invar,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold when entering function", *m_currentScanner)));
+			procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function", *m_currentScanner)));
 		}
-		procDecl->getEnsures().push_back(smack::Specification::spec(invar,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant might not hold at end of function", *m_currentScanner)));
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function", *m_currentScanner)));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 	return false;

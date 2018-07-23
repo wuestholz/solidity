@@ -20,7 +20,7 @@ private:
 	static const std::string ERR_EXPR;
 
 	ErrorReporter& m_errorReporter;
-	std::vector<smack::Expr const*> m_currentInvars;
+	std::map<smack::Expr const*, std::string> m_currentInvars;
 	std::list<const Declaration*> m_sumRequired;
 	Scanner const* m_scanner;
 	SourceLocation const* m_defaultLocation;
@@ -76,7 +76,7 @@ public:
 
 	ASTBoogieExpressionConverter(
 			ErrorReporter& errorReporter,
-			std::vector<smack::Expr const*> currentInvars,
+			std::map<smack::Expr const*, std::string> currentInvars,
 			std::list<const Declaration*> sumRequired,
 			Scanner const* scanner,
 			SourceLocation const* defaultLocation = nullptr);

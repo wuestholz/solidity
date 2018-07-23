@@ -33,7 +33,7 @@ private:
 	smack::Program m_program;
 
 	// Helper variables to pass information between the visit methods
-	std::vector<smack::Expr const*> m_currentInvars; // List of invariants for the current contract
+	std::map<smack::Expr const*, std::string> m_currentInvars; // Invariants for the current contract (in Boogie and original format)
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
