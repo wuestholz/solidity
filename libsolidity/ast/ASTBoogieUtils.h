@@ -51,6 +51,7 @@ public:
 	static const std::string BOOGIE_SUM;
 	static const std::string BOOGIE_STRING_TYPE;
 	static const std::string ERR_TYPE;
+	static const std::string BOOGIE_ZERO_ADDRESS;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()

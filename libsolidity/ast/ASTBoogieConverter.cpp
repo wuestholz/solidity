@@ -96,6 +96,7 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	m_program.getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
 	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	// address.transfer()

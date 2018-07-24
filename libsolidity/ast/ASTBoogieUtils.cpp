@@ -42,6 +42,7 @@ const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
 const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
+const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {

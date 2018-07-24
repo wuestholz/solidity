@@ -357,6 +357,17 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
 			{
 				(*_node.arguments().begin())->accept(*this);
+				if (auto lit = dynamic_cast<smack::IntLit const*>(m_currentExpr))
+				{
+					if (lit->getVal() == 0)
+					{
+						m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
+					}
+					else
+					{
+						reportError(_node.location(), "Unsupported conversion to address");
+					}
+				}
 				return false;
 			}
 		}
