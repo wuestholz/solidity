@@ -467,7 +467,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Get arguments recursively
 	list<const smack::Expr*> args;
 	// Pass extra arguments
-	if (!m_isLibraryCall) { args.push_back(m_currentAddress); } // this
+	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
+	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	args.push_back(m_currentValue ? m_currentValue : smack::Expr::lit((long)0)); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
