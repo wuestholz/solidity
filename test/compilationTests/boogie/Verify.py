@@ -28,9 +28,14 @@ def main():
     # Run verification, get result
     verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
     verifierOutput = subprocess.check_output(verifyCommand, shell = True)
-    outputLines = list(filter(None, verifierOutput.decode("utf-8").split("\n")))
+    verifierOutputStr = verifierOutput.decode("utf-8")
+    if re.search("Boogie program verifier finished with", verifierOutputStr) == None:
+        print("Error(s) while running verifier, details:")
+        print(verifierOutputStr)
+        return
 
     # Map results back to .sol file
+    outputLines = list(filter(None, verifierOutputStr.split("\n")))
     for outputLine, nextOutputLine in zip(outputLines, outputLines[1:]):
         if "This assertion might not hold." in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
