@@ -18,9 +18,12 @@ def main():
 
     # First convert .sol to .bpl
     convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite"
-    compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
-
-    # TODO: check compiler output
+    try:
+        subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as err:
+        compilerOutputStr = err.output.decode("utf-8")
+        print(compilerOutputStr)
+        return
 
     # Run verification, get result
     verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
