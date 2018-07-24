@@ -43,6 +43,8 @@ const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
 const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
+const string ASTBoogieUtils::SOLIDITY_NOW = "now";
+const string ASTBoogieUtils::BOOGIE_NOW = "__now";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
@@ -215,6 +217,7 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	if (decl.name() == SOLIDITY_REQUIRE) return SOLIDITY_REQUIRE;
 	if (decl.name() == SOLIDITY_REVERT) return SOLIDITY_REVERT;
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
+	if (decl.name() == SOLIDITY_NOW) return BOOGIE_NOW;
 
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for state variables and local variables in functions, (2) return

@@ -107,6 +107,8 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
 	// Uninterpreted type for strings
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	// now
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, "int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node, Scanner const* scanner)
