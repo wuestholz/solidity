@@ -42,3 +42,26 @@ contract DefaultConstructor {
         y += amount;
     }
 }
+
+/**
+ * @notice invariant x == y
+ */
+contract PrivateFunctions {
+    uint x = 0;
+    uint y = 0;
+
+    function add(uint amount) public {
+        // Private functions do not have the invariant as pre/postcondition
+        // so they should be inlined
+        addToX(amount);
+        addToY(amount);
+    }
+
+    function addToX(uint amount) private {
+        x += amount;
+    }
+
+    function addToY(uint amount) private {
+        y += amount;
+    }
+}

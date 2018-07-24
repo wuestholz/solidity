@@ -412,16 +412,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
 
-	// Add invariants as pre and postconditions
-	for (auto invar : m_currentInvars)
+	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
 	{
-		if (!_node.isConstructor())
+		for (auto invar : m_currentInvars)
 		{
-			procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_currentScanner)));
+			if (!_node.isConstructor())
+			{
+				procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_currentScanner)));
+			}
+			procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_currentScanner)));
 		}
-		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_currentScanner)));
+	}
+	else // Private functions: inline
+	{
+		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 	return false;
