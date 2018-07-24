@@ -3,6 +3,7 @@
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <string>
 
 namespace dev
@@ -47,8 +48,12 @@ public:
 	static const std::string VERIFIER_SUM;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
+	static const std::string BOOGIE_SUM;
 	static const std::string BOOGIE_STRING_TYPE;
 	static const std::string ERR_TYPE;
+	static const std::string BOOGIE_ZERO_ADDRESS;
+	static const std::string SOLIDITY_NOW;
+	static const std::string BOOGIE_NOW;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()
@@ -75,6 +80,8 @@ public:
 	 * Map a Solidity type to a Boogie type
 	 */
 	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter);
+
+	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 };
 
 }

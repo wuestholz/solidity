@@ -3,6 +3,7 @@
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
+#include <libsolidity/parsing/Scanner.h>
 
 namespace dev
 {
@@ -19,6 +20,9 @@ private:
 	static const std::string ERR_EXPR;
 
 	ErrorReporter& m_errorReporter;
+	std::map<smack::Expr const*, std::string> m_currentInvars;
+	std::list<const Declaration*> m_sumRequired;
+	Scanner const* m_scanner;
 	SourceLocation const* m_defaultLocation;
 
 	// Helper variables to pass information between the visit methods
@@ -34,6 +38,7 @@ private:
 	std::vector<smack::Stmt const*> m_newStatements;
 	std::list<smack::Decl*> m_newDecls;
 	std::list<smack::Decl*> m_newConstants;
+	std::list<const Declaration*> m_newSumDecls;
 
 	// Helper method to get the length of an array
 	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
@@ -41,6 +46,8 @@ private:
 	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
 	// Helper method to transform a select to an update
 	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
+	// Helper method to get the length of an array
+	const smack::Expr* getSumShadowVar(ASTNode const* node);
 
 	void reportError(SourceLocation const& location, std::string const& description);
 	void reportWarning(SourceLocation const& location, std::string const& description);
@@ -58,14 +65,21 @@ public:
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
 		std::list<smack::Decl*> newConstants;
+		std::list<const Declaration*> newSumDecls;
 
 		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
-				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants) {}
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants,
+				std::list<const Declaration*> newSumDecls)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants), newSumDecls(newSumDecls) {}
 	};
 
 
-	ASTBoogieExpressionConverter(ErrorReporter& errorReporter, SourceLocation const* defaultLocation = nullptr);
+	ASTBoogieExpressionConverter(
+			ErrorReporter& errorReporter,
+			std::map<smack::Expr const*, std::string> currentInvars,
+			std::list<const Declaration*> sumRequired,
+			Scanner const* scanner,
+			SourceLocation const* defaultLocation = nullptr);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side

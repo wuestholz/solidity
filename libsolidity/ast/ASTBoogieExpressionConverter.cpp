@@ -4,7 +4,9 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
+#include <libsolidity/parsing/Scanner.h>
 #include <utility>
+#include <tuple>
 
 using namespace std;
 using namespace dev;
@@ -39,6 +41,22 @@ const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Exp
 	return smack::Expr::id(ERR_EXPR);
 }
 
+const smack::Expr* ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
+{
+	if (auto sumBase = dynamic_cast<Identifier const*>(node))
+	{
+		auto sumBaseDecl = sumBase->annotation().referencedDeclaration;
+		if (sumBaseDecl != nullptr)
+		{
+			return smack::Expr::sel(
+					smack::Expr::id(ASTBoogieUtils::mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+		}
+	}
+	reportError(node->location(), "Unsupported identifier for sum function");
+	return smack::Expr::id(ERR_EXPR);
+}
+
 void ASTBoogieExpressionConverter::reportError(SourceLocation const& location, std::string const& description)
 {
 	m_errorReporter.error(Error::Type::ParserError, m_defaultLocation ? *m_defaultLocation : location, description);
@@ -49,8 +67,11 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 	m_errorReporter.warning(m_defaultLocation ? *m_defaultLocation : location, description);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter, SourceLocation const* defaultLocation) :
-		m_errorReporter(errorReporter), m_defaultLocation(defaultLocation)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter,
+		map<smack::Expr const*, string> currentInvars, list<const Declaration*> sumRequired,
+		Scanner const* scanner, SourceLocation const* defaultLocation) :
+		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired),
+		m_scanner(scanner), m_defaultLocation(defaultLocation)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -68,10 +89,11 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
+	m_newSumDecls.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_newSumDecls);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -130,6 +152,26 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs)
 {
+	// First check if shadow variables need to be updated
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
+	{
+		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
+		{
+			if (find(m_sumRequired.begin(), m_sumRequired.end(), lhsId->annotation().referencedDeclaration) != m_sumRequired.end())
+			{
+				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
+				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
+				m_newStatements.push_back(smack::Stmt::assign(
+						sumId,
+						smack::Expr::upd(
+								sumId,
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+								smack::Expr::plus(smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)), smack::Expr::minus(rhs, lhs)))));
+			}
+		}
+	}
+
+
 	// If LHS is simply an identifier, we can assign to it
 	if (dynamic_cast<smack::VarExpr const*>(lhs))
 	{
@@ -315,6 +357,17 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
 			{
 				(*_node.arguments().begin())->accept(*this);
+				if (auto lit = dynamic_cast<smack::IntLit const*>(m_currentExpr))
+				{
+					if (lit->getVal() == 0)
+					{
+						m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
+					}
+					else
+					{
+						reportError(_node.location(), "Unsupported conversion to address");
+					}
+				}
 				return false;
 			}
 		}
@@ -389,7 +442,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	m_currentExpr = nullptr;
 	m_currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-	m_currentValue = smack::Expr::lit((long)0);
+	m_currentValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
 	_node.expression().accept(*this);
@@ -414,9 +467,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Get arguments recursively
 	list<const smack::Expr*> args;
 	// Pass extra arguments
-	if (!m_isLibraryCall) { args.push_back(m_currentAddress); } // this
+	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
+	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	args.push_back(m_currentValue); // msg.value
+	args.push_back(m_currentValue ? m_currentValue : smack::Expr::lit((long)0)); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
 	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
@@ -445,7 +499,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// The parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it));
+		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold.", *m_scanner)));
 		return false;
 	}
 
@@ -482,12 +536,44 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
 	{
-		if (auto sumBase = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
+		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
-			m_currentExpr = smack::Expr::sel(smack::Expr::id(sumBase->name() + "#sum"), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
-			return false;
+			m_newSumDecls.push_back(id->annotation().referencedDeclaration);
+			auto declCategory = id->annotation().type->category();
+			if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
+			{
+				reportError(_node.location(), "Argument of sum must be an array or a mapping");
+			}
 		}
+		else
+		{
+			reportError(_node.location(), "Argument of sum must be an identifier");
+		}
+		m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
+		return false;
+	}
 
+	// If we set msg.value, we should reduce our own balance
+	if (m_currentValue)
+	{
+		// balance[this] -= msg.value
+		m_newStatements.push_back(smack::Stmt::assign(
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+				smack::Expr::upd(
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+						smack::Expr::minus(
+								smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+								m_currentValue))));
+	}
+
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+	{
+		for (auto invar : m_currentInvars)
+		{
+			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_scanner)));
+		}
 	}
 
 	// TODO: check for void return in a more appropriate way
@@ -513,14 +599,36 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			list<string> rets;
 			rets.push_back(returnVar->getName());
 			// Assign call to the fresh variable
+			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
 			m_newStatements.push_back(smack::Stmt::call(funcName, args, rets));
+
+			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentValue)
+			{
+				smack::Block* revert = smack::Block::block();
+				// balance[this] -= msg.value
+				revert->addStmt(smack::Stmt::assign(
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+						smack::Expr::upd(
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+								smack::Expr::plus(
+										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+										m_currentValue))));
+				m_newStatements.push_back(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
+			}
 		}
 
 	}
 	else
 	{
 		m_currentExpr = nullptr; // No return value for function
+		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
 		m_newStatements.push_back(smack::Stmt::call(funcName, args));
+	}
+
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+	{
+		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assume(invar.first));
 	}
 
 	return false;

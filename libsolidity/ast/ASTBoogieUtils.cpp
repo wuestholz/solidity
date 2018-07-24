@@ -1,6 +1,7 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/AST.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <libsolidity/parsing/Scanner.h>
 
 using namespace std;
 using namespace dev;
@@ -38,8 +39,12 @@ const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 const string ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
+const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
 const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
+const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
+const string ASTBoogieUtils::SOLIDITY_NOW = "now";
+const string ASTBoogieUtils::BOOGIE_NOW = "__now";
 
 smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 {
@@ -47,7 +52,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
+	transferParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
 	transferParams.push_back(make_pair("amount", "int"));
 
 	// Body
@@ -79,25 +84,16 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	transfer->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
-	// Postcondition: if sender and receiver is different (ether gets transferred)
-	transfer->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
-					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount))));
-	transfer->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
-					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))));
-	// Postcondition: if sender and receiver is the same (nothing happens)
-	transfer->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
-					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal))));
-	transfer->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))));
+	transfer->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
+	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
+	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
+			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
+			smack::Expr::and_(
+					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
+					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
+			smack::Expr::and_(
+					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
+					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
 
 	return transfer;
 }
@@ -108,20 +104,42 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	list<smack::Binding> callParams;
 	callParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	callParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	callParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
+	callParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
 
 	// Return value
 	list<smack::Binding> callReturns;
 	callReturns.push_back(make_pair("__result", "bool"));
 
 	// Body
-	smack::Block* callImpl = smack::Block::block();
-	callImpl->addStmt(smack::Stmt::comment("TODO: model something nondeterministic here"));
-	list<smack::Block*> callBlocks;
-	callBlocks.push_back(callImpl);
-	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL,
-			callParams, callReturns, list<smack::Decl*>(), callBlocks);
+	// Successful transfer
+	smack::Block* thenBlock = smack::Block::block();
+	const smack::Expr* this_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
+	const smack::Expr* msg_val = smack::Expr::id(BOOGIE_MSG_VALUE);
+	const smack::Expr* result = smack::Expr::id("__result");
 
+	// balance[this] += msg.value
+	thenBlock->addStmt(smack::Stmt::assign(
+			smack::Expr::id(BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(BOOGIE_BALANCE),
+					smack::Expr::id(BOOGIE_THIS),
+					smack::Expr::plus(this_bal, msg_val)
+			)));
+	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
+	// Unsuccessful transfer
+	smack::Block* elseBlock = smack::Block::block();
+	elseBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(false)));
+	// Nondeterministic choice between success and failure
+	smack::Block* callBlock = smack::Block::block();
+	callBlock->addStmt(smack::Stmt::comment("TODO: call fallback"));
+	callBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
+
+	list<smack::Block*> callBlocks;
+	callBlocks.push_back(callBlock);
+	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL, callParams, callReturns, list<smack::Decl*>(), callBlocks);
+	// Postcondition: if result is false nothing happens
+	callProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::or_(result,
+			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE))))));
 	return callProc;
 }
 
@@ -177,26 +195,17 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc()
 			sendParams, sendReturns, list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	sendProc->getRequires().push_back(smack::Expr::gte(sender_bal, amount));
-	// Postcondition: if result is true and sender/receiver is different (ether gets transferred)
-	sendProc->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
-					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount))));
-	sendProc->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
-					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))));
-	// Postcondition: if result is false or sender/receiver is the same (nothing happens)
-	sendProc->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::or_(smack::Expr::not_(result), smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
-					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal))));
-	sendProc->getEnsures().push_back(
-			smack::Expr::impl(
-					smack::Expr::or_(smack::Expr::not_(result), smack::Expr::eq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))));
-
+	sendProc->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
+	// Postcondition: if result is true and sender/receiver is different ether gets transferred
+	// otherwise nothing happens
+	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
+			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
+			smack::Expr::and_(
+					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
+					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
+			smack::Expr::and_(
+					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
+					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
 	return sendProc;
 }
 
@@ -208,6 +217,7 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	if (decl.name() == SOLIDITY_REQUIRE) return SOLIDITY_REQUIRE;
 	if (decl.name() == SOLIDITY_REVERT) return SOLIDITY_REVERT;
 	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
+	if (decl.name() == SOLIDITY_NOW) return BOOGIE_NOW;
 
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for state variables and local variables in functions, (2) return
@@ -263,6 +273,16 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 	return ERR_TYPE;
 }
 
+
+list<const smack::Attr*> ASTBoogieUtils::createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
+{
+	list<const smack::Attr*> attrs;
+	int srcLine, srcCol;
+	tie(srcLine, srcCol) = scanner.translatePositionToLineColumn(loc.start);
+	attrs.push_back(smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1));
+	attrs.push_back(smack::Attr::attr("message", message));
+	return attrs;
+}
 
 
 }

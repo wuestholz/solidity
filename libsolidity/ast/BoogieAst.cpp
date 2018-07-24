@@ -731,6 +731,21 @@ void VarDecl::print(std::ostream& os) const {
   os << "var " << name << ": " << type << ";";
 }
 
+void Specification::print(std::ostream& os, std::string kind) const {
+  os << "  " << kind << " ";
+  if (attrs.size() > 0)
+      print_seq<const Attr*>(os, attrs, "", " ", " ");
+  os << expr << ";\n";
+}
+
+Specification const* Specification::spec(const Expr* e, std::list<const Attr*> ax){
+  return new Specification(e, ax);
+}
+
+Specification const* Specification::spec(const Expr* e){
+  return Specification::spec(e, std::list<const Attr*>());
+}
+
 void ProcDecl::print(std::ostream& os) const {
   os << "procedure ";
   if (attrs.size() > 0)
@@ -755,11 +770,11 @@ void ProcDecl::print(std::ostream& os) const {
   }
   if (requires.size() > 0) {
     os << "\n";
-    print_seq<const Expr*>(os, requires, "  requires ", ";\n  requires ", ";");
+    for (auto req : requires) req->print(os, "requires");
   }
   if (ensures.size() > 0) {
     os << "\n";
-    print_seq<const Expr*>(os, ensures, "  ensures ", ";\n  ensures ", ";");
+    for (auto ens : ensures) ens->print(os, "ensures");
   }
   if (blocks.size() > 0) {
     os << "\n";

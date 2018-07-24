@@ -10,7 +10,6 @@
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/parsing/Parser.h>
-#include <libsolidity/parsing/Scanner.h>
 #include <utility>
 
 using namespace std;
@@ -29,7 +28,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_errorReporter, m_currentInvars, m_currentSumDecls, m_currentScanner).convert(_node);
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
@@ -73,7 +72,11 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks);
-	for (auto invar : m_currentInvars) { procDecl->getEnsures().push_back(invar); }
+	for (auto invar : m_currentInvars)
+	{
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
+				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_currentScanner)));
+	}
 	m_program.getDeclarations().push_back(procDecl);
 }
 
@@ -93,6 +96,7 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	m_program.getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
 	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	// address.transfer()
@@ -103,10 +107,13 @@ ASTBoogieConverter::ASTBoogieConverter(ErrorReporter& errorReporter, std::shared
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
 	// Uninterpreted type for strings
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	// now
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, "int"));
 }
 
-void ASTBoogieConverter::convert(ASTNode const& _node)
+void ASTBoogieConverter::convert(ASTNode const& _node, Scanner const* scanner)
 {
+	m_currentScanner = scanner;
 	_node.accept(*this);
 }
 
@@ -148,6 +155,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process invariants
 	m_currentInvars.clear();
+	m_currentSumDecls.clear();
 
 	// TODO: we use a different error reporter for the type checker to ignore
 	// error messages related to our special functions like the __verifier_sum
@@ -159,28 +167,45 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	for (auto dt : _node.annotation().docTags)
 	{
+		// Find invariants
 		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
 		{
+			// Parse
 			string invarStr = dt.second.content.substr(dt.second.content.find(" ") + 1);
 			addGlobalComment("Contract invariant: " + invarStr);
 			ASTPointer<Expression> invar = Parser(m_errorReporter)
 					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
 
+			// Resolve references, using the scope of the contract
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
 			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			// Do type checking
 			typeChecker.checkTypeRequirements(*invar);
-			cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
-			auto result = ASTBoogieExpressionConverter(m_errorReporter, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty())
+			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
+			// Convert invariant to Boogie representation
+			auto result = ASTBoogieExpressionConverter(m_errorReporter, map<smack::Expr const*, string>(), list<Declaration const*>(), m_currentScanner, &_node.location()).convert(*invar);
+			if (!result.newStatements.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
 			}
-			if (!result.newDecls.empty())
+			if (!result.newDecls.empty()) // Make sure that there are no side effects
 			{
 				m_errorReporter.error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
-			m_currentInvars.push_back(result.expr);
+			m_currentInvars[result.expr] = invarStr;
+			// Add new shadow variables for sum
+			for (auto sumDecl : result.newSumDecls)
+			{
+				if (find(m_currentSumDecls.begin(), m_currentSumDecls.end(), sumDecl) == m_currentSumDecls.end())
+				{
+					m_currentSumDecls.push_back(sumDecl);
+					addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
+					m_program.getDeclarations().push_back(
+								smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
+								"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+				}
+			}
 		}
 	}
 
@@ -260,10 +285,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Input parameters
 	list<smack::Binding> params;
 	// Add some extra parameters for globally available variables
-	if (!(_node.inContractKind() == ContractDefinition::ContractKind::Library))
-	{
-		params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
-	}
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
 	// Add original parameters of the function
@@ -313,6 +335,20 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
 		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 	}
+	// Payable functions should handle msg.value
+	if (_node.isPayable())
+	{
+		// balance[this] += msg.value
+		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					smack::Expr::upd(
+							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+							smack::Expr::plus(
+									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
+	}
+
 	if (_node.modifiers().empty())
 	{
 		if (_node.isImplemented())
@@ -376,11 +412,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
 
-	// Add invariants as pre and postconditions
-	for (auto invar : m_currentInvars)
+	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
 	{
-		if (!_node.isConstructor()) {procDecl->getRequires().push_back(invar); }
-		procDecl->getEnsures().push_back(invar);
+		for (auto invar : m_currentInvars)
+		{
+			if (!_node.isConstructor())
+			{
+				procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_currentScanner)));
+			}
+			procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_currentScanner)));
+		}
+	}
+	else // Private functions: inline
+	{
+		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
 	m_program.getDeclarations().push_back(procDecl);
 	return false;
@@ -688,19 +735,24 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 {
 	for (auto decl : _node.declarations())
 	{
-		if (decl->isLocalVariable())
+		// Decl can be null, e.g., var (x,,) = (1,2,3)
+		// In this case we just ignore it
+		if (decl != nullptr)
 		{
-			// Boogie requires local variables to be declared at the beginning of the procedure
-			m_localDecls.push_back(smack::Decl::variable(
-					ASTBoogieUtils::mapDeclName(*decl),
-					ASTBoogieUtils::mapType(decl->type(), *decl, m_errorReporter)));
-		}
-		else
-		{
-			// Non-local variables should be handled elsewhere
-			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-					errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
-					errinfo_sourceLocation(_node.location()));
+			if (decl->isLocalVariable())
+			{
+				// Boogie requires local variables to be declared at the beginning of the procedure
+				m_localDecls.push_back(smack::Decl::variable(
+						ASTBoogieUtils::mapDeclName(*decl),
+						ASTBoogieUtils::mapType(decl->type(), *decl, m_errorReporter)));
+			}
+			else
+			{
+				// Non-local variables should be handled elsewhere
+				BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+						errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
+						errinfo_sourceLocation(_node.location()));
+			}
 		}
 	}
 
