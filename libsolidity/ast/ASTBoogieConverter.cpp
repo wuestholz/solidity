@@ -6,7 +6,6 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/ASTPrinter.h> // TODO: just for debugging, remove later
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/parsing/Parser.h>
@@ -179,10 +178,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			// Resolve references, using the scope of the contract
 			m_scopes[&*invar] = m_scopes[&_node];
 			resolver.resolveNamesAndTypes(*invar);
-			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Do type checking
 			typeChecker.checkTypeRequirements(*invar);
-			//cerr << endl << "DEBUG: AST for " << invarStr << endl; ASTPrinter(*invar).print(cerr); // TODO remove this
 			// Convert invariant to Boogie representation
 			auto result = ASTBoogieExpressionConverter(m_errorReporter, map<smack::Expr const*, string>(), list<Declaration const*>(), m_currentScanner, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty()) // Make sure that there are no side effects
