@@ -11,13 +11,14 @@ def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
     parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
+    parser.add_argument('--bit-precise', action='store_true', help='Enable bit-precise verification')
     args = parser.parse_args()
 
     solFile = args.file
     bplFile = solFile + ".bpl"
 
     # First convert .sol to .bpl
-    convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite"
+    convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite" + (" --bit-precise" if args.bit_precise else "")
     try:
         subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
