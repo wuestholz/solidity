@@ -225,40 +225,51 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter)
+string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise)
 {
-	// TODO: option for bit precise types
 	string tpStr = tp->toString();
 	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
 	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
 	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
-	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int";
+	if (boost::algorithm::starts_with(tpStr, "int_const "))
+	{
+		if (bitPrecise) errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Constants are not supported in bit-precise mode");
+		return "int";
+	}
 	for (int i = 8; i <= 256; ++i)
 	{
-		if (tpStr == "int" + to_string(i)) return "int";
-		if (tpStr == "uint" + to_string(i)) return "int";
+		if (tpStr == "int" + to_string(i)) return bitPrecise ? "bv" + to_string(i) : "int";
+		if (tpStr == "uint" + to_string(i)) return bitPrecise ? "bv" + to_string(i) : "int";
 	}
 	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
 	if (tp->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[int]" + mapType(arrType->baseType(), _associatedNode, errorReporter);
+		return "[" + string(bitPrecise ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, errorReporter, bitPrecise);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
 	{
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
-		return "[" + mapType(mappingType->keyType(), _associatedNode, errorReporter) + "]"
-				+ mapType(mappingType->valueType(), _associatedNode, errorReporter);
+		return "[" + mapType(mappingType->keyType(), _associatedNode, errorReporter, bitPrecise) + "]"
+				+ mapType(mappingType->valueType(), _associatedNode, errorReporter, bitPrecise);
 	}
 
 	if (tp->category() == Type::Category::FixedBytes)
 	{
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
-		if (fbType->numBytes() == 1) return "int";
-		else return "[int]int";
+		if (bitPrecise)
+		{
+			if (fbType->numBytes() == 1) return "bv8";
+			else return "[bv256]bv8";
+		}
+		else
+		{
+			if (fbType->numBytes() == 1) return "int";
+			else return "[int]int";
+		}
 	}
 
 	// Unsupported types

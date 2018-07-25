@@ -79,7 +79,7 @@ public:
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter);
+	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise);
 
 	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 };

@@ -1047,7 +1047,7 @@ void CommandLineInterface::handleBoogie()
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-	BoogieContext context(m_args.count(g_argAstBoogie), errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(m_args.count(g_argAstBoogieBitPrecise), errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
 	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };

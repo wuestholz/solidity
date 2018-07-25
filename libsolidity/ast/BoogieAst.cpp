@@ -717,7 +717,7 @@ void FuncDecl::print(std::ostream& os) const {
     print_seq<const Attr*>(os, attrs, "", " ", " ");
   os << name << "(";
   for (auto P = params.begin(), E = params.end(); P != E; ++P)
-    os << (P == params.begin() ? "" : ", ") << P->first << ": " << P->second;
+    os << (P == params.begin() ? "" : ", ") << (P->first != "" ? P->first + ": " : "") << P->second;
   os << ") returns (" << type << ")";
   if (body)
     os << " { " << body << " }";

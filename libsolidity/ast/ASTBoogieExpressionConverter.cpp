@@ -133,7 +133,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 	case Token::AssignDiv:
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 		else rhs = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
@@ -234,7 +234,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
+					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment x := x + 1
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -248,7 +248,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment tmp := x
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -265,7 +265,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
 			m_newDecls.push_back(tempVar);
 			createAssignment(_node.subExpression(), lhs, rhs);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -276,7 +276,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
 			m_newDecls.push_back(tempVar);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -303,43 +303,84 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	_node.rightExpression().accept(*this);
 	const smack::Expr* rhs = m_currentExpr;
 
-	switch(_node.getOperator())
+	if (m_context.bitPrecise())
 	{
-	case Token::And: m_currentExpr = smack::Expr::and_(lhs, rhs); break;
-	case Token::Or: m_currentExpr = smack::Expr::or_(lhs, rhs); break;
+		string lhsType = _node.leftExpression().annotation().type->toString();
+		string rhsType = _node.rightExpression().annotation().type->toString();
 
-	case Token::Add: m_currentExpr = smack::Expr::plus(lhs, rhs); break;
-	case Token::Sub: m_currentExpr = smack::Expr::minus(lhs, rhs); break;
-	case Token::Mul: m_currentExpr = smack::Expr::times(lhs, rhs); break;
-	case Token::Div: // Boogie has different division operators for integers and reals
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
-		else m_currentExpr = smack::Expr::div(lhs, rhs);
-		break;
-	case Token::Mod: m_currentExpr = smack::Expr::mod(lhs, rhs); break;
-
-	case Token::Equal: m_currentExpr = smack::Expr::eq(lhs, rhs); break;
-	case Token::NotEqual: m_currentExpr = smack::Expr::neq(lhs, rhs); break;
-	case Token::LessThan: m_currentExpr = smack::Expr::lt(lhs, rhs); break;
-	case Token::GreaterThan: m_currentExpr = smack::Expr::gt(lhs, rhs); break;
-	case Token::LessThanOrEqual: m_currentExpr = smack::Expr::lte(lhs, rhs); break;
-	case Token::GreaterThanOrEqual: m_currentExpr = smack::Expr::gte(lhs, rhs); break;
-
-	case Token::Exp:
-		if (auto rhsLit = dynamic_cast<smack::IntLit const *>(rhs))
+		if (lhsType != rhsType)
 		{
-			if (auto lhsLit = dynamic_cast<smack::IntLit const *>(lhs))
-			{
-				m_currentExpr = smack::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
-				break;
-			}
+			reportError(_node.location(), "Different types for LHS and RHS not supported in bit-precise mode");
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			return false;
 		}
-		reportError(_node.location(), "Exponentiation is not supported");
-		m_currentExpr = smack::Expr::id(ERR_EXPR);
-		break;
-	default:
-		reportError(_node.location(), string("Unsupported binary operator ") + Token::toString(_node.getOperator()));
-		m_currentExpr = smack::Expr::id(ERR_EXPR);
-		break;
+		string bits;
+		string uns;
+		if (boost::starts_with(lhsType, "int") || boost::starts_with(lhsType, "uint"))
+		{
+			bits = lhsType.substr(lhsType.find("t") + 1);
+			uns = lhsType[0] == 'u' ? "u" : "s";
+		}
+		switch(_node.getOperator())
+		{
+		case Token::Add: m_currentExpr = smack::Expr::fn("bv" + bits + "add", lhs, rhs); break;
+		case Token::Sub: m_currentExpr = smack::Expr::fn("bv" + bits + "sub", lhs, rhs); break;
+		case Token::Mul: m_currentExpr = smack::Expr::fn("bv" + bits + "mul", lhs, rhs); break;
+		case Token::Div: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "div", lhs, rhs); break;
+
+		case Token::Equal: m_currentExpr = smack::Expr::eq(lhs, rhs); break;
+		case Token::NotEqual: m_currentExpr = smack::Expr::neq(lhs, rhs); break;
+		case Token::LessThan: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "lt", lhs, rhs); break;
+		case Token::GreaterThan: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "gt", lhs, rhs); break;
+		case Token::LessThanOrEqual: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "le", lhs, rhs); break;
+		case Token::GreaterThanOrEqual: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "ge", lhs, rhs); break;
+
+		default:
+			reportError(_node.location(), string("Unsupported binary operator in bit-precise mode ") + Token::toString(_node.getOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		}
+	}
+	else
+	{
+		switch(_node.getOperator())
+		{
+		case Token::And: m_currentExpr = smack::Expr::and_(lhs, rhs); break;
+		case Token::Or: m_currentExpr = smack::Expr::or_(lhs, rhs); break;
+
+		case Token::Add: m_currentExpr = smack::Expr::plus(lhs, rhs); break;
+		case Token::Sub: m_currentExpr = smack::Expr::minus(lhs, rhs); break;
+		case Token::Mul: m_currentExpr = smack::Expr::times(lhs, rhs); break;
+		case Token::Div: // Boogie has different division operators for integers and reals
+			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
+			else m_currentExpr = smack::Expr::div(lhs, rhs);
+			break;
+		case Token::Mod: m_currentExpr = smack::Expr::mod(lhs, rhs); break;
+
+		case Token::Equal: m_currentExpr = smack::Expr::eq(lhs, rhs); break;
+		case Token::NotEqual: m_currentExpr = smack::Expr::neq(lhs, rhs); break;
+		case Token::LessThan: m_currentExpr = smack::Expr::lt(lhs, rhs); break;
+		case Token::GreaterThan: m_currentExpr = smack::Expr::gt(lhs, rhs); break;
+		case Token::LessThanOrEqual: m_currentExpr = smack::Expr::lte(lhs, rhs); break;
+		case Token::GreaterThanOrEqual: m_currentExpr = smack::Expr::gte(lhs, rhs); break;
+
+		case Token::Exp:
+			if (auto rhsLit = dynamic_cast<smack::IntLit const *>(rhs))
+			{
+				if (auto lhsLit = dynamic_cast<smack::IntLit const *>(lhs))
+				{
+					m_currentExpr = smack::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
+					break;
+				}
+			}
+			reportError(_node.location(), "Exponentiation is not supported");
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		default:
+			reportError(_node.location(), string("Unsupported binary operator ") + Token::toString(_node.getOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		}
 	}
 
 	return false;
@@ -381,8 +422,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) ==
-			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_context.errorReporter()))
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) ==
+			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_context.errorReporter(), m_context.bitPrecise()))
 		{
 			(*_node.arguments().begin())->accept(*this);
 			return false;
@@ -586,7 +627,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Create fresh variable to store the result
 		smack::Decl* returnVar = smack::Decl::variable(
 				funcName + "#" + to_string(_node.id()),
-				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()));
+				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
 		m_newDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		m_currentExpr = smack::Expr::id(returnVar->getName());
