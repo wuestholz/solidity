@@ -89,11 +89,10 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
-	m_newSumDecls.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_newSumDecls);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -538,7 +537,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
-			m_newSumDecls.push_back(id->annotation().referencedDeclaration);
+			auto sumDecl = id->annotation().referencedDeclaration;
+			if (find(m_context.currentSumDecls().begin(), m_context.currentSumDecls().end(), sumDecl) == m_context.currentSumDecls().end())
+			{
+				m_context.currentSumDecls().push_back(sumDecl);
+			}
+
 			auto declCategory = id->annotation().type->category();
 			if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
 			{

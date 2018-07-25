@@ -183,19 +183,16 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
 			m_context.currentInvars()[result.expr] = invarStr;
-			// Add new shadow variables for sum
-			for (auto sumDecl : result.newSumDecls)
-			{
-				if (find(m_context.currentSumDecls().begin(), m_context.currentSumDecls().end(), sumDecl) == m_context.currentSumDecls().end())
-				{
-					m_context.currentSumDecls().push_back(sumDecl);
-					addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-					m_program.getDeclarations().push_back(
-								smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
-								"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
-				}
-			}
 		}
+	}
+
+	// Add new shadow variables for sum
+	for (auto sumDecl : m_context.currentSumDecls())
+	{
+		addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
+		m_program.getDeclarations().push_back(
+					smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
+					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
 	}
 
 	// Process state variables first (to get initializer expressions)
