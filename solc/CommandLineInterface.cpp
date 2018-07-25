@@ -31,6 +31,7 @@
 #include <libsolidity/ast/ASTPrinter.h>
 #include <libsolidity/ast/ASTJsonConverter.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
+#include <libsolidity/ast/BoogieContext.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/interface/CompilerStack.h>
@@ -1043,7 +1044,8 @@ void CommandLineInterface::handleBoogie()
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-	ASTBoogieConverter boogieConverter(errorReporter, m_compiler->getGlobalContext(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	ASTBoogieConverter boogieConverter(context);
 
 	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };
 	SourceReferenceFormatter formatter(cerr, scannerFromSourceName);
@@ -1053,7 +1055,8 @@ void CommandLineInterface::handleBoogie()
 		cout << endl << "======= " << sourceCode.first << " =======" << endl;
 		try
 		{
-			boogieConverter.convert(m_compiler->ast(sourceCode.first), &m_compiler->scanner(sourceCode.first));
+			context.currentScanner() = &m_compiler->scanner(sourceCode.first);
+			boogieConverter.convert(m_compiler->ast(sourceCode.first));
 		}
 		catch (CompilerError const& _exception)
 		{

@@ -1,12 +1,10 @@
 #pragma once
 
-#include <libsolidity/analysis/DeclarationContainer.h>
 #include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/interface/ErrorReporter.h>
-#include <libsolidity/interface/EVMVersion.h>
-#include <libsolidity/parsing/Scanner.h>
+#include <libsolidity/ast/BoogieContext.h>
 #include <map>
 
 namespace dev
@@ -20,24 +18,14 @@ namespace solidity
 class ASTBoogieConverter : private ASTConstVisitor
 {
 private:
-	ErrorReporter& m_errorReporter;
-
-	// Some members required to parse invariants. (Invariants can be found
-	// in comments, so they are not parsed when the contract is parsed.)
-	std::vector<Declaration const*> m_globalDecls;
-	MagicVariableDeclaration m_verifierSum;
-	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
-	EVMVersion m_evmVersion;
+	BoogieContext& m_context;
 
 	// Result of the conversion is a single Boogie program (top-level node)
 	smack::Program m_program;
 
 	// Helper variables to pass information between the visit methods
-	std::map<smack::Expr const*, std::string> m_currentInvars; // Invariants for the current contract (in Boogie and original format)
-	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
-	Scanner const* m_currentScanner;
 
 	// Collect local variable declarations (Boogie requires them at the
 	// beginning of the function).
@@ -75,13 +63,12 @@ private:
 	void createDefaultConstructor(ContractDefinition const& _node);
 
 public:
-	ASTBoogieConverter(ErrorReporter& errorReporter, std::shared_ptr<GlobalContext> globalContext,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
+	ASTBoogieConverter(BoogieContext& context);
 
 	/**
 	 * Convert a node and add it to the actual Boogie program
 	 */
-	void convert(ASTNode const& _node, Scanner const* scanner);
+	void convert(ASTNode const& _node);
 
 	/**
 	 * Print the actual Boogie program to an output stream
