@@ -14,6 +14,7 @@ namespace solidity
 {
 
 class BoogieContext {
+	bool m_bitPrecise;
 	ErrorReporter& m_errorReporter;
 	Scanner const* m_currentScanner;
 	// Some members required to parse invariants. (Invariants can be found
@@ -27,15 +28,16 @@ class BoogieContext {
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
 public:
-	BoogieContext(ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
+	BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion)
-		: m_errorReporter(errorReporter), m_currentScanner(nullptr), m_globalDecls(globalDecls),
+		: m_bitPrecise(bitPrecise), m_errorReporter(errorReporter), m_currentScanner(nullptr), m_globalDecls(globalDecls),
 		  m_verifierSum(ASTBoogieUtils::VERIFIER_SUM, std::make_shared<FunctionType>(strings{}, strings{"int"}, FunctionType::Kind::Internal, true, StateMutability::Pure)),
 		  m_scopes(scopes), m_evmVersion(evmVersion), m_currentInvars(), m_currentSumDecls()
 	{
 		m_globalDecls.push_back(&m_verifierSum);
 	}
 
+	bool bitPrecise() { return m_bitPrecise; }
 	ErrorReporter& errorReporter() { return m_errorReporter; }
 	Scanner const*& currentScanner() { return m_currentScanner; }
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
