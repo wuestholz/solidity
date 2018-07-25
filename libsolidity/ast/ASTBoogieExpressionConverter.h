@@ -2,8 +2,7 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/ErrorReporter.h>
-#include <libsolidity/parsing/Scanner.h>
+#include <libsolidity/ast/BoogieContext.h>
 
 namespace dev
 {
@@ -19,10 +18,7 @@ private:
 	// Return this expression as an identifier when something cannot be evaluated
 	static const std::string ERR_EXPR;
 
-	ErrorReporter& m_errorReporter;
-	std::map<smack::Expr const*, std::string> m_currentInvars;
-	std::list<const Declaration*> m_sumRequired;
-	Scanner const* m_scanner;
+	BoogieContext& m_context;
 	SourceLocation const* m_defaultLocation;
 
 	// Helper variables to pass information between the visit methods
@@ -75,10 +71,7 @@ public:
 
 
 	ASTBoogieExpressionConverter(
-			ErrorReporter& errorReporter,
-			std::map<smack::Expr const*, std::string> currentInvars,
-			std::list<const Declaration*> sumRequired,
-			Scanner const* scanner,
+			BoogieContext& context,
 			SourceLocation const* defaultLocation = nullptr);
 
 	/**

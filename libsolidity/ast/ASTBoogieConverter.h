@@ -3,9 +3,7 @@
 #include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/ErrorReporter.h>
 #include <libsolidity/ast/BoogieContext.h>
-#include <map>
 
 namespace dev
 {

@@ -59,19 +59,16 @@ const smack::Expr* ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* 
 
 void ASTBoogieExpressionConverter::reportError(SourceLocation const& location, std::string const& description)
 {
-	m_errorReporter.error(Error::Type::ParserError, m_defaultLocation ? *m_defaultLocation : location, description);
+	m_context.errorReporter().error(Error::Type::ParserError, m_defaultLocation ? *m_defaultLocation : location, description);
 }
 
 void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location, std::string const& description)
 {
-	m_errorReporter.warning(m_defaultLocation ? *m_defaultLocation : location, description);
+	m_context.errorReporter().warning(m_defaultLocation ? *m_defaultLocation : location, description);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(ErrorReporter& errorReporter,
-		map<smack::Expr const*, string> currentInvars, list<const Declaration*> sumRequired,
-		Scanner const* scanner, SourceLocation const* defaultLocation) :
-		m_errorReporter(errorReporter), m_currentInvars(currentInvars), m_sumRequired(sumRequired),
-		m_scanner(scanner), m_defaultLocation(defaultLocation)
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, SourceLocation const* defaultLocation) :
+		m_context(context), m_defaultLocation(defaultLocation)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -86,6 +83,9 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
 	m_isGetter = false;
+	m_isLibraryCall = false;
+	m_isLibraryCallStatic = false;
+	m_currentValue = nullptr;
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
@@ -134,7 +134,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 	case Token::AssignDiv:
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 		else rhs = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
@@ -157,7 +157,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	{
 		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
-			if (find(m_sumRequired.begin(), m_sumRequired.end(), lhsId->annotation().referencedDeclaration) != m_sumRequired.end())
+			if (find(m_context.currentSumDecls().begin(), m_context.currentSumDecls().end(), lhsId->annotation().referencedDeclaration) != m_context.currentSumDecls().end())
 			{
 				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
 				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
@@ -235,7 +235,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
+					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment x := x + 1
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -249,7 +249,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
 			m_newDecls.push_back(tempVar);
 			// First do the assignment tmp := x
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -266,7 +266,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
 			m_newDecls.push_back(tempVar);
 			createAssignment(_node.subExpression(), lhs, rhs);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
@@ -277,7 +277,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_errorReporter));
+							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter()));
 			m_newDecls.push_back(tempVar);
 			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
 			createAssignment(_node.subExpression(), lhs, rhs);
@@ -313,7 +313,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::Sub: m_currentExpr = smack::Expr::minus(lhs, rhs); break;
 	case Token::Mul: m_currentExpr = smack::Expr::times(lhs, rhs); break;
 	case Token::Div: // Boogie has different division operators for integers and reals
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
 		else m_currentExpr = smack::Expr::div(lhs, rhs);
 		break;
 	case Token::Mod: m_currentExpr = smack::Expr::mod(lhs, rhs); break;
@@ -382,8 +382,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter) ==
-			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_errorReporter))
+		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()) ==
+			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_context.errorReporter()))
 		{
 			(*_node.arguments().begin())->accept(*this);
 			return false;
@@ -499,7 +499,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// The parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold.", *m_scanner)));
+		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
 		return false;
 	}
 
@@ -569,10 +569,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_currentInvars)
+		for (auto invar : m_context.currentInvars())
 		{
 			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_scanner)));
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_context.currentScanner())));
 		}
 	}
 
@@ -582,7 +582,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Create fresh variable to store the result
 		smack::Decl* returnVar = smack::Decl::variable(
 				funcName + "#" + to_string(_node.id()),
-				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_errorReporter));
+				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter()));
 		m_newDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		m_currentExpr = smack::Expr::id(returnVar->getName());
@@ -599,7 +599,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			list<string> rets;
 			rets.push_back(returnVar->getName());
 			// Assign call to the fresh variable
-			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
+			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_context.currentScanner())));
 			m_newStatements.push_back(smack::Stmt::call(funcName, args, rets));
 
 			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentValue)
@@ -622,13 +622,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else
 	{
 		m_currentExpr = nullptr; // No return value for function
-		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_scanner)));
+		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_context.currentScanner())));
 		m_newStatements.push_back(smack::Stmt::call(funcName, args));
 	}
 
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_currentInvars) m_newStatements.push_back(smack::Stmt::assume(invar.first));
+		for (auto invar : m_context.currentInvars()) m_newStatements.push_back(smack::Stmt::assume(invar.first));
 	}
 
 	return false;

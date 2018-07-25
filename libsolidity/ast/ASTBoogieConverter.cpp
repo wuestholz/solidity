@@ -27,8 +27,7 @@ void ASTBoogieConverter::addGlobalComment(string str)
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(
-			m_context.errorReporter(), m_context.currentInvars(), m_context.currentSumDecls(), m_context.currentScanner()).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
@@ -174,7 +173,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			// Do type checking
 			typeChecker.checkTypeRequirements(*invar);
 			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_context.errorReporter(), map<smack::Expr const*, string>(), list<Declaration const*>(), m_context.currentScanner(), &_node.location()).convert(*invar);
+			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
 			if (!result.newStatements.empty()) // Make sure that there are no side effects
 			{
 				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
