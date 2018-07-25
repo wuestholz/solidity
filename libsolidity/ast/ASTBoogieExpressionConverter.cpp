@@ -305,21 +305,23 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 	if (m_context.bitPrecise())
 	{
-		string lhsType = _node.leftExpression().annotation().type->toString();
-		string rhsType = _node.rightExpression().annotation().type->toString();
-
-		if (lhsType != rhsType)
-		{
-			reportError(_node.location(), "Different types for LHS and RHS not supported in bit-precise mode");
-			m_currentExpr = smack::Expr::id(ERR_EXPR);
-			return false;
-		}
+		auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
+		string commonTypeStr = commonType->toString();
 		string bits;
 		string uns;
-		if (boost::starts_with(lhsType, "int") || boost::starts_with(lhsType, "uint"))
+		if (boost::starts_with(commonTypeStr, "int") || boost::starts_with(commonTypeStr, "uint"))
 		{
-			bits = lhsType.substr(lhsType.find("t") + 1);
-			uns = lhsType[0] == 'u' ? "u" : "s";
+			bits = commonTypeStr.substr(commonTypeStr.find("t") + 1);
+			uns = commonTypeStr[0] == 'u' ? "u" : "s";
+
+			if (auto lhsLit = dynamic_cast<smack::IntLit const*>(lhs))
+			{
+				lhs = smack::Expr::lit(lhsLit->getVal(), stoi(bits));
+			}
+			if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
+			{
+				rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
+			}
 		}
 		switch(_node.getOperator())
 		{

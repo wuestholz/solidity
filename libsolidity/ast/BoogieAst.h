@@ -55,7 +55,7 @@ public:
   static const Expr* lit(long v);
   static const Expr* lit(bigint v);
   static const Expr* lit(std::string v, unsigned w);
-  static const Expr* lit(unsigned long v, unsigned w);
+  static const Expr* lit(bigint v, unsigned w);
   static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
   static const Expr* neq(const Expr* l, const Expr* r);
   static const Expr* not_(const Expr* e);
@@ -124,7 +124,7 @@ class BvLit : public Expr {
   unsigned width;
 public:
   BvLit(std::string v, unsigned w) : val(v), width(w) {}
-  BvLit(unsigned long v, unsigned w) : width(w) {
+  BvLit(bigint v, unsigned w) : width(w) {
     std::stringstream s;
     s << v;
     val = s.str();

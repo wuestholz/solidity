@@ -139,7 +139,7 @@ const Expr* Expr::lit(std::string v, unsigned w) {
   return w ? (const Expr*) new BvLit(v,w) : (const Expr*) new IntLit(v);
 }
 
-const Expr* Expr::lit(unsigned long v, unsigned w) {
+const Expr* Expr::lit(bigint v, unsigned w) {
   return new BvLit(v,w);
 }
 
