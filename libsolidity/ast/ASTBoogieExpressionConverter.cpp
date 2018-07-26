@@ -127,22 +127,63 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	// Result will be the LHS (for chained assignments like x = y = 5)
 	m_currentExpr = lhs;
 
-	// Transform rhs based on the operator, e.g., a += b becomes a := a + b
-	switch (_node.assignmentOperator()) {
-	case Token::Assign: break; // rhs already contains the result
-	case Token::AssignAdd: rhs = smack::Expr::plus(lhs, rhs); break;
-	case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
-	case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
-	case Token::AssignDiv:
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
-		else rhs = smack::Expr::div(lhs, rhs);
-		break;
-	case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
+	// Check if type of the expression can be represented in bit-precise way
+	bool bitPreciseType = false;
+	string typeStr;
+	if (_node.leftHandSide().annotation().type)
+	{
+		typeStr = _node.leftHandSide().annotation().type->toString();
+		boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
+		if (boost::regex_match(typeStr, regex))
+		{
+			bitPreciseType = true;
+		}
+	}
 
-	default:
-		reportError(_node.location(), string("Unsupported assignment operator: ") +
-				Token::toString(_node.assignmentOperator()));
-		return false;
+	if (m_context.bitPrecise() && bitPreciseType)
+	{
+		string bits = typeStr.substr(typeStr.find("t") + 1);
+		string uns = typeStr[0] == 'u' ? "u" : "s";
+
+		// Literals have to be converted to bitvector literals based on the size
+		// of the other operand
+		if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
+		{
+			rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
+		}
+
+		switch(_node.assignmentOperator())
+		{
+		case Token::Assign: break; // rhs already contains the result
+		case Token::AssignAdd: rhs = smack::Expr::fn("bv" + bits + "add", lhs, rhs); break;
+		case Token::AssignSub: rhs = smack::Expr::fn("bv" + bits + "sub", lhs, rhs); break;
+		case Token::AssignMul: rhs = smack::Expr::fn("bv" + bits + "mul", lhs, rhs); break;
+		case Token::AssignDiv: rhs = smack::Expr::fn("bv" + bits + uns + "div", lhs, rhs); break;
+		default:
+			reportError(_node.location(), string("Unsupported assignment operator in bit-precise mode: ") +
+					Token::toString(_node.assignmentOperator()));
+			return false;
+		}
+	}
+	else
+	{
+		// Transform rhs based on the operator, e.g., a += b becomes a := a + b
+		switch (_node.assignmentOperator()) {
+		case Token::Assign: break; // rhs already contains the result
+		case Token::AssignAdd: rhs = smack::Expr::plus(lhs, rhs); break;
+		case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
+		case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
+		case Token::AssignDiv:
+			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+			else rhs = smack::Expr::div(lhs, rhs);
+			break;
+		case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
+
+		default:
+			reportError(_node.location(), string("Unsupported assignment operator: ") +
+					Token::toString(_node.assignmentOperator()));
+			return false;
+		}
 	}
 
 	createAssignment(_node.leftHandSide(), lhs, rhs);
