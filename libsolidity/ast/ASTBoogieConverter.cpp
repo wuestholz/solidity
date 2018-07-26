@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
@@ -776,8 +777,29 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	{
 		if (_node.declarations().size() == 1)
 		{
+			auto decl = *_node.declarations().begin();
 			// Get expression recursively
 			const smack::Expr* rhs = convertExpression(*_node.initialValue());
+
+			// Check if LHS can be represented in bit-precise mode, because
+			// in this case if RHS is a literal, it has to be converted to
+			// a bitvector
+			bool bitPreciseType = false;
+			boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
+			if (decl->annotation().type && boost::regex_match(decl->annotation().type->toString(), regex))
+			{
+				bitPreciseType = true;
+			}
+
+			if (m_context.bitPrecise() && bitPreciseType)
+			{
+				string typeStr = decl->annotation().type->toString();
+				string bits = typeStr.substr(typeStr.find("t") + 1);
+				if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
+				{
+					rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
+				}
+			}
 
 			m_currentBlocks.top()->addStmt(smack::Stmt::assign(
 					smack::Expr::id(ASTBoogieUtils::mapDeclName(**_node.declarations().begin())),
