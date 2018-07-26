@@ -19,7 +19,11 @@ for sol in *.sol; do
     total=$((total+1))
     echo "======= $sol ======="
     echo "- Compiling"
-    $SOLC --boogie "$sol" -o ./output --overwrite > /dev/null
+    flags=""
+    if [ -f "$sol.flags" ]; then
+        flags=$(<"$sol.flags")
+    fi
+    $SOLC --boogie "$sol" -o ./output --overwrite $flags > /dev/null
     bpl="./output/$sol.bpl"
     out="$bpl.out"
     exp="$sol.expected"
