@@ -342,6 +342,11 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::Mul: m_currentExpr = smack::Expr::fn("bv" + bits + "mul", lhs, rhs); break;
 		case Token::Div: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "div", lhs, rhs); break;
 
+		case Token::BitAnd: m_currentExpr = smack::Expr::fn("bv" + bits + "and", lhs, rhs); break;
+		case Token::BitOr: m_currentExpr = smack::Expr::fn("bv" + bits + "or", lhs, rhs); break;
+		case Token::BitXor: m_currentExpr = smack::Expr::fn("bv" + bits + "xor", lhs, rhs); break;
+		case Token::BitNot: m_currentExpr = smack::Expr::fn("bv" + bits + "not", lhs, rhs); break;
+
 		case Token::Equal: m_currentExpr = smack::Expr::eq(lhs, rhs); break;
 		case Token::NotEqual: m_currentExpr = smack::Expr::neq(lhs, rhs); break;
 		case Token::LessThan: m_currentExpr = smack::Expr::fn("bv" + bits + uns + "lt", lhs, rhs); break;
@@ -388,6 +393,13 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 				}
 			}
 			reportError(_node.location(), "Exponentiation is not supported");
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		case Token::BitAnd:
+		case Token::BitOr:
+		case Token::BitXor:
+		case Token::BitNot:
+			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.getOperator()));
 			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			break;
 		default:

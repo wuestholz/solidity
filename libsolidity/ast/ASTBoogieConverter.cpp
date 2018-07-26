@@ -109,7 +109,7 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 		{
 			string bitstr = to_string(bits);
 			// Arithmetic
-			for (auto op : {"add", "sub", "mul", "udiv", "sdiv"})
+			for (auto op : {"add", "sub", "mul", "udiv", "sdiv", "and", "or", "xor", "not"})
 			{
 				m_program.getDeclarations().push_back(smack::Decl::function(
 						"bv"+bitstr+op, {make_pair("", "bv"+bitstr), make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
