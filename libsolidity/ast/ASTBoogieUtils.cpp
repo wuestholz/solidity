@@ -325,7 +325,15 @@ smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, Ty
 	{
 		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
 		{
-			return smack::Expr::lit(exprLit->getVal(), getBits(targetType));
+			unsigned bits = getBits(targetType);
+			if (exprLit->getVal() < 0)
+			{
+				return smack::Expr::fn("bv" + to_string(bits) + "neg", smack::Expr::lit(-exprLit->getVal(), bits));
+			}
+			else
+			{
+				return smack::Expr::lit(exprLit->getVal(), bits);
+			}
 		}
 	}
 

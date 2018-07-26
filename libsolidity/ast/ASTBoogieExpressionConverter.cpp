@@ -251,6 +251,13 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 
 bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 {
+	string tpStr = _node.annotation().type->toString();
+	if (boost::starts_with(tpStr, "int_const"))
+	{
+		m_currentExpr = smack::Expr::lit(smack::bigint(tpStr.substr(10)));
+		return false;
+	}
+
 	// Get operand recursively
 	_node.subExpression().accept(*this);
 	const smack::Expr* subExpr = m_currentExpr;
@@ -343,6 +350,13 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 
 bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 {
+	string tpStr = _node.annotation().type->toString();
+	if (boost::starts_with(tpStr, "int_const"))
+	{
+		m_currentExpr = smack::Expr::lit(smack::bigint(tpStr.substr(10)));
+		return false;
+	}
+
 	// Get lhs recursively
 	_node.leftExpression().accept(*this);
 	const smack::Expr* lhs = m_currentExpr;
@@ -927,7 +941,6 @@ bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _no
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 {
 	string tpStr = _node.annotation().type->toString();
-	// TODO: option for bit precise types
 	if (boost::starts_with(tpStr, "int_const"))
 	{
 		m_currentExpr = smack::Expr::lit(smack::bigint(_node.value()));
