@@ -225,70 +225,97 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	_node.subExpression().accept(*this);
 	const smack::Expr* subExpr = m_currentExpr;
 
-	switch (_node.getOperator()) {
-	case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
-	case Token::Sub: m_currentExpr = smack::Expr::neg(subExpr); break;
-	case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
-	case Token::Inc:
-		if (_node.isPrefixOperation()) // ++x
-		{
-			const smack::Expr* lhs = subExpr;
-			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
-			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
-			m_newDecls.push_back(tempVar);
-			// First do the assignment x := x + 1
-			createAssignment(_node.subExpression(), lhs, rhs);
-			// Then the assignment tmp := x
-			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
-			// Result is the tmp variable (if the assignment is part of an expression)
-			m_currentExpr = smack::Expr::id(tempVar->getName());
-		}
-		else // x++
-		{
-			const smack::Expr* lhs = subExpr;
-			const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
-			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
-			m_newDecls.push_back(tempVar);
-			// First do the assignment tmp := x
-			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
-			// Then the assignment x := x + 1
-			createAssignment(_node.subExpression(), lhs, rhs);
-			// Result is the tmp variable (if the assignment is part of an expression)
-			m_currentExpr = smack::Expr::id(tempVar->getName());
-		}
-		break;
-	case Token::Dec:
-		// Same as ++ but with minus
-		if (_node.isPrefixOperation())
-		{
-			const smack::Expr* lhs = subExpr;
-			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
-			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
-			m_newDecls.push_back(tempVar);
-			createAssignment(_node.subExpression(), lhs, rhs);
-			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
-			m_currentExpr = smack::Expr::id(tempVar->getName());
-		}
-		else
-		{
-			const smack::Expr* lhs = subExpr;
-			const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
-			smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
-							ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
-			m_newDecls.push_back(tempVar);
-			m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
-			createAssignment(_node.subExpression(), lhs, rhs);
-			m_currentExpr = smack::Expr::id(tempVar->getName());
-		}
-		break;
+	// Check if type can be represented in bit-precise mode
+	bool bitPreciseType = false;
+	boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
+	if (_node.annotation().type && boost::regex_match(_node.annotation().type->toString(), regex))
+	{
+		bitPreciseType = true;
+	}
 
-	default:
-		reportError(_node.location(), string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
-		m_currentExpr = smack::Expr::id(ERR_EXPR);
-		break;
+	if (m_context.bitPrecise() && bitPreciseType)
+	{
+		string typeStr = _node.annotation().type->toString();
+		string bits = typeStr.substr(typeStr.find("t") + 1);
+		string uns = typeStr[0] == 'u' ? "u" : "s";
+
+		switch (_node.getOperator()) {
+		case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
+		case Token::Sub: m_currentExpr = smack::Expr::fn("bv" + bits + "neg", subExpr); break;
+		case Token::BitNot: m_currentExpr = smack::Expr::fn("bv" + bits + "not", subExpr); break;
+		default:
+			reportError(_node.location(), string("Unsupported unary operator in bit-precise mode: ") + Token::toString(_node.getOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		}
+	}
+	else
+	{
+		switch (_node.getOperator()) {
+		case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
+		case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
+		case Token::Sub: m_currentExpr = smack::Expr::neg(subExpr); break;
+		case Token::Inc:
+			if (_node.isPrefixOperation()) // ++x
+			{
+				const smack::Expr* lhs = subExpr;
+				const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
+				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
+						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+				m_newDecls.push_back(tempVar);
+				// First do the assignment x := x + 1
+				createAssignment(_node.subExpression(), lhs, rhs);
+				// Then the assignment tmp := x
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
+				// Result is the tmp variable (if the assignment is part of an expression)
+				m_currentExpr = smack::Expr::id(tempVar->getName());
+			}
+			else // x++
+			{
+				const smack::Expr* lhs = subExpr;
+				const smack::Expr* rhs = smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1));
+				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
+								ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+				m_newDecls.push_back(tempVar);
+				// First do the assignment tmp := x
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+				// Then the assignment x := x + 1
+				createAssignment(_node.subExpression(), lhs, rhs);
+				// Result is the tmp variable (if the assignment is part of an expression)
+				m_currentExpr = smack::Expr::id(tempVar->getName());
+			}
+			break;
+		case Token::Dec:
+			// Same as ++ but with minus
+			if (_node.isPrefixOperation())
+			{
+				const smack::Expr* lhs = subExpr;
+				const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
+				smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
+								ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+				m_newDecls.push_back(tempVar);
+				createAssignment(_node.subExpression(), lhs, rhs);
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+				m_currentExpr = smack::Expr::id(tempVar->getName());
+			}
+			else
+			{
+				const smack::Expr* lhs = subExpr;
+				const smack::Expr* rhs = smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
+				smack::Decl* tempVar = smack::Decl::variable("dec#" + to_string(_node.id()),
+								ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+				m_newDecls.push_back(tempVar);
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+				createAssignment(_node.subExpression(), lhs, rhs);
+				m_currentExpr = smack::Expr::id(tempVar->getName());
+			}
+			break;
+
+		default:
+			reportError(_node.location(), string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
+		}
 	}
 
 	return false;
@@ -345,7 +372,6 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd: m_currentExpr = smack::Expr::fn("bv" + bits + "and", lhs, rhs); break;
 		case Token::BitOr: m_currentExpr = smack::Expr::fn("bv" + bits + "or", lhs, rhs); break;
 		case Token::BitXor: m_currentExpr = smack::Expr::fn("bv" + bits + "xor", lhs, rhs); break;
-		case Token::BitNot: m_currentExpr = smack::Expr::fn("bv" + bits + "not", lhs, rhs); break;
 
 		case Token::Equal: m_currentExpr = smack::Expr::eq(lhs, rhs); break;
 		case Token::NotEqual: m_currentExpr = smack::Expr::neq(lhs, rhs); break;
@@ -398,7 +424,6 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd:
 		case Token::BitOr:
 		case Token::BitXor:
-		case Token::BitNot:
 			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.getOperator()));
 			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			break;

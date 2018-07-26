@@ -109,10 +109,16 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 		{
 			string bitstr = to_string(bits);
 			// Arithmetic
-			for (auto op : {"add", "sub", "mul", "udiv", "sdiv", "and", "or", "xor", "not"})
+			for (auto op : {"add", "sub", "mul", "udiv", "sdiv", "and", "or", "xor"})
 			{
 				m_program.getDeclarations().push_back(smack::Decl::function(
 						"bv"+bitstr+op, {make_pair("", "bv"+bitstr), make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
+						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
+			}
+			for (auto op : {"neg", "not"})
+			{
+				m_program.getDeclarations().push_back(smack::Decl::function(
+						"bv"+bitstr+op, {make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
 						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
 			}
 			// Comparison
