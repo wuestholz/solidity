@@ -11,6 +11,31 @@ contract BitPrecise2 {
     function mul8s(int8 x, int8 y) public pure returns (int8) { return x * y; }
     function div8s(int8 x, int8 y) public pure returns (int8) { return x / y; }
 
+    function preinc8u(uint8 x) public pure returns (uint8) {
+        uint8 result = x;
+        uint8 tmp = ++result;
+        assert(tmp == result);
+        return result;
+    }
+    function postinc8u(uint8 x) public pure returns (uint8) {
+        uint8 result = x;
+        uint8 tmp = result++;
+        assert(tmp == x);
+        return result;
+    }
+    function predec8u(uint8 x) public pure returns (uint8) {
+        uint8 result = x;
+        uint8 tmp = --result;
+        assert(tmp == result);
+        return result;
+    }
+    function postdec8u(uint8 x) public pure returns (uint8) {
+        uint8 result = x;
+        uint8 tmp = result--;
+        assert(tmp == x);
+        return result;
+    }
+
     function bitand8u(uint8 x, uint8 y) public pure returns (uint8) { return x & y; }
     function bitor8u(uint8 x, uint8 y) public pure returns (uint8) { return x | y; }
     function bitxor8u(uint8 x, uint8 y) public pure returns (uint8) { return x ^ y; }
@@ -40,6 +65,11 @@ contract BitPrecise2 {
         assert(mul8s(8, 16) == -128);
         assert(div8s(48, 6) == 8);
         assert(div8s(48, -6) == -8);
+
+        assert(preinc8u(1) == 2);
+        assert(postinc8u(1) == 2);
+        assert(predec8u(5) == 4);
+        assert(postdec8u(5) == 4);
 
         assert(bitand8u(123, 45) == 41);
         assert(bitor8u(123, 45) == 127);
