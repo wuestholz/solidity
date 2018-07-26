@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieAst.h>
@@ -303,26 +304,37 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	_node.rightExpression().accept(*this);
 	const smack::Expr* rhs = m_currentExpr;
 
-	if (m_context.bitPrecise())
+	// Check if the common type of the expression can be represented in
+	// bit-precise way
+	bool bitPreciseType = false;
+	auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
+	string commonTypeStr;
+	if (commonType)
 	{
-		auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
-		string commonTypeStr = commonType->toString();
-		string bits;
-		string uns;
-		if (boost::starts_with(commonTypeStr, "int") || boost::starts_with(commonTypeStr, "uint"))
+		commonTypeStr = commonType->toString();
+		boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
+		if (boost::regex_match(commonTypeStr, regex))
 		{
-			bits = commonTypeStr.substr(commonTypeStr.find("t") + 1);
-			uns = commonTypeStr[0] == 'u' ? "u" : "s";
-
-			if (auto lhsLit = dynamic_cast<smack::IntLit const*>(lhs))
-			{
-				lhs = smack::Expr::lit(lhsLit->getVal(), stoi(bits));
-			}
-			if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
-			{
-				rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
-			}
+			bitPreciseType = true;
 		}
+	}
+
+	if (m_context.bitPrecise() && bitPreciseType)
+	{
+		string bits = commonTypeStr.substr(commonTypeStr.find("t") + 1);
+		string uns = commonTypeStr[0] == 'u' ? "u" : "s";
+
+		// Literals have to be converted to bitvector literals based on the size
+		// of the other operand. TODO: what if both operands are literals?
+		if (auto lhsLit = dynamic_cast<smack::IntLit const*>(lhs))
+		{
+			lhs = smack::Expr::lit(lhsLit->getVal(), stoi(bits));
+		}
+		if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
+		{
+			rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
+		}
+
 		switch(_node.getOperator())
 		{
 		case Token::Add: m_currentExpr = smack::Expr::fn("bv" + bits + "add", lhs, rhs); break;
