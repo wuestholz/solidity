@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/regex.hpp>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieAst.h>
@@ -127,30 +126,11 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	// Result will be the LHS (for chained assignments like x = y = 5)
 	m_currentExpr = lhs;
 
-	// Check if type of the expression can be represented in bit-precise way
-	bool bitPreciseType = false;
-	string typeStr;
-	if (_node.leftHandSide().annotation().type)
+	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.leftHandSide().annotation().type))
 	{
-		typeStr = _node.leftHandSide().annotation().type->toString();
-		boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-		if (boost::regex_match(typeStr, regex))
-		{
-			bitPreciseType = true;
-		}
-	}
-
-	if (m_context.bitPrecise() && bitPreciseType)
-	{
-		string bits = typeStr.substr(typeStr.find("t") + 1);
-		string uns = typeStr[0] == 'u' ? "u" : "s";
-
-		// Literals have to be converted to bitvector literals based on the size
-		// of the other operand
-		if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
-		{
-			rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
-		}
+		string bits = to_string(ASTBoogieUtils::getBits(_node.leftHandSide().annotation().type));
+		string uns = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type) ? "s" : "u";
+		rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type);
 
 		switch(_node.assignmentOperator())
 		{
@@ -275,19 +255,9 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	_node.subExpression().accept(*this);
 	const smack::Expr* subExpr = m_currentExpr;
 
-	// Check if type can be represented in bit-precise mode
-	bool bitPreciseType = false;
-	boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-	if (_node.annotation().type && boost::regex_match(_node.annotation().type->toString(), regex))
+	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 	{
-		bitPreciseType = true;
-	}
-
-	if (m_context.bitPrecise() && bitPreciseType)
-	{
-		string typeStr = _node.annotation().type->toString();
-		string bits = typeStr.substr(typeStr.find("t") + 1);
-		string uns = typeStr[0] == 'u' ? "u" : "s";
+		string bits = to_string(ASTBoogieUtils::getBits(_node.annotation().type));
 
 		switch (_node.getOperator()) {
 		case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
@@ -381,36 +351,15 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	_node.rightExpression().accept(*this);
 	const smack::Expr* rhs = m_currentExpr;
 
-	// Check if the common type of the expression can be represented in
-	// bit-precise way
-	bool bitPreciseType = false;
 	auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
-	string commonTypeStr;
-	if (commonType)
-	{
-		commonTypeStr = commonType->toString();
-		boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-		if (boost::regex_match(commonTypeStr, regex))
-		{
-			bitPreciseType = true;
-		}
-	}
 
-	if (m_context.bitPrecise() && bitPreciseType)
+	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(commonType))
 	{
-		string bits = commonTypeStr.substr(commonTypeStr.find("t") + 1);
-		string uns = commonTypeStr[0] == 'u' ? "u" : "s";
+		string bits = to_string(ASTBoogieUtils::getBits(commonType));
+		string uns = ASTBoogieUtils::isSigned(commonType) ? "s" : "u";
 
-		// Literals have to be converted to bitvector literals based on the size
-		// of the other operand. TODO: what if both operands are literals?
-		if (auto lhsLit = dynamic_cast<smack::IntLit const*>(lhs))
-		{
-			lhs = smack::Expr::lit(lhsLit->getVal(), stoi(bits));
-		}
-		if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
-		{
-			rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
-		}
+		lhs = ASTBoogieUtils::checkAndConvertBV(lhs, _node.leftExpression().annotation().type, commonType);
+		rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.rightExpression().annotation().type, commonType);
 
 		switch(_node.getOperator())
 		{
@@ -616,9 +565,20 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
 	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto arg : _node.arguments())
+		for (unsigned i = 0; i < _node.arguments().size(); ++i)
 		{
+			auto arg = _node.arguments()[i];
 			arg->accept(*this);
+			if (m_context.bitPrecise())
+			{
+				if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+				{
+					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
+					{
+						m_currentExpr = ASTBoogieUtils::checkAndConvertBV(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type);
+					}
+				}
+			}
 			args.push_back(m_currentExpr);
 
 			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)

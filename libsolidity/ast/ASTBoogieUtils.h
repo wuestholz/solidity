@@ -82,6 +82,14 @@ public:
 	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise);
 
 	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
+
+	static bool isBitPreciseType(TypePointer type);
+
+	static unsigned getBits(TypePointer type);
+
+	static bool isSigned(TypePointer type);
+
+	static smack::Expr const* checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType);
 };
 
 }

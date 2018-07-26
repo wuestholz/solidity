@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/regex.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
@@ -109,20 +108,21 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 		for (int bits = 8; bits <= 256; bits += 8)
 		{
 			string bitstr = to_string(bits);
-			// Arithmetic
+			// Binary functions: (bvXXX, bvXXX) -> bvXXX
 			for (auto op : {"add", "sub", "mul", "udiv", "sdiv", "and", "or", "xor"})
 			{
 				m_program.getDeclarations().push_back(smack::Decl::function(
 						"bv"+bitstr+op, {make_pair("", "bv"+bitstr), make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
 						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
 			}
+			// Unary functions: (bvXXX) -> bvXXX
 			for (auto op : {"neg", "not"})
 			{
 				m_program.getDeclarations().push_back(smack::Decl::function(
 						"bv"+bitstr+op, {make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
 						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
 			}
-			// Comparison
+			// Binary functions: (bvXXX, bvXXX) -> bool
 			for (auto op : {"ult", "ule", "ugt", "uge", "slt", "sle", "sgt", "sge"})
 			{
 				m_program.getDeclarations().push_back(smack::Decl::function(
@@ -464,6 +464,10 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		// A new block is introduced to collect side effects of the expression
 		m_currentBlocks.push(smack::Block::block());
 		smack::Expr const* initExpr = convertExpression(*_node.value());
+		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
+		{
+			initExpr = ASTBoogieUtils::checkAndConvertBV(initExpr, _node.value()->annotation().type, _node.annotation().type);
+		}
 		for (auto stmt : *m_currentBlocks.top()) { m_stateVarInitializers.push_back(stmt); }
 		m_currentBlocks.pop();
 		m_stateVarInitializers.push_back(smack::Stmt::assign(smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
@@ -781,24 +785,9 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// Get expression recursively
 			const smack::Expr* rhs = convertExpression(*_node.initialValue());
 
-			// Check if LHS can be represented in bit-precise mode, because
-			// in this case if RHS is a literal, it has to be converted to
-			// a bitvector
-			bool bitPreciseType = false;
-			boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-			if (decl->annotation().type && boost::regex_match(decl->annotation().type->toString(), regex))
+			if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
 			{
-				bitPreciseType = true;
-			}
-
-			if (m_context.bitPrecise() && bitPreciseType)
-			{
-				string typeStr = decl->annotation().type->toString();
-				string bits = typeStr.substr(typeStr.find("t") + 1);
-				if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
-				{
-					rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
-				}
+				rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.initialValue()->annotation().type, decl->annotation().type);
 			}
 
 			m_currentBlocks.top()->addStmt(smack::Stmt::assign(

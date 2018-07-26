@@ -1,6 +1,7 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/AST.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 #include <libsolidity/parsing/Scanner.h>
 
 using namespace std;
@@ -293,6 +294,42 @@ list<const smack::Attr*> ASTBoogieUtils::createLocAttrs(SourceLocation const& lo
 	attrs.push_back(smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1));
 	attrs.push_back(smack::Attr::attr("message", message));
 	return attrs;
+}
+
+bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
+{
+	if (!type) { return false; }
+	boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
+	return boost::regex_match(type->toString(), regex);
+}
+
+unsigned ASTBoogieUtils::getBits(TypePointer type)
+{
+	if (!isBitPreciseType(type)) { return 0; }
+	string typeStr = type->toString();
+	return stoi(typeStr.substr(typeStr.find("t") + 1));
+}
+
+bool ASTBoogieUtils::isSigned(TypePointer type)
+{
+	if (!isBitPreciseType(type)) { return false; }
+	string typeStr = type->toString();
+	return typeStr[0] == 'i';
+}
+
+smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType)
+{
+	if (!targetType || !exprType) { return expr; }
+
+	if (isBitPreciseType(targetType))
+	{
+		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
+		{
+			return smack::Expr::lit(exprLit->getVal(), getBits(targetType));
+		}
+	}
+
+	return expr;
 }
 
 
