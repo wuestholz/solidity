@@ -317,7 +317,7 @@ bool ASTBoogieUtils::isSigned(TypePointer type)
 	return typeStr[0] == 'i';
 }
 
-smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType)
+smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, map<string, smack::FuncDecl*>& bvBuiltin)
 {
 	if (!targetType || !exprType) { return expr; }
 
@@ -328,7 +328,12 @@ smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, Ty
 			unsigned bits = getBits(targetType);
 			if (exprLit->getVal() < 0)
 			{
-				return smack::Expr::fn("bv" + to_string(bits) + "neg", smack::Expr::lit(-exprLit->getVal(), bits));
+				string fullName = "bv" + to_string(bits) + "neg";
+				// TODO: check if exists
+				bvBuiltin[fullName] = smack::Decl::function(
+								fullName, {make_pair("", "bv"+to_string(bits))}, "bv"+to_string(bits), nullptr,
+								{smack::Attr::attr("bvbuiltin", "bvneg")});
+				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), bits));
 			}
 			else
 			{

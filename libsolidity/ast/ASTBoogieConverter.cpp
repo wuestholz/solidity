@@ -101,41 +101,16 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
 	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, "int"));
-
-	// Bit-precise stuff
-	if (m_context.bitPrecise())
-	{
-		for (int bits = 8; bits <= 256; bits += 8)
-		{
-			string bitstr = to_string(bits);
-			// Binary functions: (bvXXX, bvXXX) -> bvXXX
-			for (auto op : {"add", "sub", "mul", "udiv", "sdiv", "and", "or", "xor"})
-			{
-				m_program.getDeclarations().push_back(smack::Decl::function(
-						"bv"+bitstr+op, {make_pair("", "bv"+bitstr), make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
-						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
-			}
-			// Unary functions: (bvXXX) -> bvXXX
-			for (auto op : {"neg", "not"})
-			{
-				m_program.getDeclarations().push_back(smack::Decl::function(
-						"bv"+bitstr+op, {make_pair("", "bv"+bitstr)}, "bv"+bitstr, nullptr,
-						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
-			}
-			// Binary functions: (bvXXX, bvXXX) -> bool
-			for (auto op : {"ult", "ule", "ugt", "uge", "slt", "sle", "sgt", "sge"})
-			{
-				m_program.getDeclarations().push_back(smack::Decl::function(
-						"bv"+bitstr+op, {make_pair("", "bv"+bitstr), make_pair("", "bv"+bitstr)}, "bool", nullptr,
-						{smack::Attr::attr("bvbuiltin", string("bv")+op)}));
-			}
-		}
-	}
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
 {
 	_node.accept(*this);
+	for (auto builtin : m_context.bvBuiltinFunctions())
+	{
+		// TODO: avoid duplicates
+		m_program.getDeclarations().push_back(builtin.second);
+	}
 }
 
 void ASTBoogieConverter::print(ostream& _stream)
@@ -466,7 +441,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		smack::Expr const* initExpr = convertExpression(*_node.value());
 		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
-			initExpr = ASTBoogieUtils::checkAndConvertBV(initExpr, _node.value()->annotation().type, _node.annotation().type);
+			initExpr = ASTBoogieUtils::checkAndConvertBV(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
 		}
 		for (auto stmt : *m_currentBlocks.top()) { m_stateVarInitializers.push_back(stmt); }
 		m_currentBlocks.pop();
@@ -787,7 +762,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 			if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
 			{
-				rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.initialValue()->annotation().type, decl->annotation().type);
+				rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context.bvBuiltinFunctions());
 			}
 
 			m_currentBlocks.top()->addStmt(smack::Stmt::assign(

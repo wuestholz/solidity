@@ -26,7 +26,7 @@ class BoogieContext {
 
 	std::map<smack::Expr const*, std::string> m_currentInvars; // Invariants for the current contract (in Boogie and original format)
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
-	std::map<std::string, smack::FuncDecl const*> m_bvBuiltinFunctions;
+	std::map<std::string, smack::FuncDecl*> m_bvBuiltinFunctions;
 
 public:
 	BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
@@ -46,7 +46,7 @@ public:
 	EVMVersion& evmVersion() { return m_evmVersion; }
 	std::map<smack::Expr const*, std::string>& currentInvars() { return m_currentInvars; }
 	std::list<Declaration const*>& currentSumDecls() { return m_currentSumDecls; }
-	std::map<std::string, smack::FuncDecl const*>& bvBuiltinFunctions() { return m_bvBuiltinFunctions; }
+	std::map<std::string, smack::FuncDecl*>& bvBuiltinFunctions() { return m_bvBuiltinFunctions; }
 
 };
 
