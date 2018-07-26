@@ -193,27 +193,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs)
 {
-	// Check if LHS can be represented in bit-precise mode, because
-	// in this case if RHS is a literal, it has to be converted to
-	// a bitvector
-	bool bitPreciseType = false;
-	boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-	if (originalLhs.annotation().type && boost::regex_match(originalLhs.annotation().type->toString(), regex))
-	{
-		bitPreciseType = true;
-	}
-
-	if (m_context.bitPrecise() && bitPreciseType)
-	{
-		string typeStr = originalLhs.annotation().type->toString();
-		string bits = typeStr.substr(typeStr.find("t") + 1);
-		if (auto rhsLit = dynamic_cast<smack::IntLit const*>(rhs))
-		{
-			rhs = smack::Expr::lit(rhsLit->getVal(), stoi(bits));
-		}
-	}
-
-
 	// First check if shadow variables need to be updated
 	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
 	{
