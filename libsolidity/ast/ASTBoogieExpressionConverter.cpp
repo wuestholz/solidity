@@ -159,6 +159,9 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		case Token::AssignSub: rhs = smack::Expr::fn("bv" + bits + "sub", lhs, rhs); break;
 		case Token::AssignMul: rhs = smack::Expr::fn("bv" + bits + "mul", lhs, rhs); break;
 		case Token::AssignDiv: rhs = smack::Expr::fn("bv" + bits + uns + "div", lhs, rhs); break;
+		case Token::AssignBitAnd: rhs = smack::Expr::fn("bv" + bits + "and", lhs, rhs); break;
+		case Token::AssignBitOr: rhs = smack::Expr::fn("bv" + bits + "or", lhs, rhs); break;
+		case Token::AssignBitXor: rhs = smack::Expr::fn("bv" + bits + "xor", lhs, rhs); break;
 		default:
 			reportError(_node.location(), string("Unsupported assignment operator in bit-precise mode: ") +
 					Token::toString(_node.assignmentOperator()));
@@ -178,6 +181,12 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			else rhs = smack::Expr::div(lhs, rhs);
 			break;
 		case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
+		case Token::AssignBitAnd:
+		case Token::AssignBitOr:
+		case Token::AssignBitXor:
+			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.assignmentOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
+			break;
 
 		default:
 			reportError(_node.location(), string("Unsupported assignment operator: ") +
