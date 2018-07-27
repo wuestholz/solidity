@@ -702,7 +702,13 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		// Get rhs recursively
 		const smack::Expr* rhs = convertExpression(*_node.expression());
 
-		// TODO: bit-precise mode: check for implicit conversion
+		if (m_context.bitPrecise())
+		{
+			// We already throw an error elsewhere if there are multiple return values
+			auto returnType = m_currentFunc->returnParameters()[0]->annotation().type;
+			rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.expression()->annotation().type,
+					returnType, m_context.bvBuiltinFunctions());
+		}
 
 		// lhs should already be known (set by the enclosing FunctionDefinition)
 		const smack::Expr* lhs = m_currentRet;
