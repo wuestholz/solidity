@@ -1,6 +1,6 @@
 pragma solidity ^0.4.23;
 
-contract BitPrecise2 {
+contract BitPreciseArith {
     function add8u(uint8 x, uint8 y) public pure returns (uint8) { return x + y; }
     function sub8u(uint8 x, uint8 y) public pure returns (uint8) { return x - y; }
     function mul8u(uint8 x, uint8 y) public pure returns (uint8) { return x * y; }
