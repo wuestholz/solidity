@@ -323,21 +323,48 @@ smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, Ty
 
 	if (isBitPreciseType(targetType))
 	{
+		unsigned targetBits = getBits(targetType);
 		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
 		{
-			unsigned bits = getBits(targetType);
 			if (exprLit->getVal() < 0)
 			{
-				string fullName = "bv" + to_string(bits) + "neg";
+				string fullName = "bv" + to_string(targetBits) + "neg";
 				// TODO: check if exists
 				bvBuiltin[fullName] = smack::Decl::function(
-								fullName, {make_pair("", "bv"+to_string(bits))}, "bv"+to_string(bits), nullptr,
+								fullName, {make_pair("", "bv"+to_string(targetBits))}, "bv"+to_string(targetBits), nullptr,
 								{smack::Attr::attr("bvbuiltin", "bvneg")});
-				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), bits));
+				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), targetBits));
 			}
 			else
 			{
-				return smack::Expr::lit(exprLit->getVal(), bits);
+				return smack::Expr::lit(exprLit->getVal(), targetBits);
+			}
+		}
+		else if (isBitPreciseType(exprType))
+		{
+			unsigned exprBits = getBits(exprType);
+			bool targetSigned = isSigned(targetType);
+			bool exprSigned = isSigned(exprType);
+
+			if (targetBits == exprBits && targetSigned == exprSigned) { return expr; }
+			if (targetBits < exprBits) { BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion to smaller type")); }
+
+			if (!targetSigned && !exprSigned)
+			{
+				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
+				bvBuiltin[fullName] = smack::Decl::function(
+						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
+						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))});
+				return smack::Expr::fn(fullName, expr);
+			}
+
+			if (targetSigned && exprSigned)
+			{
+				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
+				bvBuiltin[fullName] = smack::Decl::function(
+						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
+						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))});
+				return smack::Expr::fn(fullName, expr);
 			}
 		}
 	}
