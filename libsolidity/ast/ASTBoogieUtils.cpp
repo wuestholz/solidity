@@ -317,7 +317,7 @@ bool ASTBoogieUtils::isSigned(TypePointer type)
 	return typeStr[0] == 'i';
 }
 
-smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, map<string, smack::FuncDecl*>& bvBuiltin)
+smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, map<string, smack::FuncDecl*>& bvBuiltin)
 {
 	if (!targetType || !exprType) { return expr; }
 
@@ -346,25 +346,32 @@ smack::Expr const* ASTBoogieUtils::checkAndConvertBV(smack::Expr const* expr, Ty
 			bool targetSigned = isSigned(targetType);
 			bool exprSigned = isSigned(exprType);
 
+			// Nothing to do if size and signedness is the same
 			if (targetBits == exprBits && targetSigned == exprSigned) { return expr; }
+			// Conversion to smaller type should have already been detected by the compiler
 			if (targetBits < exprBits) { BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion to smaller type")); }
 
-			if (!targetSigned && !exprSigned)
+			if (!exprSigned) // Unsigned can be converted to larger (signed or unsigned) with zero extension
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
+				// TODO: check if exists
 				bvBuiltin[fullName] = smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))});
 				return smack::Expr::fn(fullName, expr);
 			}
-
-			if (targetSigned && exprSigned)
+			else if (targetSigned) // Signed can only be converted to signed with sign extension
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
 				bvBuiltin[fullName] = smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))});
 				return smack::Expr::fn(fullName, expr);
+			}
+			else // Signed to unsigned should have alrady been detected by the compiler
+			{
+				BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion from signed to unsigned"));
+				return nullptr;
 			}
 		}
 	}

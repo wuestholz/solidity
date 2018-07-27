@@ -441,7 +441,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		smack::Expr const* initExpr = convertExpression(*_node.value());
 		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
-			initExpr = ASTBoogieUtils::checkAndConvertBV(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
+			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
 		}
 		for (auto stmt : *m_currentBlocks.top()) { m_stateVarInitializers.push_back(stmt); }
 		m_currentBlocks.pop();
@@ -702,6 +702,8 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		// Get rhs recursively
 		const smack::Expr* rhs = convertExpression(*_node.expression());
 
+		// TODO: bit-precise mode: check for implicit conversion
+
 		// lhs should already be known (set by the enclosing FunctionDefinition)
 		const smack::Expr* lhs = m_currentRet;
 
@@ -762,7 +764,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 			if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
 			{
-				rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context.bvBuiltinFunctions());
+				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context.bvBuiltinFunctions());
 			}
 
 			m_currentBlocks.top()->addStmt(smack::Stmt::assign(

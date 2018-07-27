@@ -189,7 +189,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	{
 		unsigned bits = ASTBoogieUtils::getBits(_node.leftHandSide().annotation().type);
 		bool isSigned = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type);
-		rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context.bvBuiltinFunctions());
+		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context.bvBuiltinFunctions());
 
 		switch(_node.assignmentOperator())
 		{
@@ -433,8 +433,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(commonType))
 	{
-		lhs = ASTBoogieUtils::checkAndConvertBV(lhs, _node.leftExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
-		rhs = ASTBoogieUtils::checkAndConvertBV(rhs, _node.rightExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
+		lhs = ASTBoogieUtils::checkImplicitBvConversion(lhs, _node.leftExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
+		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
 
 		m_currentExpr = bvBinaryFunc(_node, _node.getOperator(), lhs, rhs, ASTBoogieUtils::getBits(commonType), ASTBoogieUtils::isSigned(commonType));
 	}
@@ -628,7 +628,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				{
 					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
 					{
-						m_currentExpr = ASTBoogieUtils::checkAndConvertBV(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type, m_context.bvBuiltinFunctions());
+						m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type, m_context.bvBuiltinFunctions());
 					}
 				}
 			}

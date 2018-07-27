@@ -9,10 +9,15 @@ contract BitPreciseExt {
         int48 y = x;
         return y;
     }
+    function u32tos40(uint32 x) private pure returns (int40) {
+        int40 y = x;
+        return y;
+    }
 
     function __verifier_main() public pure {
         assert(u32tou40(123) == 123);
         assert(s16tos48(123) == 123);
         assert(s16tos48(-123) == -123);
+        assert(u32tos40(123) == 123);
     }
 }

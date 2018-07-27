@@ -89,7 +89,7 @@ public:
 
 	static bool isSigned(TypePointer type);
 
-	static smack::Expr const* checkAndConvertBV(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, std::map<std::string, smack::FuncDecl*>& bvBuiltin);
+	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, std::map<std::string, smack::FuncDecl*>& bvBuiltin);
 };
 
 }
