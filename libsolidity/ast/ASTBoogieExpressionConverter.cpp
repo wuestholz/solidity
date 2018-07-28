@@ -250,12 +250,22 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 			{
 				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
 				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
+				smack::Expr const* upd = nullptr;
+				if (m_context.bitPrecise())
+				{
+					unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
+					bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
+					upd = bvBinaryFunc(originalLhs, Token::Value::Add, smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
+							bvBinaryFunc(originalLhs, Token::Value::Sub, rhs, lhs, bits, isSigned), bits, isSigned);
+				}
+				else
+				{
+					upd = smack::Expr::plus(smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)), smack::Expr::minus(rhs, lhs));
+				}
+
 				m_newStatements.push_back(smack::Stmt::assign(
 						sumId,
-						smack::Expr::upd(
-								sumId,
-								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-								smack::Expr::plus(smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)), smack::Expr::minus(rhs, lhs)))));
+						smack::Expr::upd(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), upd)));
 			}
 		}
 	}
