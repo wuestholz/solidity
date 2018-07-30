@@ -546,6 +546,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			(*_node.arguments().begin())->accept(*this);
 			m_currentValue = m_currentExpr;
 			// TODO: check for implicit bitvector conversion
+			if (m_context.bitPrecise())
+			{
+				m_currentValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentValue,
+						(*_node.arguments().begin())->annotation().type, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned), m_context);
+			}
+
 
 			// Continue with the rest of the AST
 			expMa->expression().accept(*this);
@@ -607,12 +613,19 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			arg->accept(*this);
 			if (m_context.bitPrecise())
 			{
+				const FunctionDefinition* calledFunc = nullptr;
 				if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 				{
-					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
-					{
-						m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type, m_context);
-					}
+					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration)) { calledFunc = funcDef; }
+				}
+				if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
+				{
+					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration)) { calledFunc = funcDef; }
+				}
+
+				if (calledFunc)
+				{
+					m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
 				}
 			}
 			args.push_back(m_currentExpr);
@@ -705,7 +718,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 						m_context.bitPrecise() ?
-								ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Add,
+								ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Sub,
 										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
 										m_currentValue, 256, false) :
 								smack::Expr::minus(
