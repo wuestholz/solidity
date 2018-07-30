@@ -189,7 +189,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	{
 		unsigned bits = ASTBoogieUtils::getBits(_node.leftHandSide().annotation().type);
 		bool isSigned = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type);
-		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context.bvBuiltinFunctions());
+		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context);
 
 		switch(_node.assignmentOperator())
 		{
@@ -216,7 +216,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		case Token::AssignSub: rhs = smack::Expr::minus(lhs, rhs); break;
 		case Token::AssignMul: rhs = smack::Expr::times(lhs, rhs); break;
 		case Token::AssignDiv:
-			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
+			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context) == "int") rhs = smack::Expr::intdiv(lhs, rhs);
 			else rhs = smack::Expr::div(lhs, rhs);
 			break;
 		case Token::AssignMod: rhs = smack::Expr::mod(lhs, rhs); break;
@@ -351,7 +351,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 						bvBinaryFunc(_node, Token::Add, lhs, smack::Expr::lit(smack::bigint(1), bits), bits) :
 						bvBinaryFunc(_node, Token::Sub, lhs, smack::Expr::lit(smack::bigint(1), bits), bits);
 				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
 				m_newDecls.push_back(tempVar);
 				if (_node.isPrefixOperation()) // ++x (or --x)
 				{
@@ -392,7 +392,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 						smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1)) :
 						smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
 				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
 				m_newDecls.push_back(tempVar);
 				if (_node.isPrefixOperation()) // ++x (or --x)
 				{
@@ -443,8 +443,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(commonType))
 	{
-		lhs = ASTBoogieUtils::checkImplicitBvConversion(lhs, _node.leftExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
-		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightExpression().annotation().type, commonType, m_context.bvBuiltinFunctions());
+		lhs = ASTBoogieUtils::checkImplicitBvConversion(lhs, _node.leftExpression().annotation().type, commonType, m_context);
+		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightExpression().annotation().type, commonType, m_context);
 
 		m_currentExpr = bvBinaryFunc(_node, _node.getOperator(), lhs, rhs, ASTBoogieUtils::getBits(commonType), ASTBoogieUtils::isSigned(commonType));
 	}
@@ -459,7 +459,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::Sub: m_currentExpr = smack::Expr::minus(lhs, rhs); break;
 		case Token::Mul: m_currentExpr = smack::Expr::times(lhs, rhs); break;
 		case Token::Div: // Boogie has different division operators for integers and reals
-			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
+			if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context) == "int") m_currentExpr = smack::Expr::intdiv(lhs, rhs);
 			else m_currentExpr = smack::Expr::div(lhs, rhs);
 			break;
 		case Token::Mod: m_currentExpr = smack::Expr::mod(lhs, rhs); break;
@@ -534,8 +534,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				return false;
 			}
 		}
-		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise());
-		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, *arg, m_context.errorReporter(), m_context.bitPrecise());
+		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context);
+		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, *arg, m_context);
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
 		if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
@@ -547,7 +547,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (m_context.bitPrecise() && sourceType == "int_const")
 		{
 			arg->accept(*this);
-			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
+			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
 			return false;
 		}
 
@@ -584,6 +584,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			}
 			(*_node.arguments().begin())->accept(*this);
 			m_currentValue = m_currentExpr;
+			// TODO: check for implicit bitvector conversion
 
 			// Continue with the rest of the AST
 			expMa->expression().accept(*this);
@@ -632,7 +633,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
 	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	args.push_back(m_currentValue ? m_currentValue : smack::Expr::lit((long)0)); // msg.value
+	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ? smack::Expr::lit((long)0, 256) : smack::Expr::lit((long)0));
+	args.push_back(m_currentValue ? m_currentValue : defaultMsgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
 	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
@@ -647,7 +649,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				{
 					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
 					{
-						m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type, m_context.bvBuiltinFunctions());
+						m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, funcDef->parameters()[i]->annotation().type, m_context);
 					}
 				}
 			}
@@ -760,7 +762,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Create fresh variable to store the result
 		smack::Decl* returnVar = smack::Decl::variable(
 				funcName + "#" + to_string(_node.id()),
-				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+				ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context));
 		m_newDecls.push_back(returnVar);
 		// Result of the function call is the fresh variable
 		m_currentExpr = smack::Expr::id(returnVar->getName());

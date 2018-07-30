@@ -2,6 +2,7 @@
 
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
+#include <libsolidity/ast/BoogieContext.h>
 #include <libsolidity/interface/ErrorReporter.h>
 #include <libsolidity/parsing/Scanner.h>
 #include <string>
@@ -58,18 +59,17 @@ public:
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */
-	static smack::ProcDecl* createTransferProc();
+	static smack::ProcDecl* createTransferProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.call()
 	 */
-	static smack::ProcDecl* createCallProc();
-
+	static smack::ProcDecl* createCallProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.send()
 	 */
-	static smack::ProcDecl* createSendProc();
+	static smack::ProcDecl* createSendProc(BoogieContext& context);
 
 	/**
 	 * Map a declaration name to a name in Boogie
@@ -79,7 +79,7 @@ public:
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise);
+	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
 
 	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 
@@ -89,7 +89,7 @@ public:
 
 	static bool isSigned(TypePointer type);
 
-	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, std::map<std::string, smack::FuncDecl*>& bvBuiltin);
+	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 };
 
 }

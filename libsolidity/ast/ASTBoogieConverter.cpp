@@ -59,7 +59,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	// Add some extra parameters for globally available variables
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
 
 	list<smack::Block*> blocks;
 	blocks.push_back(smack::Block::block());
@@ -90,17 +90,18 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
 	m_program.getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
 	// address.transfer()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc(m_context));
 	// address.call()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc(m_context));
 	// address.send()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(m_context));
 	// Uninterpreted type for strings
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, "int"));
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -207,7 +208,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			m_program.getDeclarations().push_back(
 						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
 						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context.errorReporter(), m_context.bitPrecise())));
+						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
 		}
 	}
 
@@ -289,11 +290,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add some extra parameters for globally available variables
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{
-		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context.errorReporter(), m_context.bitPrecise())));
+		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context)));
 		if (p->type()->category() == Type::Category::Array) // Array length
 		{
 			params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.bitPrecise() ? "bv256" : "int"));
@@ -309,7 +310,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Arrays are not supported as return values");
 			return false;
 		}
-		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context.errorReporter(), m_context.bitPrecise())));
+		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context)));
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -380,7 +381,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
 				{
 					smack::Decl* modifierParam = smack::Decl::variable(ASTBoogieUtils::mapDeclName(*(modifierDecl->parameters()[i])),
-							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_context.errorReporter(), m_context.bitPrecise()));
+							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_context));
 					m_localDecls.push_back(modifierParam);
 					smack::Expr const* modifierArg = convertExpression(*modifier->arguments()->at(i));
 					m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(modifierParam->getName()), modifierArg));
@@ -452,7 +453,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		smack::Expr const* initExpr = convertExpression(*_node.value());
 		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
-			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
+			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
 		}
 		for (auto stmt : *m_currentBlocks.top()) { m_stateVarInitializers.push_back(stmt); }
 		m_currentBlocks.pop();
@@ -468,14 +469,14 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	// State variables are represented as maps from address to their type
 	m_program.getDeclarations().push_back(
 			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_context.errorReporter(), m_context.bitPrecise())));
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_context)));
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
 	{
 		m_program.getDeclarations().push_back(
 				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
-				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
 	}
 	return false;
 }
@@ -574,7 +575,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
 				{
 					smack::Decl* modifierParam = smack::Decl::variable(ASTBoogieUtils::mapDeclName(*(modifierDecl->parameters()[i])),
-							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_context.errorReporter(), m_context.bitPrecise()));
+							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, *(modifierDecl->parameters()[i]), m_context));
 					m_localDecls.push_back(modifierParam);
 					smack::Expr const* modifierArg = convertExpression(*modifier->arguments()->at(i));
 					m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(modifierParam->getName()), modifierArg));
@@ -718,7 +719,7 @@ bool ASTBoogieConverter::visit(Return const& _node)
 			// We already throw an error elsewhere if there are multiple return values
 			auto returnType = m_currentFunc->returnParameters()[0]->annotation().type;
 			rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.expression()->annotation().type,
-					returnType, m_context.bvBuiltinFunctions());
+					returnType, m_context);
 		}
 
 		// lhs should already be known (set by the enclosing FunctionDefinition)
@@ -758,7 +759,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				// Boogie requires local variables to be declared at the beginning of the procedure
 				m_localDecls.push_back(smack::Decl::variable(
 						ASTBoogieUtils::mapDeclName(*decl),
-						ASTBoogieUtils::mapType(decl->type(), *decl, m_context.errorReporter(), m_context.bitPrecise())));
+						ASTBoogieUtils::mapType(decl->type(), *decl, m_context)));
 			}
 			else
 			{
@@ -781,7 +782,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 			if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
 			{
-				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context.bvBuiltinFunctions());
+				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context);
 			}
 
 			m_currentBlocks.top()->addStmt(smack::Stmt::assign(
@@ -829,7 +830,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 	smack::Expr const* expr = convertExpression(_node.expression());
 	smack::Decl* tmpVar = smack::Decl::variable("tmpVar" + to_string(_node.id()),
-			ASTBoogieUtils::mapType(_node.expression().annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()));
+			ASTBoogieUtils::mapType(_node.expression().annotation().type, _node, m_context));
 	m_localDecls.push_back(tmpVar);
 	m_currentBlocks.top()->addStmt(smack::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
 	m_currentBlocks.top()->addStmt(smack::Stmt::assign(smack::Expr::id(tmpVar->getName()), expr));
