@@ -633,7 +633,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
 	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ? smack::Expr::lit((long)0, 256) : smack::Expr::lit((long)0));
+	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ?
+			smack::Expr::lit(smack::bigint(0), 256) : smack::Expr::lit(smack::bigint(0)));
 	args.push_back(m_currentValue ? m_currentValue : defaultMsgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
