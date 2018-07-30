@@ -226,7 +226,7 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise)
+string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context)
 {
 	string tpStr = tp->toString();
 	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
@@ -238,28 +238,28 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int_const";
 	for (int i = 8; i <= 256; ++i)
 	{
-		if (tpStr == "int" + to_string(i)) return bitPrecise ? "bv" + to_string(i) : "int";
-		if (tpStr == "uint" + to_string(i)) return bitPrecise ? "bv" + to_string(i) : "int";
+		if (tpStr == "int" + to_string(i)) return context.bitPrecise() ? "bv" + to_string(i) : "int";
+		if (tpStr == "uint" + to_string(i)) return context.bitPrecise() ? "bv" + to_string(i) : "int";
 	}
 	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
 	if (tp->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[" + string(bitPrecise ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, errorReporter, bitPrecise);
+		return "[" + string(context.bitPrecise() ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, context);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
 	{
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
-		return "[" + mapType(mappingType->keyType(), _associatedNode, errorReporter, bitPrecise) + "]"
-				+ mapType(mappingType->valueType(), _associatedNode, errorReporter, bitPrecise);
+		return "[" + mapType(mappingType->keyType(), _associatedNode, context) + "]"
+				+ mapType(mappingType->valueType(), _associatedNode, context);
 	}
 
 	if (tp->category() == Type::Category::FixedBytes)
 	{
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
-		if (bitPrecise)
+		if (context.bitPrecise())
 		{
 			if (fbType->numBytes() == 1) return "bv8";
 			else return "[bv256]bv8";
@@ -274,11 +274,11 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 	// Unsupported types
 	if (boost::algorithm::starts_with(tpStr, "tuple("))
 	{
-		errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Tuples are not supported");
+		context.errorReporter().error(Error::Type::ParserError, _associatedNode.location(), "Tuples are not supported");
 	}
 	else
 	{
-		errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+		context.errorReporter().error(Error::Type::ParserError, _associatedNode.location(), "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
 	return ERR_TYPE;
 }
@@ -315,7 +315,7 @@ bool ASTBoogieUtils::isSigned(TypePointer type)
 	return typeStr[0] == 'i';
 }
 
-smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, map<string, smack::FuncDecl*>& bvBuiltin)
+smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
 	if (!targetType || !exprType) { return expr; }
 
@@ -328,7 +328,7 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			{
 				string fullName = "bv" + to_string(targetBits) + "neg";
 				// TODO: check if exists
-				bvBuiltin[fullName] = smack::Decl::function(
+				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
 								fullName, {make_pair("", "bv"+to_string(targetBits))}, "bv"+to_string(targetBits), nullptr,
 								{smack::Attr::attr("bvbuiltin", "bvneg")});
 				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), targetBits));
@@ -353,7 +353,7 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
 				// TODO: check if exists
-				bvBuiltin[fullName] = smack::Decl::function(
+				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))});
 				return smack::Expr::fn(fullName, expr);
@@ -361,7 +361,7 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			else if (targetSigned) // Signed can only be converted to signed with sign extension
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
-				bvBuiltin[fullName] = smack::Decl::function(
+				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))});
 				return smack::Expr::fn(fullName, expr);

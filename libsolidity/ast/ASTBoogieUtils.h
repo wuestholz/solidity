@@ -79,7 +79,7 @@ public:
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, ErrorReporter& errorReporter, bool bitPrecise);
+	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
 
 	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 
@@ -89,7 +89,7 @@ public:
 
 	static bool isSigned(TypePointer type);
 
-	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, std::map<std::string, smack::FuncDecl*>& bvBuiltin);
+	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 };
 
 }
