@@ -15,7 +15,7 @@ def main():
     
     solc = "~/Workspace/solidity-sri/build/solc/solc"
     boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
-    output = "./"
+    output = "."
     timeout = 30
 
     # Set up argument parser
@@ -38,7 +38,7 @@ def main():
         timeout = args.timeout
 
     solFile = args.file
-    bplFile = os.path.basename(solFile) + ".bpl"
+    bplFile = output + "/" + os.path.basename(solFile) + ".bpl"
 
     # First convert .sol to .bpl
     solcArgs = " --boogie " + solFile + " -o " + output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
