@@ -4,12 +4,19 @@ import argparse
 import re
 import subprocess
 import os
+import threading
+import signal
 
-solc = "~/Workspace/solidity-sri/build/solc/solc"
-boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
+def kill():
+    print("Timeout while running verifier")
+    os.kill(os.getpid(), signal.SIGKILL)
 
 def main():
-    global solc, boogie
+    
+    solc = "~/Workspace/solidity-sri/build/solc/solc"
+    boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
+    output = "./"
+    timeout = 30
 
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
@@ -17,34 +24,46 @@ def main():
     parser.add_argument('--bit-precise', action='store_true', help='Enable bit-precise verification')
     parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)")
     parser.add_argument("--boogie", type=str, help="Boogie binary to use")
+    parser.add_argument("--output", type=str, help="Output directory")
+    parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)")
     args = parser.parse_args()
 
     if args.solc is not None:
         solc = args.solc
     if args.boogie is not None:
         boogie = args.boogie
+    if args.output is not None:
+        output = args.output
+    if args.timeout is not None:
+        timeout = args.timeout
 
     solFile = args.file
     bplFile = os.path.basename(solFile) + ".bpl"
 
     # First convert .sol to .bpl
-    solcArgs = " --boogie " + solFile + " -o ./ --overwrite" + (" --bit-precise" if args.bit_precise else "")
+    solcArgs = " --boogie " + solFile + " -o " + output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
     convertCommand = solc + " " + solcArgs
     try:
         subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
         compilerOutputStr = err.output.decode("utf-8")
+        print("Error while running compiler, details:")
         print(compilerOutputStr)
         return
 
+    # Run timer
+    timer = threading.Timer(timeout, kill)
     # Run verification, get result
+    timer.start()
     boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0"
     verifyCommand = "mono " + boogie + " " + bplFile + " " + boogieArgs
-    verifierOutput = subprocess.check_output(verifyCommand, shell = True)
+    verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
+    timer.cancel()
+
     verifierOutputStr = verifierOutput.decode("utf-8")
     if re.search("Boogie program verifier finished with", verifierOutputStr) == None:
-        print("Error(s) while running verifier, details:")
-        print(verifierOutputStr)
+        print("Error while running verifier, details:")
+        print(verifierOutputStr)        
         return
 
     # Map results back to .sol file
