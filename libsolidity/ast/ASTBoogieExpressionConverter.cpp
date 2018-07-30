@@ -504,12 +504,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
+		auto arg = *_node.arguments().begin();
 		// Nothing to do when converting to address
 		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
 		{
 			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
 			{
-				(*_node.arguments().begin())->accept(*this);
+				arg->accept(*this);
 				if (auto lit = dynamic_cast<smack::IntLit const*>(m_currentExpr))
 				{
 					if (lit->getVal() == 0)
@@ -529,16 +530,24 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		{
 			if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
 			{
-				(*_node.arguments().begin())->accept(*this);
+				arg->accept(*this);
 				return false;
 			}
 		}
+		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise());
+		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, *arg, m_context.errorReporter(), m_context.bitPrecise());
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
-		if (ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context.errorReporter(), m_context.bitPrecise()) ==
-			ASTBoogieUtils::mapType((*_node.arguments().begin())->annotation().type, **_node.arguments().begin(), m_context.errorReporter(), m_context.bitPrecise()))
+		if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
 		{
-			(*_node.arguments().begin())->accept(*this);
+			arg->accept(*this);
+			return false;
+		}
+
+		if (m_context.bitPrecise() && sourceType == "int_const")
+		{
+			arg->accept(*this);
+			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context.bvBuiltinFunctions());
 			return false;
 		}
 

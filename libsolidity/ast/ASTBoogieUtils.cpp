@@ -233,11 +233,9 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, E
 	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
 	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
-	if (boost::algorithm::starts_with(tpStr, "int_const "))
-	{
-		if (bitPrecise) errorReporter.error(Error::Type::ParserError, _associatedNode.location(), "Constants are not supported in bit-precise mode");
-		return "int";
-	}
+	// For literals we return 'int_const' even in bit-precise mode, they will be
+	// converted to appropriate type when assigned to something
+	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int_const";
 	for (int i = 8; i <= 256; ++i)
 	{
 		if (tpStr == "int" + to_string(i)) return bitPrecise ? "bv" + to_string(i) : "int";
