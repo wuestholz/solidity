@@ -18,7 +18,8 @@ def main():
     bplFile = solFile + ".bpl"
 
     # First convert .sol to .bpl
-    convertCommand = solc + " --boogie " + solFile + " -o ./ --overwrite" + (" --bit-precise" if args.bit_precise else "")
+    solcArgs = " --boogie " + solFile + " -o ./ --overwrite" + (" --bit-precise" if args.bit_precise else "")
+    convertCommand = solc + " " + solcArgs
     try:
         subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
@@ -27,7 +28,8 @@ def main():
         return
 
     # Run verification, get result
-    verifyCommand = "mono " + boogie + " " + bplFile + " /nologo /doModSetAnalysis /errorTrace:0"
+    boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0"
+    verifyCommand = "mono " + boogie + " " + bplFile + " " + boogieArgs
     verifierOutput = subprocess.check_output(verifyCommand, shell = True)
     verifierOutputStr = verifierOutput.decode("utf-8")
     if re.search("Boogie program verifier finished with", verifierOutputStr) == None:
