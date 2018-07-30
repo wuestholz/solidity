@@ -3,19 +3,29 @@
 import argparse
 import re
 import subprocess
+import os
 
 solc = "~/Workspace/solidity-sri/build/solc/solc"
 boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
 
 def main():
+    global solc, boogie
+
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
     parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
     parser.add_argument('--bit-precise', action='store_true', help='Enable bit-precise verification')
+    parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)")
+    parser.add_argument("--boogie", type=str, help="Boogie binary to use")
     args = parser.parse_args()
 
+    if args.solc is not None:
+        solc = args.solc
+    if args.boogie is not None:
+        boogie = args.boogie
+
     solFile = args.file
-    bplFile = solFile + ".bpl"
+    bplFile = os.path.basename(solFile) + ".bpl"
 
     # First convert .sol to .bpl
     solcArgs = " --boogie " + solFile + " -o ./ --overwrite" + (" --bit-precise" if args.bit_precise else "")
