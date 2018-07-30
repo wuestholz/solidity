@@ -85,7 +85,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	transfer->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
+	transfer->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount), {smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
 	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
@@ -196,7 +196,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			sendParams, sendReturns, list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	sendProc->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount)));
+	sendProc->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount), {smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
 	// Postcondition: if result is true and sender/receiver is different ether gets transferred
 	// otherwise nothing happens
 	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
