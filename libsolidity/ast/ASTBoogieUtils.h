@@ -90,6 +90,10 @@ public:
 	static bool isSigned(TypePointer type);
 
 	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+
+	static smack::Expr const* bvBinaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
+
+	static smack::Expr const* bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned = false);
 };
 
 }

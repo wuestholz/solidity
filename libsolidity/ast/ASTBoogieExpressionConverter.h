@@ -44,12 +44,6 @@ private:
 	// Helper method to get the length of an array
 	const smack::Expr* getSumShadowVar(ASTNode const* node);
 
-	const smack::Expr* bvBinaryFunc(ASTNode const& associatedNode, Token::Value op,
-			smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
-
-	const smack::Expr* bvUnaryFunc(ASTNode const& associatedNode, Token::Value op,
-			smack::Expr const* subExpr, unsigned bits, bool isSigned = false);
-
 	void reportError(SourceLocation const& location, std::string const& description);
 	void reportWarning(SourceLocation const& location, std::string const& description);
 

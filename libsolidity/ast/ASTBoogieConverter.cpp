@@ -347,9 +347,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					smack::Expr::upd(
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							smack::Expr::plus(
-									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
+							m_context.bitPrecise() ?
+									ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Add,
+											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+											smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false) :
+									smack::Expr::plus(
+											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+											smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
 	}
 
 	if (_node.modifiers().empty())

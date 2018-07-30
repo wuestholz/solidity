@@ -68,7 +68,9 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					smack::Expr::plus(this_bal, amount)
+					context.bitPrecise() ?
+							bvBinaryFunc(context, Token::Value::Add, this_bal, amount, 256, false) :
+							smack::Expr::plus(this_bal, amount)
 			)));
 	// balance[msg.sender] -= amount
 	transferImpl->addStmt(smack::Stmt::assign(
@@ -76,7 +78,9 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					smack::Expr::minus(sender_bal, amount)
+					context.bitPrecise() ?
+							bvBinaryFunc(context, Token::Value::Sub, sender_bal, amount, 256, false) :
+							smack::Expr::minus(sender_bal, amount)
 			)));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
 	list<smack::Block*> transferBlocks;
@@ -85,13 +89,23 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	transfer->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount), {smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
+	transfer->getRequires().push_back(smack::Specification::spec(
+			context.bitPrecise() ?
+					bvBinaryFunc(context, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false) :
+					smack::Expr::gte(sender_bal, amount),
+			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
 	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
 			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
-					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
+					smack::Expr::eq(sender_bal,
+							context.bitPrecise() ?
+									bvBinaryFunc(context, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false) :
+									smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
+					smack::Expr::eq(this_bal,
+							context.bitPrecise() ?
+									bvBinaryFunc(context, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false) :
+									smack::Expr::plus(smack::Expr::old(this_bal), amount))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -124,7 +138,9 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					smack::Expr::plus(this_bal, msg_val)
+					context.bitPrecise() ?
+						bvBinaryFunc(context, Token::Value::Add, this_bal, msg_val, 256, false) :
+						smack::Expr::plus(this_bal, msg_val)
 			)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
@@ -171,7 +187,9 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					smack::Expr::plus(this_bal, amount)
+					context.bitPrecise() ?
+							bvBinaryFunc(context, Token::Value::Add, this_bal, amount, 256, false) :
+							smack::Expr::plus(this_bal, amount)
 			)));
 	// balance[msg.sender] -= amount
 	thenBlock->addStmt(smack::Stmt::assign(
@@ -179,7 +197,9 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					smack::Expr::minus(sender_bal, amount)
+					context.bitPrecise() ?
+							bvBinaryFunc(context, Token::Value::Sub, sender_bal, amount, 256, false) :
+							smack::Expr::minus(sender_bal, amount)
 			)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
@@ -196,14 +216,24 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			sendParams, sendReturns, list<smack::Decl*>(), transferBlocks);
 
 	// Precondition: there is enough ether to transfer
-	sendProc->getRequires().push_back(smack::Specification::spec(smack::Expr::gte(sender_bal, amount), {smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
+	sendProc->getRequires().push_back(smack::Specification::spec(
+			context.bitPrecise() ?
+					bvBinaryFunc(context, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false) :
+					smack::Expr::gte(sender_bal, amount),
+			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
 	// Postcondition: if result is true and sender/receiver is different ether gets transferred
 	// otherwise nothing happens
 	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
 			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
-					smack::Expr::eq(this_bal, smack::Expr::plus(smack::Expr::old(this_bal), amount))),
+					smack::Expr::eq(sender_bal,
+							context.bitPrecise() ?
+									bvBinaryFunc(context, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false) :
+									smack::Expr::minus(smack::Expr::old(sender_bal), amount)),
+					smack::Expr::eq(this_bal,
+							context.bitPrecise() ?
+									bvBinaryFunc(context, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false) :
+									smack::Expr::plus(smack::Expr::old(this_bal), amount))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -375,6 +405,63 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 	}
 
 	return expr;
+}
+
+smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::Value op,
+		smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
+{
+	string uns("");
+	string name("");
+	string retType("");
+	switch (op) {
+	case Token::Add: name = "add"; retType = "bv" + to_string(bits); break;
+	case Token::Sub: name = "sub"; retType = "bv" + to_string(bits); break;
+	case Token::Mul: name = "mul"; retType = "bv" + to_string(bits); break;
+	case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = "bv" + to_string(bits); break;
+
+	case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
+	case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
+	case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
+
+	case Token::Equal: return smack::Expr::eq(lhs, rhs);
+	case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
+
+	case Token::LessThan: name = isSigned ? "slt" : "ult"; retType = "bool"; break;
+	case Token::GreaterThan: name = isSigned ? "sgt" : "ugt"; retType = "bool";  break;
+	case Token::LessThanOrEqual: name = isSigned ? "sle" : "ule"; retType = "bool";  break;
+	case Token::GreaterThanOrEqual: name = isSigned ? "sge" : "uge"; retType = "bool";  break;
+	default:
+		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment(string("Unsupported binary operator in bit-precise mode ") + Token::toString(op)));
+		return nullptr;
+	}
+	string fullName = "bv" + to_string(bits) + name;
+	// TODO: check if exists
+	context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+					fullName, {make_pair("", "bv"+to_string(bits)), make_pair("", "bv"+to_string(bits))}, retType, nullptr,
+					{smack::Attr::attr("bvbuiltin", "bv" + name)});
+
+	return smack::Expr::fn("bv" + to_string(bits) + name, lhs, rhs);
+}
+
+smack::Expr const* ASTBoogieUtils::bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool)
+{
+	string name("");
+	switch (op) {
+	case Token::Add: return subExpr;
+	case Token::Sub: name = "neg"; break;
+	case Token::BitNot: name = "not"; break;
+	default:
+		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment(string("Unsupported unary operator in bit-precise mode ") + Token::toString(op)));
+		return nullptr;
+	}
+
+	string fullName = "bv" + to_string(bits) + name;
+	// TODO: check if exists
+	context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+					fullName, {make_pair("", "bv"+to_string(bits))}, "bv"+to_string(bits), nullptr,
+					{smack::Attr::attr("bvbuiltin", "bv" + name)});
+
+	return smack::Expr::fn("bv" + to_string(bits) + name, subExpr);
 }
 
 
