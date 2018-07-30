@@ -47,14 +47,14 @@ const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
 const string ASTBoogieUtils::SOLIDITY_NOW = "now";
 const string ASTBoogieUtils::BOOGIE_NOW = "__now";
 
-smack::ProcDecl* ASTBoogieUtils::createTransferProc()
+smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	list<smack::Binding> transferParams;
 	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
-	transferParams.push_back(make_pair("amount", "int"));
+	transferParams.push_back(make_pair(BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
+	transferParams.push_back(make_pair("amount", context.bitPrecise() ? "bv256" : "int"));
 
 	// Body
 	smack::Block* transferImpl = smack::Block::block();
@@ -99,13 +99,13 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc()
 	return transfer;
 }
 
-smack::ProcDecl* ASTBoogieUtils::createCallProc()
+smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value
 	list<smack::Binding> callParams;
 	callParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	callParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	callParams.push_back(make_pair(BOOGIE_MSG_VALUE, "int"));
+	callParams.push_back(make_pair(BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
 
 	// Return value
 	list<smack::Binding> callReturns;
@@ -144,14 +144,14 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc()
 	return callProc;
 }
 
-smack::ProcDecl* ASTBoogieUtils::createSendProc()
+smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	list<smack::Binding> sendParams;
 	sendParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
 	sendParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	sendParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int"));
-	sendParams.push_back(make_pair("amount", "int"));
+	sendParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
+	sendParams.push_back(make_pair("amount", context.bitPrecise() ? "bv256" : "int"));
 
 	// Return value
 	list<smack::Binding> sendReturns;

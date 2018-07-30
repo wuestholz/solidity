@@ -584,6 +584,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			}
 			(*_node.arguments().begin())->accept(*this);
 			m_currentValue = m_currentExpr;
+			// TODO: check for implicit bitvector conversion
 
 			// Continue with the rest of the AST
 			expMa->expression().accept(*this);
@@ -632,7 +633,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
 	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	args.push_back(m_currentValue ? m_currentValue : smack::Expr::lit((long)0)); // msg.value
+	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ? smack::Expr::lit((long)0, 256) : smack::Expr::lit((long)0));
+	args.push_back(m_currentValue ? m_currentValue : defaultMsgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 	// Add normal arguments (except when calling 'call') TODO: is this ok?
 	if (funcName != ASTBoogieUtils::BOOGIE_CALL)

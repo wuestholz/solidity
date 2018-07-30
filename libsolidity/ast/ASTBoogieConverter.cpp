@@ -59,7 +59,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	// Add some extra parameters for globally available variables
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
 
 	list<smack::Block*> blocks;
 	blocks.push_back(smack::Block::block());
@@ -90,17 +90,18 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
 	m_program.getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE, "[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
 	// address.transfer()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc(m_context));
 	// address.call()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc(m_context));
 	// address.send()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc());
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(m_context));
 	// Uninterpreted type for strings
 	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, "int"));
+	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
@@ -289,7 +290,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add some extra parameters for globally available variables
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
 	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, "int")); // msg.value
+	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
 	// Add original parameters of the function
 	for (auto p : _node.parameters())
 	{
@@ -475,7 +476,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	{
 		m_program.getDeclarations().push_back(
 				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
-				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]int"));
+				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
 	}
 	return false;
 }
