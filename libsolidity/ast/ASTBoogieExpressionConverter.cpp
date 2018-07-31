@@ -846,18 +846,21 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// address.transfer()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
+		m_context.addTransferFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
 		return false;
 	}
 	// address.send()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
 	{
+		m_context.addSendFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
 		return false;
 	}
 	// address.call()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
 	{
+		m_context.addCallFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
 		return false;
 	}

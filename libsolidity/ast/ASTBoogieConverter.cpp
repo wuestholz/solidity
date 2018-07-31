@@ -22,7 +22,7 @@ namespace solidity
 
 void ASTBoogieConverter::addGlobalComment(string str)
 {
-	m_program.getDeclarations().push_back(smack::Decl::comment("", str));
+	m_context.program().getDeclarations().push_back(smack::Decl::comment("", str));
 }
 
 const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node)
@@ -34,7 +34,7 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 	for (auto c : result.newConstants)
 	{
 		bool alreadyDefined = false;
-		for (auto d : m_program.getDeclarations())
+		for (auto d : m_context.program().getDeclarations())
 		{
 			if (d->getName() == c->getName())
 			{
@@ -43,7 +43,7 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 				break;
 			}
 		}
-		if (!alreadyDefined) m_program.getDeclarations().push_back(c);
+		if (!alreadyDefined) m_context.program().getDeclarations().push_back(c);
 	}
 
 	return result.expr;
@@ -77,7 +77,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
 	}
 	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
-	m_program.getDeclarations().push_back(procDecl);
+	m_context.program().getDeclarations().push_back(procDecl);
 }
 
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
@@ -88,36 +88,25 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
-	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
-	m_program.getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	m_context.program().getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
+	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
-	// address.transfer()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc(m_context));
-	// address.call()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc(m_context));
-	// address.send()
-	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(m_context));
 	// Uninterpreted type for strings
-	m_program.getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
-	m_program.getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
+	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
 }
 
 void ASTBoogieConverter::convert(ASTNode const& _node)
 {
 	_node.accept(*this);
-	for (auto builtin : m_context.bvBuiltinFunctions())
-	{
-		// TODO: avoid duplicates
-		m_program.getDeclarations().push_back(builtin.second);
-	}
 }
 
 void ASTBoogieConverter::print(ostream& _stream)
 {
-	m_program.print(_stream);
+	m_context.program().print(_stream);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +195,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		else
 		{
 			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-			m_program.getDeclarations().push_back(
+			m_context.program().getDeclarations().push_back(
 						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
 						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
 						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
@@ -438,7 +427,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
 	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
-	m_program.getDeclarations().push_back(procDecl);
+	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
 }
 
@@ -473,14 +462,14 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	addGlobalComment("");
 	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
-	m_program.getDeclarations().push_back(
+	m_context.program().getDeclarations().push_back(
 			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_context)));
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
 	{
-		m_program.getDeclarations().push_back(
+		m_context.program().getDeclarations().push_back(
 				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
 				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
 	}

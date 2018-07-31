@@ -18,9 +18,6 @@ class ASTBoogieConverter : private ASTConstVisitor
 private:
 	BoogieContext& m_context;
 
-	// Result of the conversion is a single Boogie program (top-level node)
-	smack::Program m_program;
-
 	// Helper variables to pass information between the visit methods
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed

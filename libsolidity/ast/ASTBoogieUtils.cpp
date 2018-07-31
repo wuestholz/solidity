@@ -357,10 +357,9 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			if (exprLit->getVal() < 0)
 			{
 				string fullName = "bv" + to_string(targetBits) + "neg";
-				// TODO: check if exists
-				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+				context.addBvBuiltinFunction(fullName, smack::Decl::function(
 								fullName, {make_pair("", "bv"+to_string(targetBits))}, "bv"+to_string(targetBits), nullptr,
-								{smack::Attr::attr("bvbuiltin", "bvneg")});
+								{smack::Attr::attr("bvbuiltin", "bvneg")}));
 				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), targetBits));
 			}
 			else
@@ -382,18 +381,17 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			if (!exprSigned) // Unsigned can be converted to larger (signed or unsigned) with zero extension
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
-				// TODO: check if exists
-				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+				context.addBvBuiltinFunction(fullName, smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
-						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))});
+						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))}));
 				return smack::Expr::fn(fullName, expr);
 			}
 			else if (targetSigned) // Signed can only be converted to signed with sign extension
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
-				context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+				context.addBvBuiltinFunction(fullName, smack::Decl::function(
 						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
-						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))});
+						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
 				return smack::Expr::fn(fullName, expr);
 			}
 			else // Signed to unsigned should have alrady been detected by the compiler
@@ -435,10 +433,9 @@ smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::V
 		return nullptr;
 	}
 	string fullName = "bv" + to_string(bits) + name;
-	// TODO: check if exists
-	context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+	context.addBvBuiltinFunction(fullName, smack::Decl::function(
 					fullName, {make_pair("", "bv"+to_string(bits)), make_pair("", "bv"+to_string(bits))}, retType, nullptr,
-					{smack::Attr::attr("bvbuiltin", "bv" + name)});
+					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
 
 	return smack::Expr::fn("bv" + to_string(bits) + name, lhs, rhs);
 }
@@ -456,10 +453,9 @@ smack::Expr const* ASTBoogieUtils::bvUnaryFunc(BoogieContext& context, Token::Va
 	}
 
 	string fullName = "bv" + to_string(bits) + name;
-	// TODO: check if exists
-	context.bvBuiltinFunctions()[fullName] = smack::Decl::function(
+	context.addBvBuiltinFunction(fullName, smack::Decl::function(
 					fullName, {make_pair("", "bv"+to_string(bits))}, "bv"+to_string(bits), nullptr,
-					{smack::Attr::attr("bvbuiltin", "bv" + name)});
+					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
 
 	return smack::Expr::fn("bv" + to_string(bits) + name, subExpr);
 }
