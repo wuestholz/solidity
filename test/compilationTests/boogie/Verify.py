@@ -6,10 +6,14 @@ import subprocess
 import os
 import threading
 import signal
+import psutil
 
 def kill():
     print("Timeout while running verifier")
-    os.killpg(os.getpgrp(), signal.SIGKILL)
+    parent = psutil.Process(os.getpid())
+    for child in parent.children(recursive=True):  # or parent.children() for recursive=False
+        child.kill()
+    parent.kill()
 
 def main():
     
