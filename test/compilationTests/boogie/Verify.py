@@ -82,13 +82,14 @@ def main():
             print(getSourceLineAndCol(errLinePrev) + ": " + getMessage(errLine))
         if "Verification inconclusive" in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
-            print(getSourceLineAndCol(errLine) + ": Inconclusive result for function " + getMessage(errLine))
+            print(getSourceLineAndCol(errLine) + ": Inconclusive result for function '" + getMessage(errLine) + "'")
 
     if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[-1])):
         print("No errors found.")
 
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
+    # Errors have the format "filename(line,col): Message"
     errFileLineCol = outputLine.split(":")[0]
     errFile = errFileLineCol[:errFileLineCol.rfind("(")]
     errLineNo = int(errFileLineCol[errFileLineCol.rfind("(")+1:errFileLineCol.rfind(",")]) - 1
@@ -97,11 +98,18 @@ def getRelatedLineFromBpl(outputLine, offset):
 # Gets the original (.sol) line and column number from an annotated line in the .bpl
 def getSourceLineAndCol(line):
     match = re.search("{:sourceloc \"([^}]*)\", (\\d+), (\\d+)}", line)
-    return match.group(1) + ", line " + match.group(2) + ", col " + match.group(3)
+    if match is None:
+        return "[Could not trace back error location]"
+    else:
+        return match.group(1) + ", line " + match.group(2) + ", col " + match.group(3)
 
 # Gets the message from an annotated line in the .bpl
 def getMessage(line):
-    return re.search("{:message \"([^}]*)\"}", line).group(1)
+    match = re.search("{:message \"([^}]*)\"}", line)
+    if match is None:
+        return "[No message found for error]"
+    else:
+        return match.group(1)
 
 if __name__== "__main__":
     main()
