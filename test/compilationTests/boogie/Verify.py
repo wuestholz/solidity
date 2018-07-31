@@ -18,7 +18,7 @@ def kill():
 def main():
     
     solc = "~/Workspace/solidity-sri/build/solc/solc"
-    boogie = "~/Workspace/boogie/Binaries/Boogie.exe"
+    boogie = "~/Workspace/boogie-yices/Binaries/Boogie.exe"
     output = "."
     timeout = 30
 
@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--boogie", type=str, help="Boogie binary to use")
     parser.add_argument("--output", type=str, help="Output directory")
     parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)")
+    parser.add_argument('--yices', action='store_true', help='Use Yices as SMT solver')
     args = parser.parse_args()
 
     if args.solc is not None:
@@ -59,7 +60,7 @@ def main():
     timer = threading.Timer(timeout, kill)
     # Run verification, get result
     timer.start()
-    boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0"
+    boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0" + (" /proverOpt:SOLVER=Yices2 /useArrayTheory" if args.yices else "")
     verifyCommand = "mono " + boogie + " " + bplFile + " " + boogieArgs
     verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
     timer.cancel()
