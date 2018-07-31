@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--output", type=str, help="Output directory", default=".")
     parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)", default=30)
     parser.add_argument('--yices', action='store_true', help='Use Yices as SMT solver')
+    parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
     args = parser.parse_args()
 
     solFile = args.file
@@ -30,7 +31,12 @@ def main():
     solcArgs = " --boogie " + solFile + " -o " + args.output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
     convertCommand = args.solc + " " + solcArgs
     try:
-        subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+        compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+        if args.verbose:
+            compilerOutputStr = compilerOutput.decode("utf-8")
+            print("----- Compiler output -----")
+            print(compilerOutputStr)
+            print("---------------------------")
     except subprocess.CalledProcessError as err:
         compilerOutputStr = err.output.decode("utf-8")
         print("Error while running compiler, details:")
@@ -51,6 +57,10 @@ def main():
         print("Error while running verifier, details:")
         print(verifierOutputStr)        
         return
+    elif args.verbose:
+        print("----- Verifier output -----")
+        print(verifierOutputStr)
+        print("---------------------------")
 
     # Map results back to .sol file
     outputLines = list(filter(None, verifierOutputStr.split("\n")))
