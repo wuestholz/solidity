@@ -9,7 +9,7 @@ import signal
 
 def kill():
     print("Timeout while running verifier")
-    os.kill(os.getpid(), signal.SIGKILL)
+    os.killpg(os.getpgrp(), signal.SIGKILL)
 
 def main():
     
