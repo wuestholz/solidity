@@ -12,38 +12,23 @@ def kill():
     os.killpg(os.getpgrp(), signal.SIGKILL)
 
 def main():
-    
-    solc = "~/Workspace/solidity-sri/build/solc/solc"
-    boogie = "~/Workspace/boogie-yices/Binaries/Boogie.exe"
-    output = "."
-    timeout = 30
-
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
-    parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
+    parser.add_argument('file', type=str, help='Path to the input file')
     parser.add_argument('--bit-precise', action='store_true', help='Enable bit-precise verification')
-    parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)")
-    parser.add_argument("--boogie", type=str, help="Boogie binary to use")
-    parser.add_argument("--output", type=str, help="Output directory")
-    parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)")
+    parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)", default="~/Workspace/solidity-sri/build/solc/solc")
+    parser.add_argument("--boogie", type=str, help="Boogie binary to use", default="~/Workspace/boogie-yices/Binaries/Boogie.exe")
+    parser.add_argument("--output", type=str, help="Output directory", default=".")
+    parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)", default=30)
     parser.add_argument('--yices', action='store_true', help='Use Yices as SMT solver')
     args = parser.parse_args()
 
-    if args.solc is not None:
-        solc = args.solc
-    if args.boogie is not None:
-        boogie = args.boogie
-    if args.output is not None:
-        output = args.output
-    if args.timeout is not None:
-        timeout = args.timeout
-
     solFile = args.file
-    bplFile = output + "/" + os.path.basename(solFile) + ".bpl"
+    bplFile = args.output + "/" + os.path.basename(solFile) + ".bpl"
 
     # First convert .sol to .bpl
-    solcArgs = " --boogie " + solFile + " -o " + output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
-    convertCommand = solc + " " + solcArgs
+    solcArgs = " --boogie " + solFile + " -o " + args.output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
+    convertCommand = args.solc + " " + solcArgs
     try:
         subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
@@ -53,11 +38,11 @@ def main():
         return
 
     # Run timer
-    timer = threading.Timer(timeout, kill)
+    timer = threading.Timer(args.timeout, kill)
     # Run verification, get result
     timer.start()
     boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0" + (" /proverOpt:SOLVER=Yices2 /useArrayTheory" if args.yices else "")
-    verifyCommand = "mono " + boogie + " " + bplFile + " " + boogieArgs
+    verifyCommand = "mono " + args.boogie + " " + bplFile + " " + boogieArgs
     verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
     timer.cancel()
 
