@@ -941,7 +941,8 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.baseExpression().annotation().type);
 		if (fbType->numBytes() == 1)
 		{
-			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0))));
+			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
 			m_currentExpr = baseExpr;
 			return false;
 		}
