@@ -711,6 +711,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// If we set msg.value, we should reduce our own balance
 	if (m_currentValue)
 	{
+		// assert(balance[this] >= msg.value)
+		m_newStatements.push_back(smack::Stmt::assert_(
+			m_context.bitPrecise() ?
+				ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue, 256, false) :
+				smack::Expr::gte(smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue),
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		m_newStatements.push_back(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
