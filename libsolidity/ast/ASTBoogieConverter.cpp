@@ -76,6 +76,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
 				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
 	}
+	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
 	m_program.getDeclarations().push_back(procDecl);
 }
 
@@ -436,6 +437,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
+	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_program.getDeclarations().push_back(procDecl);
 	return false;
 }

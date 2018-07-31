@@ -448,6 +448,7 @@ public:
   unsigned getId() const { return id; }
   std::string getName() const { return name; }
   void addAttr(const Attr* a) { attrs.push_back(a); }
+  void addAttrs(std::list<const Attr*> ax) { for (auto a : ax) addAttr(a); }
 
   static Decl* typee(std::string name, std::string type = "",
     std::list<const Attr*> attrs = std::list<const Attr*>());

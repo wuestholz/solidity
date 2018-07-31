@@ -80,8 +80,11 @@ def main():
             errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Message is in the next line
             errLinePrev = getRelatedLineFromBpl(outputLine, -1) # Location is in the line before
             print(getSourceLineAndCol(errLinePrev) + ": " + getMessage(errLine))
+        if "Verification inconclusive" in outputLine:
+            errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
+            print(getSourceLineAndCol(errLine) + ": Inconclusive result for function " + getMessage(errLine))
 
-    if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[0])):
+    if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[-1])):
         print("No errors found.")
 
 # Gets the line related to an error in the output
