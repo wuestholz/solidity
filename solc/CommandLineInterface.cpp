@@ -1083,6 +1083,7 @@ void CommandLineInterface::handleBoogie()
 
 	if (!Error::containsOnlyWarnings(errorReporter.errors()))
 	{
+		m_error = true; // We set this flag so that the whole application returns with an error
 		return;
 	}
 
