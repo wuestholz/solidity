@@ -46,6 +46,22 @@ bool DocStringAnalyser::visit(ContractDefinition const& _contract)
 	return true;
 }
 
+bool DocStringAnalyser::visit(ForStatement const& _loop)
+{
+	static const set<string> validTags = set<string>{"notice"};
+	parseDocStrings(_loop, _loop.annotation(), validTags, "loops");
+
+	return true;
+}
+
+bool DocStringAnalyser::visit(WhileStatement const& _loop)
+{
+	static const set<string> validTags = set<string>{"notice"};
+	parseDocStrings(_loop, _loop.annotation(), validTags, "loops");
+
+	return true;
+}
+
 bool DocStringAnalyser::visit(FunctionDefinition const& _function)
 {
 	handleCallable(_function, _function, _function.annotation());

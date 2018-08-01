@@ -47,6 +47,8 @@ private:
 	virtual bool visit(FunctionDefinition const& _function) override;
 	virtual bool visit(ModifierDefinition const& _modifier) override;
 	virtual bool visit(EventDefinition const& _event) override;
+	virtual bool visit(ForStatement const& _loop) override;
+	virtual bool visit(WhileStatement const& _loop) override;
 
 	void handleCallable(
 		CallableDeclaration const& _callable,
