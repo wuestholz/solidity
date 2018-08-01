@@ -736,7 +736,7 @@ void Specification::print(std::ostream& os, std::string kind) const {
   os << "  " << kind << " ";
   if (attrs.size() > 0)
       print_seq<const Attr*>(os, attrs, "", " ", " ");
-  os << expr << ";\n";
+  os << expr << ";";
 }
 
 Specification const* Specification::spec(const Expr* e, std::list<const Attr*> ax){
