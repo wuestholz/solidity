@@ -1,12 +1,6 @@
-#include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/Exceptions.h>
-#include <libsolidity/parsing/Scanner.h>
-#include <utility>
-#include <tuple>
 
 using namespace std;
 using namespace dev;

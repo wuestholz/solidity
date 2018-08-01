@@ -32,6 +32,7 @@
 #include <libsolidity/ast/ASTJsonConverter.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/BoogieContext.h>
+#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/interface/CompilerStack.h>

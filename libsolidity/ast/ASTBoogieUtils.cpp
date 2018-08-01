@@ -1,8 +1,6 @@
-#include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/AST.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/regex.hpp>
-#include <libsolidity/parsing/Scanner.h>
+#include <libsolidity/ast/ASTBoogieUtils.h>
 
 using namespace std;
 using namespace dev;
@@ -406,7 +404,6 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::Value op,
 		smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
 {
-	string uns("");
 	string name("");
 	string retType("");
 	switch (op) {

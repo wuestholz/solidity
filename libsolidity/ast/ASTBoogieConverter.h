@@ -1,6 +1,5 @@
 #pragma once
 
-#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/BoogieContext.h>

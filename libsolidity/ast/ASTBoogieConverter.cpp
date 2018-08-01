@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
@@ -6,10 +5,7 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/parsing/Parser.h>
-#include <utility>
 
 using namespace std;
 using namespace dev;

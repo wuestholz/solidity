@@ -1,9 +1,7 @@
 #pragma once
 
-#include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/BoogieContext.h>
-#include <libsolidity/interface/ErrorReporter.h>
 #include <libsolidity/parsing/Scanner.h>
 #include <string>
 
