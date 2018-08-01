@@ -178,9 +178,9 @@ bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(ImportDirective const& _node)
+bool ASTBoogieConverter::visit(ImportDirective const&)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
+//	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
