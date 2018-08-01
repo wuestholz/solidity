@@ -11,11 +11,42 @@ namespace solidity
 {
 BoogieContext::BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion)
-		: m_bitPrecise(bitPrecise), m_errorReporter(errorReporter), m_currentScanner(nullptr), m_globalDecls(globalDecls),
+		: m_program(), m_bitPrecise(bitPrecise), m_errorReporter(errorReporter), m_currentScanner(nullptr), m_globalDecls(globalDecls),
 		  m_verifierSum(ASTBoogieUtils::VERIFIER_SUM, std::make_shared<FunctionType>(strings{}, strings{"int"}, FunctionType::Kind::Internal, true, StateMutability::Pure)),
-		  m_scopes(scopes), m_evmVersion(evmVersion), m_currentInvars(), m_currentSumDecls(), m_bvBuiltinFunctions()
-	{
-		m_globalDecls.push_back(&m_verifierSum);
-	}
+		  m_scopes(scopes), m_evmVersion(evmVersion), m_currentInvars(), m_currentSumDecls(), m_bvBuiltinFunctions(),
+		  m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
+{
+	m_globalDecls.push_back(&m_verifierSum);
+}
+
+void BoogieContext::addBvBuiltinFunction(std::string name, smack::FuncDecl* decl)
+{
+	if (m_bvBuiltinFunctions.find(name) != m_bvBuiltinFunctions.end()) return;
+	m_bvBuiltinFunctions.insert(name);
+	m_program.getDeclarations().push_back(decl);
+}
+
+void BoogieContext::addTransferFunction()
+{
+	if (m_transferIncluded) return;
+	m_transferIncluded = true;
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createTransferProc(*this));
+}
+
+void BoogieContext::addCallFunction()
+{
+	if (m_callIncluded) return;
+	m_callIncluded = true;
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createCallProc(*this));
+}
+
+void BoogieContext::addSendFunction()
+{
+	if (m_sendIncluded) return;
+	m_sendIncluded = true;
+	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(*this));
+}
+
+
 }
 }

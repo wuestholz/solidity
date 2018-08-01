@@ -16,40 +16,31 @@ def kill():
     parent.kill()
 
 def main():
-    
-    solc = "~/Workspace/solidity-sri/build/solc/solc"
-    boogie = "~/Workspace/boogie-yices/Binaries/Boogie.exe"
-    output = "."
-    timeout = 30
-
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
-    parser.add_argument('file', metavar='f', type=str, help='Path to the input file')
+    parser.add_argument('file', type=str, help='Path to the input file')
     parser.add_argument('--bit-precise', action='store_true', help='Enable bit-precise verification')
-    parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)")
-    parser.add_argument("--boogie", type=str, help="Boogie binary to use")
-    parser.add_argument("--output", type=str, help="Output directory")
-    parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)")
+    parser.add_argument("--solc", type=str, help="Solidity compiler to use (with boogie translator)", default="~/Workspace/solidity-sri/build/solc/solc")
+    parser.add_argument("--boogie", type=str, help="Boogie binary to use", default="~/Workspace/boogie-yices/Binaries/Boogie.exe")
+    parser.add_argument("--output", type=str, help="Output directory", default=".")
+    parser.add_argument("--timeout", type=int, help="Timeout for running Boogie (in seconds)", default=30)
     parser.add_argument('--yices', action='store_true', help='Use Yices as SMT solver')
+    parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
     args = parser.parse_args()
 
-    if args.solc is not None:
-        solc = args.solc
-    if args.boogie is not None:
-        boogie = args.boogie
-    if args.output is not None:
-        output = args.output
-    if args.timeout is not None:
-        timeout = args.timeout
-
     solFile = args.file
-    bplFile = output + "/" + os.path.basename(solFile) + ".bpl"
+    bplFile = args.output + "/" + os.path.basename(solFile) + ".bpl"
 
     # First convert .sol to .bpl
-    solcArgs = " --boogie " + solFile + " -o " + output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
-    convertCommand = solc + " " + solcArgs
+    solcArgs = " --boogie " + solFile + " -o " + args.output + " --overwrite" + (" --bit-precise" if args.bit_precise else "")
+    convertCommand = args.solc + " " + solcArgs
     try:
-        subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+        compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+        if args.verbose:
+            compilerOutputStr = compilerOutput.decode("utf-8")
+            print("----- Compiler output -----")
+            print(compilerOutputStr)
+            print("---------------------------")
     except subprocess.CalledProcessError as err:
         compilerOutputStr = err.output.decode("utf-8")
         print("Error while running compiler, details:")
@@ -57,11 +48,11 @@ def main():
         return
 
     # Run timer
-    timer = threading.Timer(timeout, kill)
+    timer = threading.Timer(args.timeout, kill)
     # Run verification, get result
     timer.start()
     boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0" + (" /proverOpt:SOLVER=Yices2 /useArrayTheory" if args.yices else "")
-    verifyCommand = "mono " + boogie + " " + bplFile + " " + boogieArgs
+    verifyCommand = "mono " + args.boogie + " " + bplFile + " " + boogieArgs
     verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
     timer.cancel()
 
@@ -70,6 +61,10 @@ def main():
         print("Error while running verifier, details:")
         print(verifierOutputStr)        
         return
+    elif args.verbose:
+        print("----- Verifier output -----")
+        print(verifierOutputStr)
+        print("---------------------------")
 
     # Map results back to .sol file
     outputLines = list(filter(None, verifierOutputStr.split("\n")))
@@ -84,12 +79,16 @@ def main():
             errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Message is in the next line
             errLinePrev = getRelatedLineFromBpl(outputLine, -1) # Location is in the line before
             print(getSourceLineAndCol(errLinePrev) + ": " + getMessage(errLine))
+        if "Verification inconclusive" in outputLine:
+            errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
+            print(getSourceLineAndCol(errLine) + ": Inconclusive result for function '" + getMessage(errLine) + "'")
 
-    if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[0])):
+    if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[-1])):
         print("No errors found.")
 
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
+    # Errors have the format "filename(line,col): Message"
     errFileLineCol = outputLine.split(":")[0]
     errFile = errFileLineCol[:errFileLineCol.rfind("(")]
     errLineNo = int(errFileLineCol[errFileLineCol.rfind("(")+1:errFileLineCol.rfind(",")]) - 1
@@ -98,11 +97,18 @@ def getRelatedLineFromBpl(outputLine, offset):
 # Gets the original (.sol) line and column number from an annotated line in the .bpl
 def getSourceLineAndCol(line):
     match = re.search("{:sourceloc \"([^}]*)\", (\\d+), (\\d+)}", line)
-    return match.group(1) + ", line " + match.group(2) + ", col " + match.group(3)
+    if match is None:
+        return "[Could not trace back error location]"
+    else:
+        return match.group(1) + ", line " + match.group(2) + ", col " + match.group(3)
 
 # Gets the message from an annotated line in the .bpl
 def getMessage(line):
-    return re.search("{:message \"([^}]*)\"}", line).group(1)
+    match = re.search("{:message \"([^}]*)\"}", line)
+    if match is None:
+        return "[No message found for error]"
+    else:
+        return match.group(1)
 
 if __name__== "__main__":
     main()

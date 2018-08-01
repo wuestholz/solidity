@@ -711,6 +711,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// If we set msg.value, we should reduce our own balance
 	if (m_currentValue)
 	{
+		// assert(balance[this] >= msg.value)
+		m_newStatements.push_back(smack::Stmt::assert_(
+			m_context.bitPrecise() ?
+				ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue, 256, false) :
+				smack::Expr::gte(smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue),
+				ASTBoogieUtils::createLocAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		m_newStatements.push_back(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
@@ -840,18 +846,21 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// address.transfer()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
+		m_context.addTransferFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
 		return false;
 	}
 	// address.send()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
 	{
+		m_context.addSendFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
 		return false;
 	}
 	// address.call()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
 	{
+		m_context.addCallFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
 		return false;
 	}
@@ -932,7 +941,8 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.baseExpression().annotation().type);
 		if (fbType->numBytes() == 1)
 		{
-			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0))));
+			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
+					ASTBoogieUtils::createLocAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
 			m_currentExpr = baseExpr;
 			return false;
 		}

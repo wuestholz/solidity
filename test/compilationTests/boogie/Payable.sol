@@ -11,10 +11,12 @@ contract Payable {
     PayableFunctions p;
 
     function transfer(uint amount) public returns (uint) {
+        require(address(this).balance >= amount);
         return p.receive.gas(5000).value(amount)(1);
     }
 
     function transferNested(uint amount) public returns (uint) {
+        require(address(this).balance >= amount + 3);
         return p.receive.value(p.receive.value(1)(2))(p.receive.value(amount)(3));
     }
 
