@@ -393,6 +393,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd:
 		case Token::BitOr:
 		case Token::BitXor:
+		case Token::SHL:
+		case Token::SAR:
 		case Token::Equal:
 		case Token::NotEqual:
 		case Token::LessThan:
@@ -446,6 +448,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd:
 		case Token::BitOr:
 		case Token::BitXor:
+		case Token::SHL:
+		case Token::SAR:
 			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.getOperator()));
 			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			break;

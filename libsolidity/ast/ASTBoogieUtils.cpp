@@ -415,6 +415,8 @@ smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::V
 	case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
 	case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
 	case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
+	case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
+	case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
 
 	case Token::Equal: return smack::Expr::eq(lhs, rhs);
 	case Token::NotEqual: return smack::Expr::neq(lhs, rhs);

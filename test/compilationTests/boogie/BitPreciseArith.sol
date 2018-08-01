@@ -1,51 +1,54 @@
 pragma solidity ^0.4.23;
 
 contract BitPreciseArith {
-    function add8u(uint8 x, uint8 y) public pure returns (uint8) { return x + y; }
-    function sub8u(uint8 x, uint8 y) public pure returns (uint8) { return x - y; }
-    function mul8u(uint8 x, uint8 y) public pure returns (uint8) { return x * y; }
-    function div8u(uint8 x, uint8 y) public pure returns (uint8) { return x / y; }
+    function add8u(uint8 x, uint8 y) private pure returns (uint8) { return x + y; }
+    function sub8u(uint8 x, uint8 y) private pure returns (uint8) { return x - y; }
+    function mul8u(uint8 x, uint8 y) private pure returns (uint8) { return x * y; }
+    function div8u(uint8 x, uint8 y) private pure returns (uint8) { return x / y; }
 
-    function add8s(int8 x, int8 y) public pure returns (int8) { return x + y; }
-    function sub8s(int8 x, int8 y) public pure returns (int8) { return x - y; }
-    function mul8s(int8 x, int8 y) public pure returns (int8) { return x * y; }
-    function div8s(int8 x, int8 y) public pure returns (int8) { return x / y; }
+    function add8s(int8 x, int8 y) private pure returns (int8) { return x + y; }
+    function sub8s(int8 x, int8 y) private pure returns (int8) { return x - y; }
+    function mul8s(int8 x, int8 y) private pure returns (int8) { return x * y; }
+    function div8s(int8 x, int8 y) private pure returns (int8) { return x / y; }
 
-    function preinc8u(uint8 x) public pure returns (uint8) {
+    function preinc8u(uint8 x) private pure returns (uint8) {
         uint8 result = x;
         uint8 tmp = ++result;
         assert(tmp == result);
         return result;
     }
-    function postinc8u(uint8 x) public pure returns (uint8) {
+    function postinc8u(uint8 x) private pure returns (uint8) {
         uint8 result = x;
         uint8 tmp = result++;
         assert(tmp == x);
         return result;
     }
-    function predec8u(uint8 x) public pure returns (uint8) {
+    function predec8u(uint8 x) private pure returns (uint8) {
         uint8 result = x;
         uint8 tmp = --result;
         assert(tmp == result);
         return result;
     }
-    function postdec8u(uint8 x) public pure returns (uint8) {
+    function postdec8u(uint8 x) private pure returns (uint8) {
         uint8 result = x;
         uint8 tmp = result--;
         assert(tmp == x);
         return result;
     }
 
-    function bitand8u(uint8 x, uint8 y) public pure returns (uint8) { return x & y; }
-    function bitor8u(uint8 x, uint8 y) public pure returns (uint8) { return x | y; }
-    function bitxor8u(uint8 x, uint8 y) public pure returns (uint8) { return x ^ y; }
+    function bitand8u(uint8 x, uint8 y) private pure returns (uint8) { return x & y; }
+    function bitor8u(uint8 x, uint8 y) private pure returns (uint8) { return x | y; }
+    function bitxor8u(uint8 x, uint8 y) private pure returns (uint8) { return x ^ y; }
+    function bitshl8u(uint8 x, uint8 y) private pure returns (uint8) { return x << y; }
+    function bitsar8u(uint8 x, uint8 y) private pure returns (uint8) { return x >> y; }
+    function bitsar8s(int8 x, int8 y) private pure returns (int8) { return x >> y; }
 
-    function eq8u(uint8 x, uint8 y) public pure returns (bool) { return x == y; }
-    function ne8u(uint8 x, uint8 y) public pure returns (bool) { return x != y; }
-    function lt8u(uint8 x, uint8 y) public pure returns (bool) { return x < y; }
-    function le8u(uint8 x, uint8 y) public pure returns (bool) { return x <= y; }
-    function gt8u(uint8 x, uint8 y) public pure returns (bool) { return x > y; }
-    function ge8u(uint8 x, uint8 y) public pure returns (bool) { return x >= y; }
+    function eq8u(uint8 x, uint8 y) private pure returns (bool) { return x == y; }
+    function ne8u(uint8 x, uint8 y) private pure returns (bool) { return x != y; }
+    function lt8u(uint8 x, uint8 y) private pure returns (bool) { return x < y; }
+    function le8u(uint8 x, uint8 y) private pure returns (bool) { return x <= y; }
+    function gt8u(uint8 x, uint8 y) private pure returns (bool) { return x > y; }
+    function ge8u(uint8 x, uint8 y) private pure returns (bool) { return x >= y; }
 
     function __verifier_main() public pure {
         assert(add8u(128, 127) == 255);
@@ -74,6 +77,12 @@ contract BitPreciseArith {
         assert(bitand8u(123, 45) == 41);
         assert(bitor8u(123, 45) == 127);
         assert(bitxor8u(123, 45) == 86);
+        assert(bitshl8u(3, 2) == 12);
+        assert(bitshl8u(3, 100) == 0);
+        assert(bitsar8u(48, 4) == 3);
+        assert(bitsar8u(48, 100) == 0);
+        assert(bitsar8s(-48, 4) == -3);
+        assert(bitsar8s(-48, 100) == -1);
 
         assert(eq8u(34, 34) == true);
         assert(eq8u(34, 35) == false);
