@@ -684,8 +684,9 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	const smack::Block* body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
-	// TODO: loop invariants can be added here
 	std::list<smack::Specification const*> invars;
+	// TODO: the scope of the invariant should be the enclosing block of the while loop
+	// which might be different than the current function (e.g., while loop inside for).
 	for(auto invar : getLoopInvariants(_node, &m_currentFunc->body()))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
@@ -723,9 +724,13 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	const smack::Block* body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
-	// TODO: loop invariants can be added here
+	std::list<smack::Specification const*> invars;
+	for(auto invar : getLoopInvariants(_node, &_node))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
 
-	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
 	return false;
 }

@@ -39,4 +39,13 @@ contract SpecificationLoopInvar {
         }
         assert(x == i);
     }
+
+    function forLoop() public pure {
+        int x = 0;
+        /** @notice invariant i == x */
+        for (int i = 0; i < 10; i++) {
+            x++;
+        }
+        assert(x <= 10);
+    }
 }
