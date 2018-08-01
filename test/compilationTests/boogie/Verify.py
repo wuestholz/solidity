@@ -78,6 +78,12 @@ def main():
         if "Verification inconclusive" in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
             print(getSourceLineAndCol(errLine) + ": Inconclusive result for function '" + getMessage(errLine) + "'")
+        if "This loop invariant might not hold on entry." in outputLine:
+            errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
+            print(getSourceLineAndCol(errLine) + ": Invariant '" + getMessage(errLine) + "' might not hold on loop entry")
+        if "This loop invariant might not be maintained by the loop." in outputLine:
+            errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
+            print(getSourceLineAndCol(errLine) + ": Invariant '" + getMessage(errLine) + "' might not be maintained by the loop")
 
     if (re.match("Boogie program verifier finished with \\d+ verified, 0 errors", outputLines[-1])):
         print("No errors found.")

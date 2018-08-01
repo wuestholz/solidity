@@ -18,6 +18,7 @@ private:
 	BoogieContext& m_context;
 
 	// Helper variables to pass information between the visit methods
+	ContractDefinition const* m_currentContract;
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
 
@@ -57,6 +58,8 @@ private:
 	void createDefaultConstructor(ContractDefinition const& _node);
 
 	void processInvariants(ContractDefinition const& _node);
+
+	std::map<smack::Expr const*, std::string> getLoopInvariants(Statement const& _node, ASTNode const* _scope);
 
 public:
 	/**

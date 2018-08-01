@@ -245,6 +245,7 @@ public:
 };
 
 class Block;
+class Specification;
 
 class Stmt {
 public:
@@ -284,7 +285,7 @@ public:
   static const Stmt* while_(
 		  const Expr* cond,
 		  const Block* body,
-		  std::list<const Expr*> invars = std::list<const Expr*>());
+		  std::list<const Specification*> invars = std::list<const Specification*>());
   static const Stmt* break_();
   static const Stmt* label(std::string name);
   virtual void print(std::ostream& os) const = 0;
@@ -399,9 +400,9 @@ public:
 class WhileStmt : public Stmt {
   const Expr* cond;
   const Block* body;
-  std::list<const Expr*> invars;
+  std::list<const Specification*> invars;
 public:
-  WhileStmt(const Expr* cond, const Block* body, std::list<const Expr*> invars)
+  WhileStmt(const Expr* cond, const Block* body, std::list<const Specification*> invars)
     : Stmt(WHILE), cond(cond), body(body), invars(invars) {}
   void print(std::ostream& os) const;
   static bool classof(const Stmt* S) { return S->getKind() == WHILE; }

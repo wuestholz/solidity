@@ -140,6 +140,52 @@ void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
 	}
 }
 
+
+map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement const& _node, ASTNode const* _scope)
+{
+	map<smack::Expr const*, string> loopInvars;
+	// Process invariants
+	// TODO: we use a different error reporter for the type checker to ignore
+	// error messages related to our special functions like the __verifier_sum
+	ErrorList typeCheckerErrList;
+	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
+
+	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
+	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
+
+	for (auto docTag : _node.annotation().docTags)
+	{
+		// Find invariants
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
+		{
+			// Parse
+			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
+			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
+					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, m_currentContract->sourceUnitName())));
+			// Resolve references, using the scope of the contract
+			m_context.scopes()[&*invar] = m_context.scopes()[_scope];
+			resolver.resolveNamesAndTypes(*invar);
+			// Do type checking
+			typeChecker.checkTypeRequirements(*invar);
+			// Convert invariant to Boogie representation
+			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
+			if (!result.newStatements.empty()) // Make sure that there are no side effects
+			{
+				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
+			}
+			if (!result.newDecls.empty()) // Make sure that there are no side effects
+			{
+				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
+			}
+			loopInvars[result.expr] = invarStr;
+		}
+	}
+
+	// TODO: sumDecls?
+	return loopInvars;
+
+}
+
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 				m_context(context),
 				m_currentRet(nullptr),
@@ -186,6 +232,7 @@ bool ASTBoogieConverter::visit(ImportDirective const&)
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
+	m_currentContract = &_node;
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
@@ -638,8 +685,13 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	m_currentBlocks.pop();
 
 	// TODO: loop invariants can be added here
+	std::list<smack::Specification const*> invars;
+	for(auto invar : getLoopInvariants(_node, &m_currentFunc->body()))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
 
-	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
 	return false;
 }
