@@ -726,9 +726,10 @@ void FuncDecl::print(std::ostream& os) const {
 }
 
 void VarDecl::print(std::ostream& os) const {
+  os << "var ";
   if (attrs.size() > 0)
     print_seq<const Attr*>(os, attrs, "", " ", " ");
-  os << "var " << name << ": " << type << ";";
+  os << name << ": " << type << ";";
 }
 
 void Specification::print(std::ostream& os, std::string kind) const {

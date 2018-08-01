@@ -41,6 +41,7 @@ public:
 	static const std::string SOLIDITY_ASSERT;
 	static const std::string SOLIDITY_REQUIRE;
 	static const std::string SOLIDITY_REVERT;
+	// no constant required for 'throw' because it is a separate statement
 
 	// Other identifiers
 	static const std::string SOLIDITY_THIS;
@@ -81,18 +82,42 @@ public:
 	 */
 	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
 
-	static std::list<const smack::Attr*> createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
+	/**
+	 * Create attributes for original source location and message
+	 */
+	static std::list<const smack::Attr*> createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 
+	/**
+	 * Check if a type can be represented with bitvectors
+	 */
 	static bool isBitPreciseType(TypePointer type);
 
+	/**
+	 * Get the number of bits required to represent type
+	 */
 	static unsigned getBits(TypePointer type);
 
+	/**
+	 * Check if the type is signed
+	 */
 	static bool isSigned(TypePointer type);
 
+	/**
+	 * Check if bitvector type conversion from the implicit type conversion from exprType
+	 * to targetType. If yes, the conversion expression is returned, otherwise expr is
+	 * returned unchanged. For example, if exprType is uint32 and targetType is uint40,
+	 * then we return an extension of 8 bits to expr.
+	 */
 	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
+	/**
+	 * Get a bitvector function for a given binary operation. Throws exception for unsupported operations.
+	 */
 	static smack::Expr const* bvBinaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
 
+	/**
+	 * Get a bitvector function for a given unary operation. Throws exception for unsupported operations.
+	 */
 	static smack::Expr const* bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned = false);
 };
 
