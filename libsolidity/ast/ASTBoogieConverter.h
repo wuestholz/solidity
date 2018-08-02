@@ -68,6 +68,37 @@ private:
 	 */
 	std::map<smack::Expr const*, std::string> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
 
+
+	/**
+	 * Chronological stack of scoppable nodes.
+	 */
+	std::stack<ASTNode const*> m_scopes;
+
+	/** Remember the scope of the node before visiting */
+	void rememberScope(ASTNode const& _node) {
+		if (dynamic_cast<Scopable const*>(&_node)) {
+			m_scopes.push(&_node);
+		}
+	}
+
+	/** If the node is scopable, it will be removed from the scopes stack */
+	void endVisitNode(ASTNode const& _node) override {
+		if (m_scopes.size() > 0) {
+			if (m_scopes.top() == &_node) {
+				m_scopes.pop();
+			}
+		}
+	}
+
+	/** Returns the closest scoped node */
+	ASTNode const* scope() const {
+		if (m_scopes.size() > 0) {
+			return m_scopes.top();
+		} else {
+			return nullptr;
+		}
+	}
+
 public:
 	/**
 	 * Create a new instance with a given context

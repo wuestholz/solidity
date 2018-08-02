@@ -673,7 +673,7 @@ void WhileStmt::print(std::ostream& os) const {
     os << " {\n";
   } else {
     os << "\n";
-    for (auto inv : invars) inv->print(os, "invariant");
+    for (auto inv : invars) { inv->print(os, "invariant"); os << "\n"; }
     os << "\n  {\n";
   }
   body->print(os);
