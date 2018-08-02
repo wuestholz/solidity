@@ -49,3 +49,17 @@ contract SpecificationLoopInvar {
         assert(x <= 10);
     }
 }
+
+/** @notice invariant x == y */
+contract ContractInvarOnLoop {
+    int x;
+    int y;
+
+    function increase(int amount) public {
+        /** @notice {contractInvariants} */
+        for (int i = 0; i < amount; i++) {
+            x++;
+            y++;
+        }
+    }
+}

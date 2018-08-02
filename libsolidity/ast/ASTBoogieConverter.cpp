@@ -179,6 +179,14 @@ map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement 
 			}
 			loopInvars[result.expr] = invarStr;
 		}
+		else if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "{contractInvariants}"))
+		{
+			// TODO: warning when currentinvars is empty
+			for (auto invar : m_context.currentInvars())
+			{
+				loopInvars[invar.first] = invar.second;
+			}
+		}
 	}
 
 	// TODO: sumDecls?
