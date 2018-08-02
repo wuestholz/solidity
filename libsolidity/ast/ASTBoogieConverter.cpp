@@ -461,6 +461,15 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else // Private functions: inline
 	{
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
+
+		// Add contract invariants only if explicitly requested
+		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+		{
+			procDecl->getRequires().push_back(smack::Specification::spec(cInv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold when entering function.", *m_context.currentScanner())));
+			procDecl->getEnsures().push_back(smack::Specification::spec(cInv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold at end of function.", *m_context.currentScanner())));
+		}
 	}
 
 	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_PRECOND))
