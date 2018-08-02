@@ -57,9 +57,7 @@ private:
 	 */
 	void createDefaultConstructor(ContractDefinition const& _node);
 
-	void processInvariants(ContractDefinition const& _node);
-
-	std::map<smack::Expr const*, std::string> getLoopInvariants(Statement const& _node, ASTNode const* _scope);
+	std::map<smack::Expr const*, std::string> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
 
 public:
 	/**

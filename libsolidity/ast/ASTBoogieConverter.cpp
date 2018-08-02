@@ -75,76 +75,10 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
-void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
+map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, string _tag)
 {
-	// Process invariants
-	m_context.currentContractInvars().clear();
-	m_context.currentSumDecls().clear();
-
-	// TODO: we use a different error reporter for the type checker to ignore
-	// error messages related to our special functions like the __verifier_sum
-	ErrorList typeCheckerErrList;
-	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
-
-	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
-	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, &_node);
-
-	for (auto docTag : _node.annotation().docTags)
-	{
-		// Find invariants
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
-		{
-			// Parse
-			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
-			addGlobalComment("Contract invariant: " + invarStr);
-			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
-					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
-
-			// Resolve references, using the scope of the contract
-			m_context.scopes()[&*invar] = m_context.scopes()[&_node];
-			resolver.resolveNamesAndTypes(*invar);
-			// Do type checking
-			typeChecker.checkTypeRequirements(*invar);
-			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty()) // Make sure that there are no side effects
-			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
-			}
-			if (!result.newDecls.empty()) // Make sure that there are no side effects
-			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
-			}
-			m_context.currentContractInvars()[result.expr] = invarStr;
-		}
-	}
-
-	// Add new shadow variables for sum
-	for (auto sumDecl : m_context.currentSumDecls())
-	{
-		TypePointer sumDeclType = nullptr;
-		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
-		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
-		if (!sumDeclType)
-		{
-			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
-		}
-		else
-		{
-			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-			m_context.program().getDeclarations().push_back(
-						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
-						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
-		}
-	}
-}
-
-
-map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement const& _node, ASTNode const* _scope)
-{
-	map<smack::Expr const*, string> loopInvars;
-	// Process invariants
+	map<smack::Expr const*, string> exprs;
+	// Process expressions
 	// TODO: we use a different error reporter for the type checker to ignore
 	// error messages related to our special functions like the __verifier_sum
 	ErrorList typeCheckerErrList;
@@ -153,45 +87,42 @@ map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement 
 	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
 	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
 
-	for (auto docTag : _node.annotation().docTags)
+	for (auto docTag : _annot.docTags)
 	{
-		// Find invariants
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
 		{
-			// Parse
-			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
-			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
-					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, m_currentContract->sourceUnitName())));
-			// Resolve references, using the scope of the contract
-			m_context.scopes()[&*invar] = m_context.scopes()[_scope];
-			resolver.resolveNamesAndTypes(*invar);
-			// Do type checking
-			typeChecker.checkTypeRequirements(*invar);
-			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty()) // Make sure that there are no side effects
+			if (_tag == "{contractInvariants}") // Special tag to include contract invariants
 			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
+				// TODO: warning when currentinvars is empty
+				for (auto invar : m_context.currentContractInvars()) { exprs[invar.first] = invar.second; }
 			}
-			if (!result.newDecls.empty()) // Make sure that there are no side effects
+			else // Normal tags just parse the expression afterwards
 			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
-			}
-			loopInvars[result.expr] = invarStr;
-		}
-		else if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "{contractInvariants}"))
-		{
-			// TODO: warning when currentinvars is empty
-			for (auto invar : m_context.currentContractInvars())
-			{
-				loopInvars[invar.first] = invar.second;
+				// Parse
+				string exprStr = docTag.second.content.substr(_tag.length() + 1);
+				ASTPointer<Expression> expr = Parser(m_context.errorReporter())
+						.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)exprStr, m_currentContract->sourceUnitName())));
+				// Resolve references, using the given scope
+				m_context.scopes()[&*expr] = m_context.scopes()[_scope];
+				resolver.resolveNamesAndTypes(*expr);
+				// Do type checking
+				typeChecker.checkTypeRequirements(*expr);
+				// Convert expression to Boogie representation
+				auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*expr);
+				if (!result.newStatements.empty()) // Make sure that there are no side effects
+				{
+					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate statements");
+				}
+				if (!result.newDecls.empty()) // Make sure that there are no side effects
+				{
+					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate declarations");
+				}
+				exprs[result.expr] = exprStr;
 			}
 		}
 	}
 
-	// TODO: sumDecls?
-	return loopInvars;
-
+	return exprs;
 }
 
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
@@ -245,8 +176,35 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
-	// Process invariants
-	processInvariants(_node);
+	// Process contract invariants
+	m_context.currentContractInvars().clear();
+	m_context.currentSumDecls().clear();
+
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "invariant"))
+	{
+		addGlobalComment("Contract invariant: " + invar.second);
+		m_context.currentContractInvars()[invar.first] = invar.second;
+	}
+
+	// Add new shadow variables for sum
+	for (auto sumDecl : m_context.currentSumDecls())
+	{
+		TypePointer sumDeclType = nullptr;
+		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
+		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
+		if (!sumDeclType)
+		{
+			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
+		}
+		else
+		{
+			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
+			m_context.program().getDeclarations().push_back(
+						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
+						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
+						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
+		}
+	}
 
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
@@ -695,7 +653,11 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	std::list<smack::Specification const*> invars;
 	// TODO: the scope of the invariant should be the enclosing block of the while loop
 	// which might be different than the current function (e.g., while loop inside for).
-	for(auto invar : getLoopInvariants(_node, &m_currentFunc->body()))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), "invariant"))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), "{contractInvariants}"))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
@@ -733,7 +695,11 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	for(auto invar : getLoopInvariants(_node, &_node))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "invariant"))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "{contractInvariants}"))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
