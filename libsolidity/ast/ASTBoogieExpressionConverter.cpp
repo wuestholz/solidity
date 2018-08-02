@@ -1,6 +1,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
+#include <libsolidity/ast/AST.h>
 
 using namespace std;
 using namespace dev;
@@ -182,7 +183,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	{
 		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
-			if (find(m_context.currentSumDecls().begin(), m_context.currentSumDecls().end(), lhsId->annotation().referencedDeclaration) != m_context.currentSumDecls().end())
+			if (m_context.currentSumDecls()[lhsId->annotation().referencedDeclaration])
 			{
 				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
 				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
@@ -700,15 +701,20 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Sum function
-	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
+	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 	{
 		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
 			auto sumDecl = id->annotation().referencedDeclaration;
-			if (find(m_context.currentSumDecls().begin(), m_context.currentSumDecls().end(), sumDecl) == m_context.currentSumDecls().end())
+
+			MagicVariableDeclaration const* magicVar = nullptr;
+			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 			{
-				m_context.currentSumDecls().push_back(sumDecl);
+				magicVar = dynamic_cast<MagicVariableDeclaration const *>(exprId->annotation().referencedDeclaration);
 			}
+
+			if (magicVar) { m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0]; }
+			else { reportError(_node.location(), "Could not find sum function"); }
 
 			auto declCategory = id->annotation().type->category();
 			if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)

@@ -27,12 +27,12 @@ class BoogieContext {
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
 	std::vector<Declaration const*> m_globalDecls;
-	MagicVariableDeclaration m_verifierSum;
+	std::vector<MagicVariableDeclaration*> m_verifierSum;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	EVMVersion m_evmVersion;
 
 	std::map<smack::Expr const*, std::string> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
-	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
+	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
 	std::set<std::string> m_builtinFunctions;
 	bool m_transferIncluded;
@@ -51,7 +51,7 @@ public:
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	EVMVersion& evmVersion() { return m_evmVersion; }
 	std::map<smack::Expr const*, std::string>& currentContractInvars() { return m_currentContractInvars; }
-	std::list<Declaration const*>& currentSumDecls() { return m_currentSumDecls; }
+	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
 	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);
 	void includeTransferFunction();

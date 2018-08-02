@@ -203,21 +203,11 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Add new shadow variables for sum
 	for (auto sumDecl : m_context.currentSumDecls())
 	{
-		TypePointer sumDeclType = nullptr;
-		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
-		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
-		if (!sumDeclType)
-		{
-			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
-		}
-		else
-		{
-			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-			m_context.program().getDeclarations().push_back(
-						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
-						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
-		}
+		addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
+		m_context.program().getDeclarations().push_back(
+					smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
+					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
+					ASTBoogieUtils::mapType(sumDecl.second, *sumDecl.first, m_context)));
 	}
 
 	// Process state variables first (to get initializer expressions)
