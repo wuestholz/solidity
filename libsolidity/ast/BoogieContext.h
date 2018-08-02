@@ -31,7 +31,7 @@ class BoogieContext {
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	EVMVersion m_evmVersion;
 
-	std::map<smack::Expr const*, std::string> m_currentInvars; // Invariants for the current contract (in Boogie and original format)
+	std::map<smack::Expr const*, std::string> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
 	std::set<std::string> m_builtinFunctions;
@@ -50,7 +50,7 @@ public:
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	EVMVersion& evmVersion() { return m_evmVersion; }
-	std::map<smack::Expr const*, std::string>& currentInvars() { return m_currentInvars; }
+	std::map<smack::Expr const*, std::string>& currentContractInvars() { return m_currentContractInvars; }
 	std::list<Declaration const*>& currentSumDecls() { return m_currentSumDecls; }
 
 	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);

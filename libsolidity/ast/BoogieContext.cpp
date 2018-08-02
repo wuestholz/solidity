@@ -19,7 +19,7 @@ BoogieContext::BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std:
 					m_verifierSum(ASTBoogieUtils::VERIFIER_SUM, std::make_shared<FunctionType>(strings{}, strings{"int"}, FunctionType::Kind::Internal, true, StateMutability::Pure)),
 					m_scopes(scopes),
 				  	m_evmVersion(evmVersion),
-				  	m_currentInvars(),
+				  	m_currentContractInvars(),
 				  	m_currentSumDecls(),
 				  	m_builtinFunctions(),
 				  	m_transferIncluded(false),

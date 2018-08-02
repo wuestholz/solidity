@@ -66,7 +66,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, {}, {}, {block});
-	for (auto invar : m_context.currentInvars())
+	for (auto invar : m_context.currentContractInvars())
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
@@ -78,7 +78,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
 {
 	// Process invariants
-	m_context.currentInvars().clear();
+	m_context.currentContractInvars().clear();
 	m_context.currentSumDecls().clear();
 
 	// TODO: we use a different error reporter for the type checker to ignore
@@ -115,7 +115,7 @@ void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
 			{
 				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
 			}
-			m_context.currentInvars()[result.expr] = invarStr;
+			m_context.currentContractInvars()[result.expr] = invarStr;
 		}
 	}
 
@@ -182,7 +182,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement 
 		else if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "{contractInvariants}"))
 		{
 			// TODO: warning when currentinvars is empty
-			for (auto invar : m_context.currentInvars())
+			for (auto invar : m_context.currentContractInvars())
 			{
 				loopInvars[invar.first] = invar.second;
 			}
@@ -461,7 +461,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
 	{
-		for (auto invar : m_context.currentInvars())
+		for (auto invar : m_context.currentContractInvars())
 		{
 			if (!_node.isConstructor())
 			{
