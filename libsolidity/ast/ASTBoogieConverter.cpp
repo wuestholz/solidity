@@ -434,6 +434,19 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
+
+	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), "precondition"))
+	{
+		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
+							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
+	}
+	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), "postcondition"))
+	{
+		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
+							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));
+	}
+	// TODO: check that no new sum variables were introduced
+
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
@@ -661,6 +674,7 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
@@ -703,6 +717,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
