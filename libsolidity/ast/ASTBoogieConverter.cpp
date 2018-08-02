@@ -16,6 +16,12 @@ namespace dev
 namespace solidity
 {
 
+const string ASTBoogieConverter::DOCTAG_CONTRACT_INVAR = "invariant";
+const string ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
+const string ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
+const string ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
+const string ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
+
 void ASTBoogieConverter::addGlobalComment(string str)
 {
 	m_context.program().getDeclarations().push_back(smack::Decl::comment("", str));
@@ -91,7 +97,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
 		{
-			if (_tag == "{contractInvariants}") // Special tag to include contract invariants
+			if (_tag == DOCTAG_CONTRACT_INVARS_INCLUDE) // Special tag to include contract invariants
 			{
 				// TODO: warning when currentinvars is empty
 				for (auto invar : m_context.currentContractInvars()) { exprs[invar.first] = invar.second; }
@@ -180,7 +186,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	m_context.currentContractInvars().clear();
 	m_context.currentSumDecls().clear();
 
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "invariant"))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR))
 	{
 		addGlobalComment("Contract invariant: " + invar.second);
 		m_context.currentContractInvars()[invar.first] = invar.second;
@@ -435,12 +441,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
 
-	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), "precondition"))
+	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_PRECOND))
 	{
 		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
 	}
-	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), "postcondition"))
+	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_POSTCOND))
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));
@@ -666,11 +672,11 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	std::list<smack::Specification const*> invars;
 	// TODO: the scope of the invariant should be the enclosing block of the while loop
 	// which might be different than the current function (e.g., while loop inside for).
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), "invariant"))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), DOCTAG_LOOP_INVAR))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), "{contractInvariants}"))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &m_currentFunc->body(), DOCTAG_CONTRACT_INVARS_INCLUDE))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
@@ -709,11 +715,11 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "invariant"))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, "{contractInvariants}"))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}

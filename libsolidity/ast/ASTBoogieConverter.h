@@ -40,6 +40,12 @@ private:
 	std::string m_currentReturnLabel;
 	int m_nextReturnLabelId;
 
+	static const std::string DOCTAG_CONTRACT_INVAR;
+	static const std::string DOCTAG_LOOP_INVAR;
+	static const std::string DOCTAG_CONTRACT_INVARS_INCLUDE;
+	static const std::string DOCTAG_PRECOND;
+	static const std::string DOCTAG_POSTCOND;
+
 	/**
 	 * Add a top-level comment
 	 */
@@ -57,6 +63,9 @@ private:
 	 */
 	void createDefaultConstructor(ContractDefinition const& _node);
 
+	/**
+	 * Parse expressions from documentation for a given doctag
+	 */
 	std::map<smack::Expr const*, std::string> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
 
 public:
