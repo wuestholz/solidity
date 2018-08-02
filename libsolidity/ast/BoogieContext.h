@@ -13,12 +13,17 @@ namespace dev
 namespace solidity
 {
 
+/**
+ * Context class that is used to pass information around the different
+ * transformation classes.
+ */
 class BoogieContext {
 	smack::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 
-	bool m_bitPrecise;
-	ErrorReporter& m_errorReporter;
-	Scanner const* m_currentScanner;
+	bool m_bitPrecise; // Flag for bit-precise mode
+	ErrorReporter& m_errorReporter; // Report errors with this member
+	Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
+
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
 	std::vector<Declaration const*> m_globalDecls;
@@ -29,7 +34,7 @@ class BoogieContext {
 	std::map<smack::Expr const*, std::string> m_currentInvars; // Invariants for the current contract (in Boogie and original format)
 	std::list<Declaration const*> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
-	std::set<std::string> m_bvBuiltinFunctions;
+	std::set<std::string> m_builtinFunctions;
 	bool m_transferIncluded;
 	bool m_callIncluded;
 	bool m_sendIncluded;
@@ -47,10 +52,11 @@ public:
 	EVMVersion& evmVersion() { return m_evmVersion; }
 	std::map<smack::Expr const*, std::string>& currentInvars() { return m_currentInvars; }
 	std::list<Declaration const*>& currentSumDecls() { return m_currentSumDecls; }
-	void addBvBuiltinFunction(std::string name, smack::FuncDecl* decl);
-	void addTransferFunction();
-	void addCallFunction();
-	void addSendFunction();
+
+	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);
+	void includeTransferFunction();
+	void includeCallFunction();
+	void includeSendFunction();
 };
 
 }

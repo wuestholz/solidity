@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
@@ -6,10 +5,7 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/parsing/Parser.h>
-#include <utility>
 
 using namespace std;
 using namespace dev;
@@ -55,91 +51,32 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	addGlobalComment("Default constructor");
 
 	// Input parameters
-	list<smack::Binding> params;
-	// Add some extra parameters for globally available variables
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
+	list<smack::Binding> params {
+		{ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // this
+		{ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // msg.sender
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int"} // msg.value
+	};
 
-	list<smack::Block*> blocks;
-	blocks.push_back(smack::Block::block());
+	smack::Block* block = smack::Block::block();
 	// State variable initializers should go to the beginning of the constructor
-	for (auto i : m_stateVarInitializers) (*blocks.begin())->addStmt(i);
+	for (auto i : m_stateVarInitializers) { block->addStmt(i); }
 	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 
 	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
 
 	// Create the procedure
-	auto procDecl = smack::Decl::procedure(funcName, params, std::list<smack::Binding>(), std::list<smack::Decl*>(), blocks);
+	auto procDecl = smack::Decl::procedure(funcName, params, {}, {}, {block});
 	for (auto invar : m_context.currentInvars())
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createLocAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
+				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
 	}
-	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
-ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
-				m_context(context),
-				m_currentRet(nullptr),
-				m_nextReturnLabelId(0)
+void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
 {
-	// Initialize global declarations
-	addGlobalComment("Global declarations and definitions related to the address type");
-	// address type
-	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
-	m_context.program().getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
-	// address.balance
-	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
-	// Uninterpreted type for strings
-	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
-	// now
-	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
-}
-
-void ASTBoogieConverter::convert(ASTNode const& _node)
-{
-	_node.accept(*this);
-}
-
-void ASTBoogieConverter::print(ostream& _stream)
-{
-	m_context.program().print(_stream);
-}
-
-// ---------------------------------------------------------------------------
-//         Visitor methods for top-level nodes and declarations
-// ---------------------------------------------------------------------------
-
-bool ASTBoogieConverter::visit(SourceUnit const& _node)
-{
-	// Boogie programs are flat, source units do not appear explicitly
-	addGlobalComment("");
-	addGlobalComment("------- Source: " + _node.annotation().path + " -------");
-	return true; // Simply apply visitor recursively
-}
-
-bool ASTBoogieConverter::visit(PragmaDirective const& _node)
-{
-	// Pragmas are only included as comments
-	addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
-	return false;
-}
-
-bool ASTBoogieConverter::visit(ImportDirective const& _node)
-{
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
-	return false;
-}
-
-bool ASTBoogieConverter::visit(ContractDefinition const& _node)
-{
-	// Boogie programs are flat, contracts do not appear explicitly
-	addGlobalComment("");
-	addGlobalComment("------- Contract: " + _node.name() + " -------");
-
 	// Process invariants
 	m_context.currentInvars().clear();
 	m_context.currentSumDecls().clear();
@@ -152,13 +89,13 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
 	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, &_node);
 
-	for (auto dt : _node.annotation().docTags)
+	for (auto docTag : _node.annotation().docTags)
 	{
 		// Find invariants
-		if (dt.first == "notice" && boost::starts_with(dt.second.content, "invariant "))
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
 		{
 			// Parse
-			string invarStr = dt.second.content.substr(dt.second.content.find(" ") + 1);
+			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
 			addGlobalComment("Contract invariant: " + invarStr);
 			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
 					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
@@ -201,6 +138,107 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
 		}
 	}
+}
+
+
+map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement const& _node, ASTNode const* _scope)
+{
+	map<smack::Expr const*, string> loopInvars;
+	// Process invariants
+	// TODO: we use a different error reporter for the type checker to ignore
+	// error messages related to our special functions like the __verifier_sum
+	ErrorList typeCheckerErrList;
+	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
+
+	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
+	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
+
+	for (auto docTag : _node.annotation().docTags)
+	{
+		// Find invariants
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
+		{
+			// Parse
+			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
+			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
+					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, m_currentContract->sourceUnitName())));
+			// Resolve references, using the scope of the contract
+			m_context.scopes()[&*invar] = m_context.scopes()[_scope];
+			resolver.resolveNamesAndTypes(*invar);
+			// Do type checking
+			typeChecker.checkTypeRequirements(*invar);
+			// Convert invariant to Boogie representation
+			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
+			if (!result.newStatements.empty()) // Make sure that there are no side effects
+			{
+				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
+			}
+			if (!result.newDecls.empty()) // Make sure that there are no side effects
+			{
+				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
+			}
+			loopInvars[result.expr] = invarStr;
+		}
+	}
+
+	// TODO: sumDecls?
+	return loopInvars;
+
+}
+
+ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
+				m_context(context),
+				m_currentRet(nullptr),
+				m_nextReturnLabelId(0)
+{
+	// Initialize global declarations
+	addGlobalComment("Global declarations and definitions related to the address type");
+	// address type
+	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	m_context.program().getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+	// address.balance
+	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
+	// Uninterpreted type for strings
+	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	// now
+	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
+}
+
+// ---------------------------------------------------------------------------
+//         Visitor methods for top-level nodes and declarations
+// ---------------------------------------------------------------------------
+
+bool ASTBoogieConverter::visit(SourceUnit const& _node)
+{
+	// Boogie programs are flat, source units do not appear explicitly
+	addGlobalComment("");
+	addGlobalComment("------- Source: " + _node.annotation().path + " -------");
+	return true; // Simply apply visitor recursively
+}
+
+bool ASTBoogieConverter::visit(PragmaDirective const& _node)
+{
+	// Pragmas are only included as comments
+	addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
+	return false;
+}
+
+bool ASTBoogieConverter::visit(ImportDirective const&)
+{
+//	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
+	return false;
+}
+
+bool ASTBoogieConverter::visit(ContractDefinition const& _node)
+{
+	m_currentContract = &_node;
+	// Boogie programs are flat, contracts do not appear explicitly
+	addGlobalComment("");
+	addGlobalComment("------- Contract: " + _node.name() + " -------");
+
+	// Process invariants
+	processInvariants(_node);
 
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
@@ -215,7 +253,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
 	}
 
-	// If there are still initializers left, there was no constructor
+	// If there are still initializers left, there was no constructor, so we create one
 	if (!m_stateVarInitializers.empty()) { createDefaultConstructor(_node); }
 
 	return false;
@@ -269,38 +307,40 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
-	m_currentFunc = &_node;
 	// Solidity functions are mapped to Boogie procedures
+	m_currentFunc = &_node;
+
 	addGlobalComment("");
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
 	addGlobalComment("Function: " + _node.name() + funcType);
 
 	// Input parameters
-	list<smack::Binding> params;
-	// Add some extra parameters for globally available variables
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // this
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE)); // msg.sender
-	params.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int")); // msg.value
+	list<smack::Binding> params {
+		// Globally available stuff
+		{ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // this
+		{ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // msg.sender
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int"} // msg.value
+	};
 	// Add original parameters of the function
-	for (auto p : _node.parameters())
+	for (auto par : _node.parameters())
 	{
-		params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context)));
-		if (p->type()->category() == Type::Category::Array) // Array length
+		params.push_back({ASTBoogieUtils::mapDeclName(*par), ASTBoogieUtils::mapType(par->type(), *par, m_context)});
+		if (par->type()->category() == Type::Category::Array) // Array length
 		{
-			params.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.bitPrecise() ? "bv256" : "int"));
+			params.push_back({ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.bitPrecise() ? "bv256" : "int"});
 		}
 	}
 
 	// Return values
 	list<smack::Binding> rets;
-	for (auto p : _node.returnParameters())
+	for (auto ret : _node.returnParameters())
 	{
-		if (p->type()->category() == Type::Category::Array)
+		if (ret->type()->category() == Type::Category::Array)
 		{
 			m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Arrays are not supported as return values");
 			return false;
 		}
-		rets.push_back(make_pair(ASTBoogieUtils::mapDeclName(*p), ASTBoogieUtils::mapType(p->type(), *p, m_context)));
+		rets.push_back({ASTBoogieUtils::mapDeclName(*ret), ASTBoogieUtils::mapType(ret->type(), *ret, m_context)});
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -346,6 +386,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 											smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
 	}
 
+	// Modifiers need to be inlined
 	if (_node.modifiers().empty())
 	{
 		if (_node.isImplemented())
@@ -370,6 +411,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentReturnLabel = retLabel;
 			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 
+			// Introduce and assign local variables for modifier arguments
 			if (modifier->arguments())
 			{
 				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
@@ -416,17 +458,17 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			if (!_node.isConstructor())
 			{
 				procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_context.currentScanner())));
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_context.currentScanner())));
 			}
 			procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_context.currentScanner())));
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
 	else // Private functions: inline
 	{
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 	}
-	procDecl->addAttrs(ASTBoogieUtils::createLocAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
 }
@@ -443,7 +485,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	if (_node.value())
 	{
 		// Initialization is saved for the constructor
-		// A new block is introduced to collect side effects of the expression
+		// A new block is introduced to collect side effects of the initializer expression
 		m_currentBlocks.push(smack::Block::block());
 		smack::Expr const* initExpr = convertExpression(*_node.value());
 		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
@@ -462,9 +504,10 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	addGlobalComment("");
 	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
-	m_context.program().getDeclarations().push_back(
-			smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_context)));
+	auto varDecl = smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), _node, m_context));
+	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
+	m_context.program().getDeclarations().push_back(varDecl);
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
@@ -536,16 +579,16 @@ bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 
 bool ASTBoogieConverter::visit(Block const&)
 {
-	// Simply apply visitor recursively, compound statements will
-	// handle creating new blocks when required
+	// Simply apply visitor recursively, compound statements will create new blocks when required
 	return true;
 }
 
 bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 {
+	// We go one level deeper in the modifier list
 	m_currentModifier++;
 
-	if (m_currentModifier < m_currentFunc->modifiers().size())
+	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
 	{
 		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
 		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
@@ -565,6 +608,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
 			++m_nextReturnLabelId;
 			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+
+			// Introduce and assign local variables for modifier arguments
 			if (modifier->arguments())
 			{
 				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
@@ -586,7 +631,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 			m_context.errorReporter().error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation");
 		}
 	}
-	else if (m_currentFunc->isImplemented())
+	else if (m_currentFunc->isImplemented()) // We reached the function
 	{
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
@@ -598,7 +643,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 		m_currentReturnLabel = oldReturnLabel;
 	}
 
-	m_currentModifier--;
+	m_currentModifier--; // Go back one level in the modifier list
 
 	return false;
 }
@@ -614,7 +659,7 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 	const smack::Block* thenBlock = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
-	// Get false branch recursively
+	// Get false branch recursively (might not exist)
 	const smack::Block* elseBlock = nullptr;
 	if (_node.falseStatement())
 	{
@@ -639,9 +684,15 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	const smack::Block* body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
-	// TODO: loop invariants can be added here
+	std::list<smack::Specification const*> invars;
+	// TODO: the scope of the invariant should be the enclosing block of the while loop
+	// which might be different than the current function (e.g., while loop inside for).
+	for(auto invar : getLoopInvariants(_node, &m_currentFunc->body()))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
 
-	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
 	return false;
 }
@@ -657,17 +708,10 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 	// Get initialization recursively (adds statement to current block)
 	m_currentBlocks.top()->addStmt(smack::Stmt::comment("The following while loop was mapped from a for loop"));
-	if (_node.initializationExpression())
-	{
-		_node.initializationExpression()->accept(*this);
-	}
+	if (_node.initializationExpression()) { _node.initializationExpression()->accept(*this); }
 
 	// Get condition recursively
-	const smack::Expr* cond = nullptr;
-	if (_node.condition())
-	{
-		cond = convertExpression(*_node.condition());
-	}
+	const smack::Expr* cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
 
 	// Get body recursively
 	m_currentBlocks.push(smack::Block::block());
@@ -675,14 +719,18 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// Include loop expression at the end of body
 	if (_node.loopExpression())
 	{
-		_node.loopExpression()->accept(*this); // Adds statement to current block
+		_node.loopExpression()->accept(*this); // Adds statements to current block
 	}
 	const smack::Block* body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
-	// TODO: loop invariants can be added here
+	std::list<smack::Specification const*> invars;
+	for(auto invar : getLoopInvariants(_node, &_node))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
 
-	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body));
+	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
 	return false;
 }
@@ -703,7 +751,6 @@ bool ASTBoogieConverter::visit(Break const&)
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
-	// No return value
 	if (_node.expression() != nullptr)
 	{
 		// Get rhs recursively
@@ -717,15 +764,13 @@ bool ASTBoogieConverter::visit(Return const& _node)
 					returnType, m_context);
 		}
 
-		// lhs should already be known (set by the enclosing FunctionDefinition)
+		// LHS of assignment should already be known (set by the enclosing FunctionDefinition)
 		const smack::Expr* lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
 		m_currentBlocks.top()->addStmt(smack::Stmt::assign(lhs, rhs));
 	}
-	list<string> label;
-	label.push_back(m_currentReturnLabel);
-	m_currentBlocks.top()->addStmt(smack::Stmt::goto_(label));
+	m_currentBlocks.top()->addStmt(smack::Stmt::goto_({m_currentReturnLabel}));
 	return false;
 }
 
@@ -752,9 +797,11 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			if (decl->isLocalVariable())
 			{
 				// Boogie requires local variables to be declared at the beginning of the procedure
-				m_localDecls.push_back(smack::Decl::variable(
+				auto varDecl = smack::Decl::variable(
 						ASTBoogieUtils::mapDeclName(*decl),
-						ASTBoogieUtils::mapType(decl->type(), *decl, m_context)));
+						ASTBoogieUtils::mapType(decl->type(), *decl, m_context));
+				varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
+				m_localDecls.push_back(varDecl);
 			}
 			else
 			{

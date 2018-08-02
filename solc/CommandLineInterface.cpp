@@ -32,6 +32,7 @@
 #include <libsolidity/ast/ASTJsonConverter.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/BoogieContext.h>
+#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/interface/Exceptions.h>
 #include <libsolidity/interface/CompilerStack.h>
@@ -1082,6 +1083,7 @@ void CommandLineInterface::handleBoogie()
 
 	if (!Error::containsOnlyWarnings(errorReporter.errors()))
 	{
+		m_error = true; // We set this flag so that the whole application returns with an error
 		return;
 	}
 

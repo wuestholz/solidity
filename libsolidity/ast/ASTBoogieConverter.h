@@ -1,6 +1,5 @@
 #pragma once
 
-#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/BoogieContext.h>
@@ -19,24 +18,25 @@ private:
 	BoogieContext& m_context;
 
 	// Helper variables to pass information between the visit methods
+	ContractDefinition const* m_currentContract;
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
 
-	// Collect local variable declarations (Boogie requires them at the
-	// beginning of the function).
+	// Collect local variable declarations (Boogie requires them at the beginning of the function).
 	std::list<smack::Decl*> m_localDecls;
 
-	// Collect initializers for state variables to be added to the beginning
-	// of the constructor
+	// Collect initializers for state variables to be added to the beginning of the constructor
+	// If there is no constructor, but there are initializers, we create one
 	std::list<smack::Stmt const*> m_stateVarInitializers;
 
-	// Current block(s) where statements are appended, stack is needed
-	// due to nested blocks
+	// Current block(s) where statements are appended, stack is needed due to nested blocks
 	std::stack<smack::Block*> m_currentBlocks;
 
 	// Return statement in Solidity is mapped to an assignment to the return
 	// variables in Boogie, which is described by currentRet
 	const smack::Expr* m_currentRet;
+	// Current label to jump to when encountering a return. This is needed because modifiers
+	// are inlined and their returns should not jump out of the whole function.
 	std::string m_currentReturnLabel;
 	int m_nextReturnLabelId;
 
@@ -46,29 +46,36 @@ private:
 	void addGlobalComment(std::string str);
 
 	/**
-	 * Helper method to convert an expression using the dedicated expression
-	 * converter class. It also handles the statements and declarations
-	 * returned by the conversion.
+	 * Helper method to convert an expression using the dedicated expression converter class,
+	 * it also handles side-effect statements and declarations introduced by the conversion
 	 */
 	const smack::Expr* convertExpression(Expression const& _node);
 
 	/**
-	 * Create default constructor for a contract
+	 * Create default constructor for a contract (it is required when there is no constructor,
+	 * but state variables are initialized when declared)
 	 */
 	void createDefaultConstructor(ContractDefinition const& _node);
 
+	void processInvariants(ContractDefinition const& _node);
+
+	std::map<smack::Expr const*, std::string> getLoopInvariants(Statement const& _node, ASTNode const* _scope);
+
 public:
+	/**
+	 * Create a new instance with a given context
+	 */
 	ASTBoogieConverter(BoogieContext& context);
 
 	/**
 	 * Convert a node and add it to the actual Boogie program
 	 */
-	void convert(ASTNode const& _node);
+	void convert(ASTNode const& _node) { _node.accept(*this); }
 
 	/**
 	 * Print the actual Boogie program to an output stream
 	 */
-	void print(std::ostream& _stream);
+	void print(std::ostream& _stream) { m_context.program().print(_stream); }
 
 	bool visit(SourceUnit const& _node) override;
 	bool visit(PragmaDirective const& _node) override;

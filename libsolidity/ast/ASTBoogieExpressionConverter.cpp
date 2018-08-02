@@ -1,12 +1,6 @@
-#include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/interface/Exceptions.h>
-#include <libsolidity/parsing/Scanner.h>
-#include <utility>
-#include <tuple>
 
 using namespace std;
 using namespace dev;
@@ -22,18 +16,18 @@ const string ASTBoogieExpressionConverter::ERR_EXPR = "__ERROR";
 const smack::Expr* ASTBoogieExpressionConverter::getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode)
 {
 	// Array is a local variable
-	if (auto varArray = dynamic_cast<const smack::VarExpr*>(expr))
+	if (auto localArray = dynamic_cast<const smack::VarExpr*>(expr))
 	{
-		return smack::Expr::id(varArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
+		return smack::Expr::id(localArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
 	}
 	// Array is state variable
-	if (auto selArray = dynamic_cast<const smack::SelExpr*>(expr))
+	if (auto stateArray = dynamic_cast<const smack::SelExpr*>(expr))
 	{
-		if (auto baseArray = dynamic_cast<const smack::VarExpr*>(selArray->getBase()))
+		if (auto baseArray = dynamic_cast<const smack::VarExpr*>(stateArray->getBase()))
 		{
 			return smack::Expr::sel(
 							smack::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
-							selArray->getIdxs());
+							stateArray->getIdxs());
 		}
 	}
 
@@ -68,24 +62,23 @@ void ASTBoogieExpressionConverter::reportWarning(SourceLocation const& location,
 }
 
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, SourceLocation const* defaultLocation) :
-		m_context(context), m_defaultLocation(defaultLocation)
-{
-	m_currentExpr = nullptr;
-	m_currentAddress = nullptr;
-	m_isGetter = false;
-	m_isLibraryCall = false;
-	m_isLibraryCallStatic = false;
-	m_currentValue = nullptr;
-}
+		m_context(context),
+		m_defaultLocation(defaultLocation),
+		m_currentExpr(nullptr),
+		m_currentAddress(nullptr),
+		m_currentMsgValue(nullptr),
+		m_isGetter(false),
+		m_isLibraryCall(false),
+		m_isLibraryCallStatic(false) {}
 
 ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const Expression& _node)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
+	m_currentMsgValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
 	m_isLibraryCallStatic = false;
-	m_currentValue = nullptr;
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
@@ -126,12 +119,15 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	// Result will be the LHS (for chained assignments like x = y = 5)
 	m_currentExpr = lhs;
 
+	// Bit-precise mode
 	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.leftHandSide().annotation().type))
 	{
+		// Check for implicit conversion
 		unsigned bits = ASTBoogieUtils::getBits(_node.leftHandSide().annotation().type);
 		bool isSigned = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type);
 		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context);
 
+		// Transform rhs based on the operator, e.g., a += b becomes a := bvadd(a, b)
 		switch(_node.assignmentOperator())
 		{
 		case Token::Assign: break; // rhs already contains the result
@@ -143,12 +139,12 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		case Token::AssignBitOr: rhs = ASTBoogieUtils::bvBinaryFunc(m_context, Token::BitOr, lhs, rhs, bits, isSigned); break;
 		case Token::AssignBitXor: rhs = ASTBoogieUtils::bvBinaryFunc(m_context, Token::BitXor, lhs, rhs, bits, isSigned); break;
 		default:
-			reportError(_node.location(), string("Unsupported assignment operator in bit-precise mode: ") +
-					Token::toString(_node.assignmentOperator()));
+			reportError(_node.location(), string("Unsupported assignment operator in bit-precise mode: ") + Token::toString(_node.assignmentOperator()));
+			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			return false;
 		}
 	}
-	else
+	else // Not bit-precise mode
 	{
 		// Transform rhs based on the operator, e.g., a += b becomes a := a + b
 		switch (_node.assignmentOperator()) {
@@ -167,7 +163,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.assignmentOperator()));
 			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			break;
-
 		default:
 			reportError(_node.location(), string("Unsupported assignment operator: ") +
 					Token::toString(_node.assignmentOperator()));
@@ -175,8 +170,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		}
 	}
 
+	// Create the assignment with the helper method
 	createAssignment(_node.leftHandSide(), lhs, rhs);
-
 	return false;
 }
 
@@ -244,7 +239,6 @@ smack::Expr const* ASTBoogieExpressionConverter::selectToUpdate(smack::SelExpr c
 	}
 }
 
-
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 {
 	if (_node.components().size() == 1)
@@ -261,6 +255,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 
 bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 {
+	// Check if constant propagation could infer the result
 	string tpStr = _node.annotation().type->toString();
 	if (boost::starts_with(tpStr, "int_const"))
 	{
@@ -365,6 +360,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 
 bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 {
+	// Check if constant propagation could infer the result
 	string tpStr = _node.annotation().type->toString();
 	if (boost::starts_with(tpStr, "int_const"))
 	{
@@ -380,6 +376,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	_node.rightExpression().accept(*this);
 	const smack::Expr* rhs = m_currentExpr;
 
+	// Common type might not be equal to the type of the node, e.g., in case of uint32 == uint64,
+	// the common type is uint64, but the type of the node is bool
 	auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
 
 	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(commonType))
@@ -395,13 +393,16 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd:
 		case Token::BitOr:
 		case Token::BitXor:
+		case Token::SHL:
+		case Token::SAR:
 		case Token::Equal:
 		case Token::NotEqual:
 		case Token::LessThan:
 		case Token::GreaterThan:
 		case Token::LessThanOrEqual:
 		case Token::GreaterThanOrEqual:
-			m_currentExpr = ASTBoogieUtils::bvBinaryFunc(m_context, _node.getOperator(), lhs, rhs, ASTBoogieUtils::getBits(commonType), ASTBoogieUtils::isSigned(commonType));
+			m_currentExpr = ASTBoogieUtils::bvBinaryFunc(m_context, _node.getOperator(), lhs, rhs,
+					ASTBoogieUtils::getBits(commonType), ASTBoogieUtils::isSigned(commonType));
 			break;
 		default:
 			reportError(_node.location(), string("Unsupported binary operator in bit-precise mode ") + Token::toString(_node.getOperator()));
@@ -447,6 +448,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		case Token::BitAnd:
 		case Token::BitOr:
 		case Token::BitXor:
+		case Token::SHL:
+		case Token::SAR:
 			reportError(_node.location(), string("Use bit-precise mode for bitwise operator ") + Token::toString(_node.getOperator()));
 			m_currentExpr = smack::Expr::id(ERR_EXPR);
 			break;
@@ -465,8 +468,14 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
+		if (_node.arguments().size() != 1)
+		{
+			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
+							errinfo_comment("Type conversion should have exactly one argument") <<
+							errinfo_sourceLocation(_node.location()));
+		}
 		auto arg = *_node.arguments().begin();
-		// Nothing to do when converting to address
+		// Converting to address
 		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
 		{
 			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
@@ -486,7 +495,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				return false;
 			}
 		}
-		// Nothing to do when converting to other kind of contract
+		// Converting to other kind of contract
 		if (auto expr = dynamic_cast<Identifier const*>(&_node.expression()))
 		{
 			if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
@@ -515,26 +524,25 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		reportError(_node.location(), "Unsupported type conversion");
 		m_currentExpr = smack::Expr::id(ERR_EXPR);
 		return false;
-
 	}
 	// Function calls in Boogie are statements and cannot be part of
 	// expressions, therefore each function call is given a fresh variable
 	// for its return value and is mapped to a call statement
 
 	// First, process the expression of the function call, which should give:
-	// - The name of the called function in 'currentExpr'
-	// - The address on which the function is called in 'currentAddress'
-	// - The msg.value in 'currentValue'
+	// - The name of the called function in 'm_currentExpr'
+	// - The address on which the function is called in 'm_currentAddress'
+	// - The msg.value in 'm_currentMsgValue'
 	// Example: f(z) gives 'f' as the name and 'this' as the address
 	// Example: x.f(z) gives 'f' as the name and 'x' as the address
 	// Example: x.f.value(y)(z) gives 'f' as the name, 'x' as the address and 'y' as the value
 
 	// Check for the special case of calling the 'value' function
 	// For example x.f.value(y)(z) should be treated as x.f(z), while setting
-	// 'currentValue' to 'y'.
-	if (auto expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	// 'm_currentMsgValue' to 'y'.
+	if (auto exprMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
 	{
-		if (expMa->memberName() == "value")
+		if (exprMa->memberName() == "value")
 		{
 			// Process the argument
 			if (_node.arguments().size() != 1)
@@ -543,45 +551,45 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 								errinfo_comment("Call to the value function should have exactly one argument") <<
 								errinfo_sourceLocation(_node.location()));
 			}
-			(*_node.arguments().begin())->accept(*this);
-			m_currentValue = m_currentExpr;
-			// TODO: check for implicit bitvector conversion
+			auto arg = *_node.arguments().begin();
+			arg->accept(*this);
+			m_currentMsgValue = m_currentExpr;
 			if (m_context.bitPrecise())
 			{
-				m_currentValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentValue,
-						(*_node.arguments().begin())->annotation().type, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned), m_context);
+				m_currentMsgValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentMsgValue,
+						arg->annotation().type, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned), m_context);
 			}
 
-
 			// Continue with the rest of the AST
-			expMa->expression().accept(*this);
+			exprMa->expression().accept(*this);
 			return false;
 		}
 	}
 
 	// Ignore gas setting, e.g., x.f.gas(y)(z) is just x.f(z)
-	if (auto expMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	if (auto exprMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
 	{
-		if (expMa->memberName() == "gas")
+		if (exprMa->memberName() == "gas")
 		{
-			reportWarning(expMa->location(), "Ignored call to gas() function.");
-			expMa->expression().accept(*this);
+			reportWarning(exprMa->location(), "Ignored call to gas() function.");
+			exprMa->expression().accept(*this);
 			return false;
 		}
 	}
 
 	m_currentExpr = nullptr;
 	m_currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-	m_currentValue = nullptr;
+	m_currentMsgValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
+	// Process expression
 	_node.expression().accept(*this);
 
-	// 'currentExpr' should be an identifier, giving the name of the function
+	// 'm_currentExpr' should be an identifier, giving the name of the function
 	string funcName;
-	if (auto v = dynamic_cast<smack::VarExpr const*>(m_currentExpr))
+	if (auto varExpr = dynamic_cast<smack::VarExpr const*>(m_currentExpr))
 	{
-		funcName = v->name();
+		funcName = varExpr->name();
 	}
 	else
 	{
@@ -594,48 +602,56 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		reportError(_node.location(), "Getter arguments are not supported");
 	}
 
-	// Get arguments recursively
+	// Process arguments recursively
 	list<const smack::Expr*> args;
-	// Pass extra arguments
+	// First, pass extra arguments
 	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
 	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ?
 			smack::Expr::lit(smack::bigint(0), 256) : smack::Expr::lit(smack::bigint(0)));
-	args.push_back(m_currentValue ? m_currentValue : defaultMsgValue); // msg.value
+	args.push_back(m_currentMsgValue ? m_currentMsgValue : defaultMsgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
-	// Add normal arguments (except when calling 'call') TODO: is this ok?
-	if (funcName != ASTBoogieUtils::BOOGIE_CALL)
+
+	for (unsigned i = 0; i < _node.arguments().size(); ++i)
 	{
-		for (unsigned i = 0; i < _node.arguments().size(); ++i)
+		auto arg = _node.arguments()[i];
+		arg->accept(*this);
+		// In bit-precise mode, we need the definition of the function to see the types of the parameters
+		// (for implicit conversions)
+		if (m_context.bitPrecise())
 		{
-			auto arg = _node.arguments()[i];
-			arg->accept(*this);
-			if (m_context.bitPrecise())
+			// Try to get the definition
+			const FunctionDefinition* calledFunc = nullptr;
+			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 			{
-				const FunctionDefinition* calledFunc = nullptr;
-				if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-				{
-					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration)) { calledFunc = funcDef; }
-				}
-				if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
-				{
-					if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration)) { calledFunc = funcDef; }
-				}
-
-				if (calledFunc)
-				{
-					m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
-				}
+				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration)) { calledFunc = funcDef; }
 			}
-			args.push_back(m_currentExpr);
+			if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
+			{
+				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration)) { calledFunc = funcDef; }
+			}
+			// TODO: the above does not work for complex expressions like 'x.f.value(1)()'
 
+			if (calledFunc)
+			{
+				m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
+			}
+		}
+
+		// Do not add argument for call
+		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
+		{
+			args.push_back(m_currentExpr);
+			// Array lenght
 			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)
 			{
 				args.push_back(getArrayLength(m_currentExpr, *arg));
 			}
 		}
 	}
+
+	// Check for calls to special functions
 
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == ASTBoogieUtils::SOLIDITY_ASSERT)
@@ -646,10 +662,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_comment("Assert should have exactly one argument") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		// The parameter of assert is the first (and only) normal argument
+		// Parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createLocAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
+		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
 		return false;
 	}
 
@@ -662,8 +678,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_comment("Require should have one or two argument(s)") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		// The parameter of assume is the first normal argument (the second is
-		// an message optional message that is omitted in Boogie)
+		// Parameter of assume is the first normal argument (second is optional message omitted in Boogie)
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
 		m_newStatements.push_back(smack::Stmt::assume(*it));
@@ -671,7 +686,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Revert is mapped to assume(false) statement in Boogie (instead of a function call)
-	// Its argument is an optional message that is omitted in Boogie
+	// Its argument is an optional message, omitted in Boogie
 	if (funcName == ASTBoogieUtils::SOLIDITY_REVERT)
 	{
 		if (_node.arguments().size() > 1)
@@ -684,6 +699,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
+	// Sum function
 	if (funcName == ASTBoogieUtils::VERIFIER_SUM)
 	{
 		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
@@ -708,15 +724,15 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
-	// If we set msg.value, we should reduce our own balance
-	if (m_currentValue)
+	// If msg.value was set, we should reduce our own balance (and the called function will increase its own)
+	if (m_currentMsgValue)
 	{
 		// assert(balance[this] >= msg.value)
 		m_newStatements.push_back(smack::Stmt::assert_(
 			m_context.bitPrecise() ?
-				ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue, 256, false) :
-				smack::Expr::gte(smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentValue),
-				ASTBoogieUtils::createLocAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
+				ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentMsgValue, 256, false) :
+				smack::Expr::gte(smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentMsgValue),
+				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		m_newStatements.push_back(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
@@ -726,18 +742,19 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 						m_context.bitPrecise() ?
 								ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Sub,
 										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-										m_currentValue, 256, false) :
+										m_currentMsgValue, 256, false) :
 								smack::Expr::minus(
 										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-										m_currentValue))));
+										m_currentMsgValue))));
 	}
 
+	// External calls require the invariants to hold
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
 		for (auto invar : m_context.currentInvars())
 		{
 			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_context.currentScanner())));
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_context.currentScanner())));
 		}
 	}
 
@@ -761,13 +778,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 		else
 		{
-			list<string> rets;
-			rets.push_back(returnVar->getName());
 			// Assign call to the fresh variable
-			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_context.currentScanner())));
-			m_newStatements.push_back(smack::Stmt::call(funcName, args, rets));
+			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
+			m_newStatements.push_back(smack::Stmt::call(funcName, args, {returnVar->getName()}));
 
-			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentValue)
+			// The call function is special as it indicates failure in a return value and in this case
+			// we must undo reducing our balance
+			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentMsgValue)
 			{
 				smack::Block* revert = smack::Block::block();
 				// balance[this] += msg.value
@@ -779,25 +796,26 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 								m_context.bitPrecise() ?
 									ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Add,
 											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-											m_currentValue, 256, false) :
+											m_currentMsgValue, 256, false) :
 									smack::Expr::plus(
 											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-											m_currentValue))));
+											m_currentMsgValue))));
 				m_newStatements.push_back(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
 			}
 		}
 
 	}
-	else
+	else // No return value for function
 	{
-		m_currentExpr = nullptr; // No return value for function
-		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createLocAttrs(_node.location(), "", *m_context.currentScanner())));
+		m_currentExpr = nullptr;
+		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
 		m_newStatements.push_back(smack::Stmt::call(funcName, args));
 	}
 
+	// Assume invariants after external call
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_context.currentInvars()) m_newStatements.push_back(smack::Stmt::assume(invar.first));
+		for (auto invar : m_context.currentInvars()) { m_newStatements.push_back(smack::Stmt::assume(invar.first)); }
 	}
 
 	return false;
@@ -838,7 +856,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		{
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
-				m_currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
+				m_currentExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 				return false;
 			}
 		}
@@ -846,21 +864,21 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// address.transfer()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
-		m_context.addTransferFunction();
+		m_context.includeTransferFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
 		return false;
 	}
 	// address.send()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
 	{
-		m_context.addSendFunction();
+		m_context.includeSendFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
 		return false;
 	}
 	// address.call()
 	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
 	{
-		m_context.addCallFunction();
+		m_context.includeCallFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
 		return false;
 	}
@@ -899,11 +917,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	}
 	m_currentExpr = smack::Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
 	// Check for getter
-	m_isGetter = false;
-	if (dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
-	{
-		m_isGetter = true;
-	}
+	m_isGetter =  dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration);
 	// Check for library call
 	m_isLibraryCall = false;
 	if (auto fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
@@ -942,7 +956,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		if (fbType->numBytes() == 1)
 		{
 			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
-					ASTBoogieUtils::createLocAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
+					ASTBoogieUtils::createAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
 			m_currentExpr = baseExpr;
 			return false;
 		}
@@ -1026,9 +1040,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 
 bool ASTBoogieExpressionConverter::visitNode(ASTNode const& _node)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-					errinfo_comment("Unhandled node") <<
-					errinfo_sourceLocation(_node.location()));
+	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node") << errinfo_sourceLocation(_node.location()));
 	return true;
 }
 

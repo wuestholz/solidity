@@ -64,6 +64,10 @@ contract BecTokenSimplified {
         require(_value > 0 && balances[msg.sender] >= amount);
 
         balances[msg.sender] = balances[msg.sender].sub(amount);
+        /**
+         * @notice invariant totalSupply == __verifier_sum(balances) + (cnt - i) * _value
+         * @notice invariant i <= cnt
+         */
         for (uint i = 0; i < cnt; i++) {
             balances[_receivers[i]] = balances[_receivers[i]].add(_value);
         }

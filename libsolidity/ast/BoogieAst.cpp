@@ -285,7 +285,7 @@ const Stmt* Stmt::ifelse(const Expr* cond, const Block* then, const Block* elze)
   return new IfElseStmt(cond, then, elze);
 }
 
-const Stmt* Stmt::while_(const Expr* cond, const Block* body, std::list<const Expr*> invars) {
+const Stmt* Stmt::while_(const Expr* cond, const Block* body, std::list<const Specification*> invars) {
   return new WhileStmt(cond, body, invars);
 }
 
@@ -673,7 +673,8 @@ void WhileStmt::print(std::ostream& os) const {
     os << " {\n";
   } else {
     os << "\n";
-    print_seq<const Expr*>(os, invars, "  invariant ", ";\n  invariant ", ";");
+    for (auto inv : invars) inv->print(os, "invariant");
+    os << "\n  {\n";
   }
   body->print(os);
   os << "\n  }\n";
@@ -726,16 +727,17 @@ void FuncDecl::print(std::ostream& os) const {
 }
 
 void VarDecl::print(std::ostream& os) const {
+  os << "var ";
   if (attrs.size() > 0)
     print_seq<const Attr*>(os, attrs, "", " ", " ");
-  os << "var " << name << ": " << type << ";";
+  os << name << ": " << type << ";";
 }
 
 void Specification::print(std::ostream& os, std::string kind) const {
   os << "  " << kind << " ";
   if (attrs.size() > 0)
       print_seq<const Attr*>(os, attrs, "", " ", " ");
-  os << expr << ";\n";
+  os << expr << ";";
 }
 
 Specification const* Specification::spec(const Expr* e, std::list<const Attr*> ax){

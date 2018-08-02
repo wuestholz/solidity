@@ -1,8 +1,6 @@
-#include <libsolidity/ast/ASTBoogieUtils.h>
-#include <libsolidity/ast/AST.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/regex.hpp>
-#include <libsolidity/parsing/Scanner.h>
+#include <libsolidity/ast/ASTBoogieUtils.h>
 
 using namespace std;
 using namespace dev;
@@ -32,7 +30,6 @@ const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
 const string ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
 const string ASTBoogieUtils::SOLIDITY_REVERT = "revert";
-// no constant required for 'throw' because it is a separate statement
 
 const string ASTBoogieUtils::SOLIDITY_THIS = "this";
 const string ASTBoogieUtils::BOOGIE_THIS = "__this";
@@ -50,11 +47,12 @@ const string ASTBoogieUtils::BOOGIE_NOW = "__now";
 smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
-	list<smack::Binding> transferParams;
-	transferParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	transferParams.push_back(make_pair(BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
-	transferParams.push_back(make_pair("amount", context.bitPrecise() ? "bv256" : "int"));
+	list<smack::Binding> transferParams{
+		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
+		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
+		{BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"},
+		{"amount", context.bitPrecise() ? "bv256" : "int"}
+	};
 
 	// Body
 	smack::Block* transferImpl = smack::Block::block();
@@ -83,10 +81,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 							smack::Expr::minus(sender_bal, amount)
 			)));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
-	list<smack::Block*> transferBlocks;
-	transferBlocks.push_back(transferImpl);
-	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER,
-			transferParams, list<smack::Binding>(), list<smack::Decl*>(), transferBlocks);
+	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	// Precondition: there is enough ether to transfer
 	transfer->getRequires().push_back(smack::Specification::spec(
@@ -116,14 +111,14 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value
-	list<smack::Binding> callParams;
-	callParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
-	callParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	callParams.push_back(make_pair(BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
+	list<smack::Binding> callParams {
+		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
+		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
+		{BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"}
+	};
 
 	// Return value
-	list<smack::Binding> callReturns;
-	callReturns.push_back(make_pair("__result", "bool"));
+	list<smack::Binding> callReturns{ {"__result", "bool"} };
 
 	// Body
 	// Successful transfer
@@ -151,9 +146,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	callBlock->addStmt(smack::Stmt::comment("TODO: call fallback"));
 	callBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
 
-	list<smack::Block*> callBlocks;
-	callBlocks.push_back(callBlock);
-	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL, callParams, callReturns, list<smack::Decl*>(), callBlocks);
+	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL, callParams, callReturns, {}, {callBlock});
 	// Postcondition: if result is false nothing happens
 	callProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::or_(result,
 			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE))))));
@@ -163,15 +156,15 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
-	list<smack::Binding> sendParams;
-	sendParams.push_back(make_pair(BOOGIE_THIS, BOOGIE_ADDRESS_TYPE));
-	sendParams.push_back(make_pair(BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE));
-	sendParams.push_back(make_pair(ASTBoogieUtils::BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"));
-	sendParams.push_back(make_pair("amount", context.bitPrecise() ? "bv256" : "int"));
+	list<smack::Binding> sendParams {
+		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
+		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"},
+		{"amount", context.bitPrecise() ? "bv256" : "int"}
+	};
 
 	// Return value
-	list<smack::Binding> sendReturns;
-	sendReturns.push_back(make_pair("__result", "bool"));
+	list<smack::Binding> sendReturns{ {"__result", "bool"} };
 
 	// Body
 	// Successful transfer
@@ -210,10 +203,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	transferBlock->addStmt(smack::Stmt::comment("TODO: call fallback"));
 	transferBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
 
-	list<smack::Block*> transferBlocks;
-	transferBlocks.push_back(transferBlock);
-	smack::ProcDecl* sendProc = smack::Decl::procedure(BOOGIE_SEND,
-			sendParams, sendReturns, list<smack::Decl*>(), transferBlocks);
+	smack::ProcDecl* sendProc = smack::Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
 
 	// Precondition: there is enough ether to transfer
 	sendProc->getRequires().push_back(smack::Specification::spec(
@@ -264,7 +254,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
 	if (tpStr == "bool") return "bool";
 	// For literals we return 'int_const' even in bit-precise mode, they will be
-	// converted to appropriate type when assigned to something
+	// converted to appropriate type when assigned to something (or implicitly converted)
 	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int_const";
 	for (int i = 8; i <= 256; ++i)
 	{
@@ -314,14 +304,14 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 }
 
 
-list<const smack::Attr*> ASTBoogieUtils::createLocAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
+list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
 {
-	list<const smack::Attr*> attrs;
 	int srcLine, srcCol;
 	tie(srcLine, srcCol) = scanner.translatePositionToLineColumn(loc.start);
-	attrs.push_back(smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1));
-	attrs.push_back(smack::Attr::attr("message", message));
-	return attrs;
+	return {
+		smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1),
+		smack::Attr::attr("message", message)
+	};
 }
 
 bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
@@ -335,30 +325,32 @@ unsigned ASTBoogieUtils::getBits(TypePointer type)
 {
 	if (!isBitPreciseType(type)) { return 0; }
 	string typeStr = type->toString();
-	return stoi(typeStr.substr(typeStr.find("t") + 1));
+	return stoi(typeStr.substr(typeStr.find("t") + 1)); // Parse stuff after the last 't' in 'int' or 'uint'
 }
 
 bool ASTBoogieUtils::isSigned(TypePointer type)
 {
 	if (!isBitPreciseType(type)) { return false; }
 	string typeStr = type->toString();
-	return typeStr[0] == 'i';
+	return typeStr[0] == 'i'; // Check if 'int' or 'uint'
 }
 
 smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
+	// Do nothing if any of the types is unknown
 	if (!targetType || !exprType) { return expr; }
 
 	if (isBitPreciseType(targetType))
 	{
 		unsigned targetBits = getBits(targetType);
+		// Create bitvector from literals
 		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
 		{
-			if (exprLit->getVal() < 0)
+			if (exprLit->getVal() < 0) // Negative literals are tricky
 			{
 				string fullName = "bv" + to_string(targetBits) + "neg";
-				context.addBvBuiltinFunction(fullName, smack::Decl::function(
-								fullName, {make_pair("", "bv"+to_string(targetBits))}, "bv"+to_string(targetBits), nullptr,
+				context.includeBuiltInFunction(fullName, smack::Decl::function(
+								fullName, {{"", "bv"+to_string(targetBits)}}, "bv"+to_string(targetBits), nullptr,
 								{smack::Attr::attr("bvbuiltin", "bvneg")}));
 				return smack::Expr::fn(fullName, smack::Expr::lit(-exprLit->getVal(), targetBits));
 			}
@@ -376,21 +368,25 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 			// Nothing to do if size and signedness is the same
 			if (targetBits == exprBits && targetSigned == exprSigned) { return expr; }
 			// Conversion to smaller type should have already been detected by the compiler
-			if (targetBits < exprBits) { BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion to smaller type")); }
+			if (targetBits < exprBits)
+			{
+				BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion to smaller type"));
+				return nullptr;
+			}
 
 			if (!exprSigned) // Unsigned can be converted to larger (signed or unsigned) with zero extension
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
-				context.addBvBuiltinFunction(fullName, smack::Decl::function(
-						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
+				context.includeBuiltInFunction(fullName, smack::Decl::function(
+						fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))}));
 				return smack::Expr::fn(fullName, expr);
 			}
 			else if (targetSigned) // Signed can only be converted to signed with sign extension
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
-				context.addBvBuiltinFunction(fullName, smack::Decl::function(
-						fullName, {make_pair("", "bv"+to_string(exprBits))}, "bv"+to_string(targetBits), nullptr,
+				context.includeBuiltInFunction(fullName, smack::Decl::function(
+						fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
 						{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
 				return smack::Expr::fn(fullName, expr);
 			}
@@ -408,7 +404,6 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::Value op,
 		smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
 {
-	string uns("");
 	string name("");
 	string retType("");
 	switch (op) {
@@ -420,6 +415,8 @@ smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::V
 	case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
 	case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
 	case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
+	case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
+	case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
 
 	case Token::Equal: return smack::Expr::eq(lhs, rhs);
 	case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
@@ -433,11 +430,11 @@ smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::V
 		return nullptr;
 	}
 	string fullName = "bv" + to_string(bits) + name;
-	context.addBvBuiltinFunction(fullName, smack::Decl::function(
-					fullName, {make_pair("", "bv"+to_string(bits)), make_pair("", "bv"+to_string(bits))}, retType, nullptr,
+	context.includeBuiltInFunction(fullName, smack::Decl::function(
+					fullName, {{"", "bv"+to_string(bits)}, {"", "bv"+to_string(bits)}}, retType, nullptr,
 					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
 
-	return smack::Expr::fn("bv" + to_string(bits) + name, lhs, rhs);
+	return smack::Expr::fn(fullName, lhs, rhs);
 }
 
 smack::Expr const* ASTBoogieUtils::bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool)
@@ -453,11 +450,11 @@ smack::Expr const* ASTBoogieUtils::bvUnaryFunc(BoogieContext& context, Token::Va
 	}
 
 	string fullName = "bv" + to_string(bits) + name;
-	context.addBvBuiltinFunction(fullName, smack::Decl::function(
-					fullName, {make_pair("", "bv"+to_string(bits))}, "bv"+to_string(bits), nullptr,
+	context.includeBuiltInFunction(fullName, smack::Decl::function(
+					fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
 					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
 
-	return smack::Expr::fn("bv" + to_string(bits) + name, subExpr);
+	return smack::Expr::fn(fullName, subExpr);
 }
 
 
