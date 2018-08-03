@@ -453,7 +453,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 
 		// Add contract invariants only if explicitly requested
-		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
 		{
 			procDecl->getRequires().push_back(smack::Specification::spec(cInv.first,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold when entering function.", *m_context.currentScanner())));
@@ -462,12 +462,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 	}
 
-	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_PRECOND))
+	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
 	{
 		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
 	}
-	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_POSTCOND))
+	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));
