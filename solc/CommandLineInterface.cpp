@@ -1065,12 +1065,14 @@ void CommandLineInterface::handleBoogie()
 		catch (CompilerError const& _exception)
 		{
 			formatter.printExceptionInformation(_exception, "Boogie exception");
+			m_error = true;
 			return;
 		}
 		catch (InternalCompilerError const& _exception)
 		{
 			formatter.printExceptionInformation(_exception, "Boogie internal exception");
 			cerr << "Details:" << endl << boost::diagnostic_information(_exception);
+			m_error = true;
 			return;
 		}
 	}
