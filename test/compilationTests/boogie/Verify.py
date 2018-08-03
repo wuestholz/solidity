@@ -9,11 +9,10 @@ import signal
 import psutil
 
 def kill():
-    print("Timeout while running verifier")
     parent = psutil.Process(os.getpid())
     for child in parent.children(recursive=True):  # or parent.children() for recursive=False
         child.kill()
-    parent.kill()
+    #parent.kill()
 
 def main():
     # Set up argument parser
@@ -53,8 +52,14 @@ def main():
     timer.start()
     boogieArgs = "/nologo /doModSetAnalysis /errorTrace:0" + (" /proverOpt:SOLVER=Yices2 /useArrayTheory" if args.yices else "")
     verifyCommand = "mono " + args.boogie + " " + bplFile + " " + boogieArgs
-    verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
-    timer.cancel()
+    try:
+        verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
+        timer.cancel()
+    except subprocess.CalledProcessError as err:
+        verifierOutput = err.output
+        if err.returncode == -9:
+            print("Timeout while running verifier")
+            return
 
     verifierOutputStr = verifierOutput.decode("utf-8")
     if re.search("Boogie program verifier finished with", verifierOutputStr) == None:
