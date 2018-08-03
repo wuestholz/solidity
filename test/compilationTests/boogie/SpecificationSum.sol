@@ -1,13 +1,13 @@
 pragma solidity ^0.4.23;
 
 /**
- * @notice invariant __verifier_sum(user_balances) == total_supply
+ * @notice invariant __verifier_sum_int32(user_balances) == total_supply
  */
 contract SomeContract {
-    int total_supply;
-    mapping(address=>int) user_balances;
+    int32 total_supply;
+    mapping(address=>int32) user_balances;
 
-    function deposit(int amount) public {
+    function deposit(int32 amount) public {
         total_supply += amount;
         user_balances[msg.sender] += amount;
     }

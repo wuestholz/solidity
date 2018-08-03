@@ -203,21 +203,11 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Add new shadow variables for sum
 	for (auto sumDecl : m_context.currentSumDecls())
 	{
-		TypePointer sumDeclType = nullptr;
-		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
-		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
-		if (!sumDeclType)
-		{
-			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
-		}
-		else
-		{
-			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-			m_context.program().getDeclarations().push_back(
-						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
-						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
-		}
+		addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
+		m_context.program().getDeclarations().push_back(
+					smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
+					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
+					ASTBoogieUtils::mapType(sumDecl.second, *sumDecl.first, m_context)));
 	}
 
 	// Process state variables first (to get initializer expressions)
@@ -463,7 +453,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
 
 		// Add contract invariants only if explicitly requested
-		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
 		{
 			procDecl->getRequires().push_back(smack::Specification::spec(cInv.first,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold when entering function.", *m_context.currentScanner())));
@@ -472,12 +462,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 	}
 
-	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_PRECOND))
+	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
 	{
 		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
 	}
-	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_POSTCOND))
+	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));

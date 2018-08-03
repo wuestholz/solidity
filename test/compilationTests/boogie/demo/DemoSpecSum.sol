@@ -1,7 +1,7 @@
 pragma solidity ^0.4.23;
 
 /**
- * @notice invariant __verifier_sum(user_balances) == total_supply
+ * @notice invariant __verifier_sum_uint256(user_balances) == total_supply
  */
 contract DemoSpecSum {
     uint total_supply;

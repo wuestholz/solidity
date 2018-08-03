@@ -1,3 +1,4 @@
+#include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/BoogieContext.h>
 
@@ -16,7 +17,7 @@ BoogieContext::BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std:
 					m_errorReporter(errorReporter),
 					m_currentScanner(nullptr),
 					m_globalDecls(globalDecls),
-					m_verifierSum(ASTBoogieUtils::VERIFIER_SUM, std::make_shared<FunctionType>(strings{}, strings{"int"}, FunctionType::Kind::Internal, true, StateMutability::Pure)),
+
 					m_scopes(scopes),
 				  	m_evmVersion(evmVersion),
 				  	m_currentContractInvars(),
@@ -26,7 +27,21 @@ BoogieContext::BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std:
 				  	m_callIncluded(false),
 				  	m_sendIncluded(false)
 {
-	m_globalDecls.push_back(&m_verifierSum);
+	// Add magic variables for the sum function for all sizes of int and uint
+	for (string sign : {"", "u"})
+	{
+		for (int i = 8; i <= 256; i += 8)
+		{
+			string type = sign + "int" + to_string(i);
+			// TODO: should be deleted in destructor of context
+			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + type,
+									std::make_shared<FunctionType>(strings{}, strings{type},
+											FunctionType::Kind::Internal, true, StateMutability::Pure));
+			m_verifierSum.push_back(sum);
+			m_globalDecls.push_back(sum);
+		}
+	}
+
 }
 
 void BoogieContext::includeBuiltInFunction(std::string name, smack::FuncDecl* decl)
