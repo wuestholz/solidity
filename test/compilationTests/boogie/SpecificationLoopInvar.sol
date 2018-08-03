@@ -22,13 +22,15 @@ contract SpecificationLoopInvar {
     }
     function doesNotHoldOnEntry() public pure {
         int i = 0;
-        int x = 1; // Invariant does not hold on entry
-        /** @notice invariant i == x */
-        while (i < 10) {
-            i++;
-            x++;
+        {
+            int x = 1; // Invariant does not hold on entry
+            /** @notice invariant i == x */
+            while (i < 10) {
+                i++;
+                x++;
+            }
+            assert(x == i);
         }
-        assert(x == i);
     }
     function isNotMaintainedByLoop() public pure {
         int i = 0;
@@ -47,5 +49,25 @@ contract SpecificationLoopInvar {
             x++;
         }
         assert(x <= 10);
+    }
+}
+
+/** 
+ * @notice invariant x <= y 
+ * @notice invariant x >= y 
+ */
+contract ContractInvarOnLoop {
+    int x;
+    int y;
+
+    function increase(int amount) public {
+        /** 
+         * @notice invariant x <= y 
+         * @notice invariant x >= y 
+         */
+        for (int i = 0; i < amount; i++) {
+            x++;
+            y++;
+        }
     }
 }

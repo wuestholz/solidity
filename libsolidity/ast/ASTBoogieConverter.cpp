@@ -16,6 +16,12 @@ namespace dev
 namespace solidity
 {
 
+const string ASTBoogieConverter::DOCTAG_CONTRACT_INVAR = "invariant";
+const string ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
+const string ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
+const string ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
+const string ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
+
 void ASTBoogieConverter::addGlobalComment(string str)
 {
 	m_context.program().getDeclarations().push_back(smack::Decl::comment("", str));
@@ -66,7 +72,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, {}, {}, {block});
-	for (auto invar : m_context.currentInvars())
+	for (auto invar : m_context.currentContractInvars())
 	{
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
@@ -75,76 +81,10 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
-void ASTBoogieConverter::processInvariants(const ContractDefinition& _node)
+map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, string _tag)
 {
-	// Process invariants
-	m_context.currentInvars().clear();
-	m_context.currentSumDecls().clear();
-
-	// TODO: we use a different error reporter for the type checker to ignore
-	// error messages related to our special functions like the __verifier_sum
-	ErrorList typeCheckerErrList;
-	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
-
-	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
-	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, &_node);
-
-	for (auto docTag : _node.annotation().docTags)
-	{
-		// Find invariants
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
-		{
-			// Parse
-			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
-			addGlobalComment("Contract invariant: " + invarStr);
-			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
-					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, _node.sourceUnitName())));
-
-			// Resolve references, using the scope of the contract
-			m_context.scopes()[&*invar] = m_context.scopes()[&_node];
-			resolver.resolveNamesAndTypes(*invar);
-			// Do type checking
-			typeChecker.checkTypeRequirements(*invar);
-			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty()) // Make sure that there are no side effects
-			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
-			}
-			if (!result.newDecls.empty()) // Make sure that there are no side effects
-			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
-			}
-			m_context.currentInvars()[result.expr] = invarStr;
-		}
-	}
-
-	// Add new shadow variables for sum
-	for (auto sumDecl : m_context.currentSumDecls())
-	{
-		TypePointer sumDeclType = nullptr;
-		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
-		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
-		if (!sumDeclType)
-		{
-			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
-		}
-		else
-		{
-			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
-			m_context.program().getDeclarations().push_back(
-						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
-						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
-		}
-	}
-}
-
-
-map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement const& _node, ASTNode const* _scope)
-{
-	map<smack::Expr const*, string> loopInvars;
-	// Process invariants
+	map<smack::Expr const*, string> exprs;
+	// Process expressions
 	// TODO: we use a different error reporter for the type checker to ignore
 	// error messages related to our special functions like the __verifier_sum
 	ErrorList typeCheckerErrList;
@@ -153,37 +93,42 @@ map<smack::Expr const*, string> ASTBoogieConverter::getLoopInvariants(Statement 
 	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
 	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
 
-	for (auto docTag : _node.annotation().docTags)
+	for (auto docTag : _annot.docTags)
 	{
-		// Find invariants
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, "invariant "))
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
 		{
-			// Parse
-			string invarStr = docTag.second.content.substr(docTag.second.content.find(" ") + 1);
-			ASTPointer<Expression> invar = Parser(m_context.errorReporter())
-					.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)invarStr, m_currentContract->sourceUnitName())));
-			// Resolve references, using the scope of the contract
-			m_context.scopes()[&*invar] = m_context.scopes()[_scope];
-			resolver.resolveNamesAndTypes(*invar);
-			// Do type checking
-			typeChecker.checkTypeRequirements(*invar);
-			// Convert invariant to Boogie representation
-			auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*invar);
-			if (!result.newStatements.empty()) // Make sure that there are no side effects
+			if (_tag == DOCTAG_CONTRACT_INVARS_INCLUDE) // Special tag to include contract invariants
 			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate statements");
+				// TODO: warning when currentinvars is empty
+				for (auto invar : m_context.currentContractInvars()) { exprs[invar.first] = invar.second; }
 			}
-			if (!result.newDecls.empty()) // Make sure that there are no side effects
+			else // Normal tags just parse the expression afterwards
 			{
-				m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Invariant introduces intermediate declarations");
+				// Parse
+				string exprStr = docTag.second.content.substr(_tag.length() + 1);
+				ASTPointer<Expression> expr = Parser(m_context.errorReporter())
+						.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)exprStr, m_currentContract->sourceUnitName())));
+				// Resolve references, using the given scope
+				m_context.scopes()[&*expr] = m_context.scopes()[_scope];
+				resolver.resolveNamesAndTypes(*expr);
+				// Do type checking
+				typeChecker.checkTypeRequirements(*expr);
+				// Convert expression to Boogie representation
+				auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*expr);
+				if (!result.newStatements.empty()) // Make sure that there are no side effects
+				{
+					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate statements");
+				}
+				if (!result.newDecls.empty()) // Make sure that there are no side effects
+				{
+					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate declarations");
+				}
+				exprs[result.expr] = exprStr;
 			}
-			loopInvars[result.expr] = invarStr;
 		}
 	}
 
-	// TODO: sumDecls?
-	return loopInvars;
-
+	return exprs;
 }
 
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
@@ -211,6 +156,8 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 
 bool ASTBoogieConverter::visit(SourceUnit const& _node)
 {
+	rememberScope(_node);
+
 	// Boogie programs are flat, source units do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Source: " + _node.annotation().path + " -------");
@@ -219,26 +166,59 @@ bool ASTBoogieConverter::visit(SourceUnit const& _node)
 
 bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 {
+	rememberScope(_node);
+
 	// Pragmas are only included as comments
 	addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
 	return false;
 }
 
-bool ASTBoogieConverter::visit(ImportDirective const&)
+bool ASTBoogieConverter::visit(ImportDirective const& _node)
 {
+	rememberScope(_node);
+
 //	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
+	rememberScope(_node);
+
 	m_currentContract = &_node;
 	// Boogie programs are flat, contracts do not appear explicitly
 	addGlobalComment("");
 	addGlobalComment("------- Contract: " + _node.name() + " -------");
 
-	// Process invariants
-	processInvariants(_node);
+	// Process contract invariants
+	m_context.currentContractInvars().clear();
+	m_context.currentSumDecls().clear();
+
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR))
+	{
+		addGlobalComment("Contract invariant: " + invar.second);
+		m_context.currentContractInvars()[invar.first] = invar.second;
+	}
+
+	// Add new shadow variables for sum
+	for (auto sumDecl : m_context.currentSumDecls())
+	{
+		TypePointer sumDeclType = nullptr;
+		if (auto arrType = dynamic_cast<ArrayType const*>(&*sumDecl->type())) { sumDeclType = arrType->baseType(); }
+		if (auto mapType = dynamic_cast<MappingType const*>(&*sumDecl->type())) { sumDeclType = mapType->valueType(); }
+		if (!sumDeclType)
+		{
+			m_context.errorReporter().error(Error::Type::ParserError, sumDecl->location(), "Operand of sum must be array or mapping.");
+		}
+		else
+		{
+			addGlobalComment("Shadow variable for sum over '" + sumDecl->name() + "'");
+			m_context.program().getDeclarations().push_back(
+						smack::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl) + ASTBoogieUtils::BOOGIE_SUM,
+						"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
+						ASTBoogieUtils::mapType(sumDeclType, *sumDecl, m_context)));
+		}
+	}
 
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
@@ -261,6 +241,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
+	rememberScope(_node);
+
 	// TODO: calling constructor of superclass?
 	// Boogie programs are flat, inheritance does not appear explicitly
 	addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
@@ -274,6 +256,8 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 
 bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 {
+	rememberScope(_node);
+
 	// Nothing to do with using for directives, calls to functions are resolved in the AST
 	string libraryName = _node.libraryName().annotation().type->toString();
 	string typeName = _node.typeName() ? _node.typeName()->annotation().type->toString() : "*";
@@ -283,30 +267,40 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 
 bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
+	rememberScope(_node);
+
 	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Struct definitions are not supported");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
+	rememberScope(_node);
+
 	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Enum definitions are not supported");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EnumValue const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EnumValue") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(ParameterList const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ParameterList") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 {
+	rememberScope(_node);
+
 	// Solidity functions are mapped to Boogie procedures
 	m_currentFunc = &_node;
 
@@ -453,7 +447,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
 	{
-		for (auto invar : m_context.currentInvars())
+		for (auto invar : m_context.currentContractInvars())
 		{
 			if (!_node.isConstructor())
 			{
@@ -467,7 +461,29 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else // Private functions: inline
 	{
 		procDecl->addAttr(smack::Attr::attr("inline", 1));
+
+		// Add contract invariants only if explicitly requested
+		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+		{
+			procDecl->getRequires().push_back(smack::Specification::spec(cInv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold when entering function.", *m_context.currentScanner())));
+			procDecl->getEnsures().push_back(smack::Specification::spec(cInv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold at end of function.", *m_context.currentScanner())));
+		}
 	}
+
+	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_PRECOND))
+	{
+		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
+							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
+	}
+	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node.body(), DOCTAG_POSTCOND))
+	{
+		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
+							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));
+	}
+	// TODO: check that no new sum variables were introduced
+
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
@@ -475,6 +491,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 {
+	rememberScope(_node);
+
 	// Non-state variables should be handled in the VariableDeclarationStatement
 	if (!_node.isStateVariable())
 	{
@@ -519,50 +537,66 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(ModifierDefinition const&)
+bool ASTBoogieConverter::visit(ModifierDefinition const& _node)
 {
+	rememberScope(_node);
+
 	// Modifier definitions do not appear explicitly, but are instead inlined to functions
 	return false;
 }
 
 bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierInvocation") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
+	rememberScope(_node);
+
 	m_context.errorReporter().warning(_node.location(), "Ignored event definition");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(ElementaryTypeName const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ElementaryTypeName") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(UserDefinedTypeName const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: UserDefinedTypeName") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(FunctionTypeName const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: FunctionTypeName") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(Mapping const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Mapping") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ArrayTypeName") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
@@ -573,18 +607,24 @@ bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 
 bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
+	rememberScope(_node);
+
 	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Inline assembly is not supported");
 	return false;
 }
 
-bool ASTBoogieConverter::visit(Block const&)
+bool ASTBoogieConverter::visit(Block const& _node)
 {
+	rememberScope(_node);
+
 	// Simply apply visitor recursively, compound statements will create new blocks when required
 	return true;
 }
 
-bool ASTBoogieConverter::visit(PlaceholderStatement const&)
+bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
+	rememberScope(_node);
+
 	// We go one level deeper in the modifier list
 	m_currentModifier++;
 
@@ -650,6 +690,8 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const&)
 
 bool ASTBoogieConverter::visit(IfStatement const& _node)
 {
+	rememberScope(_node);
+
 	// Get condition recursively
 	const smack::Expr* cond = convertExpression(_node.condition());
 
@@ -675,6 +717,8 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 
 bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
+	rememberScope(_node);
+
 	// Get condition recursively
 	const smack::Expr* cond = convertExpression(_node.condition());
 
@@ -685,12 +729,15 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	// TODO: the scope of the invariant should be the enclosing block of the while loop
-	// which might be different than the current function (e.g., while loop inside for).
-	for(auto invar : getLoopInvariants(_node, &m_currentFunc->body()))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
@@ -699,6 +746,8 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 bool ASTBoogieConverter::visit(ForStatement const& _node)
 {
+	rememberScope(_node);
+
 	// Boogie does not have a for statement, therefore it is transformed
 	// into a while statement in the following way:
 	//
@@ -725,10 +774,15 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	for(auto invar : getLoopInvariants(_node, &_node))
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR))
 	{
 		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
 	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
+	{
+		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
@@ -737,20 +791,26 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 bool ASTBoogieConverter::visit(Continue const& _node)
 {
+	rememberScope(_node);
+
 	// TODO: Boogie does not support continue, this must be mapped manually
 	// using labels and gotos
 	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Continue statement is not supported");
 	return false;
 }
 
-bool ASTBoogieConverter::visit(Break const&)
+bool ASTBoogieConverter::visit(Break const& _node)
 {
+	rememberScope(_node);
+
 	m_currentBlocks.top()->addStmt(smack::Stmt::break_());
 	return false;
 }
 
 bool ASTBoogieConverter::visit(Return const& _node)
 {
+	rememberScope(_node);
+
 	if (_node.expression() != nullptr)
 	{
 		// Get rhs recursively
@@ -774,20 +834,26 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(Throw const&)
+bool ASTBoogieConverter::visit(Throw const& _node)
 {
+	rememberScope(_node);
+
 	m_currentBlocks.top()->addStmt(smack::Stmt::assume(smack::Expr::lit(false)));
 	return false;
 }
 
 bool ASTBoogieConverter::visit(EmitStatement const& _node)
 {
+	rememberScope(_node);
+
 	m_context.errorReporter().warning(_node.location(), "Ignored emit statement");
 	return false;
 }
 
 bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 {
+	rememberScope(_node);
+
 	for (auto decl : _node.declarations())
 	{
 		// Decl can be null, e.g., var (x,,) = (1,2,3)
@@ -841,6 +907,8 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 
 bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 {
+	rememberScope(_node);
+
 	// Some expressions have specific statements in Boogie
 
 	// Assignment
@@ -882,6 +950,8 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 bool ASTBoogieConverter::visitNode(ASTNode const& _node)
 {
+	rememberScope(_node);
+
 	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node (unknown)") << errinfo_sourceLocation(_node.location()));
 	return true;
 }

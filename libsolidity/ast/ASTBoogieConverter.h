@@ -40,6 +40,12 @@ private:
 	std::string m_currentReturnLabel;
 	int m_nextReturnLabelId;
 
+	static const std::string DOCTAG_CONTRACT_INVAR;
+	static const std::string DOCTAG_LOOP_INVAR;
+	static const std::string DOCTAG_CONTRACT_INVARS_INCLUDE;
+	static const std::string DOCTAG_PRECOND;
+	static const std::string DOCTAG_POSTCOND;
+
 	/**
 	 * Add a top-level comment
 	 */
@@ -57,9 +63,41 @@ private:
 	 */
 	void createDefaultConstructor(ContractDefinition const& _node);
 
-	void processInvariants(ContractDefinition const& _node);
+	/**
+	 * Parse expressions from documentation for a given doctag
+	 */
+	std::map<smack::Expr const*, std::string> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
 
-	std::map<smack::Expr const*, std::string> getLoopInvariants(Statement const& _node, ASTNode const* _scope);
+
+	/**
+	 * Chronological stack of scoppable nodes.
+	 */
+	std::stack<ASTNode const*> m_scopes;
+
+	/** Remember the scope of the node before visiting */
+	void rememberScope(ASTNode const& _node) {
+		if (dynamic_cast<Scopable const*>(&_node)) {
+			m_scopes.push(&_node);
+		}
+	}
+
+	/** If the node is scopable, it will be removed from the scopes stack */
+	void endVisitNode(ASTNode const& _node) override {
+		if (m_scopes.size() > 0) {
+			if (m_scopes.top() == &_node) {
+				m_scopes.pop();
+			}
+		}
+	}
+
+	/** Returns the closest scoped node */
+	ASTNode const* scope() const {
+		if (m_scopes.size() > 0) {
+			return m_scopes.top();
+		} else {
+			return nullptr;
+		}
+	}
 
 public:
 	/**
