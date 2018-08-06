@@ -68,6 +68,7 @@ contract BitPreciseArith {
         assert(mul8s(8, 16) == -128);
         assert(div8s(48, 6) == 8);
         assert(div8s(48, -6) == -8);
+        assert(div8s(-128, -1) == -128);
 
         assert(preinc8u(1) == 2);
         assert(postinc8u(1) == 2);
