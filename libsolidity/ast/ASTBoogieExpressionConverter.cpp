@@ -238,93 +238,54 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	_node.subExpression().accept(*this);
 	const smack::Expr* subExpr = m_currentExpr;
 
-	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
-	{
-		unsigned bits = ASTBoogieUtils::getBits(_node.annotation().type);
-		bool isSigned = ASTBoogieUtils::isSigned(_node.annotation().type);
+	unsigned bits = ASTBoogieUtils::getBits(_node.annotation().type);
+	bool isSigned = ASTBoogieUtils::isSigned(_node.annotation().type);
 
-		switch (_node.getOperator()) {
-		case Token::Add:
-		case Token::Sub:
-		case Token::BitNot:
-			m_currentExpr = ASTBoogieUtils::bvUnaryFunc(m_context, _node.getOperator(), subExpr, bits);
-			break;
+	switch (_node.getOperator()) {
+	case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
+	case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
 
-		// Inc and Dec shares most part of the code
-		case Token::Inc:
-		case Token::Dec:
+	case Token::Sub:
+	case Token::BitNot:
+		m_currentExpr = ASTBoogieUtils::encodeArithUnaryOp(m_context, &_node, _node.getOperator(), subExpr, bits, isSigned);
+		break;
+
+	// Inc and Dec shares most part of the code
+	case Token::Inc:
+	case Token::Dec:
+		{
+			const smack::Expr* lhs = subExpr;
+			const smack::Expr* rhs =
+					ASTBoogieUtils::encodeArithBinOp(m_context, &_node,
+							_node.getOperator() == Token::Inc ? Token::Add : Token::Sub,
+							lhs,
+							m_context.bitPrecise() ? smack::Expr::lit(smack::bigint(1), bits) : smack::Expr::lit(smack::bigint(1)),
+							bits, isSigned);
+			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
+					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
+			m_newDecls.push_back(tempVar);
+			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
-				const smack::Expr* lhs = subExpr;
-				const smack::Expr* rhs =
-						ASTBoogieUtils::encodeArithBinOp(m_context, &_node, _node.getOperator() == Token::Inc ? Token::Add : Token::Sub,
-								lhs, smack::Expr::lit(smack::bigint(1), bits), bits, isSigned);
-				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
-				m_newDecls.push_back(tempVar);
-				if (_node.isPrefixOperation()) // ++x (or --x)
-				{
-					// First do the assignment x := x + 1 (or x := x - 1)
-					createAssignment(_node.subExpression(), lhs, rhs);
-					// Then the assignment tmp := x
-					m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
-				}
-				else // x++ (or x--)
-				{
-					// First do the assignment tmp := x
-					m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
-					// Then the assignment x := x + 1 (or x := x - 1)
-					createAssignment(_node.subExpression(), lhs, rhs);
-				}
-				// Result is the tmp variable (if the assignment is part of an expression)
-				m_currentExpr = smack::Expr::id(tempVar->getName());
+				// First do the assignment x := x + 1 (or x := x - 1)
+				createAssignment(_node.subExpression(), lhs, rhs);
+				// Then the assignment tmp := x
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
 			}
-			break;
-		default:
-			reportError(_node.location(), string("Unsupported unary operator in bit-precise mode: ") + Token::toString(_node.getOperator()));
-			m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
-			break;
-		}
-	}
-	else
-	{
-		switch (_node.getOperator()) {
-		case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
-		case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
-		case Token::Sub: m_currentExpr = smack::Expr::neg(subExpr); break;
-		// Inc and Dec shares most part of the code
-		case Token::Inc:
-		case Token::Dec:
+			else // x++ (or x--)
 			{
-				const smack::Expr* lhs = subExpr;
-				const smack::Expr* rhs = _node.getOperator() == Token::Inc ?
-						smack::Expr::plus(lhs, smack::Expr::lit((unsigned)1)) :
-						smack::Expr::minus(lhs, smack::Expr::lit((unsigned)1));
-				smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
-						ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
-				m_newDecls.push_back(tempVar);
-				if (_node.isPrefixOperation()) // ++x (or --x)
-				{
-					// First do the assignment x := x + 1 (or x := x - 1)
-					createAssignment(_node.subExpression(), lhs, rhs);
-					// Then the assignment tmp := x
-					m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
-				}
-				else // x++ (or x--)
-				{
-					// First do the assignment tmp := x
-					m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
-					// Then the assignment x := x + 1 (or x := x - 1)
-					createAssignment(_node.subExpression(), lhs, rhs);
-				}
-				// Result is the tmp variable (if the assignment is part of an expression)
-				m_currentExpr = smack::Expr::id(tempVar->getName());
+				// First do the assignment tmp := x
+				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+				// Then the assignment x := x + 1 (or x := x - 1)
+				createAssignment(_node.subExpression(), lhs, rhs);
 			}
-			break;
-		default:
-			reportError(_node.location(), string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
-			m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
-			break;
+			// Result is the tmp variable (if the assignment is part of an expression)
+			m_currentExpr = smack::Expr::id(tempVar->getName());
 		}
+		break;
+	default:
+		reportError(_node.location(), string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
+		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
+		break;
 	}
 
 	return false;

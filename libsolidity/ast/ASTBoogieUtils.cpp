@@ -361,6 +361,46 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinOp(BoogieContext& context, ASTN
 	return smack::Expr::id(ERR_EXPR);
 }
 
+
+smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+		smack::Expr const* subExpr, unsigned bits, bool isSigned)
+{
+	switch(context.encoding())
+	{
+	case BoogieContext::Encoding::INT:
+		switch(op)
+		{
+		case Token::Add: return subExpr; break; // Unary plus does not do anything
+		case Token::Sub: return smack::Expr::neg(subExpr); break;
+		default:
+			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + Token::toString(op));
+			return smack::Expr::id(ERR_EXPR);
+		}
+		break;
+
+	case BoogieContext::Encoding::BV:
+		switch (op) {
+		case Token::Add:
+		case Token::Sub:
+		case Token::BitNot:
+			return bvUnaryFunc(context, op, subExpr, bits, isSigned);
+		default:
+			context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + Token::toString(op));
+			return smack::Expr::id(ERR_EXPR);
+		}
+		break;
+
+	case BoogieContext::Encoding::MOD:
+
+		break;
+
+	default:
+		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
+		return nullptr;
+	}
+	return smack::Expr::id(ERR_EXPR);
+}
+
 bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 {
 	if (!type) { return false; }

@@ -72,8 +72,12 @@ contract BitPreciseArith {
 
         assert(preinc8u(1) == 2);
         assert(postinc8u(1) == 2);
+        assert(preinc8u(255) == 0);
+        assert(postinc8u(255) == 0);
         assert(predec8u(5) == 4);
         assert(postdec8u(5) == 4);
+        assert(predec8u(0) == 255);
+        assert(postdec8u(0) == 255);
 
         assert(bitand8u(123, 45) == 41);
         assert(bitor8u(123, 45) == 127);

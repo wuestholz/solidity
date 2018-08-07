@@ -90,6 +90,8 @@ public:
 
 	static smack::Expr const* encodeArithBinOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
 
+	static smack::Expr const* encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
+
 	/**
 	 * Check if a type can be represented with bitvectors
 	 */
@@ -119,7 +121,6 @@ private:
 	 */
 	static smack::Expr const* bvBinaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
 
-public:
 	/**
 	 * Get a bitvector function for a given unary operation. Throws exception for unsupported operations.
 	 */
