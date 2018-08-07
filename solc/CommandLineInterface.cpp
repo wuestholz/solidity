@@ -82,7 +82,10 @@ static string const g_strAst = "ast";
 static string const g_strAstJson = "ast-json";
 static string const g_strAstCompactJson = "ast-compact-json";
 static string const g_strAstBoogie = "boogie";
-static string const g_strAstBoogieBitPrecise = "bit-precise";
+static string const g_strAstBoogieArith = "boogie-arith";
+static string const g_strAstBoogieArithInt = "int";
+static string const g_strAstBoogieArithBv = "bv";
+static string const g_strAstBoogieArithMod = "mod";
 static string const g_strBinary = "bin";
 static string const g_strBinaryRuntime = "bin-runtime";
 static string const g_strCloneBinary = "clone-bin";
@@ -137,7 +140,7 @@ static string const g_argCloneBinary = g_strCloneBinary;
 static string const g_argCombinedJson = g_strCombinedJson;
 static string const g_argCompactJSON = g_strCompactJSON;
 static string const g_argAstBoogie = g_strAstBoogie;
-static string const g_argAstBoogieBitPrecise = g_strAstBoogieBitPrecise;
+static string const g_argAstBoogieArith = g_strAstBoogieArith;
 static string const g_argGas = g_strGas;
 static string const g_argHelp = g_strHelp;
 static string const g_argInputFile = g_strInputFile;
@@ -186,6 +189,14 @@ static set<string> const g_machineArgs
 	g_strEVM,
 	g_strEVM15,
 	g_streWasm
+};
+
+/// Possible arguments to for --boogie-arith
+static set<string> const g_boogieArithArgs
+{
+	g_strAstBoogieArithInt,
+	g_strAstBoogieArithBv,
+	g_strAstBoogieArithMod
 };
 
 static void version()
@@ -634,7 +645,11 @@ Allowed options)",
 		(g_argAstJson.c_str(), "AST of all source files in JSON format.")
 		(g_argAstCompactJson.c_str(), "AST of all source files in a compact JSON format.")
 		(g_argAstBoogie.c_str(), "Boogie IVL representation of all source files.")
-		(g_argAstBoogieBitPrecise.c_str(), "Bit precise representation in Boogie")
+		(
+				g_argAstBoogieArith.c_str(),
+				po::value<string>()->value_name(boost::join(g_boogieArithArgs, ",")),
+				"Encoding used for arithmetic data types and operations in Boogie."
+		)
 		(g_argAsm.c_str(), "EVM assembly of the contracts.")
 		(g_argAsmJson.c_str(), "EVM assembly of the contracts in JSON format.")
 		(g_argOpcodes.c_str(), "Opcodes of the contracts.")
@@ -1048,7 +1063,34 @@ void CommandLineInterface::handleBoogie()
 	cout << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-	BoogieContext context(m_args.count(g_argAstBoogieBitPrecise), errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext::Encoding encoding = BoogieContext::Encoding::INT;
+	if (m_args.count(g_argAstBoogieArith))
+	{
+		string encodingStr = m_args[g_argAstBoogieArith].as<string>();
+		if (encodingStr == g_strAstBoogieArithBv)
+		{
+			encoding = BoogieContext::Encoding::BV;
+		}
+		else if (encodingStr == g_strAstBoogieArithInt)
+		{
+			encoding = BoogieContext::Encoding::INT;
+		}
+		else if (encodingStr == g_strAstBoogieArithMod)
+		{
+			encoding = BoogieContext::Encoding::MOD;
+			cerr << "mod encoding is not supported yet" << endl;
+			m_error = true;
+			return;
+		}
+		else
+		{
+			cerr << "Invalid option for --" + g_strAstBoogieArith + ": " << encodingStr << endl;
+			m_error = true;
+			return;
+		}
+	}
+
+	BoogieContext context(encoding, errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
 	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };

@@ -10,10 +10,10 @@ namespace dev
 {
 namespace solidity
 {
-BoogieContext::BoogieContext(bool bitPrecise, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
+BoogieContext::BoogieContext(Encoding encoding, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion) :
 					m_program(),
-					m_bitPrecise(bitPrecise),
+					m_encoding(encoding),
 					m_errorReporter(errorReporter),
 					m_currentScanner(nullptr),
 					m_globalDecls(globalDecls),
