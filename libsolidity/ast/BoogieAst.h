@@ -7,7 +7,8 @@
 #include <sstream>
 #include <string>
 #include <list>
-#include <boost/multiprecision/cpp_int.hpp>
+
+#include "libdevcore/Common.h"
 
 // TODO: these classes are leaking memory, there is no delete. Should be
 // updated to use smart pointers.
