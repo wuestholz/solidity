@@ -56,6 +56,7 @@ public:
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
 
 	smack::Program& program() { return m_program; }
+	Encoding encoding() { return m_encoding; }
 	bool bitPrecise() { return m_encoding == Encoding::BV; }
 	ErrorReporter& errorReporter() { return m_errorReporter; }
 	Scanner const*& currentScanner() { return m_currentScanner; }
@@ -69,6 +70,9 @@ public:
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
+
+	void reportError(ASTNode const* associatedNode, std::string message);
+	void reportWarning(ASTNode const* associatedNode, std::string message);
 };
 
 }

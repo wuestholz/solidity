@@ -55,6 +55,9 @@ public:
 	static const std::string SOLIDITY_NOW;
 	static const std::string BOOGIE_NOW;
 
+	// Return this expression as an identifier when something cannot be evaluated
+	static const std::string ERR_EXPR;
+
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */
@@ -85,6 +88,8 @@ public:
 	 */
 	static std::list<const smack::Attr*> createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 
+	static smack::Expr const* encodeArithBinOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
+
 	/**
 	 * Check if a type can be represented with bitvectors
 	 */
@@ -108,11 +113,13 @@ public:
 	 */
 	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
+private:
 	/**
 	 * Get a bitvector function for a given binary operation. Throws exception for unsupported operations.
 	 */
 	static smack::Expr const* bvBinaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
 
+public:
 	/**
 	 * Get a bitvector function for a given unary operation. Throws exception for unsupported operations.
 	 */

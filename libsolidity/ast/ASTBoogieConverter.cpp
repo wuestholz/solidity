@@ -117,11 +117,11 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*expr);
 				if (!result.newStatements.empty()) // Make sure that there are no side effects
 				{
-					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate statements");
+					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
 				}
 				if (!result.newDecls.empty()) // Make sure that there are no side effects
 				{
-					m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Annotation expression introduces intermediate declarations");
+					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
 				}
 				exprs[result.expr] = exprStr;
 			}
@@ -238,8 +238,7 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 	addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
 	if (_node.arguments() && _node.arguments()->size() > 0)
 	{
-		m_context.errorReporter().error(Error::Type::ParserError, _node.location(),
-				"Arguments for base constructor in inheritance list is not supported");
+		m_context.reportError(&_node, "Arguments for base constructor in inheritance list is not supported");
 	}
 	return false;
 }
@@ -259,7 +258,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
 	rememberScope(_node);
 
-	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Struct definitions are not supported");
+	m_context.reportError(&_node, "Struct definitions are not supported");
 	return false;
 }
 
@@ -267,7 +266,7 @@ bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
 	rememberScope(_node);
 
-	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Enum definitions are not supported");
+	m_context.reportError(&_node, "Enum definitions are not supported");
 	return false;
 }
 
@@ -321,7 +320,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (ret->type()->category() == Type::Category::Array)
 		{
-			m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Arrays are not supported as return values");
+			m_context.reportError(&_node, "Arrays are not supported as return values");
 			return false;
 		}
 		rets.push_back({ASTBoogieUtils::mapDeclName(*ret), ASTBoogieUtils::mapType(ret->type(), *ret, m_context)});
@@ -338,7 +337,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 	else
 	{
-		m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Multiple return values are not supported");
+		m_context.reportError(&_node, "Multiple return values are not supported");
 		return false;
 	}
 
@@ -361,13 +360,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					smack::Expr::upd(
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							m_context.bitPrecise() ?
-									ASTBoogieUtils::bvBinaryFunc(m_context, Token::Value::Add,
-											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-											smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false) :
-									smack::Expr::plus(
-											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-											smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE)))));
+							ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Add,
+									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false))));
 	}
 
 	// Modifiers need to be inlined
@@ -414,7 +409,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 		else
 		{
-			m_context.errorReporter().error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation");
+			m_context.reportError(&*modifier, "Unsupported modifier invocation");
 		}
 	}
 
@@ -547,7 +542,7 @@ bool ASTBoogieConverter::visit(EventDefinition const& _node)
 {
 	rememberScope(_node);
 
-	m_context.errorReporter().warning(_node.location(), "Ignored event definition");
+	m_context.reportWarning(&_node, "Ignored event definition");
 	return false;
 }
 
@@ -599,7 +594,7 @@ bool ASTBoogieConverter::visit(InlineAssembly const& _node)
 {
 	rememberScope(_node);
 
-	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Inline assembly is not supported");
+	m_context.reportError(&_node, "Inline assembly is not supported");
 	return false;
 }
 
@@ -630,7 +625,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 			for (unsigned long i = 0; i < m_currentModifier; ++i)
 			{
 				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id()) {
-					m_context.errorReporter().error(Error::Type::ParserError, m_currentFunc->location(), "Duplicated modifiers are not supported");
+					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
 				}
 			}
 
@@ -658,7 +653,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 		}
 		else
 		{
-			m_context.errorReporter().error(Error::Type::ParserError, modifier->location(), "Unsupported modifier invocation");
+			m_context.reportError(&*modifier, "Unsupported modifier invocation");
 		}
 	}
 	else if (m_currentFunc->isImplemented()) // We reached the function
@@ -785,7 +780,7 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 
 	// TODO: Boogie does not support continue, this must be mapped manually
 	// using labels and gotos
-	m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Continue statement is not supported");
+	m_context.reportError(&_node, "Continue statement is not supported");
 	return false;
 }
 
@@ -836,7 +831,7 @@ bool ASTBoogieConverter::visit(EmitStatement const& _node)
 {
 	rememberScope(_node);
 
-	m_context.errorReporter().warning(_node.location(), "Ignored emit statement");
+	m_context.reportWarning(&_node, "Ignored emit statement");
 	return false;
 }
 
@@ -889,7 +884,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		}
 		else
 		{
-			m_context.errorReporter().error(Error::Type::ParserError, _node.location(), "Assignment to multiple variables is not supported");
+			m_context.reportError(&_node, "Assignment to multiple variables is not supported");
 		}
 	}
 	return false;

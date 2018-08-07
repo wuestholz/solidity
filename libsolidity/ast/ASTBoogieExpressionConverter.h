@@ -15,8 +15,6 @@ namespace solidity
 class ASTBoogieExpressionConverter : private ASTConstVisitor
 {
 private:
-	// Return this expression as an identifier when something cannot be evaluated
-	static const std::string ERR_EXPR;
 
 	BoogieContext& m_context;
 

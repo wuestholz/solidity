@@ -72,6 +72,30 @@ void BoogieContext::includeSendFunction()
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(*this));
 }
 
+void BoogieContext::reportError(ASTNode const* associatedNode, std::string message)
+{
+	if (associatedNode)
+	{
+		m_errorReporter.error(Error::Type::ParserError, associatedNode->location(), message);
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Error at unknown node: " + message));
+	}
+}
+
+void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string message)
+{
+	if (associatedNode)
+	{
+		m_errorReporter.warning(associatedNode->location(), message);
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Warning at unknown node: " + message));
+	}
+}
+
 
 }
 }
