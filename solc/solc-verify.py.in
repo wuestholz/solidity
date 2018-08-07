@@ -110,7 +110,7 @@ def getRelatedLineFromBpl(outputLine, offset):
 
 # Gets the original (.sol) line and column number from an annotated line in the .bpl
 def getSourceLineAndCol(line):
-    match = re.search('{:sourceloc \'([^}]*)\', (\\d+), (\\d+)}', line)
+    match = re.search('{:sourceloc \"([^}]*)\", (\\d+), (\\d+)}', line)
     if match is None:
         return '[Could not trace back error location]'
     else:
@@ -118,7 +118,7 @@ def getSourceLineAndCol(line):
 
 # Gets the message from an annotated line in the .bpl
 def getMessage(line):
-    match = re.search('{:message \'([^}]*)\'}', line)
+    match = re.search('{:message \"([^}]*)\"}', line)
     if match is None:
         return '[No message found for error]'
     else:
