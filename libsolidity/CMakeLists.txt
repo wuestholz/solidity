@@ -8,6 +8,16 @@ if (${Z3_FOUND})
   add_definitions(-DHAVE_Z3)
   message("Z3 SMT solver found. This enables optional SMT checking with Z3.")
   list(REMOVE_ITEM sources "${CMAKE_CURRENT_SOURCE_DIR}/formal/CVC4Interface.cpp")
+
+  # Find Boogie  
+  include(FindBoogie)
+  find_package(BOOGIE QUIET)
+  if (BOOGIE_EXE)
+    message("Boogie found: ${BOOGIE_EXE}, ${Z3_EXE}. This enables verification script.")
+    configure_file("${CMAKE_SOURCE_DIR}/scripts/solc-verify.py.in" "${CMAKE_BINARY_DIR}/solc/solc-verify.py")  
+    install(SCRIPT "${CMAKE_BINARY_DIR}/solc/solc-verify.py" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  endif()
+  
 else()
   list(REMOVE_ITEM sources "${CMAKE_CURRENT_SOURCE_DIR}/formal/Z3Interface.cpp")
   find_package(GMP QUIET)
