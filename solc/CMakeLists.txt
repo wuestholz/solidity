@@ -21,3 +21,11 @@ if(SOLC_LINK_STATIC AND UNIX AND NOT APPLE)
 		LINK_SEARCH_END_STATIC ON
 	)
 endif()
+
+# Find Boogie  
+include(FindBoogie)
+find_package(BOOGIE QUIET)
+if (BOOGIE_EXE)
+  configure_file("solc-verify.py.in" "solc-verify.py")  
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/solc-verify.py" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
