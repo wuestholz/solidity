@@ -18,7 +18,7 @@ def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
     parser.add_argument('file', type=str, help='Path to the input file')
-    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default="int", choices=["int", "bv", "mod"])
+    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod'])
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie binary to use', default='@BOOGIE_EXE@')
     parser.add_argument('--z3', type=str, help='Use Z3 and set the binary to use', default='@Z3_EXE@')
@@ -32,7 +32,7 @@ def main():
     bplFile = args.output + '/' + os.path.basename(solFile) + '.bpl'
 
     # First convert .sol to .bpl
-    solcArgs = ' --boogie ' + solFile + ' -o ' + args.output + ' --overwrite' + ' --boogie-arith ' + args.boogie_arith
+    solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, args.output, args.boogie_arith)
     convertCommand = args.solc + ' ' + solcArgs
     try:
         compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
@@ -114,7 +114,7 @@ def getSourceLineAndCol(line):
     if match is None:
         return '[Could not trace back error location]'
     else:
-        return match.group(1) + ', line ' + match.group(2) + ', col ' + match.group(3)
+        return  'Source %s, line %s, col %s' % (match.group(1), match.group(2), match.group(3))
 
 # Gets the message from an annotated line in the .bpl
 def getMessage(line):
