@@ -278,7 +278,6 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	return ERR_TYPE;
 }
 
-
 list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
 {
 	int srcLine, srcCol;
@@ -288,7 +287,6 @@ list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, 
 		smack::Attr::attr("message", message)
 	};
 }
-
 
 smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
 		 smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
@@ -328,26 +326,39 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 		}
 		break;
 	case BoogieContext::Encoding::BV:
-		switch (op) {
-		case Token::Add:
-		case Token::Sub:
-		case Token::Mul:
-		case Token::Div:
-		case Token::BitAnd:
-		case Token::BitOr:
-		case Token::BitXor:
-		case Token::SHL:
-		case Token::SAR:
-		case Token::Equal:
-		case Token::NotEqual:
-		case Token::LessThan:
-		case Token::GreaterThan:
-		case Token::LessThanOrEqual:
-		case Token::GreaterThanOrEqual:
-			return bvBinaryFunc(context, op, lhs, rhs, bits, isSigned);
-		default:
-			context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + Token::toString(op));
-			return smack::Expr::id(ERR_EXPR);
+		{
+			string name("");
+			string retType("");
+
+			switch (op) {
+			case Token::Add: name = "add"; retType = "bv" + to_string(bits); break;
+			case Token::Sub: name = "sub"; retType = "bv" + to_string(bits); break;
+			case Token::Mul: name = "mul"; retType = "bv" + to_string(bits); break;
+			case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = "bv" + to_string(bits); break;
+
+			case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
+			case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
+			case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
+			case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
+			case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
+
+			case Token::Equal: return smack::Expr::eq(lhs, rhs);
+			case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
+
+			case Token::LessThan: name = isSigned ? "slt" : "ult"; retType = "bool"; break;
+			case Token::GreaterThan: name = isSigned ? "sgt" : "ugt"; retType = "bool";  break;
+			case Token::LessThanOrEqual: name = isSigned ? "sle" : "ule"; retType = "bool";  break;
+			case Token::GreaterThanOrEqual: name = isSigned ? "sge" : "uge"; retType = "bool";  break;
+
+			default:
+				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + Token::toString(op));
+				return smack::Expr::id(ERR_EXPR);
+			}
+			string fullName = "bv" + to_string(bits) + name;
+			context.includeBuiltInFunction(fullName, smack::Decl::function(
+							fullName, {{"", "bv"+to_string(bits)}, {"", "bv"+to_string(bits)}}, retType, nullptr,
+							{smack::Attr::attr("bvbuiltin", "bv" + name)}));
+			return smack::Expr::fn(fullName, lhs, rhs);
 		}
 		break;
 	case BoogieContext::Encoding::MOD:
@@ -361,9 +372,8 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 	return smack::Expr::id(ERR_EXPR);
 }
 
-
 smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
-		smack::Expr const* subExpr, unsigned bits, bool isSigned)
+		smack::Expr const* subExpr, unsigned bits, bool)
 {
 	switch(context.encoding())
 	{
@@ -379,14 +389,23 @@ smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, AS
 		break;
 
 	case BoogieContext::Encoding::BV:
-		switch (op) {
-		case Token::Add:
-		case Token::Sub:
-		case Token::BitNot:
-			return bvUnaryFunc(context, op, subExpr, bits, isSigned);
-		default:
-			context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + Token::toString(op));
-			return smack::Expr::id(ERR_EXPR);
+		{
+			string name("");
+			switch (op) {
+			case Token::Add: return subExpr;
+
+			case Token::Sub: name = "neg"; break;
+			case Token::BitNot: name = "not"; break;
+			default:
+				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + Token::toString(op));
+				return smack::Expr::id(ERR_EXPR);
+			}
+			string fullName = "bv" + to_string(bits) + name;
+			context.includeBuiltInFunction(fullName, smack::Decl::function(
+							fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
+							{smack::Attr::attr("bvbuiltin", "bv" + name)}));
+
+			return smack::Expr::fn(fullName, subExpr);
 		}
 		break;
 
@@ -487,63 +506,6 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 
 	return expr;
 }
-
-smack::Expr const* ASTBoogieUtils::bvBinaryFunc(BoogieContext& context, Token::Value op,
-		smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
-{
-	string name("");
-	string retType("");
-	switch (op) {
-	case Token::Add: name = "add"; retType = "bv" + to_string(bits); break;
-	case Token::Sub: name = "sub"; retType = "bv" + to_string(bits); break;
-	case Token::Mul: name = "mul"; retType = "bv" + to_string(bits); break;
-	case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = "bv" + to_string(bits); break;
-
-	case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
-	case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
-	case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
-	case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
-	case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
-
-	case Token::Equal: return smack::Expr::eq(lhs, rhs);
-	case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
-
-	case Token::LessThan: name = isSigned ? "slt" : "ult"; retType = "bool"; break;
-	case Token::GreaterThan: name = isSigned ? "sgt" : "ugt"; retType = "bool";  break;
-	case Token::LessThanOrEqual: name = isSigned ? "sle" : "ule"; retType = "bool";  break;
-	case Token::GreaterThanOrEqual: name = isSigned ? "sge" : "uge"; retType = "bool";  break;
-	default:
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment(string("Unsupported binary operator in bit-precise mode ") + Token::toString(op)));
-		return nullptr;
-	}
-	string fullName = "bv" + to_string(bits) + name;
-	context.includeBuiltInFunction(fullName, smack::Decl::function(
-					fullName, {{"", "bv"+to_string(bits)}, {"", "bv"+to_string(bits)}}, retType, nullptr,
-					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
-
-	return smack::Expr::fn(fullName, lhs, rhs);
-}
-
-smack::Expr const* ASTBoogieUtils::bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool)
-{
-	string name("");
-	switch (op) {
-	case Token::Add: return subExpr;
-	case Token::Sub: name = "neg"; break;
-	case Token::BitNot: name = "not"; break;
-	default:
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment(string("Unsupported unary operator in bit-precise mode ") + Token::toString(op)));
-		return nullptr;
-	}
-
-	string fullName = "bv" + to_string(bits) + name;
-	context.includeBuiltInFunction(fullName, smack::Decl::function(
-					fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
-					{smack::Attr::attr("bvbuiltin", "bv" + name)}));
-
-	return smack::Expr::fn(fullName, subExpr);
-}
-
 
 }
 }

@@ -114,17 +114,6 @@ public:
 	 * then we return an extension of 8 bits to expr.
 	 */
 	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
-
-private:
-	/**
-	 * Get a bitvector function for a given binary operation. Throws exception for unsupported operations.
-	 */
-	static smack::Expr const* bvBinaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned = false);
-
-	/**
-	 * Get a bitvector function for a given unary operation. Throws exception for unsupported operations.
-	 */
-	static smack::Expr const* bvUnaryFunc(BoogieContext& context, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned = false);
 };
 
 }
