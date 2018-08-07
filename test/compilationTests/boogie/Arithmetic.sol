@@ -1,84 +1,84 @@
 pragma solidity ^0.4.23;
 
 contract Arithmetic {
-    function and(bool a, bool b) pure public returns (bool) {
+    function and(bool a, bool b) private pure returns (bool) {
         return a && b;
     }
-    function or(bool a, bool b) pure public returns (bool) {
+    function or(bool a, bool b) private pure returns (bool) {
         return a || b;
     }
-    function not(bool a) pure public returns (bool) {
+    function not(bool a) private pure returns (bool) {
         return !a;
     }
 
-    function add(uint a, uint b) pure public returns (uint) {
+    function add(uint a, uint b) private pure returns (uint) {
         return a + b;
     }
-    function sub(uint a, uint b) pure public returns (uint) {
+    function sub(uint a, uint b) private pure returns (uint) {
         return a - b;
     }
-    function mul(uint a, uint b) pure public returns (uint) {
+    function mul(uint a, uint b) private pure returns (uint) {
         return a * b;
     }
-    function div(uint a, uint b) pure public returns (uint) {
+    function div(uint a, uint b) private pure returns (uint) {
         return a / b;
     }
-    function mod(uint a, uint b) pure public returns (uint) {
+    function mod(uint a, uint b) private pure returns (uint) {
         return a % b;
     }
-    function minus(int a) pure public returns (int) {
+    function minus(int a) private pure returns (int) {
         return -a;
     }
-    function doSomethingComplex(uint a, uint b, uint c) pure public returns (uint){
+    function doSomethingComplex(uint a, uint b, uint c) private pure returns (uint){
         return ((a + b) * 1234 / c) % 56;
     }
 
-    function assignAdd(uint a, uint b) pure public returns (uint) {
+    function assignAdd(uint a, uint b) private pure returns (uint) {
         uint result = a;
         result += b;
         return result;
     }
-    function assignSub(uint a, uint b) pure public returns (uint) {
+    function assignSub(uint a, uint b) private pure returns (uint) {
         uint result = a;
         result -= b;
         return result;
     }
-    function assignMul(uint a, uint b) pure public returns (uint) {
+    function assignMul(uint a, uint b) private pure returns (uint) {
         uint result = a;
         result *= b;
         return result;
     }
-    function assignDiv(uint a, uint b) pure public returns (uint) {
+    function assignDiv(uint a, uint b) private pure returns (uint) {
         uint result = a;
         result /= b;
         return result;
     }
-    function assignMod(uint a, uint b) pure public returns (uint) {
+    function assignMod(uint a, uint b) private pure returns (uint) {
         uint result = a;
         result %= b;
         return result;
     }
 
-    function eq(uint a, uint b) pure public returns (bool) {
+    function eq(uint a, uint b) private pure returns (bool) {
         return a == b;
     }
-    function neq(uint a, uint b) pure public returns (bool) {
+    function neq(uint a, uint b) private pure returns (bool) {
         return a != b;
     }
-    function lt(uint a, uint b) pure public returns (bool) {
+    function lt(uint a, uint b) private pure returns (bool) {
         return a < b;
     }
-    function gt(uint a, uint b) pure public returns (bool) {
+    function gt(uint a, uint b) private pure returns (bool) {
         return a > b;
     }
-    function lte(uint a, uint b) pure public returns (bool) {
+    function lte(uint a, uint b) private pure returns (bool) {
         return a <= b;
     }
-    function gte(uint a, uint b) pure public returns (bool) {
+    function gte(uint a, uint b) private pure returns (bool) {
         return a >= b;
     }
 
-    function __verifier_main() pure public {
+    function __verifier_main() public pure {
         assert(and(true, true) == true);
         assert(and(true, false) == false);
         assert(and(false, true) == false);

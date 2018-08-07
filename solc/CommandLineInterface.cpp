@@ -1078,9 +1078,6 @@ void CommandLineInterface::handleBoogie()
 		else if (encodingStr == g_strAstBoogieArithMod)
 		{
 			encoding = BoogieContext::Encoding::MOD;
-			cerr << "mod encoding is not supported yet" << endl;
-			m_error = true;
-			return;
 		}
 		else
 		{

@@ -362,9 +362,84 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 		}
 		break;
 	case BoogieContext::Encoding::MOD:
+		{
+			auto modulo = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits));
+			auto largest = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
+			auto smallest = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
+			switch(op)
+			{
+			case Token::Add:
+			{
+				auto sum = smack::Expr::plus(lhs, rhs);
+				if (isSigned)
+				{
+					return smack::Expr::cond(smack::Expr::gt(sum, largest),
+						smack::Expr::minus(sum, modulo),
+						smack::Expr::cond(smack::Expr::lt(sum, smallest), smack::Expr::plus(sum, modulo), sum));
+				}
+				else
+				{
+					return smack::Expr::cond(smack::Expr::gte(sum, modulo), smack::Expr::minus(sum, modulo), sum);
+				}
 
+			}
+			case Token::Sub:
+			{
+				auto diff = smack::Expr::minus(lhs, rhs);
+				if (isSigned)
+				{
+					return smack::Expr::cond(smack::Expr::gt(diff, largest),
+						smack::Expr::minus(diff, modulo),
+						smack::Expr::cond(smack::Expr::lt(diff, smallest), smack::Expr::plus(diff, modulo), diff));
+				}
+				else
+				{
+					return smack::Expr::cond(smack::Expr::gte(lhs, rhs), diff, smack::Expr::plus(diff, modulo));
+				}
+			}
+			case Token::Mul:
+			{
+				if (isSigned)
+				{
+					auto lhs1 = smack::Expr::cond(smack::Expr::gte(lhs, smack::Expr::lit((long)0)), lhs, smack::Expr::plus(modulo, lhs));
+					auto rhs1 = smack::Expr::cond(smack::Expr::gte(rhs, smack::Expr::lit((long)0)), rhs, smack::Expr::plus(modulo, rhs));
+					auto prod = smack::Expr::mod(smack::Expr::times(lhs1, rhs1), modulo);
+					return smack::Expr::cond(smack::Expr::gt(prod, largest), smack::Expr::minus(prod, modulo), prod);
+				}
+				else
+				{
+					auto prod = smack::Expr::times(lhs, rhs);
+					return smack::Expr::cond(smack::Expr::gte(prod, modulo), smack::Expr::mod(prod, modulo), prod);
+				}
+			}
+			case Token::Div:
+			{
+				auto div = smack::Expr::intdiv(lhs, rhs);
+				if (isSigned)
+				{
+					return smack::Expr::cond(smack::Expr::gt(div, largest),
+						smack::Expr::minus(div, modulo),
+						smack::Expr::cond(smack::Expr::lt(div, smallest), smack::Expr::plus(div, modulo), div));
+				}
+				else
+				{
+					return div;
+				}
+			}
+
+			case Token::Equal: return smack::Expr::eq(lhs, rhs);
+			case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
+			case Token::LessThan: return smack::Expr::lt(lhs, rhs);
+			case Token::GreaterThan: return smack::Expr::gt(lhs, rhs);
+			case Token::LessThanOrEqual: return smack::Expr::lte(lhs, rhs);
+			case Token::GreaterThanOrEqual: return smack::Expr::gte(lhs, rhs);
+
+			default:
+				context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + Token::toString(op));
+				return smack::Expr::id(ERR_EXPR);
+			}
+		}
 		break;
-
 	default:
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
 		return nullptr;
@@ -410,7 +485,12 @@ smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, AS
 		break;
 
 	case BoogieContext::Encoding::MOD:
-
+		switch(op)
+		{
+		default:
+			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + Token::toString(op));
+			return smack::Expr::id(ERR_EXPR);
+		}
 		break;
 
 	default:
