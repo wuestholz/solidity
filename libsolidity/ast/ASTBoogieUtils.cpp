@@ -52,8 +52,8 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	list<smack::Binding> transferParams{
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"},
-		{"amount", context.bitPrecise() ? "bv256" : "int"}
+		{BOOGIE_MSG_VALUE, context.isBvEncoding() ? "bv256" : "int"},
+		{"amount", context.isBvEncoding() ? "bv256" : "int"}
 	};
 
 	// Body
@@ -68,29 +68,29 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
+					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
 	// balance[msg.sender] -= amount
 	transferImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					encodeArithBinOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
+					encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	// Precondition: there is enough ether to transfer
 	transfer->getRequires().push_back(smack::Specification::spec(
-			encodeArithBinOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
+			encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
 			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
 	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal,
-							encodeArithBinOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
+							encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
 					smack::Expr::eq(this_bal,
-							encodeArithBinOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
+							encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -104,7 +104,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	list<smack::Binding> callParams {
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"}
+		{BOOGIE_MSG_VALUE, context.isBvEncoding() ? "bv256" : "int"}
 	};
 
 	// Return value
@@ -123,7 +123,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false))));
+					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false))));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
@@ -146,8 +146,8 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	list<smack::Binding> sendParams {
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.bitPrecise() ? "bv256" : "int"},
-		{"amount", context.bitPrecise() ? "bv256" : "int"}
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.isBvEncoding() ? "bv256" : "int"},
+		{"amount", context.isBvEncoding() ? "bv256" : "int"}
 	};
 
 	// Return value
@@ -167,14 +167,14 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
+					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
 	// balance[msg.sender] -= amount
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					encodeArithBinOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
+					encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
@@ -188,7 +188,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 
 	// Precondition: there is enough ether to transfer
 	sendProc->getRequires().push_back(smack::Specification::spec(
-			encodeArithBinOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
+			encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
 			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
 	// Postcondition: if result is true and sender/receiver is different ether gets transferred
 	// otherwise nothing happens
@@ -196,9 +196,9 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal,
-							encodeArithBinOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
+							encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
 					smack::Expr::eq(this_bal,
-							encodeArithBinOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
+							encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -233,15 +233,15 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int_const";
 	for (int i = 8; i <= 256; ++i)
 	{
-		if (tpStr == "int" + to_string(i)) return context.bitPrecise() ? "bv" + to_string(i) : "int";
-		if (tpStr == "uint" + to_string(i)) return context.bitPrecise() ? "bv" + to_string(i) : "int";
+		if (tpStr == "int" + to_string(i)) return context.isBvEncoding() ? "bv" + to_string(i) : "int";
+		if (tpStr == "uint" + to_string(i)) return context.isBvEncoding() ? "bv" + to_string(i) : "int";
 	}
 	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
 
 	if (tp->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[" + string(context.bitPrecise() ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, context);
+		return "[" + string(context.isBvEncoding() ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, context);
 	}
 
 	if (tp->category() == Type::Category::Mapping)
@@ -254,7 +254,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	if (tp->category() == Type::Category::FixedBytes)
 	{
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
-		if (context.bitPrecise())
+		if (context.isBvEncoding())
 		{
 			if (fbType->numBytes() == 1) return "bv8";
 			else return "[bv256]bv8";
@@ -290,7 +290,7 @@ list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, 
 }
 
 
-smack::Expr const* ASTBoogieUtils::encodeArithBinOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
 		 smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
 {
 	switch(context.encoding())

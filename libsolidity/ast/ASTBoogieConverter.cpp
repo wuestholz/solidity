@@ -60,7 +60,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	list<smack::Binding> params {
 		{ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // this
 		{ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // msg.sender
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int"} // msg.value
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.isBvEncoding() ? "bv256" : "int"} // msg.value
 	};
 
 	smack::Block* block = smack::Block::block();
@@ -143,11 +143,11 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	m_context.program().getDeclarations().push_back(smack::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
 	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.isBvEncoding() ? "bv256" : "int")));
 	// Uninterpreted type for strings
 	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
-	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.bitPrecise() ? "bv256" : "int"));
+	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.isBvEncoding() ? "bv256" : "int"));
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		// Globally available stuff
 		{ASTBoogieUtils::BOOGIE_THIS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // this
 		{ASTBoogieUtils::BOOGIE_MSG_SENDER, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE}, // msg.sender
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.bitPrecise() ? "bv256" : "int"} // msg.value
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.isBvEncoding() ? "bv256" : "int"} // msg.value
 	};
 	// Add original parameters of the function
 	for (auto par : _node.parameters())
@@ -310,7 +310,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		params.push_back({ASTBoogieUtils::mapDeclName(*par), ASTBoogieUtils::mapType(par->type(), *par, m_context)});
 		if (par->type()->category() == Type::Category::Array) // Array length
 		{
-			params.push_back({ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.bitPrecise() ? "bv256" : "int"});
+			params.push_back({ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.isBvEncoding() ? "bv256" : "int"});
 		}
 	}
 
@@ -360,7 +360,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					smack::Expr::upd(
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Add,
+							ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
 									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
 									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false))));
 	}
@@ -491,7 +491,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		// A new block is introduced to collect side effects of the initializer expression
 		m_currentBlocks.push(smack::Block::block());
 		smack::Expr const* initExpr = convertExpression(*_node.value());
-		if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
+		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
 			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
 		}
@@ -517,7 +517,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	{
 		m_context.program().getDeclarations().push_back(
 				smack::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
-				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.bitPrecise() ? "bv256" : "int")));
+				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.isBvEncoding() ? "bv256" : "int")));
 	}
 	return false;
 }
@@ -801,7 +801,7 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		// Get rhs recursively
 		const smack::Expr* rhs = convertExpression(*_node.expression());
 
-		if (m_context.bitPrecise())
+		if (m_context.isBvEncoding())
 		{
 			// We already throw an error elsewhere if there are multiple return values
 			auto returnType = m_currentFunc->returnParameters()[0]->annotation().type;
@@ -873,7 +873,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// Get expression recursively
 			const smack::Expr* rhs = convertExpression(*_node.initialValue());
 
-			if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
+			if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(decl->annotation().type))
 			{
 				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.initialValue()->annotation().type, decl->annotation().type, m_context);
 			}

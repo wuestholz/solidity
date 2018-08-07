@@ -122,7 +122,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	bool isSigned = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type);
 
 	// Bit-precise mode
-	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(_node.leftHandSide().annotation().type))
+	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.leftHandSide().annotation().type))
 	{
 		// Check for implicit conversion
 		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context);
@@ -131,14 +131,14 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	switch(_node.assignmentOperator())
 	{
 	case Token::Assign: break; // rhs already contains the result
-	case Token::AssignAdd: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::Add, lhs, rhs, bits, isSigned); break;
-	case Token::AssignSub: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::Sub, lhs, rhs, bits, isSigned); break;
-	case Token::AssignMul: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::Mul, lhs, rhs, bits, isSigned); break;
-	case Token::AssignDiv: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::Div, lhs, rhs, bits, isSigned); break;
-	case Token::AssignMod: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::Mod, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitAnd: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::BitAnd, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitOr: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::BitOr, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitXor: rhs = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, Token::BitXor, lhs, rhs, bits, isSigned); break;
+	case Token::AssignAdd: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, lhs, rhs, bits, isSigned); break;
+	case Token::AssignSub: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, lhs, rhs, bits, isSigned); break;
+	case Token::AssignMul: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Mul, lhs, rhs, bits, isSigned); break;
+	case Token::AssignDiv: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Div, lhs, rhs, bits, isSigned); break;
+	case Token::AssignMod: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Mod, lhs, rhs, bits, isSigned); break;
+	case Token::AssignBitAnd: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitAnd, lhs, rhs, bits, isSigned); break;
+	case Token::AssignBitOr: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitOr, lhs, rhs, bits, isSigned); break;
+	case Token::AssignBitXor: rhs = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitXor, lhs, rhs, bits, isSigned); break;
 	default:
 		reportError(_node.location(), string("Unsupported assignment operator: ") + Token::toString(_node.assignmentOperator()));
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
@@ -165,9 +165,9 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
 				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
 
-				smack::Expr const* upd = ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Add,
+				smack::Expr const* upd = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
 						smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
-						ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Sub,
+						ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
 								rhs, lhs, bits, isSigned), bits, isSigned);
 
 				m_newStatements.push_back(smack::Stmt::assign(
@@ -256,10 +256,10 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 		{
 			const smack::Expr* lhs = subExpr;
 			const smack::Expr* rhs =
-					ASTBoogieUtils::encodeArithBinOp(m_context, &_node,
+					ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node,
 							_node.getOperator() == Token::Inc ? Token::Add : Token::Sub,
 							lhs,
-							m_context.bitPrecise() ? smack::Expr::lit(smack::bigint(1), bits) : smack::Expr::lit(smack::bigint(1)),
+							m_context.isBvEncoding() ? smack::Expr::lit(smack::bigint(1), bits) : smack::Expr::lit(smack::bigint(1)),
 							bits, isSigned);
 			smack::Decl* tempVar = smack::Decl::variable("inc#" + to_string(_node.id()),
 					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
@@ -317,7 +317,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	bool isSigned = ASTBoogieUtils::isSigned(commonType);
 
 	// Check implicit conversion for bitvectors
-	if (m_context.bitPrecise() && ASTBoogieUtils::isBitPreciseType(commonType))
+	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(commonType))
 	{
 		lhs = ASTBoogieUtils::checkImplicitBvConversion(lhs, _node.leftExpression().annotation().type, commonType, m_context);
 		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightExpression().annotation().type, commonType, m_context);
@@ -349,7 +349,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::BitXor:
 	case Token::SHL:
 	case Token::SAR:
-		m_currentExpr = ASTBoogieUtils::encodeArithBinOp(m_context, &_node, _node.getOperator(), lhs, rhs, bits, isSigned);
+		m_currentExpr = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, _node.getOperator(), lhs, rhs, bits, isSigned);
 		break;
 
 	default:
@@ -412,7 +412,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			return false;
 		}
 
-		if (m_context.bitPrecise() && sourceType == "int_const")
+		if (m_context.isBvEncoding() && sourceType == "int_const")
 		{
 			arg->accept(*this);
 			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
@@ -452,7 +452,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			auto arg = *_node.arguments().begin();
 			arg->accept(*this);
 			m_currentMsgValue = m_currentExpr;
-			if (m_context.bitPrecise())
+			if (m_context.isBvEncoding())
 			{
 				m_currentMsgValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentMsgValue,
 						arg->annotation().type, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned), m_context);
@@ -506,7 +506,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (m_isLibraryCall) { args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
 	else { args.push_back(m_currentAddress); } // this
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	smack::Expr const* defaultMsgValue = (m_context.bitPrecise() ?
+	smack::Expr const* defaultMsgValue = (m_context.isBvEncoding() ?
 			smack::Expr::lit(smack::bigint(0), 256) : smack::Expr::lit(smack::bigint(0)));
 	args.push_back(m_currentMsgValue ? m_currentMsgValue : defaultMsgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
@@ -517,7 +517,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		arg->accept(*this);
 		// In bit-precise mode, we need the definition of the function to see the types of the parameters
 		// (for implicit conversions)
-		if (m_context.bitPrecise())
+		if (m_context.isBvEncoding())
 		{
 			// Try to get the definition
 			const FunctionDefinition* calledFunc = nullptr;
@@ -632,7 +632,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// assert(balance[this] >= msg.value)
 		m_newStatements.push_back(smack::Stmt::assert_(
-				ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentMsgValue, 256, false),
+				ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS), m_currentMsgValue, 256, false),
 				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		m_newStatements.push_back(smack::Stmt::assign(
@@ -640,7 +640,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				smack::Expr::upd(
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-						ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Sub,
+						ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
 										smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
 										m_currentMsgValue, 256, false))));
 	}
@@ -690,7 +690,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 						smack::Expr::upd(
 								smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-								ASTBoogieUtils::encodeArithBinOp(m_context, nullptr, Token::Value::Add,
+								ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
 											smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
 											m_currentMsgValue, 256, false))));
 				m_newStatements.push_back(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
