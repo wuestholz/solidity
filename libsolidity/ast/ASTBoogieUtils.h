@@ -114,6 +114,9 @@ public:
 	 * then we return an extension of 8 bits to expr.
 	 */
 	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+
+
+	static smack::Expr const* checkExplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 };
 
 }

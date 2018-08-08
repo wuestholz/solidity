@@ -587,5 +587,62 @@ smack::Expr const* ASTBoogieUtils::checkImplicitBvConversion(smack::Expr const* 
 	return expr;
 }
 
+smack::Expr const* ASTBoogieUtils::checkExplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
+{
+	// Do nothing if any of the types is unknown
+	if (!targetType || !exprType) { return expr; }
+
+	if (isBitPreciseType(targetType))
+	{
+		unsigned targetBits = getBits(targetType);
+		// Literals can be handled by implicit conversion
+		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
+		{
+			return checkImplicitBvConversion(expr, exprType, targetType, context);
+		}
+		else if (isBitPreciseType(exprType))
+		{
+			unsigned exprBits = getBits(exprType);
+			bool targetSigned = isSigned(targetType);
+			bool exprSigned = isSigned(exprType);
+
+			// Check if explicit conversion is really needed:
+			// - converting to smaller size
+			// - converting from signed to unsigned
+			// - converting from unsinged to same size signed
+			if (targetBits < exprBits || (exprSigned && !targetSigned) || (targetBits == exprBits && !exprSigned && targetSigned))
+			{
+				// Nothing to do for same size, since Boogie bitvectors do not have signs
+				if (targetBits == exprBits) { return expr; }
+				// For larger sizes, sign extension is done
+				else if (targetBits > exprBits)
+				{
+					string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
+					context.includeBuiltInFunction(fullName, smack::Decl::function(
+							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+							{smack::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
+					return smack::Expr::fn(fullName, expr);
+				}
+				// For smaller sizes, higher-order bits are discarded
+				else
+				{
+					string fullName = "extract" + to_string(targetBits);
+					context.includeBuiltInFunction(fullName, smack::Decl::function(
+							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+							{smack::Attr::attr("bvbuiltin", "extract " + to_string(targetBits - 1) + " 0")}));
+					return smack::Expr::fn(fullName, expr);
+				}
+			}
+			// Otherwise the implicit will handle it
+			else
+			{
+				return checkImplicitBvConversion(expr, exprType, targetType, context);
+			}
+		}
+	}
+
+	return expr;
+}
+
 }
 }

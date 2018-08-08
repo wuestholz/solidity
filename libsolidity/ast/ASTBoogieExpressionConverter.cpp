@@ -401,10 +401,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			return false;
 		}
 
-		if (m_context.isBvEncoding() && sourceType == "int_const")
+		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
 			arg->accept(*this);
-			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
+			m_currentExpr = ASTBoogieUtils::checkExplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
 			return false;
 		}
 
