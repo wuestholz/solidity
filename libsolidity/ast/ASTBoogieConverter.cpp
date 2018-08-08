@@ -90,7 +90,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 	ErrorList typeCheckerErrList;
 	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
 
-	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), m_context.errorReporter());
+	NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), *m_context.errorReporter());
 	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
 
 	for (auto docTag : _annot.docTags)
@@ -106,7 +106,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 			{
 				// Parse
 				string exprStr = docTag.second.content.substr(_tag.length() + 1);
-				ASTPointer<Expression> expr = Parser(m_context.errorReporter())
+				ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
 						.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)exprStr, m_currentContract->sourceUnitName())));
 				// Resolve references, using the given scope
 				m_context.scopes()[&*expr] = m_context.scopes()[_scope];
@@ -114,7 +114,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				// Do type checking
 				typeChecker.checkTypeRequirements(*expr);
 				// Convert expression to Boogie representation
-				auto result = ASTBoogieExpressionConverter(m_context, &_node.location()).convert(*expr);
+				auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
 				if (!result.newStatements.empty()) // Make sure that there are no side effects
 				{
 					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");

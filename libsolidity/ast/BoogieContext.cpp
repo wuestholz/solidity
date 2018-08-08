@@ -10,7 +10,7 @@ namespace dev
 {
 namespace solidity
 {
-BoogieContext::BoogieContext(Encoding encoding, ErrorReporter& errorReporter, std::vector<Declaration const*> globalDecls,
+BoogieContext::BoogieContext(Encoding encoding, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion) :
 					m_program(),
 					m_encoding(encoding),
@@ -76,7 +76,7 @@ void BoogieContext::reportError(ASTNode const* associatedNode, std::string messa
 {
 	if (associatedNode)
 	{
-		m_errorReporter.error(Error::Type::ParserError, associatedNode->location(), message);
+		m_errorReporter->error(Error::Type::ParserError, associatedNode->location(), message);
 	}
 	else
 	{
@@ -88,7 +88,7 @@ void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string mes
 {
 	if (associatedNode)
 	{
-		m_errorReporter.warning(associatedNode->location(), message);
+		m_errorReporter->warning(associatedNode->location(), message);
 	}
 	else
 	{

@@ -1087,11 +1087,10 @@ void CommandLineInterface::handleBoogie()
 		}
 	}
 
-	BoogieContext context(encoding, errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(encoding, &errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
-	auto scannerFromSourceName = [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); };
-	SourceReferenceFormatter formatter(cerr, scannerFromSourceName);
+	SourceReferenceFormatter formatter(cerr, [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); });
 
 	for (auto const& sourceCode: m_sourceCodes)
 	{

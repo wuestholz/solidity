@@ -269,11 +269,11 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	// Unsupported types
 	if (boost::algorithm::starts_with(tpStr, "tuple("))
 	{
-		context.errorReporter().error(Error::Type::ParserError, _associatedNode.location(), "Tuples are not supported");
+		context.reportError(&_associatedNode, "Tuples are not supported");
 	}
 	else
 	{
-		context.errorReporter().error(Error::Type::ParserError, _associatedNode.location(), "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+		context.reportError(&_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
 	return ERR_TYPE;
 }

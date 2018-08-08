@@ -18,10 +18,6 @@ private:
 
 	BoogieContext& m_context;
 
-	// When this location is given, use this to report errors, this is used for
-	// invariants, as they do not have corresponding nodes in the original AST
-	SourceLocation const* m_defaultLocation;
-
 	// Helper variables to pass information between the visit methods
 	const smack::Expr* m_currentExpr;
 	const smack::Expr* m_currentAddress;
@@ -48,10 +44,6 @@ private:
 	// Helper method to get the length of an array
 	const smack::Expr* getSumShadowVar(ASTNode const* node);
 
-	// Helper methods to report errors and warnings
-	void reportError(SourceLocation const& location, std::string const& description);
-	void reportWarning(SourceLocation const& location, std::string const& description);
-
 public:
 
 	/**
@@ -74,7 +66,7 @@ public:
 	/**
 	 * Create a new instance with a given context and an optional location used for reporting errors.
 	 */
-	ASTBoogieExpressionConverter(BoogieContext& context, SourceLocation const* defaultLocation = nullptr);
+	ASTBoogieExpressionConverter(BoogieContext& context);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side effect, the conversion might
