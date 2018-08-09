@@ -843,6 +843,10 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 			return false;
 		}
 	}
+	if (_node.baseExpression().annotation().type->category() == Type::Category::Array && m_context.isBvEncoding())
+	{
+		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, _node.indexExpression()->annotation().type, make_shared<IntegerType>(256), m_context);
+	}
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
 	// that case is handled when converting assignments
