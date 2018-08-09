@@ -6,7 +6,7 @@ cd $BOOGIE_TEST_DIR
 BASE_DIR=$BOOGIE_TEST_DIR/../../..
 
 
-BOOGIE=$BASE_DIR/../boogie-yices/Binaries/Boogie.exe
+BOOGIE=$BASE_DIR/../boogie/Binaries/Boogie.exe
 CORRAL=$BASE_DIR/../corral/bin/Debug/corral.exe
 SOLC=$BASE_DIR/build/solc/solc
 
@@ -34,7 +34,7 @@ for sol in *.sol; do
         mono $CORRAL "$bpl" /main:main /recursionBound:20 > "$out"
     else
         echo -e "- Running Boogie (no main)"
-        mono $BOOGIE "$bpl" /doModSetAnalysis /nologo /errorTrace:0 /useArrayTheory /proverOpt:SOLVER=Yices2 > "$out"
+        mono $BOOGIE "$bpl" /doModSetAnalysis /nologo /errorTrace:0 > "$out"
     fi
 
     grep -f "$exp" "$out" > /dev/null

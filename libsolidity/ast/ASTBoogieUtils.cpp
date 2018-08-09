@@ -629,7 +629,7 @@ smack::Expr const* ASTBoogieUtils::checkExplicitBvConversion(smack::Expr const* 
 					string fullName = "extract" + to_string(targetBits);
 					context.includeBuiltInFunction(fullName, smack::Decl::function(
 							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
-							{smack::Attr::attr("bvbuiltin", "extract " + to_string(targetBits - 1) + " 0")}));
+							{smack::Attr::attr("bvbuiltin", "(_ extract " + to_string(targetBits - 1) + " 0)")}));
 					return smack::Expr::fn(fullName, expr);
 				}
 			}
