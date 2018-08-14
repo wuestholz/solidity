@@ -26,7 +26,7 @@ def main():
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
     parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod'])
 
-    parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default='z3', choices=['z3', 'yices2'])
+    parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default='z3', choices=['z3', 'yices2', 'cvc4'])
     parser.add_argument('--solverBin', type=str, help='Binary of the solver to use', default='@Z3_EXE@')
     args = parser.parse_args()
 
@@ -36,6 +36,8 @@ def main():
     # First convert .sol to .bpl
     solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, args.output, args.boogie_arith)
     convertCommand = args.solc + ' ' + solcArgs
+    if args.verbose:
+        print("Solc command: " + convertCommand)
     try:
         compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
         if args.verbose:
@@ -53,10 +55,17 @@ def main():
     timer = threading.Timer(args.timeout, kill)
     # Run verification, get result
     timer.start()
-    boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0' + \
-        (' /z3exe:%s' % args.solverBin if args.solver == 'z3' else '') + \
-        (' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.solverBin if args.solver == 'yices2' else '')
+    boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0'
+    if args.solver == 'z3':
+        boogieArgs += ' /z3exe:%s' % args.solverBin
+    if args.solver == 'yices2':
+        boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.solverBin
+    if args.solver == 'cvc4':
+        boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % args.solverBin
+
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
+    if args.verbose:
+        print("Verifier command: " + verifyCommand)
     try:
         verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
         timer.cancel()
