@@ -364,8 +364,8 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 	case BoogieContext::Encoding::MOD:
 		{
 			auto modulo = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits));
-			auto largest = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
-			auto smallest = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
+			auto largestSigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
+			auto smallestSigned = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
 			switch(op)
 			{
 			case Token::Add:
@@ -373,9 +373,9 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 				auto sum = smack::Expr::plus(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(sum, largest),
+					return smack::Expr::cond(smack::Expr::gt(sum, largestSigned),
 						smack::Expr::minus(sum, modulo),
-						smack::Expr::cond(smack::Expr::lt(sum, smallest), smack::Expr::plus(sum, modulo), sum));
+						smack::Expr::cond(smack::Expr::lt(sum, smallestSigned), smack::Expr::plus(sum, modulo), sum));
 				}
 				else
 				{
@@ -388,9 +388,9 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 				auto diff = smack::Expr::minus(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(diff, largest),
+					return smack::Expr::cond(smack::Expr::gt(diff, largestSigned),
 						smack::Expr::minus(diff, modulo),
-						smack::Expr::cond(smack::Expr::lt(diff, smallest), smack::Expr::plus(diff, modulo), diff));
+						smack::Expr::cond(smack::Expr::lt(diff, smallestSigned), smack::Expr::plus(diff, modulo), diff));
 				}
 				else
 				{
@@ -404,7 +404,7 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 					auto lhs1 = smack::Expr::cond(smack::Expr::gte(lhs, smack::Expr::lit((long)0)), lhs, smack::Expr::plus(modulo, lhs));
 					auto rhs1 = smack::Expr::cond(smack::Expr::gte(rhs, smack::Expr::lit((long)0)), rhs, smack::Expr::plus(modulo, rhs));
 					auto prod = smack::Expr::mod(smack::Expr::times(lhs1, rhs1), modulo);
-					return smack::Expr::cond(smack::Expr::gt(prod, largest), smack::Expr::minus(prod, modulo), prod);
+					return smack::Expr::cond(smack::Expr::gt(prod, largestSigned), smack::Expr::minus(prod, modulo), prod);
 				}
 				else
 				{
@@ -417,9 +417,9 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 				auto div = smack::Expr::intdiv(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(div, largest),
+					return smack::Expr::cond(smack::Expr::gt(div, largestSigned),
 						smack::Expr::minus(div, modulo),
-						smack::Expr::cond(smack::Expr::lt(div, smallest), smack::Expr::plus(div, modulo), div));
+						smack::Expr::cond(smack::Expr::lt(div, smallestSigned), smack::Expr::plus(div, modulo), div));
 				}
 				else
 				{
