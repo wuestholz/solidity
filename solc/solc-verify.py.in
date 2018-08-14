@@ -16,16 +16,18 @@ def kill():
 
 def main():
     # Set up argument parser
-    parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.')
+    parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('file', type=str, help='Path to the input file')
-    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod'])
-    parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
-    parser.add_argument('--boogie', type=str, help='Boogie binary to use', default='@BOOGIE_EXE@')
-    parser.add_argument('--z3', type=str, help='Use Z3 and set the binary to use', default='@Z3_EXE@')
-    parser.add_argument('--output', type=str, help='Output directory', default='.')
     parser.add_argument('--timeout', type=int, help='Timeout for running Boogie (in seconds)', default=30)
-    parser.add_argument('--yices', type=str, help='Use Yices and set the binary to use')
+    parser.add_argument('--output', type=str, help='Output directory', default='.')
     parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
+
+    parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
+    parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
+    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod'])
+
+    parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default='z3', choices=['z3', 'yices2'])
+    parser.add_argument('--solverBin', type=str, help='Binary of the solver to use', default='@Z3_EXE@')
     args = parser.parse_args()
 
     solFile = args.file
@@ -52,8 +54,8 @@ def main():
     # Run verification, get result
     timer.start()
     boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0' + \
-        (' /z3exe:%s' % args.z3 if args.z3 else '') + \
-        (' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.yices if args.yices else '')
+        (' /z3exe:%s' % args.solverBin if args.solver == 'z3' else '') + \
+        (' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.solverBin if args.solver == 'yices2' else '')
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
     try:
         verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
