@@ -31,6 +31,8 @@ private:
 	std::vector<smack::Stmt const*> m_newStatements;
 	std::list<smack::Decl*> m_newDecls;
 	std::list<smack::Decl*> m_newConstants;
+	// Type checking conditions
+	std::list<smack::Expr const*> m_tccs;
 
 	// Helper method to get the length of an array (currently only works for 1D arrays)
 	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
@@ -43,6 +45,9 @@ private:
 
 	// Helper method to get the length of an array
 	const smack::Expr* getSumShadowVar(ASTNode const* node);
+
+	// Helper method to add a type checking condition for an expression with a given type
+	void addTCC(smack::Expr const* expr, TypePointer tp);
 
 public:
 
@@ -57,10 +62,11 @@ public:
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
 		std::list<smack::Decl*> newConstants;
+		std::list<smack::Expr const*> tccs;
 
 		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
-				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants){}
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants, std::list<smack::Expr const*> tccs)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants), tccs(tccs) {}
 	};
 
 	/**

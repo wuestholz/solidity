@@ -50,6 +50,32 @@ const smack::Expr* ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* 
 	return smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
+void ASTBoogieExpressionConverter::addTCC(smack::Expr const* expr, TypePointer tp)
+{
+	if (m_context.encoding() == BoogieContext::Encoding::MOD && ASTBoogieUtils::isBitPreciseType(tp))
+	{
+		unsigned bits = ASTBoogieUtils::getBits(tp);
+		bool isSigned = ASTBoogieUtils::isSigned(tp);
+		if (isSigned)
+		{
+			auto largestSigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
+			auto smallestSigned = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
+			m_tccs.push_back(smack::Expr::and_(
+					smack::Expr::lte(smallestSigned, expr),
+					smack::Expr::lte(expr, largestSigned)));
+		}
+		else
+		{
+			auto largestUnsigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits) - 1);
+			auto smallestUnsigned = smack::Expr::lit(long(0));
+			m_tccs.push_back(smack::Expr::and_(
+					smack::Expr::lte(smallestUnsigned, expr),
+					smack::Expr::lte(expr, largestUnsigned)));
+		}
+
+	}
+}
+
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context) :
 		m_context(context),
 		m_currentExpr(nullptr),
@@ -70,10 +96,11 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_newStatements.clear();
 	m_newDecls.clear();
 	m_newConstants.clear();
+	m_tccs.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_tccs);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -840,6 +867,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
 					ASTBoogieUtils::createAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
 			m_currentExpr = baseExpr;
+			// TODO: TCC?
 			return false;
 		}
 	}
@@ -851,6 +879,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
 	// that case is handled when converting assignments
 	m_currentExpr = smack::Expr::sel(baseExpr, indexExpr);
+	addTCC(m_currentExpr, _node.annotation().type);
 
 	return false;
 }
@@ -882,6 +911,9 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	if (referencesStateVar) { m_currentExpr = smack::Expr::sel(declName, ASTBoogieUtils::BOOGIE_THIS); }
 	// Other identifiers can be referenced by their name
 	else { m_currentExpr = smack::Expr::id(declName); }
+
+	addTCC(m_currentExpr, _node.annotation().referencedDeclaration->type());
+
 	return false;
 }
 

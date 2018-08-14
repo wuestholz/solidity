@@ -33,6 +33,7 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
+	for (auto tcc : result.tccs) { m_currentBlocks.top()->addStmt(smack::Stmt::assume(tcc)); }
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
 	for (auto c : result.newConstants)
 	{
