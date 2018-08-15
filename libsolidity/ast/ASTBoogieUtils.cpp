@@ -596,7 +596,7 @@ smack::Expr const* ASTBoogieUtils::checkExplicitBvConversion(smack::Expr const* 
 	{
 		unsigned targetBits = getBits(targetType);
 		// Literals can be handled by implicit conversion
-		if (auto exprLit = dynamic_cast<smack::IntLit const*>(expr))
+		if (dynamic_cast<smack::IntLit const*>(expr))
 		{
 			return checkImplicitBvConversion(expr, exprType, targetType, context);
 		}
