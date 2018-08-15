@@ -76,16 +76,16 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	auto procDecl = smack::Decl::procedure(funcName, params, {}, {}, {block});
 	for (auto invar : m_context.currentContractInvars())
 	{
-		procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.second + "'.", *m_context.currentScanner())));
+		procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
+				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner())));
 	}
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
-map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, string _tag)
+list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, string _tag)
 {
-	map<smack::Expr const*, string> exprs;
+	list<BoogieContext::DocTagExpr> exprs;
 
 	// We use a different error reporter for the type checker to ignore
 	// error messages related to our special functions like the __verifier_sum
@@ -100,7 +100,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 			if (_tag == DOCTAG_CONTRACT_INVARS_INCLUDE) // Special tag to include contract invariants
 			{
 				// TODO: warning when currentinvars is empty
-				for (auto invar : m_context.currentContractInvars()) { exprs[invar.first] = invar.second; }
+				for (auto invar : m_context.currentContractInvars()) { exprs.push_back(invar); }
 			}
 			else // Normal tags just parse the expression afterwards
 			{
@@ -149,7 +149,7 @@ map<smack::Expr const*, string> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				{
 					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
 				}
-				exprs[result.expr] = exprStr;
+				exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs));
 			}
 		}
 	}
@@ -222,8 +222,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR))
 	{
-		addGlobalComment("Contract invariant: " + invar.second);
-		m_context.currentContractInvars()[invar.first] = invar.second;
+		addGlobalComment("Contract invariant: " + invar.exprStr);
+		m_context.currentContractInvars().push_back(invar);
 	}
 
 	// Add new shadow variables for sum
@@ -462,11 +462,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		{
 			if (!_node.isConstructor())
 			{
-				procDecl->getRequires().push_back(smack::Specification::spec(invar.first,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold when entering function.", *m_context.currentScanner())));
+				procDecl->getRequires().push_back(smack::Specification::spec(invar.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 			}
-			procDecl->getEnsures().push_back(smack::Specification::spec(invar.first,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold at end of function.", *m_context.currentScanner())));
+			procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
 	else // Private functions: inline
@@ -476,22 +476,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		// Add contract invariants only if explicitly requested
 		for (auto cInv : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
 		{
-			procDecl->getRequires().push_back(smack::Specification::spec(cInv.first,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold when entering function.", *m_context.currentScanner())));
-			procDecl->getEnsures().push_back(smack::Specification::spec(cInv.first,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.second + "' might not hold at end of function.", *m_context.currentScanner())));
+			procDecl->getRequires().push_back(smack::Specification::spec(cInv.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
+			procDecl->getEnsures().push_back(smack::Specification::spec(cInv.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
 
 	for (auto pre : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
 	{
-		procDecl->getRequires().push_back(smack::Specification::spec(pre.first,
-							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.second + "' might not hold when entering function.", *m_context.currentScanner())));
+		procDecl->getRequires().push_back(smack::Specification::spec(pre.expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 	}
 	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
-		procDecl->getEnsures().push_back(smack::Specification::spec(post.first,
-							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.second + "' might not hold at end of function.", *m_context.currentScanner())));
+		procDecl->getEnsures().push_back(smack::Specification::spec(post.expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 	}
 	// TODO: check that no new sum variables were introduced
 
@@ -742,11 +742,11 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	std::list<smack::Specification const*> invars;
 	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR))
 	{
-		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE))
 	{
-		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
@@ -787,11 +787,11 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	std::list<smack::Specification const*> invars;
 	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR))
 	{
-		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
 	{
-		invars.push_back(smack::Specification::spec(invar.first, ASTBoogieUtils::createAttrs(_node.location(), invar.second, *m_context.currentScanner())));
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
 

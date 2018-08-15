@@ -66,7 +66,7 @@ private:
 	/**
 	 * Parse expressions from documentation for a given doctag
 	 */
-	std::map<smack::Expr const*, std::string> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
+	std::list<BoogieContext::DocTagExpr> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
 
 
 	/**

@@ -29,6 +29,15 @@ public:
 		MOD  // Use integers with modulo operations
 	};
 
+	struct DocTagExpr {
+		smack::Expr const* expr; // Expression converted to Boogie
+		std::string exprStr; // Expression in original format
+		std::list<smack::Expr const*> tccs; // TCCs for the expression
+
+		DocTagExpr(smack::Expr const* expr, std::string exprStr, std::list<smack::Expr const*> tccs) :
+			expr(expr), exprStr(exprStr), tccs(tccs) {}
+	};
+
 private:
 	smack::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 
@@ -43,7 +52,7 @@ private:
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	EVMVersion m_evmVersion;
 
-	std::map<smack::Expr const*, std::string> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
+	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
 	std::set<std::string> m_builtinFunctions;
@@ -63,7 +72,7 @@ public:
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	EVMVersion& evmVersion() { return m_evmVersion; }
-	std::map<smack::Expr const*, std::string>& currentContractInvars() { return m_currentContractInvars; }
+	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
 	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);

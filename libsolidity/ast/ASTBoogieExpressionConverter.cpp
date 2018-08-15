@@ -666,8 +666,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
-			m_newStatements.push_back(smack::Stmt::assert_(invar.first,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.second + "' might not hold before external call.", *m_context.currentScanner())));
+			m_newStatements.push_back(smack::Stmt::assert_(invar.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold before external call.", *m_context.currentScanner())));
 		}
 	}
 
@@ -724,7 +724,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Assume invariants after external call
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_context.currentContractInvars()) { m_newStatements.push_back(smack::Stmt::assume(invar.first)); }
+		for (auto invar : m_context.currentContractInvars()) { m_newStatements.push_back(smack::Stmt::assume(invar.expr)); }
 	}
 
 	return false;
