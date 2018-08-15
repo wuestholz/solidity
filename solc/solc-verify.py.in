@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--timeout', type=int, help='Timeout for running Boogie (in seconds)', default=30)
     parser.add_argument('--output', type=str, help='Output directory', default='.')
     parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
+    parser.add_argument('--smtlog', type=str, help='Log input for the SMT solver')
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
@@ -56,6 +57,9 @@ def main():
     # Run verification, get result
     timer.start()
     boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0'
+    if args.smtlog:
+        boogieArgs += ' /proverLog:%s' % args.smtlog
+    
     if args.solver == 'z3':
         boogieArgs += ' /z3exe:%s' % args.solverBin
     if args.solver == 'yices2':
