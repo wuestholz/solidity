@@ -27,6 +27,7 @@ public:
 	static const std::string BOOGIE_SEND;
 	static const std::string SOLIDITY_CALL;
 	static const std::string BOOGIE_CALL;
+	static const std::string SOLIDITY_SUPER;
 
 	// Identifiers related to 'msg'
 	static const std::string SOLIDITY_MSG;

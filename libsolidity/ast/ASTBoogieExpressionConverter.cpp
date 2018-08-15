@@ -760,6 +760,15 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	const smack::Expr* expr = m_currentExpr;
 	// The current expression gives the address on which something is done
 	m_currentAddress = m_currentExpr;
+	// If we are accessing something on 'super', the current address should be 'this'
+	// and not 'super', because that does not exist
+	if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
+	{
+		if (id->annotation().referencedDeclaration->name() == ASTBoogieUtils::SOLIDITY_SUPER)
+		{
+			m_currentAddress = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
+		}
+	}
 	// Type of the expression
 	string typeStr = _node.expression().annotation().type->toString();
 

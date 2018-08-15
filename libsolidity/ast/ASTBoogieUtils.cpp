@@ -20,6 +20,7 @@ const string ASTBoogieUtils::SOLIDITY_SEND = "send";
 const string ASTBoogieUtils::BOOGIE_SEND = "__send";
 const string ASTBoogieUtils::SOLIDITY_CALL = "call";
 const string ASTBoogieUtils::BOOGIE_CALL = "__call";
+const string ASTBoogieUtils::SOLIDITY_SUPER = "super";
 
 const string ASTBoogieUtils::SOLIDITY_MSG = "msg";
 const string ASTBoogieUtils::SOLIDITY_SENDER = "sender";
