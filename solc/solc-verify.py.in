@@ -62,6 +62,8 @@ def main():
         boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.solverBin
     if args.solver == 'cvc4':
         boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % args.solverBin
+        if args.boogie_arith == 'mod':
+            boogieArgs += ' /proverOpt:C:"--nl-ext-tplanes --decision=internal --incremental"'
 
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
     if args.verbose:
