@@ -673,7 +673,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		for (auto invar : m_context.currentContractInvars())
 		{
 			for (auto tcc : invar.tccs) { m_newStatements.push_back(smack::Stmt::assert_(tcc,
-										ASTBoogieUtils::createAttrs(_node.location(), "TCC", *m_context.currentScanner()))); }
+										ASTBoogieUtils::createAttrs(_node.location(), "Variables for invariant '" + invar.exprStr + "' might be out of range before external call.", *m_context.currentScanner()))); }
 			m_newStatements.push_back(smack::Stmt::assert_(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold before external call.", *m_context.currentScanner())));
 		}
