@@ -616,6 +616,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Sum function
 	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 	{
+		TypePointer tp = nullptr;
 		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 		{
 			auto sumDecl = id->annotation().referencedDeclaration;
@@ -626,7 +627,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				magicVar = dynamic_cast<MagicVariableDeclaration const *>(exprId->annotation().referencedDeclaration);
 			}
 
-			if (magicVar) { m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0]; }
+			if (magicVar)
+			{
+				m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0];
+				tp = m_context.currentSumDecls()[sumDecl];
+			}
 			else { m_context.reportError(&_node, "Could not find sum function"); }
 
 			auto declCategory = id->annotation().type->category();
@@ -640,6 +645,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			m_context.reportError(&_node, "Argument of sum must be an identifier");
 		}
 		m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
+		addTCC(m_currentExpr, tp);
 		return false;
 	}
 
@@ -666,6 +672,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
+			for (auto tcc : invar.tccs) { m_newStatements.push_back(smack::Stmt::assert_(tcc,
+										ASTBoogieUtils::createAttrs(_node.location(), "TCC", *m_context.currentScanner()))); }
 			m_newStatements.push_back(smack::Stmt::assert_(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold before external call.", *m_context.currentScanner())));
 		}
@@ -724,7 +732,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Assume invariants after external call
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_context.currentContractInvars()) { m_newStatements.push_back(smack::Stmt::assume(invar.expr)); }
+
+		for (auto invar : m_context.currentContractInvars()) {
+			for (auto tcc : invar.tccs) { m_newStatements.push_back(smack::Stmt::assume(tcc)); }
+			m_newStatements.push_back(smack::Stmt::assume(invar.expr));
+		}
 	}
 
 	return false;
