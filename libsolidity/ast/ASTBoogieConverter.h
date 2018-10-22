@@ -60,7 +60,12 @@ private:
 	/**
 	 * Helper method to give a default value for a type.
 	 */
-	const smack::Stmt* defaultValueAssignment(std::string id, TypePointer type);
+	const smack::Expr* defaultValue(TypePointer _type);
+
+	/**
+	 * Helper method to give a statement assigning a default value for a type.
+	 */
+	const smack::Stmt* defaultValueAssignment(std::string _id, TypePointer _type, ASTNode const& _node);
 
 	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,

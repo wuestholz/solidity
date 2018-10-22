@@ -53,44 +53,66 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 	return result.expr;
 }
 
-const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(std::string id, TypePointer type) {
+const smack::Expr* ASTBoogieConverter::defaultValue(TypePointer type) {
 
-	const smack::Stmt* valueAssert = nullptr;
-
-	bool bitPrecise = m_context.encoding() == BoogieContext::BV;
-
+	const smack::Stmt* defaultValue(TypePointer type);
 	switch (type->category()) {
 	case Type::Category::Integer: {
+		// Zero
+		bool bitPrecise = m_context.encoding() == BoogieContext::BV;
 		if (bitPrecise) {
 			unsigned bits = ASTBoogieUtils::getBits(type);
-			const smack::Expr* zero = smack::Expr::lit("0", bits);
-			valueAssert = smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
-					smack::Expr::id(id),
-					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-					zero));
+			return smack::Expr::lit("0", bits);
 		} else {
-			const smack::Expr* zero = smack::Expr::lit((long) 0);
-			valueAssert = smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
-					smack::Expr::id(id),
-					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-					zero));
+			return smack::Expr::lit((long) 0);
 		}
 		break;
 	}
-	case Type::Category::RationalNumber:
-		break;
 	case Type::Category::Bool:
 		// False
-		valueAssert = smack::Stmt::assign(smack::Expr::id(id), 	smack::Expr::upd(
-				smack::Expr::id(id),
-				smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-				smack::Expr::lit(false)));
-		break;
-	case Type::Category::Mapping:
+		return smack::Expr::lit(false);
 		break;
 	default:
-		// Return null
+		// For unhandled, just return null
 		break;
+	}
+
+	return nullptr;
+}
+
+const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(std::string _id, TypePointer _type, ASTNode const& _node) {
+
+	const smack::Stmt* valueAssert = nullptr;
+
+	const smack::Expr* value = defaultValue(_type);
+	if (value) {
+		return smack::Stmt::assign(smack::Expr::id(_id), smack::Expr::upd(
+				smack::Expr::id(_id),
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
+	} else {
+		switch (_type->category()) {
+		case Type::Category::Mapping: {
+			// Type of the index and element
+			TypePointer key_type = dynamic_cast<MappingType const&>(*_type).keyType();
+			TypePointer element_type = dynamic_cast<MappingType const&>(*_type).valueType();
+			// Default value for elements
+			value = defaultValue(element_type);
+			// Make the assertions
+			std::list<smack::Binding> binding;
+			std::string var_name = _id + "_index";
+			std::string var_type = ASTBoogieUtils::mapType(key_type, _node, m_context);
+			binding.push_back(smack::Binding(var_name, var_type));
+			const smack::Expr* read = smack::Expr::sel(
+					smack::Expr::sel(smack::Expr::id(_id), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
+					smack::Expr::id(var_name));
+			const smack::Expr* eq = smack::Expr::eq(read, value);
+			valueAssert = smack::Stmt::assume(smack::Expr::forall(binding, eq));
+			break;
+		}
+		default:
+			// Return null
+			break;
+		}
 	}
 
 	return valueAssert;
@@ -594,11 +616,12 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 						initExpr)));
 	} else {
 		// Use implicit default value
-		smack::Stmt const* defaultValueAssign = defaultValueAssignment(ASTBoogieUtils::mapDeclName(_node), _node.type());
+		smack::Stmt const* defaultValueAssign = defaultValueAssignment(ASTBoogieUtils::mapDeclName(_node), _node.type(), _node);
 		if (defaultValueAssign == nullptr) {
-			BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled default value.") << errinfo_sourceLocation(_node.location()));
+			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+		} else {
+			m_stateVarInitializers.push_back(defaultValueAssign);
 		}
-		m_stateVarInitializers.push_back(defaultValueAssign);
 	}
 
 	addGlobalComment("");
