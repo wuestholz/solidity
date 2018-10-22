@@ -4,6 +4,7 @@ contract Constr {
     uint value;
 
     constructor(uint init) public {
+        // Value should be initialize to 0 here
         value = init;
     }
 

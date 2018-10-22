@@ -58,6 +58,11 @@ private:
 	const smack::Expr* convertExpression(Expression const& _node);
 
 	/**
+	 * Helper method to give a default value for a type.
+	 */
+	const smack::Stmt* defaultValueAssignment(std::string id, TypePointer type);
+
+	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,
 	 * but state variables are initialized when declared)
 	 */

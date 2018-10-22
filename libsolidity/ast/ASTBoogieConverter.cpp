@@ -53,6 +53,49 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 	return result.expr;
 }
 
+const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(std::string id, TypePointer type) {
+
+	const smack::Stmt* valueAssert = nullptr;
+
+	bool bitPrecise = m_context.encoding() == BoogieContext::BV;
+
+	switch (type->category()) {
+	case Type::Category::Integer: {
+		if (bitPrecise) {
+			unsigned bits = ASTBoogieUtils::getBits(type);
+			const smack::Expr* zero = smack::Expr::lit("0", bits);
+			valueAssert = smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
+					smack::Expr::id(id),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+					zero));
+		} else {
+			const smack::Expr* zero = smack::Expr::lit((long) 0);
+			valueAssert = smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
+					smack::Expr::id(id),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+					zero));
+		}
+		break;
+	}
+	case Type::Category::RationalNumber:
+		break;
+	case Type::Category::Bool:
+		// False
+		valueAssert = smack::Stmt::assign(smack::Expr::id(id), 	smack::Expr::upd(
+				smack::Expr::id(id),
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+				smack::Expr::lit(false)));
+		break;
+	case Type::Category::Mapping:
+		break;
+	default:
+		// Return null
+		break;
+	}
+
+	return valueAssert;
+}
+
 void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _node)
 {
 	addGlobalComment("");
@@ -549,6 +592,13 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 						smack::Expr::id(ASTBoogieUtils::mapDeclName(_node)),
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 						initExpr)));
+	} else {
+		// Use implicit default value
+		smack::Stmt const* defaultValueAssign = defaultValueAssignment(ASTBoogieUtils::mapDeclName(_node), _node.type());
+		if (defaultValueAssign == nullptr) {
+			BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled default value.") << errinfo_sourceLocation(_node.location()));
+		}
+		m_stateVarInitializers.push_back(defaultValueAssign);
 	}
 
 	addGlobalComment("");
