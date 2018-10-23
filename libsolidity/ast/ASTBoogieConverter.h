@@ -29,6 +29,9 @@ private:
 	// If there is no constructor, but there are initializers, we create one
 	std::list<smack::Stmt const*> m_stateVarInitializers;
 
+	// Collect variables to be initialized to default values
+	std::list<VariableDeclaration const*> m_stateVarsToInitialize;
+
 	// Current block(s) where statements are appended, stack is needed due to nested blocks
 	std::stack<smack::Block*> m_currentBlocks;
 
@@ -63,9 +66,14 @@ private:
 	const smack::Expr* defaultValue(TypePointer _type);
 
 	/**
-	 * Helper method to give a statement assigning a default value for a type.
+	 * Helper method to get all Boogie IDs of a given type in the current scope.
 	 */
-	const smack::Stmt* defaultValueAssignment(VariableDeclaration const& _node);
+	void getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<std::string>& output);
+
+	/**
+	 * Helper method to produce statement assigning a default value for a declared variable.
+	 */
+	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::list<smack::Stmt const*>& output);
 
 	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,

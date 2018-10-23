@@ -80,45 +80,97 @@ const smack::Expr* ASTBoogieConverter::defaultValue(TypePointer type) {
 	return nullptr;
 }
 
-const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _node) {
+void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<std::string>& output) {
+	std::string target = _type->toString();
+	DeclarationContainer const* decl_container = m_context.scopes()[&_scope].get();
+	for (; decl_container != nullptr; decl_container = decl_container->enclosingContainer()) {
+		for (auto const& decl_pair: decl_container->declarations()) {
+			auto const& decl_vector = decl_pair.second;
+			for (auto const& decl: decl_vector) {
+				if (decl->type()->toString() == target) {
+					output.push_back(ASTBoogieUtils::mapDeclName(*decl));
+				} else {
+					// Structs: go through fields
+					if (decl->type()->category() == Type::Category::Struct) {
+						auto const& s = dynamic_cast<StructType const&>(*decl->type());
+						for (auto const& s_member: s.members(nullptr)) {
+							if (s_member.declaration->type()->toString() == target) {
+								output.push_back(ASTBoogieUtils::mapDeclName(*s_member.declaration));
+							}
+						}
+					}
+					// Magic
+					if (decl->type()->category() == Type::Category::Magic) {
+						auto const& m = dynamic_cast<MagicType const&>(*decl->type());
+						auto const& m_members = m.members(nullptr);
+						for (auto const& m_member: m_members) {
+							if (m_member.type->toString() == target) {
+								// Only sender for now. TODO: Better handling of magic variables
+								// and names
+								if (m_member.name == ASTBoogieUtils::SOLIDITY_SENDER) {
+									output.push_back(ASTBoogieUtils::BOOGIE_MSG_SENDER);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
 
-	std::string id = ASTBoogieUtils::mapDeclName(_node);
-	TypePointer type = _node.type();
+bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl, ASTNode const& _scope, std::list<smack::Stmt const*>& output) {
 
-	const smack::Stmt* valueAssert = nullptr;
+	bool ok = false;
 
+	std::string id = ASTBoogieUtils::mapDeclName(_decl);
+	TypePointer type = _decl.type();
+
+	// Default value for the given type
 	const smack::Expr* value = defaultValue(type);
+
+	// If there just assign
 	if (value) {
-		return smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
+		const smack::Stmt* valueAssign = smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
 				smack::Expr::id(id),
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
+		output.push_back(valueAssign);
+		ok = true;
 	} else {
+		// Otherwise, it's probably a complex type
 		switch (type->category()) {
 		case Type::Category::Mapping: {
+
 			// Type of the index and element
 			TypePointer key_type = dynamic_cast<MappingType const&>(*type).keyType();
 			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
 			// Default value for elements
 			value = defaultValue(element_type);
-			// Make the assertions
-			std::list<smack::Binding> binding;
-			std::string var_name = id + "_index";
-			std::string var_type = ASTBoogieUtils::mapType(key_type, _node, m_context);
-			binding.push_back(smack::Binding(var_name, var_type));
-			const smack::Expr* read = smack::Expr::sel(
-					smack::Expr::sel(smack::Expr::id(id), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
-					smack::Expr::id(var_name));
-			const smack::Expr* eq = smack::Expr::eq(read, value);
-			const smack::Expr* forall_eq = smack::Expr::forall(binding, eq);
-			// If there is a sum, add that the sum of elements is 0
-			if (m_context.currentSumDecls()[&_node]) {
-				const smack::Expr* sum_eq_default = smack::Expr::eq(
-						smack::Expr::sel(smack::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
-						value);
-				valueAssert = smack::Stmt::assume(smack::Expr::and_(forall_eq, sum_eq_default));
-			} else {
-				valueAssert = smack::Stmt::assume(forall_eq);
+			// Get all ids to initialize
+			std::vector<std::string> index_ids;
+			getVariablesOfType(key_type, _scope, index_ids);
+			// Initialize all instantiations to default value
+			for (auto index_id: index_ids) {
+				// a[this][i] = v
+				// a = update(a, this
+				//        update(sel(a, this), i, v)
+				//     )
+				auto map_id = smack::Expr::id(id);
+				auto this_i = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
+				auto index_i = smack::Expr::id(index_id);
+				auto valueAssign = smack::Stmt::assign(map_id,
+				        smack::Expr::upd(map_id, this_i,
+				        		smack::Expr::upd(smack::Expr::sel(map_id, this_i), index_i, value)));
+				output.push_back(valueAssign);
 			}
+			// Initialize the sum, if there, to default value
+			if (m_context.currentSumDecls()[&_decl]) {
+				const smack::Expr* sum = smack::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
+				const smack::Stmt* sum_default = smack::Stmt::assign(sum,
+						smack::Expr::upd(sum, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
+				output.push_back(sum_default);
+			}
+			ok = true;
 			break;
 		}
 		default:
@@ -127,7 +179,7 @@ const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(VariableDeclaratio
 		}
 	}
 
-	return valueAssert;
+	return ok;
 }
 
 void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _node)
@@ -146,6 +198,18 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers) { block->addStmt(i); }
 	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+	// Assign uninitialized state variables to default values
+	for (auto declNode : m_stateVarsToInitialize) {
+		std::list<smack::Stmt const*> stmts;
+		bool ok = defaultValueAssignment(*declNode, _node, stmts);
+		if (!ok) {
+			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+		}
+		for (auto stmt: stmts) {
+			block->addStmt(stmt);
+		}
+	}
+	m_stateVarsToInitialize.clear();
 
 	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
 
@@ -315,6 +379,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
+	m_stateVarsToInitialize.clear();
 	for (auto sn : _node.subNodes())
 	{
 		if (dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
@@ -453,6 +518,18 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
 		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+		// Assign uninitialized state variables to default values
+		for (auto declNode : m_stateVarsToInitialize) {
+			std::list<smack::Stmt const*> stmts;
+			bool ok = defaultValueAssignment(*declNode, _node, stmts);
+			if (!ok) {
+				m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+			}
+			for (auto stmt : stmts) {
+				m_currentBlocks.top()->addStmt(stmt);
+			}
+		}
+		m_stateVarsToInitialize.clear();
 	}
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
@@ -627,13 +704,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 						initExpr)));
 	} else {
-		// Use implicit default value
-		smack::Stmt const* defaultValueAssign = defaultValueAssignment(_node);
-		if (defaultValueAssign == nullptr) {
-			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
-		} else {
-			m_stateVarInitializers.push_back(defaultValueAssign);
-		}
+		// Use implicit default value (will generate later, once we are in scope of constructor)
+		m_stateVarsToInitialize.push_back(&_node);
 	}
 
 	addGlobalComment("");
