@@ -80,33 +80,45 @@ const smack::Expr* ASTBoogieConverter::defaultValue(TypePointer type) {
 	return nullptr;
 }
 
-const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(std::string _id, TypePointer _type, ASTNode const& _node) {
+const smack::Stmt* ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _node) {
+
+	std::string id = ASTBoogieUtils::mapDeclName(_node);
+	TypePointer type = _node.type();
 
 	const smack::Stmt* valueAssert = nullptr;
 
-	const smack::Expr* value = defaultValue(_type);
+	const smack::Expr* value = defaultValue(type);
 	if (value) {
-		return smack::Stmt::assign(smack::Expr::id(_id), smack::Expr::upd(
-				smack::Expr::id(_id),
+		return smack::Stmt::assign(smack::Expr::id(id), smack::Expr::upd(
+				smack::Expr::id(id),
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
 	} else {
-		switch (_type->category()) {
+		switch (type->category()) {
 		case Type::Category::Mapping: {
 			// Type of the index and element
-			TypePointer key_type = dynamic_cast<MappingType const&>(*_type).keyType();
-			TypePointer element_type = dynamic_cast<MappingType const&>(*_type).valueType();
+			TypePointer key_type = dynamic_cast<MappingType const&>(*type).keyType();
+			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
 			// Default value for elements
 			value = defaultValue(element_type);
 			// Make the assertions
 			std::list<smack::Binding> binding;
-			std::string var_name = _id + "_index";
+			std::string var_name = id + "_index";
 			std::string var_type = ASTBoogieUtils::mapType(key_type, _node, m_context);
 			binding.push_back(smack::Binding(var_name, var_type));
 			const smack::Expr* read = smack::Expr::sel(
-					smack::Expr::sel(smack::Expr::id(_id), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
+					smack::Expr::sel(smack::Expr::id(id), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
 					smack::Expr::id(var_name));
 			const smack::Expr* eq = smack::Expr::eq(read, value);
-			valueAssert = smack::Stmt::assume(smack::Expr::forall(binding, eq));
+			const smack::Expr* forall_eq = smack::Expr::forall(binding, eq);
+			// If there is a sum, add that the sum of elements is 0
+			if (m_context.currentSumDecls()[&_node]) {
+				const smack::Expr* sum_eq_default = smack::Expr::eq(
+						smack::Expr::sel(smack::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)),
+						value);
+				valueAssert = smack::Stmt::assume(smack::Expr::and_(forall_eq, sum_eq_default));
+			} else {
+				valueAssert = smack::Stmt::assume(forall_eq);
+			}
 			break;
 		}
 		default:
@@ -616,7 +628,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 						initExpr)));
 	} else {
 		// Use implicit default value
-		smack::Stmt const* defaultValueAssign = defaultValueAssignment(ASTBoogieUtils::mapDeclName(_node), _node.type(), _node);
+		smack::Stmt const* defaultValueAssign = defaultValueAssignment(_node);
 		if (defaultValueAssign == nullptr) {
 			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
 		} else {
