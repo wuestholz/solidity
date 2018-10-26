@@ -64,34 +64,36 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	const smack::Expr* amount = smack::Expr::id("amount");
 
 	// balance[this] += amount
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
 	transferImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
+					addBalance.first)));
 	// balance[msg.sender] -= amount
+	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
 	transferImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
+					subSenderBalance.first)));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	// Precondition: there is enough ether to transfer
-	transfer->getRequires().push_back(smack::Specification::spec(
-			encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
+	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
+	transfer->getRequires().push_back(smack::Specification::spec(geqResult.first,
 			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
+	auto subOldSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false);
+	auto addOldBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false);
 	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
 			smack::Expr::and_(
-					smack::Expr::eq(sender_bal,
-							encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
-					smack::Expr::eq(this_bal,
-							encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
+					smack::Expr::eq(sender_bal, subOldSenderBalance.first),
+					smack::Expr::eq(this_bal, addOldBalance.first)),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -119,12 +121,13 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	const smack::Expr* result = smack::Expr::id("__result");
 
 	// balance[this] += msg.value
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false);
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false))));
+					addBalance.first)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
@@ -163,19 +166,21 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	const smack::Expr* result = smack::Expr::id("__result");
 
 	// balance[this] += amount
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_THIS),
-					encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false))));
+					addBalance.first)));
 	// balance[msg.sender] -= amount
+	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
 			smack::Expr::upd(
 					smack::Expr::id(BOOGIE_BALANCE),
 					smack::Expr::id(BOOGIE_MSG_SENDER),
-					encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false))));
+					subSenderBalance.first)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
@@ -188,18 +193,19 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	smack::ProcDecl* sendProc = smack::Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
 
 	// Precondition: there is enough ether to transfer
+	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
 	sendProc->getRequires().push_back(smack::Specification::spec(
-			encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false),
+			senderBalanceGEQ.first,
 			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
 	// Postcondition: if result is true and sender/receiver is different ether gets transferred
 	// otherwise nothing happens
+	auto subOldSender = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false);
+	auto addOldBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false);
 	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
 			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
 			smack::Expr::and_(
-					smack::Expr::eq(sender_bal,
-							encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false)),
-					smack::Expr::eq(this_bal,
-							encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false))),
+					smack::Expr::eq(sender_bal, subOldSender.first),
+					smack::Expr::eq(this_bal, addOldBalance.first)),
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
@@ -289,47 +295,53 @@ list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, 
 	};
 }
 
-smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
 		 smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
 {
+	const smack::Expr* result = nullptr;
+	const smack::Expr* ecc = nullptr;
+
 	switch(context.encoding())
 	{
 	case BoogieContext::Encoding::INT:
 		switch(op)
 		{
-		case Token::Add: return smack::Expr::plus(lhs, rhs);
-		case Token::Sub: return smack::Expr::minus(lhs, rhs);
-		case Token::Mul: return smack::Expr::times(lhs, rhs);
+		case Token::Add: result = smack::Expr::plus(lhs, rhs); break;
+		case Token::Sub: result = smack::Expr::minus(lhs, rhs); break;
+		case Token::Mul: result = smack::Expr::times(lhs, rhs); break;
 		// TODO: returning integer division is fine, because Solidity does not support floats yet
-		case Token::Div: return smack::Expr::intdiv(lhs, rhs);
-		case Token::Mod: return smack::Expr::mod(lhs, rhs);
+		case Token::Div: result = smack::Expr::intdiv(lhs, rhs); break;
+		case Token::Mod: result = smack::Expr::mod(lhs, rhs); break;
 
-		case Token::Equal: return smack::Expr::eq(lhs, rhs);
-		case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
-		case Token::LessThan: return smack::Expr::lt(lhs, rhs);
-		case Token::GreaterThan: return smack::Expr::gt(lhs, rhs);
-		case Token::LessThanOrEqual: return smack::Expr::lte(lhs, rhs);
-		case Token::GreaterThanOrEqual: return smack::Expr::gte(lhs, rhs);
+		case Token::Equal: result = smack::Expr::eq(lhs, rhs); break;
+		case Token::NotEqual: result = smack::Expr::neq(lhs, rhs); break;
+		case Token::LessThan: result = smack::Expr::lt(lhs, rhs); break;
+		case Token::GreaterThan: result = smack::Expr::gt(lhs, rhs); break;
+		case Token::LessThanOrEqual: result = smack::Expr::lte(lhs, rhs); break;
+		case Token::GreaterThanOrEqual: result = smack::Expr::gte(lhs, rhs); break;
 
 		case Token::Exp:
 			if (auto rhsLit = dynamic_cast<smack::IntLit const *>(rhs))
 			{
 				if (auto lhsLit = dynamic_cast<smack::IntLit const *>(lhs))
 				{
-					return smack::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
+					result = smack::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
 				}
 			}
 			context.reportError(associatedNode, "Exponentiation is not supported in 'int' encoding");
-			return smack::Expr::id(ERR_EXPR);
+			if (result == nullptr) {
+				result = smack::Expr::id(ERR_EXPR);
+			}
+			break;
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + Token::toString(op));
-			return smack::Expr::id(ERR_EXPR);
+			result = smack::Expr::id(ERR_EXPR);
 		}
 		break;
 	case BoogieContext::Encoding::BV:
 		{
-			string name("");
-			string retType("");
+			string name;
+			string retType;
 
 			switch (op) {
 			case Token::Add: name = "add"; retType = "bv" + to_string(bits); break;
@@ -343,8 +355,8 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 			case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
 			case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
 
-			case Token::Equal: return smack::Expr::eq(lhs, rhs);
-			case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
+			case Token::Equal: result = smack::Expr::eq(lhs, rhs); break;
+			case Token::NotEqual: result = smack::Expr::neq(lhs, rhs); break;
 
 			case Token::LessThan: name = isSigned ? "slt" : "ult"; retType = "bool"; break;
 			case Token::GreaterThan: name = isSigned ? "sgt" : "ugt"; retType = "bool";  break;
@@ -353,13 +365,15 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 
 			default:
 				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + Token::toString(op));
-				return smack::Expr::id(ERR_EXPR);
+				result = smack::Expr::id(ERR_EXPR);
 			}
-			string fullName = "bv" + to_string(bits) + name;
-			context.includeBuiltInFunction(fullName, smack::Decl::function(
+			if (result == nullptr) { // not computd yet, no error
+				string fullName = "bv" + to_string(bits) + name;
+				context.includeBuiltInFunction(fullName, smack::Decl::function(
 							fullName, {{"", "bv"+to_string(bits)}, {"", "bv"+to_string(bits)}}, retType, nullptr,
 							{smack::Attr::attr("bvbuiltin", "bv" + name)}));
-			return smack::Expr::fn(fullName, lhs, rhs);
+				result = smack::Expr::fn(fullName, lhs, rhs);
+			}
 		}
 		break;
 	case BoogieContext::Encoding::MOD:
@@ -374,78 +388,97 @@ smack::Expr const* ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, A
 				auto sum = smack::Expr::plus(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(sum, largestSigned),
+					result = smack::Expr::cond(smack::Expr::gt(sum, largestSigned),
 						smack::Expr::minus(sum, modulo),
 						smack::Expr::cond(smack::Expr::lt(sum, smallestSigned), smack::Expr::plus(sum, modulo), sum));
 				}
 				else
 				{
-					return smack::Expr::cond(smack::Expr::gte(sum, modulo), smack::Expr::minus(sum, modulo), sum);
+					result = smack::Expr::cond(smack::Expr::gte(sum, modulo), smack::Expr::minus(sum, modulo), sum);
 				}
-
+				ecc = smack::Expr::eq(sum, result);
+				break;
 			}
 			case Token::Sub:
 			{
 				auto diff = smack::Expr::minus(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(diff, largestSigned),
+					result = smack::Expr::cond(smack::Expr::gt(diff, largestSigned),
 						smack::Expr::minus(diff, modulo),
 						smack::Expr::cond(smack::Expr::lt(diff, smallestSigned), smack::Expr::plus(diff, modulo), diff));
 				}
 				else
 				{
-					return smack::Expr::cond(smack::Expr::gte(lhs, rhs), diff, smack::Expr::plus(diff, modulo));
+					result = smack::Expr::cond(smack::Expr::gte(lhs, rhs), diff, smack::Expr::plus(diff, modulo));
 				}
+				ecc = smack::Expr::eq(diff, result);
+				break;
 			}
 			case Token::Mul:
 			{
+				auto prod = smack::Expr::times(lhs, rhs);
 				if (isSigned)
 				{
 					auto lhs1 = smack::Expr::cond(smack::Expr::gte(lhs, smack::Expr::lit((long)0)), lhs, smack::Expr::plus(modulo, lhs));
 					auto rhs1 = smack::Expr::cond(smack::Expr::gte(rhs, smack::Expr::lit((long)0)), rhs, smack::Expr::plus(modulo, rhs));
 					auto prod = smack::Expr::mod(smack::Expr::times(lhs1, rhs1), modulo);
-					return smack::Expr::cond(smack::Expr::gt(prod, largestSigned), smack::Expr::minus(prod, modulo), prod);
+					result = smack::Expr::cond(smack::Expr::gt(prod, largestSigned), smack::Expr::minus(prod, modulo), prod);
 				}
 				else
 				{
-					auto prod = smack::Expr::times(lhs, rhs);
-					return smack::Expr::cond(smack::Expr::gte(prod, modulo), smack::Expr::mod(prod, modulo), prod);
+					result = smack::Expr::cond(smack::Expr::gte(prod, modulo), smack::Expr::mod(prod, modulo), prod);
 				}
+				ecc = smack::Expr::eq(prod, result);
+				break;
 			}
 			case Token::Div:
 			{
 				auto div = smack::Expr::intdiv(lhs, rhs);
 				if (isSigned)
 				{
-					return smack::Expr::cond(smack::Expr::gt(div, largestSigned),
+					result = smack::Expr::cond(smack::Expr::gt(div, largestSigned),
 						smack::Expr::minus(div, modulo),
 						smack::Expr::cond(smack::Expr::lt(div, smallestSigned), smack::Expr::plus(div, modulo), div));
 				}
 				else
 				{
-					return div;
+					result = div;
 				}
+				ecc = smack::Expr::eq(div, result);
+				break;
 			}
 
-			case Token::Equal: return smack::Expr::eq(lhs, rhs);
-			case Token::NotEqual: return smack::Expr::neq(lhs, rhs);
-			case Token::LessThan: return smack::Expr::lt(lhs, rhs);
-			case Token::GreaterThan: return smack::Expr::gt(lhs, rhs);
-			case Token::LessThanOrEqual: return smack::Expr::lte(lhs, rhs);
-			case Token::GreaterThanOrEqual: return smack::Expr::gte(lhs, rhs);
-
+			case Token::Equal:
+				result = smack::Expr::eq(lhs, rhs);
+				break;
+			case Token::NotEqual:
+				result = smack::Expr::neq(lhs, rhs);
+				break;
+			case Token::LessThan:
+				result = smack::Expr::lt(lhs, rhs);
+				break;
+			case Token::GreaterThan:
+				result = smack::Expr::gt(lhs, rhs);
+				break;
+			case Token::LessThanOrEqual:
+				result = smack::Expr::lte(lhs, rhs);
+				break;
+			case Token::GreaterThanOrEqual:
+				result = smack::Expr::gte(lhs, rhs);
+				break;
 			default:
 				context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + Token::toString(op));
-				return smack::Expr::id(ERR_EXPR);
+				result = smack::Expr::id(ERR_EXPR);
 			}
 		}
 		break;
 	default:
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
-		return nullptr;
 	}
-	return smack::Expr::id(ERR_EXPR);
+
+	assert(result != nullptr);
+	return expr_pair(result, ecc);
 }
 
 smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,

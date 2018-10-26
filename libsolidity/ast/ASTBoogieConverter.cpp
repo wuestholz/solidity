@@ -535,14 +535,15 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	if (_node.isPayable())
 	{
 		// balance[this] += msg.value
+		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
+				smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false);
 		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
 					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 					smack::Expr::upd(
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
-									smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-									smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false))));
+							addResult.first)));
 	}
 
 	// Modifiers need to be inlined

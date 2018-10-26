@@ -89,7 +89,10 @@ public:
 	 */
 	static std::list<const smack::Attr*> createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
 
-	static smack::Expr const* encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
+	/** Pair of expressions: first = result, second = correctness condition */
+	typedef std::pair<smack::Expr const*, smack::Expr const*> expr_pair;
+
+	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
 
 	static smack::Expr const* encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
 
