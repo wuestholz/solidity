@@ -627,7 +627,7 @@ smack::Expr const* ASTBoogieUtils::checkExplicitBvConversion(smack::Expr const* 
 				// For smaller sizes, higher-order bits are discarded
 				else
 				{
-					string fullName = "extract" + to_string(targetBits);
+					string fullName = "extract" + to_string(targetBits) + "from" + to_string(exprBits);
 					context.includeBuiltInFunction(fullName, smack::Decl::function(
 							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
 							{smack::Attr::attr("bvbuiltin", "(_ extract " + to_string(targetBits - 1) + " 0)")}));
