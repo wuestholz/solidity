@@ -14,6 +14,18 @@ def kill():
         child.kill()
     #parent.kill()
 
+def findSolver(solver):
+    # Name of the solver
+    if solver == 'z3': solverExe = 'z3'
+    elif solver == 'yices2': solverExe = 'yices-smt2'
+    elif solver == 'cvc4': solverExe = 'cvc4'
+    else: return None
+    # Now, find it in the path
+    for path in os.environ["PATH"].split(os.pathsep):
+        solverPath = os.path.join(path, solverExe)
+        if os.path.isfile(solverPath) and os.access(solverPath, os.X_OK):
+            return solverPath
+    
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -60,12 +72,24 @@ def main():
     if args.smtlog:
         boogieArgs += ' /proverLog:%s' % args.smtlog
     
+    # Solver path 
     if args.solver == 'z3':
-        boogieArgs += ' /z3exe:%s' % args.solverBin
+        solverPath = args.solverBin
+    else:
+        solverPath = findSolver(args.solver)
+    if solverPath is None:
+        print('Error: cannot find %s' % arg.solver)
+        return
+    if args.verbose:
+       print('Using %s at %s' % (args.solver, solverPath))
+    
+    # Setup solver-specific arguments      
+    if args.solver == 'z3':
+        boogieArgs += ' /z3exe:%s' % solverPath
     if args.solver == 'yices2':
-        boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % args.solverBin
+        boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % solverPath
     if args.solver == 'cvc4':
-        boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % args.solverBin
+        boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % solverPath
         if args.boogie_arith == 'mod':
             boogieArgs += ' /proverOpt:C:"--nl-ext-tplanes --decision=internal --incremental --no-arrays-eager-index --arrays-eager-lemmas"'
             boogieArgs += ' /proverOpt:LOGIC=QF_AUFNIA'
