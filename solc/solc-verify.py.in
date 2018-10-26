@@ -91,7 +91,7 @@ def main():
     if args.solver == 'cvc4':
         boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % solverPath
         if args.boogie_arith == 'mod':
-            boogieArgs += ' /proverOpt:C:"--nl-ext-tplanes --decision=internal --incremental --no-arrays-eager-index --arrays-eager-lemmas"'
+            boogieArgs += ' /proverOpt:C:"--nl-ext-tplanes --decision=internal --incremental"'
             boogieArgs += ' /proverOpt:LOGIC=QF_AUFNIA'
 
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
