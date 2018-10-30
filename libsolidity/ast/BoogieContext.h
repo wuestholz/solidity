@@ -42,6 +42,7 @@ private:
 	smack::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 
 	Encoding m_encoding;
+	bool m_overflow;
 	ErrorReporter* m_errorReporter; // Report errors with this member
 	Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
 
@@ -61,7 +62,7 @@ private:
 	bool m_sendIncluded;
 
 public:
-	BoogieContext(Encoding encoding, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
+	BoogieContext(Encoding encoding, bool overflow, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
 
 	smack::Program& program() { return m_program; }

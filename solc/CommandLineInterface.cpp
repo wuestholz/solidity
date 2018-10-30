@@ -86,6 +86,7 @@ static string const g_strAstBoogieArith = "boogie-arith";
 static string const g_strAstBoogieArithInt = "int";
 static string const g_strAstBoogieArithBv = "bv";
 static string const g_strAstBoogieArithMod = "mod";
+static string const g_strAstBoogieArithModOverflow = "mod-overflow";
 static string const g_strBinary = "bin";
 static string const g_strBinaryRuntime = "bin-runtime";
 static string const g_strCloneBinary = "clone-bin";
@@ -196,7 +197,8 @@ static set<string> const g_boogieArithArgs
 {
 	g_strAstBoogieArithInt,
 	g_strAstBoogieArithBv,
-	g_strAstBoogieArithMod
+	g_strAstBoogieArithMod,
+	g_strAstBoogieArithModOverflow
 };
 
 static void version()
@@ -1064,6 +1066,7 @@ void CommandLineInterface::handleBoogie()
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
 	BoogieContext::Encoding encoding = BoogieContext::Encoding::INT;
+	bool overflow = false;
 	if (m_args.count(g_argAstBoogieArith))
 	{
 		string encodingStr = m_args[g_argAstBoogieArith].as<string>();
@@ -1079,6 +1082,11 @@ void CommandLineInterface::handleBoogie()
 		{
 			encoding = BoogieContext::Encoding::MOD;
 		}
+		else if (encodingStr == g_strAstBoogieArithModOverflow)
+		{
+			encoding = BoogieContext::Encoding::MOD;
+			overflow = true;
+		}
 		else
 		{
 			cerr << "Invalid option for --" + g_strAstBoogieArith + ": " << encodingStr << endl;
@@ -1087,7 +1095,7 @@ void CommandLineInterface::handleBoogie()
 		}
 	}
 
-	BoogieContext context(encoding, &errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(encoding, overflow, &errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
 	SourceReferenceFormatter formatter(cerr, [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); });
