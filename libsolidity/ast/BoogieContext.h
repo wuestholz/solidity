@@ -68,6 +68,7 @@ public:
 	smack::Program& program() { return m_program; }
 	Encoding encoding() { return m_encoding; }
 	bool isBvEncoding() { return m_encoding == Encoding::BV; }
+	bool overflow() { return m_overflow; }
 	ErrorReporter*& errorReporter() { return m_errorReporter; }
 	Scanner const*& currentScanner() { return m_currentScanner; }
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }

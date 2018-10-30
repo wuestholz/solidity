@@ -37,7 +37,7 @@ def main():
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
-    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod'])
+    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod', 'mod-overflow'])
 
     parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default='z3', choices=['z3', 'yices2', 'cvc4'])
     parser.add_argument('--solverBin', type=str, help='Binary of the solver to use', default='@Z3_EXE@')

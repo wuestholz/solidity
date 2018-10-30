@@ -44,6 +44,7 @@ const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
 const string ASTBoogieUtils::SOLIDITY_NOW = "now";
 const string ASTBoogieUtils::BOOGIE_NOW = "__now";
+const string ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
 const string ASTBoogieUtils::ERR_EXPR = "__ERROR";
 

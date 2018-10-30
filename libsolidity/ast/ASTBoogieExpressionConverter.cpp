@@ -97,10 +97,11 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const
 	m_newDecls.clear();
 	m_newConstants.clear();
 	m_tccs.clear();
+	m_ocs.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_tccs);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_tccs, m_ocs);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -367,6 +368,9 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::SAR: {
 		auto exprResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, _node.getOperator(), lhs, rhs, bits, isSigned);
 		m_currentExpr = exprResult.first;
+		if (m_context.overflow() && exprResult.second){
+			m_ocs.push_back(exprResult.second);
+		}
 		break;
 	}
 

@@ -34,6 +34,12 @@ const smack::Expr* ASTBoogieConverter::convertExpression(Expression const& _node
 
 	for (auto d : result.newDecls) { m_localDecls.push_back(d); }
 	for (auto tcc : result.tccs) { m_currentBlocks.top()->addStmt(smack::Stmt::assume(tcc)); }
+	for (auto oc : result.ocs)
+	{
+		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
+			smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
+			smack::Expr::or_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), smack::Expr::not_(oc))));
+	}
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
 	for (auto c : result.newConstants)
 	{
@@ -315,6 +321,10 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 	m_context.program().getDeclarations().push_back(smack::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
 	m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.isBvEncoding() ? "bv256" : "int"));
+	// overflow
+	if (m_context.overflow()) {
+		m_context.program().getDeclarations().push_back(smack::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, "bool"));
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -669,6 +679,16 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 						ASTBoogieUtils::createAttrs(_node.location(), "Variables in postcondition '" + post.exprStr + "' might be out of range at end of function.", *m_context.currentScanner()))); }
 	}
 	// TODO: check that no new sum variables were introduced
+
+	// Overflow conditions
+	if (m_context.overflow())
+	{
+		auto noOverflow = smack::Expr::not_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
+		procDecl->getRequires().push_back(smack::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "An overflow can occur before calling function", *m_context.currentScanner())));
+		procDecl->getEnsures().push_back(smack::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
+	}
 
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);

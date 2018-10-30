@@ -33,6 +33,8 @@ private:
 	std::list<smack::Decl*> m_newConstants;
 	// Type checking conditions
 	std::list<smack::Expr const*> m_tccs;
+	// Overflow conditions
+	std::list<smack::Expr const*> m_ocs;
 
 	// Helper method to get the length of an array (currently only works for 1D arrays)
 	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
@@ -62,11 +64,14 @@ public:
 		std::vector<smack::Stmt const*> newStatements;
 		std::list<smack::Decl*> newDecls;
 		std::list<smack::Decl*> newConstants;
-		std::list<smack::Expr const*> tccs;
+		std::list<smack::Expr const*> tccs; // Type checking conditions
+		std::list<smack::Expr const*> ocs;  // Overflow conditions
 
 		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
-				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants, std::list<smack::Expr const*> tccs)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls), newConstants(newConstants), tccs(tccs) {}
+				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants,
+				std::list<smack::Expr const*> tccs, std::list<smack::Expr const*> ocs)
+			:expr(expr), newStatements(newStatements), newDecls(newDecls),
+			 newConstants(newConstants), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**
