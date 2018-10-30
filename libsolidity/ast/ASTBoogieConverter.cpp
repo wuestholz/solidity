@@ -952,6 +952,15 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
+	// No overflow invariant
+	if (m_context.overflow())
+	{
+		invars.push_back(smack::Specification::spec(
+				smack::Expr::not_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
+				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
+		));
+	}
+
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
 	return false;
@@ -1000,6 +1009,15 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
+
+	// No overflow invariant
+	if (m_context.overflow())
+	{
+		invars.push_back(smack::Specification::spec(
+				smack::Expr::not_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
+				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
+		));
+	}
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
