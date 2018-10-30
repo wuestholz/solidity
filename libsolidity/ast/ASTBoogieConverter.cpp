@@ -615,14 +615,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
-			if (!_node.isConstructor())
-			{
-				procDecl->getRequires().push_back(smack::Specification::spec(invar.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
-			}
-			procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
-
 			for (auto tcc : invar.tccs)
 			{
 				procDecl->getRequires().push_back(smack::Specification::spec(tcc,
@@ -630,6 +622,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				procDecl->getEnsures().push_back(smack::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + invar.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
 			}
+			if (!_node.isConstructor())
+			{
+				procDecl->getRequires().push_back(smack::Specification::spec(invar.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
+			}
+			procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
 	else // Private functions: inline
