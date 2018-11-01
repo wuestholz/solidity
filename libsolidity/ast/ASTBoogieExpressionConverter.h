@@ -51,6 +51,9 @@ private:
 	// Helper method to add a type checking condition for an expression with a given type
 	void addTCC(smack::Expr const* expr, TypePointer tp);
 
+	// Helper method to add a side effect (statement)
+	void addSideEffect(smack::Stmt const* stmt);
+
 public:
 
 	/**

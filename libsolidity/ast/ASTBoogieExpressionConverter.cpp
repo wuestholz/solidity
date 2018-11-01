@@ -76,6 +76,18 @@ void ASTBoogieExpressionConverter::addTCC(smack::Expr const* expr, TypePointer t
 	}
 }
 
+void ASTBoogieExpressionConverter::addSideEffect(smack::Stmt const* stmt)
+{
+	for (auto oc : m_ocs)
+	{
+		m_newStatements.push_back(smack::Stmt::assign(
+			smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
+			smack::Expr::or_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), smack::Expr::not_(oc))));
+	}
+	m_ocs.clear();
+	m_newStatements.push_back(stmt);
+}
+
 ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context) :
 		m_context(context),
 		m_currentExpr(nullptr),
@@ -190,7 +202,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub, rhs, lhs, bits, isSigned);
 				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, selExpr, subResult.first, bits, isSigned);
 
-				m_newStatements.push_back(smack::Stmt::assign(
+				addSideEffect(smack::Stmt::assign(
 						sumId,
 						smack::Expr::upd(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), updResult.first)));
 			}
@@ -201,7 +213,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	// If LHS is simply an identifier, we can assign to it
 	if (dynamic_cast<smack::VarExpr const*>(lhs))
 	{
-		m_newStatements.push_back(smack::Stmt::assign(lhs, rhs));
+		addSideEffect(smack::Stmt::assign(lhs, rhs));
 		return;
 	}
 
@@ -210,7 +222,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	{
 		if (auto lhsUpd = dynamic_cast<const smack::UpdExpr*>(selectToUpdate(lhsSel, rhs)))
 		{
-			m_newStatements.push_back(smack::Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			addSideEffect(smack::Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
 		}
 	}
@@ -292,15 +304,17 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
 				// First do the assignment x := x + 1 (or x := x - 1)
+				if (m_context.overflow() && rhsResult.second) { m_ocs.push_back(rhsResult.second); }
 				createAssignment(_node.subExpression(), lhs, rhsResult.first);
 				// Then the assignment tmp := x
-				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
+				addSideEffect(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), lhs));
 			}
 			else // x++ (or x--)
 			{
 				// First do the assignment tmp := x
-				m_newStatements.push_back(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
+				addSideEffect(smack::Stmt::assign(smack::Expr::id(tempVar->getName()), subExpr));
 				// Then the assignment x := x + 1 (or x := x - 1)
+				if (m_context.overflow() && rhsResult.second) { m_ocs.push_back(rhsResult.second); }
 				createAssignment(_node.subExpression(), lhs, rhsResult.first);
 			}
 			// Result is the tmp variable (if the assignment is part of an expression)
@@ -593,7 +607,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Parameter of assert is the first (and only) normal argument
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assert_(*it, ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
+		addSideEffect(smack::Stmt::assert_(*it, ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
 		return false;
 	}
 
@@ -609,7 +623,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Parameter of assume is the first normal argument (second is optional message omitted in Boogie)
 		list<const smack::Expr*>::iterator it = args.begin();
 		std::advance(it, args.size() - _node.arguments().size());
-		m_newStatements.push_back(smack::Stmt::assume(*it));
+		addSideEffect(smack::Stmt::assume(*it));
 		return false;
 	}
 
@@ -623,7 +637,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_comment("Revert should have at most one argument") <<
 							errinfo_sourceLocation(_node.location()));
 		}
-		m_newStatements.push_back(smack::Stmt::assume(smack::Expr::lit(false)));
+		addSideEffect(smack::Stmt::assume(smack::Expr::lit(false)));
 		return false;
 	}
 
@@ -669,13 +683,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// assert(balance[this] >= msg.value)
 		auto selExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, selExpr, m_currentMsgValue, 256, false);
-		m_newStatements.push_back(smack::Stmt::assert_(geqResult.first,
+		addSideEffect(smack::Stmt::assert_(geqResult.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
 												smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
 												m_currentMsgValue, 256, false);
-		m_newStatements.push_back(smack::Stmt::assign(
+		addSideEffect(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 				smack::Expr::upd(
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
@@ -688,9 +702,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
-			for (auto tcc : invar.tccs) { m_newStatements.push_back(smack::Stmt::assert_(tcc,
+			for (auto tcc : invar.tccs) { addSideEffect(smack::Stmt::assert_(tcc,
 										ASTBoogieUtils::createAttrs(_node.location(), "Variables for invariant '" + invar.exprStr + "' might be out of range before external call.", *m_context.currentScanner()))); }
-			m_newStatements.push_back(smack::Stmt::assert_(invar.expr,
+			addSideEffect(smack::Stmt::assert_(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold before external call.", *m_context.currentScanner())));
 		}
 	}
@@ -709,15 +723,15 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (m_isGetter)
 		{
 			// Getters are replaced with map access (instead of function call)
-			m_newStatements.push_back(smack::Stmt::assign(
+			addSideEffect(smack::Stmt::assign(
 					smack::Expr::id(returnVar->getName()),
 					smack::Expr::sel(smack::Expr::id(funcName), m_currentAddress)));
 		}
 		else
 		{
 			// Assign call to the fresh variable
-			m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
-			m_newStatements.push_back(smack::Stmt::call(funcName, args, {returnVar->getName()}));
+			addSideEffect(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
+			addSideEffect(smack::Stmt::call(funcName, args, {returnVar->getName()}));
 
 			// The call function is special as it indicates failure in a return value and in this case
 			// we must undo reducing our balance
@@ -734,7 +748,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 								smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 								smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 								addResult.first)));
-				m_newStatements.push_back(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
+				addSideEffect(smack::Stmt::ifelse(smack::Expr::not_(m_currentExpr), revert));
 			}
 		}
 
@@ -742,8 +756,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else // No return value for function
 	{
 		m_currentExpr = nullptr;
-		m_newStatements.push_back(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
-		m_newStatements.push_back(smack::Stmt::call(funcName, args));
+		addSideEffect(smack::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
+		addSideEffect(smack::Stmt::call(funcName, args));
 	}
 
 	// Assume invariants after external call
@@ -751,8 +765,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 
 		for (auto invar : m_context.currentContractInvars()) {
-			for (auto tcc : invar.tccs) { m_newStatements.push_back(smack::Stmt::assume(tcc)); }
-			m_newStatements.push_back(smack::Stmt::assume(invar.expr));
+			for (auto tcc : invar.tccs) { addSideEffect(smack::Stmt::assume(tcc)); }
+			addSideEffect(smack::Stmt::assume(invar.expr));
 		}
 	}
 
@@ -902,7 +916,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.baseExpression().annotation().type);
 		if (fbType->numBytes() == 1)
 		{
-			m_newStatements.push_back(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
+			addSideEffect(smack::Stmt::assert_(smack::Expr::eq(indexExpr, smack::Expr::lit((unsigned)0)),
 					ASTBoogieUtils::createAttrs(_node.location(), "Index may be out of bounds", *m_context.currentScanner())));
 			m_currentExpr = baseExpr;
 			// TODO: TCC?

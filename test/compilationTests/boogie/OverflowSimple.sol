@@ -32,6 +32,16 @@ contract OverflowSimple {
         // No require needed for y, the one for x and the invariant is sufficient
     }
 
+    function sideeffect_overflow() public {
+        y = ++x;
+    }
+
+    function sideeffect_no_overflow() public {
+        ++x;
+        require(x > y);
+        y++;
+    }
+
     function inc_call_overflow() public {
         x = x + 1;
         nothing(); // Overflow before call
