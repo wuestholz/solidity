@@ -482,19 +482,23 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 	return expr_pair(result, ecc);
 }
 
-smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
 		smack::Expr const* subExpr, unsigned bits, bool)
 {
+	const smack::Expr* result = nullptr;
+	const smack::Expr* ecc = nullptr;
+
 	switch(context.encoding())
 	{
 	case BoogieContext::Encoding::INT:
 		switch(op)
 		{
-		case Token::Add: return subExpr; break; // Unary plus does not do anything
-		case Token::Sub: return smack::Expr::neg(subExpr); break;
+		case Token::Add: result = subExpr; break; // Unary plus does not do anything
+		case Token::Sub: result = smack::Expr::neg(subExpr); break;
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + Token::toString(op));
-			return smack::Expr::id(ERR_EXPR);
+			result = smack::Expr::id(ERR_EXPR);
+			break;
 		}
 		break;
 
@@ -502,20 +506,23 @@ smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, AS
 		{
 			string name("");
 			switch (op) {
-			case Token::Add: return subExpr;
+			case Token::Add: result = subExpr; break;
 
 			case Token::Sub: name = "neg"; break;
 			case Token::BitNot: name = "not"; break;
 			default:
 				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + Token::toString(op));
-				return smack::Expr::id(ERR_EXPR);
+				result = smack::Expr::id(ERR_EXPR);
+				break;
 			}
-			string fullName = "bv" + to_string(bits) + name;
-			context.includeBuiltInFunction(fullName, smack::Decl::function(
-							fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
-							{smack::Attr::attr("bvbuiltin", "bv" + name)}));
+			if (!result) {
+				string fullName = "bv" + to_string(bits) + name;
+				context.includeBuiltInFunction(fullName, smack::Decl::function(
+								fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
+								{smack::Attr::attr("bvbuiltin", "bv" + name)}));
 
-			return smack::Expr::fn(fullName, subExpr);
+				result = smack::Expr::fn(fullName, subExpr);
+			}
 		}
 		break;
 
@@ -524,15 +531,16 @@ smack::Expr const* ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, AS
 		{
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + Token::toString(op));
-			return smack::Expr::id(ERR_EXPR);
+			result = smack::Expr::id(ERR_EXPR);
+			break;
 		}
 		break;
 
 	default:
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
-		return nullptr;
 	}
-	return smack::Expr::id(ERR_EXPR);
+	assert(result != nullptr);
+	return expr_pair(result, ecc);
 }
 
 bool ASTBoogieUtils::isBitPreciseType(TypePointer type)

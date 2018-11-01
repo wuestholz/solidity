@@ -95,7 +95,7 @@ public:
 
 	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
 
-	static smack::Expr const* encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
+	static expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
 
 	/**
 	 * Check if a type can be represented with bitvectors

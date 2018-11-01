@@ -263,9 +263,14 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	case Token::Not: m_currentExpr = smack::Expr::not_(subExpr); break;
 
 	case Token::Sub:
-	case Token::BitNot:
-		m_currentExpr = ASTBoogieUtils::encodeArithUnaryOp(m_context, &_node, _node.getOperator(), subExpr, bits, isSigned);
+	case Token::BitNot: {
+		auto exprResult = ASTBoogieUtils::encodeArithUnaryOp(m_context, &_node, _node.getOperator(), subExpr, bits, isSigned);
+		m_currentExpr = exprResult.first;
+		if (m_context.overflow() && exprResult.second){
+			m_ocs.push_back(exprResult.second);
+		}
 		break;
+	}
 
 	// Inc and Dec shares most part of the code
 	case Token::Inc:
