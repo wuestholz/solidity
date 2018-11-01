@@ -20,6 +20,18 @@ contract OverflowSimple {
         // No require needed for y, the one for x and the invariant is sufficient
     }
 
+    function inc_assignadd_overflow() public {
+        x += 1;
+        y += 1;
+    }  // Overflow at end
+
+    function inc_assignadd_no_overflow() public {
+        x += 1;
+        require(x > y);
+        y += 1;
+        // No require needed for y, the one for x and the invariant is sufficient
+    }
+
     function inc_call_overflow() public {
         x = x + 1;
         nothing(); // Overflow before call

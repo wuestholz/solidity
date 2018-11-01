@@ -162,7 +162,10 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		return false;
 	}
-
+	if (m_context.overflow() && result.second)
+	{
+		m_ocs.push_back(result.second);
+	}
 	// Create the assignment with the helper method
 	createAssignment(_node.leftHandSide(), lhs, result.first);
 	return false;
