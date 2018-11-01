@@ -1,15 +1,17 @@
 pragma solidity ^0.4.23;
 
-contract BitPreciseArith {
+contract ModArith {
     function add8u(uint8 x, uint8 y) private pure returns (uint8) { return x + y; }
     function sub8u(uint8 x, uint8 y) private pure returns (uint8) { return x - y; }
     function mul8u(uint8 x, uint8 y) private pure returns (uint8) { return x * y; }
     function div8u(uint8 x, uint8 y) private pure returns (uint8) { return x / y; }
+    function sub8u(uint8 x) private pure returns (uint8) {return -x; }
 
     function add8s(int8 x, int8 y) private pure returns (int8) { return x + y; }
     function sub8s(int8 x, int8 y) private pure returns (int8) { return x - y; }
     function mul8s(int8 x, int8 y) private pure returns (int8) { return x * y; }
     function div8s(int8 x, int8 y) private pure returns (int8) { return x / y; }
+    function sub8s(int8 x) private pure returns (int8) {return -x; }
 
     function eq8u(uint8 x, uint8 y) private pure returns (bool) { return x == y; }
     function ne8u(uint8 x, uint8 y) private pure returns (bool) { return x != y; }
@@ -27,6 +29,9 @@ contract BitPreciseArith {
         assert(mul8u(8, 32) == 0);
         assert(div8u(48, 6) == 8);
         assert(div8u(3, 6) == 0);
+        assert(sub8u(0) == 0);
+        assert(sub8u(1) == 255);
+        assert(sub8u(255) == 1);
 
         assert(add8s(127, -1) == 126);
         assert(add8s(127, 1) == -128);
@@ -38,6 +43,9 @@ contract BitPreciseArith {
         assert(div8s(48, 6) == 8);
         assert(div8s(48, -6) == -8);
         assert(div8s(-128, -1) == -128);
+        assert(sub8s(127) == -127);
+        assert(sub8s(0) == 0);
+        assert(sub8s(-128) == -128);
 
         assert(eq8u(34, 34) == true);
         assert(eq8u(34, 35) == false);

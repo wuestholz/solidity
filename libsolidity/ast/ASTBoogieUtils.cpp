@@ -483,7 +483,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 }
 
 ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
-		smack::Expr const* subExpr, unsigned bits, bool)
+		smack::Expr const* subExpr, unsigned bits, bool isSigned)
 {
 	const smack::Expr* result = nullptr;
 	const smack::Expr* ecc = nullptr;
@@ -505,8 +505,9 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 	case BoogieContext::Encoding::BV:
 		{
 			string name("");
-			switch (op) {
-			case Token::Add: result = subExpr; break;
+			switch (op)
+			{
+			case Token::Add: result = subExpr; break; // Unary plus does not do anything
 
 			case Token::Sub: name = "neg"; break;
 			case Token::BitNot: name = "not"; break;
@@ -515,7 +516,8 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 				result = smack::Expr::id(ERR_EXPR);
 				break;
 			}
-			if (!result) {
+			if (!result)
+			{
 				string fullName = "bv" + to_string(bits) + name;
 				context.includeBuiltInFunction(fullName, smack::Decl::function(
 								fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
@@ -529,6 +531,27 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 	case BoogieContext::Encoding::MOD:
 		switch(op)
 		{
+		case Token::Add: result = subExpr; break; // Unary plus does not do anything
+		case Token::Sub:
+		{
+			auto sub = smack::Expr::neg(subExpr);
+			if (isSigned)
+			{
+				auto smallestSigned = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
+				result = smack::Expr::cond(smack::Expr::eq(subExpr, smallestSigned),
+						smallestSigned,
+						sub);
+			}
+			else
+			{
+				auto modulo = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits));
+				result = smack::Expr::cond(smack::Expr::eq(subExpr, smack::Expr::lit((long)0)),
+						smack::Expr::lit((long)0),
+						smack::Expr::minus(modulo, subExpr));
+			}
+			ecc = smack::Expr::eq(sub, result);
+			break;
+		}
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + Token::toString(op));
 			result = smack::Expr::id(ERR_EXPR);
