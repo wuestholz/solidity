@@ -98,7 +98,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
-
+	transfer->addAttr(smack::Attr::attr("message", "transfer"));
 	return transfer;
 }
 
@@ -142,6 +142,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// Postcondition: if result is false nothing happens
 	callProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::or_(result,
 			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE))))));
+	callProc->addAttr(smack::Attr::attr("message", "call"));
 	return callProc;
 }
 
@@ -210,6 +211,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 			smack::Expr::and_(
 					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
 					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
+	sendProc->addAttr(smack::Attr::attr("message", "send"));
 	return sendProc;
 }
 

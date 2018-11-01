@@ -34,6 +34,7 @@ def main():
     parser.add_argument('--output', type=str, help='Output directory', default='.')
     parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
     parser.add_argument('--smtlog', type=str, help='Log input for the SMT solver')
+    parser.add_argument('--errors-only', action='store_true', help='Only display error messages')
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
@@ -68,7 +69,7 @@ def main():
     timer = threading.Timer(args.timeout, kill)
     # Run verification, get result
     timer.start()
-    boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0 /useArrayTheory'
+    boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0 /useArrayTheory /trace'
     if args.smtlog:
         boogieArgs += ' /proverLog:%s' % args.smtlog
     
@@ -117,27 +118,31 @@ def main():
         print('---------------------------')
 
     # Map results back to .sol file
+    prefix = '' if args.errors_only else ' - '
     outputLines = list(filter(None, verifierOutputStr.split('\n')))
     for outputLine, nextOutputLine in zip(outputLines, outputLines[1:]):
         if 'This assertion might not hold.' in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
-            print(getSourceLineAndCol(errLine) + ': ' + getMessage(errLine))
+            print(prefix + getSourceLineAndCol(errLine) + ': ' + getMessage(errLine))
         if 'A postcondition might not hold on this return path.' in outputLine:
             errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Info is in the next line
-            print(getSourceLineAndCol(errLine) + ': ' + getMessage(errLine))
+            print(prefix + getSourceLineAndCol(errLine) + ': ' + getMessage(errLine))
         if 'A precondition for this call might not hold.' in outputLine:
             errLine = getRelatedLineFromBpl(nextOutputLine, 0) # Message is in the next line
             errLinePrev = getRelatedLineFromBpl(outputLine, -1) # Location is in the line before
-            print(getSourceLineAndCol(errLinePrev) + ': ' + getMessage(errLine))
+            print(prefix + getSourceLineAndCol(errLinePrev) + ': ' + getMessage(errLine))
         if 'Verification inconclusive' in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
-            print(getSourceLineAndCol(errLine) + ': Inconclusive result for function \'' + getMessage(errLine) + '\'')
+            print(prefix + getSourceLineAndCol(errLine) + ': Inconclusive result for function \'' + getMessage(errLine) + '\'')
         if 'This loop invariant might not hold on entry.' in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
-            print(getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not hold on loop entry')
+            print(prefix + getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not hold on loop entry')
         if 'This loop invariant might not be maintained by the loop.' in outputLine:
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
-            print(getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not be maintained by the loop')
+            print(prefix + getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not be maintained by the loop')
+        if not args.errors_only and re.search('Verifying .* \.\.\.', outputLine) is not None:
+            result = "ERROR" if "error" in nextOutputLine else "OK"
+            print('Verifying ' + getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
 
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print('No errors found.')
@@ -165,6 +170,12 @@ def getMessage(line):
         return '[No message found for error]'
     else:
         return match.group(1)
+
+def getFunctionName(boogieName, bplFile):
+    for line in open(bplFile).readlines():
+        if line.startswith('procedure ') and boogieName in line:
+            return getMessage(line)
+    return '[Unknown function]'
 
 if __name__== '__main__':
     main()

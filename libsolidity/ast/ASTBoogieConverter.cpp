@@ -226,7 +226,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
 				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner())));
 	}
-	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), "Default constructor", *m_context.currentScanner()));
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::default_constructor", *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
@@ -690,7 +690,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
 	}
 
-	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), m_currentContract->name() + "::" +_node.name(), *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
 }
