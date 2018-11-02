@@ -811,6 +811,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
 		{
 			m_currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
+			addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
 			return false;
 		}
 		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
@@ -818,6 +819,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
 				m_currentExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+				addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
 				return false;
 			}
 		}
@@ -853,6 +855,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+		addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
 		return false;
 	}
 	// array.length
