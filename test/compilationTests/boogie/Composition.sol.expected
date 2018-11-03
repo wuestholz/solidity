@@ -1,1 +1,4 @@
-^Boogie program verifier finished with 3 verified, 0 errors$
+Verifying A::someFunc: OK
+Verifying B::callOtherFunc: OK
+Verifying B::accessOtherMember: OK
+No errors found.

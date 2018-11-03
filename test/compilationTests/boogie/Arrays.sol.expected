@@ -1,1 +1,6 @@
-^Boogie program verifier finished with 5 verified, 0 errors
+Verifying Arrays::readStateArr: OK
+Verifying Arrays::writeStateArr: OK
+Verifying Arrays::readParamArr: OK
+Verifying Arrays::callWithLocalArray: OK
+Verifying Arrays::callWithStateArray: OK
+No errors found.

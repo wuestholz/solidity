@@ -1,1 +1,5 @@
-Program has no bugs
+Verifying Base::f: OK
+Verifying Base::g: OK
+Verifying Inheritance::f: OK
+Verifying Inheritance::h: OK
+No errors found.

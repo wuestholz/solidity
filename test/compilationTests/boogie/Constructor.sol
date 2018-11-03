@@ -5,7 +5,9 @@ contract Constr {
 
     constructor(uint init) public {
         // Value should be initialize to 0 here
+        assert(value == 0);
         value = init;
+        assert(value == init);
     }
 
     function doSomething(uint param) public returns (uint) {

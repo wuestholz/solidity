@@ -2,7 +2,10 @@ pragma solidity ^0.4.23;
 
 contract PayableFunctions {
 
-    function receive(uint param) public payable returns (uint) {
+    /**
+     * @notice postcondition r == param + msg.value
+     */
+    function receive(uint param) public payable returns (uint r) {
         return param + msg.value;
     }
 }
@@ -10,18 +13,21 @@ contract PayableFunctions {
 contract Payable {
     PayableFunctions p;
 
-    function transfer(uint amount) public returns (uint) {
+    function transfer(uint amount) private returns (uint) {
         require(address(this).balance >= amount);
         return p.receive.gas(5000).value(amount)(1);
     }
 
-    function transferNested(uint amount) public returns (uint) {
-        require(address(this).balance >= amount + 3);
-        return p.receive.value(p.receive.value(1)(2))(p.receive.value(amount)(3));
-    }
-
     function __verifier_main() public {
         assert(transfer(1) == 2);
-        assert(transferNested(1) == 7);
+    }
+
+    function transferNested(uint amount) public returns (uint) {
+        require(amount >= 0);
+        require(address(this).balance >= amount + 3);
+        // Calling a payable function multiple times with checking for balance
+        // only in the beginning will fail, because the called function might
+        // modify our balance as well.
+        return p.receive.value(p.receive.value(1)(2))(p.receive.value(amount)(3));
     }
 }

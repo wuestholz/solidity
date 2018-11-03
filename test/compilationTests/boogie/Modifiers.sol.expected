@@ -1,1 +1,5 @@
-^Boogie program verifier finished with 4 verified, 0 errors$
+Verifying A::someFunc: OK
+Verifying A::someFunc2: OK
+Verifying A::twoModifiers: OK
+Verifying A::costs: OK
+No errors found.

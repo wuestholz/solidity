@@ -1,25 +1,32 @@
 pragma solidity ^0.4.23;
 
 contract Base {
-    function f() public pure returns (uint) {
+    /**
+     * @notice postcondition r == 1
+     */
+    function f() public pure returns (uint r) {
         return 1;
     }
 
-    function g() public pure returns (uint) {
+    /**
+     * @notice postcondition r == 2
+     */
+    function g() public pure returns (uint r) {
         return 2;
     }
 }
 
 contract Inheritance is Base {
-    function f() public pure returns (uint) {
+    /**
+     * @notice postcondition r == 3
+     */
+    function f() public pure returns (uint r) {
         return 3;
     }
 
     function h() public pure returns (uint) {
-        return f() + g();
-    }
-
-    function __verifier_main() public pure {
-        assert(h() == 5);
+        uint x = f() + g();
+        assert(x == 5);
+        return x;
     }
 }

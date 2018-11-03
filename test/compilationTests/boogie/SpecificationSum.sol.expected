@@ -1,1 +1,4 @@
-^Boogie program verifier finished with 2 verified, 1 error$
+Verifying SomeContract::deposit: OK
+Verifying SomeContract::withdraw: OK
+Verifying SomeContract::withdraw_incorrect: ERROR
+ - Source SpecificationSum.sol, line 20, col 5: Invariant '__verifier_sum_uint8(user_balances) == total_supply' might not hold at end of function.

@@ -7,43 +7,44 @@ contract FunctionCall {
         x = x1;
     }
 
-    function get() view public returns (uint) {
+    function get() view private returns (uint) {
         return x;
     }
 
     function addSome() public {
+        uint old_x = x;
         set(x + 1);
+        assert(x == old_x + 1);
     }
 
-    function f() pure public returns (uint) {
+    /**
+     * @notice postcondition r == 1
+     */
+    function f() pure public returns (uint r) {
         return 1;
     }
 
-    function g() pure public returns (uint) {
+    /**
+     * @notice postcondition r == 2
+     */
+    function g() pure public returns (uint r) {
         return 2;
     }
 
-    function h(uint h1) pure public returns (uint) {
+    /**
+     * @notice postcondition r == h1 + 5
+     */
+    function h(uint h1) pure public returns (uint r) {
         return h1 + 5;
     }
 
     function sequentialCall() public {
-        x = f() + g();
+        uint y = f() + g();
+        assert(y == 3);
     }
 
     function compositeCall() public {
-        x = h(f() + f());
+        uint y = h(f() + f());
+        assert(y == 7);
     }
-
-    function __verifier_main() public {
-        set(5);
-        assert(get() == 5);
-        addSome();
-        assert(get() == 6);
-        sequentialCall();
-        assert(get() == 3);
-        compositeCall();
-        assert(get() == 7);
-    }
-
 }

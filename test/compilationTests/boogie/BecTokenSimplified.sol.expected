@@ -1,1 +1,5 @@
-^Boogie program verifier finished with 4 verified, 0 errors$
+Verifying BecTokenSimplified::[constructor]: OK
+Verifying BecTokenSimplified::balanceOf: OK
+Verifying BecTokenSimplified::transfer: OK
+Verifying BecTokenSimplified::batchTransfer: OK
+No errors found.

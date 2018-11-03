@@ -1,7 +1,7 @@
 pragma solidity ^0.4.23;
 
 contract IfElse {
-    function ifthenelse(uint param) pure public returns (uint) {
+    function ifthenelse(uint param) private pure returns (uint) {
         if (param < 10) {
             return 10;
         } else if (param < 20) {
@@ -11,18 +11,18 @@ contract IfElse {
         }
     }
 
-    function onlyif(uint param) pure public returns (uint) {
+    function onlyif(uint param) private pure returns (uint) {
         if (param < 10) {
             return 10;
         }
         return 20;
     }
 
-    function conditional(uint param) pure public returns (uint) {
+    function conditional(uint param) private pure returns (uint) {
         return param > 10 ? 10 : 0;
     }
 
-    function __verifier_main() pure public {
+    function __verifier_main() public pure {
         assert(ifthenelse(5) == 10);
         assert(ifthenelse(15) == 20);
         assert(ifthenelse(25) == 30);

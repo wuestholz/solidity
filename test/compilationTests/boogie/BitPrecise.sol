@@ -3,8 +3,8 @@ pragma solidity ^0.4.23;
 contract BitPrecise {
     function add128(uint128 a, uint128 b) public pure returns (uint128) {
         uint128 result = a + b;
-        assert(result >= a);
-        assert(result >= b);
+        assert(result >= a); // Can fail
+        assert(result >= b); // Can fail
         return result;
     }
 

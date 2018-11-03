@@ -2,10 +2,13 @@ pragma solidity ^0.4.23;
 
 contract Loops {
 
-    function whileLoopFunc(uint param) pure public returns (uint) {
+    function whileLoopFunc(uint param) private pure returns (uint) {
         uint i = 0;
         uint result = param;
 
+        /**
+         * @notice invariant result == param + i
+         */
         while (i < 10) {
             result = result + 1;
             i = i + 1;
@@ -14,9 +17,12 @@ contract Loops {
         return result;
     }
 
-    function forLoopFunc(uint param) pure public returns (uint) {
+    function forLoopFunc(uint param) private pure returns (uint) {
         uint result = param;
-
+        
+        /**
+         * @notice invariant result == param + i
+         */
         for (uint i = 0; i < 10; i = i + 1) {
             result = result + 1;
         }
@@ -24,10 +30,13 @@ contract Loops {
         return result;
     }
 
-    function breakLoop(uint param) pure public returns (uint) {
+    function breakLoop(uint param) private pure returns (uint) {
         uint i = 0;
         uint result = param;
 
+        /**
+         * @notice invariant result == param + i
+         */
         while (i < 10) {
             result = result + 1;
             if (result >= 100) break;
@@ -37,7 +46,7 @@ contract Loops {
         return result;
     }
 
-    function __verifier_main() pure public {
+    function __verifier_main() public pure {
         assert(whileLoopFunc(5) == 15);
         assert(forLoopFunc(9) == 19);
         assert(breakLoop(5) == 15);

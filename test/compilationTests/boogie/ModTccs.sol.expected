@@ -1,1 +1,4 @@
-^Boogie program verifier finished with 3 verified, 0 errors$
+Verifying ModTccs::f: OK
+Verifying ModTccs::g: OK
+Verifying ModTccs::h: OK
+No errors found.

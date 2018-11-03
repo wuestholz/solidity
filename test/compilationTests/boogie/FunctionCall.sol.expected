@@ -1,1 +1,7 @@
-Program has no bugs
+Verifying FunctionCall::addSome: OK
+Verifying FunctionCall::f: OK
+Verifying FunctionCall::g: OK
+Verifying FunctionCall::h: OK
+Verifying FunctionCall::sequentialCall: OK
+Verifying FunctionCall::compositeCall: OK
+No errors found.

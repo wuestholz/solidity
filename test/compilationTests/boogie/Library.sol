@@ -9,16 +9,16 @@ library MathLib {
 contract Library {
     using MathLib for uint256;
 
-    function someFunc() public pure returns (uint256) {
+    function someFunc() private pure returns (uint256) {
         uint256 x = 5;
-        return x.add(10); // Does not work yet
+        return x.add(10);
     }
 
-    function otherFunc() public pure returns (uint256) {
+    function otherFunc() private pure returns (uint256) {
         return MathLib.add(1, 2);
     }
 
-    function __verifier_main() pure public {
+    function __verifier_main() public pure {
         assert(someFunc() == 15);
         assert(otherFunc() == 3);
     }

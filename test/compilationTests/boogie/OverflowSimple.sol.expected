@@ -1,1 +1,18 @@
-^Boogie program verifier finished with 6 verified, 6 errors$
+Verifying OverflowSimple::inc_overflow: ERROR
+ - Source OverflowSimple.sol, line 11, col 5: Function can terminate with overflow
+Verifying OverflowSimple::inc_no_overflow: OK
+Verifying OverflowSimple::inc_assignadd_overflow: ERROR
+ - Source OverflowSimple.sol, line 23, col 5: Function can terminate with overflow
+Verifying OverflowSimple::inc_assignadd_no_overflow: OK
+Verifying OverflowSimple::sideeffect_overflow: ERROR
+ - Source OverflowSimple.sol, line 35, col 5: Function can terminate with overflow
+Verifying OverflowSimple::sideeffect_no_overflow: OK
+Verifying OverflowSimple::inc_call_overflow: ERROR
+ - Source OverflowSimple.sol, line 47, col 9: An overflow can occur before calling function
+Verifying OverflowSimple::inc_call_no_overflow: OK
+Verifying OverflowSimple::loop_no_overflow: OK
+Verifying OverflowSimple::loop_overflow: ERROR
+ - Source OverflowSimple.sol, line 75, col 9: Invariant 'No overflow' might not be maintained by the loop
+Verifying OverflowSimple::whileloop_no_overflow: OK
+Verifying OverflowSimple::whileloop_overflow: ERROR
+ - Source OverflowSimple.sol, line 99, col 9: Invariant 'No overflow' might not be maintained by the loop

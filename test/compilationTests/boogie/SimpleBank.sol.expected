@@ -1,1 +1,7 @@
-^Boogie program verifier finished with 5 verified, 1 error$
+Verifying SimpleBank::deposit: OK
+Verifying transfer: OK
+Verifying SimpleBank::withdraw_transfer: OK
+Verifying call: OK
+Verifying SimpleBank::withdraw_call_incorrect: ERROR
+ - Source SimpleBank.sol, line 26, col 18: Invariant '__verifier_sum_uint256(user_balances) == this.balance' might not hold before external call.
+Verifying SimpleBank::withdraw_call_correct: OK

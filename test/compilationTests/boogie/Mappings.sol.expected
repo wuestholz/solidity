@@ -1,1 +1,5 @@
-^Boogie program verifier finished with 4 verified, 0 errors$
+Verifying Mappings::getMyBalance: OK
+Verifying Mappings::setMyBalance: OK
+Verifying Nested::getSomething: OK
+Verifying Nested::setSomething: OK
+No errors found.
