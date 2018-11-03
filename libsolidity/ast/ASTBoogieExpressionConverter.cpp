@@ -552,7 +552,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	args.push_back(smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	smack::Expr const* defaultMsgValue = (m_context.isBvEncoding() ?
 			smack::Expr::lit(smack::bigint(0), 256) : smack::Expr::lit(smack::bigint(0)));
-	args.push_back(m_currentMsgValue ? m_currentMsgValue : defaultMsgValue); // msg.value
+	smack::Expr const* msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
+	args.push_back(msgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
 
 	for (unsigned i = 0; i < _node.arguments().size(); ++i)
@@ -678,17 +679,17 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// If msg.value was set, we should reduce our own balance (and the called function will increase its own)
-	if (m_currentMsgValue)
+	if (msgValue != defaultMsgValue)
 	{
 		// assert(balance[this] >= msg.value)
 		auto selExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, selExpr, m_currentMsgValue, 256, false);
+		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, selExpr, msgValue, 256, false);
 		addSideEffect(smack::Stmt::assert_(geqResult.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
 		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
 												smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-												m_currentMsgValue, 256, false);
+												msgValue, 256, false);
 		addSideEffect(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 				smack::Expr::upd(
@@ -735,13 +736,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 			// The call function is special as it indicates failure in a return value and in this case
 			// we must undo reducing our balance
-			if (funcName == ASTBoogieUtils::BOOGIE_CALL && m_currentMsgValue)
+			if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
 			{
 				smack::Block* revert = smack::Block::block();
 				// balance[this] += msg.value
 				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
 															smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-															m_currentMsgValue, 256, false);
+															msgValue, 256, false);
 				revert->addStmt(smack::Stmt::assign(
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 						smack::Expr::upd(
