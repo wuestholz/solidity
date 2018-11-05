@@ -202,6 +202,13 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 	};
 
 	smack::Block* block = smack::Block::block();
+	// this.balance = 0
+	block->addStmt(smack::Stmt::assign(
+			smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+			smack::Expr::upd(
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+					defaultValue(make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned)))));
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers) { block->addStmt(i); }
 	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
@@ -537,6 +544,13 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// State variable initializers should go to the beginning of the constructor
 	if (_node.isConstructor())
 	{
+		// this.balance = 0
+		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
+				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+				smack::Expr::upd(
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+						smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
+						defaultValue(make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned)))));
 		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
 		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 		// Assign uninitialized state variables to default values
