@@ -153,31 +153,33 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
 			// Default value for elements
 			value = defaultValue(element_type);
-			// Get all ids to initialize
-			std::vector<std::string> index_ids;
-			getVariablesOfType(key_type, _scope, index_ids);
-			// Initialize all instantiations to default value
-			for (auto index_id: index_ids) {
-				// a[this][i] = v
-				// a = update(a, this
-				//        update(sel(a, this), i, v)
-				//     )
-				auto map_id = smack::Expr::id(id);
-				auto this_i = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-				auto index_i = smack::Expr::id(index_id);
-				auto valueAssign = smack::Stmt::assign(map_id,
-				        smack::Expr::upd(map_id, this_i,
-				        		smack::Expr::upd(smack::Expr::sel(map_id, this_i), index_i, value)));
-				output.push_back(valueAssign);
+			if (value) {
+				// Get all ids to initialize
+				std::vector<std::string> index_ids;
+				getVariablesOfType(key_type, _scope, index_ids);
+				// Initialize all instantiations to default value
+				for (auto index_id: index_ids) {
+					// a[this][i] = v
+					// a = update(a, this
+					//        update(sel(a, this), i, v)
+					//     )
+					auto map_id = smack::Expr::id(id);
+					auto this_i = smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
+					auto index_i = smack::Expr::id(index_id);
+					auto valueAssign = smack::Stmt::assign(map_id,
+							smack::Expr::upd(map_id, this_i,
+									smack::Expr::upd(smack::Expr::sel(map_id, this_i), index_i, value)));
+					output.push_back(valueAssign);
+				}
+				// Initialize the sum, if there, to default value
+				if (m_context.currentSumDecls()[&_decl]) {
+					const smack::Expr* sum = smack::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
+					const smack::Stmt* sum_default = smack::Stmt::assign(sum,
+							smack::Expr::upd(sum, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
+					output.push_back(sum_default);
+				}
+				ok = true;
 			}
-			// Initialize the sum, if there, to default value
-			if (m_context.currentSumDecls()[&_decl]) {
-				const smack::Expr* sum = smack::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
-				const smack::Stmt* sum_default = smack::Stmt::assign(sum,
-						smack::Expr::upd(sum, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), value));
-				output.push_back(sum_default);
-			}
-			ok = true;
 			break;
 		}
 		default:
