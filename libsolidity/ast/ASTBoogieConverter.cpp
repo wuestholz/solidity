@@ -219,7 +219,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 		std::list<smack::Stmt const*> stmts;
 		bool ok = defaultValueAssignment(*declNode, _node, stmts);
 		if (!ok) {
-			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+			m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
 		}
 		for (auto stmt: stmts) {
 			block->addStmt(stmt);
@@ -560,7 +560,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			std::list<smack::Stmt const*> stmts;
 			bool ok = defaultValueAssignment(*declNode, _node, stmts);
 			if (!ok) {
-				m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+				m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
 			}
 			for (auto stmt : stmts) {
 				m_currentBlocks.top()->addStmt(stmt);
