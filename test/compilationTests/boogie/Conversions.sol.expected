@@ -1,4 +1,7 @@
 Verifying SomeContract::someFunc: OK
+Verifying SomeContract::[implicit_constructor]: OK
 Verifying OtherContract::otherFunc: OK
+Verifying OtherContract::[implicit_constructor]: OK
 Verifying Conversions::someFunc: OK
+Verifying Conversions::[implicit_constructor]: OK
 No errors found.

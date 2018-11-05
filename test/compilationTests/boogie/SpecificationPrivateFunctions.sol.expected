@@ -1,3 +1,4 @@
 Verifying SpecificationPrivateFunctions::add: OK
 Verifying SpecificationPrivateFunctions::addWrong: ERROR
  - Source SpecificationPrivateFunctions.sol, line 17, col 5: Invariant 'x == y' might not hold at end of function.
+Verifying SpecificationPrivateFunctions::[implicit_constructor]: OK

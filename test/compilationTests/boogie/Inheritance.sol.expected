@@ -1,5 +1,7 @@
 Verifying Base::f: OK
 Verifying Base::g: OK
+Verifying Base::[implicit_constructor]: OK
 Verifying Inheritance::f: OK
 Verifying Inheritance::h: OK
+Verifying Inheritance::[implicit_constructor]: OK
 No errors found.

@@ -1,2 +1,3 @@
 Verifying BitPreciseExt::__verifier_main: OK
+Verifying BitPreciseExt::[implicit_constructor]: OK
 No errors found.

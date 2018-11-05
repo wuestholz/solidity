@@ -3,4 +3,5 @@ Verifying Arrays::writeStateArr: OK
 Verifying Arrays::readParamArr: OK
 Verifying Arrays::callWithLocalArray: OK
 Verifying Arrays::callWithStateArray: OK
+Verifying Arrays::[implicit_constructor]: OK
 No errors found.

@@ -13,3 +13,4 @@ Verifying Addresses::testSendError: ERROR
 Verifying call: OK
 Verifying Addresses::testCall: OK
 Verifying Addresses::literals: OK
+Verifying Addresses::[implicit_constructor]: OK

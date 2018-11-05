@@ -65,8 +65,9 @@ const smack::Expr* ASTBoogieConverter::defaultValue(TypePointer type) {
 	switch (type->category()) {
 	case Type::Category::Integer: {
 		// Zero
-		bool bitPrecise = m_context.encoding() == BoogieContext::BV;
-		if (bitPrecise) {
+		if (type->toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE) {
+			return smack::Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
+		} else if (m_context.isBvEncoding()) {
 			unsigned bits = ASTBoogieUtils::getBits(type);
 			return smack::Expr::lit("0", bits);
 		} else {
@@ -226,7 +227,7 @@ void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _nod
 		procDecl->getEnsures().push_back(smack::Specification::spec(invar.expr,
 				ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner())));
 	}
-	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[default_constructor]", *m_context.currentScanner()));
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[implicit_constructor]", *m_context.currentScanner()));
 	m_context.program().getDeclarations().push_back(procDecl);
 }
 
@@ -401,8 +402,18 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
 	}
 
-	// If there are still initializers left, there was no constructor, so we create one
-	if (!m_stateVarInitializers.empty()) { createDefaultConstructor(_node); }
+	if (!_node.isLibrary())
+	{
+		bool hasConstructor = false;
+		for (auto sn : _node.subNodes())
+		{
+			if (FunctionDefinition const* fn = dynamic_cast<FunctionDefinition const*>(&*sn))
+			{
+				if (fn->isConstructor()) { hasConstructor = true; break; }
+			}
+		}
+		if (!hasConstructor) { createDefaultConstructor(_node); }
+	}
 
 	return false;
 }

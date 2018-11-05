@@ -1,4 +1,4 @@
 Verifying Initializers::[constructor]: OK
-Verifying Initializers::getA: OK
-Verifying NoConstructorButNeeded::[default_constructor]: OK
+Verifying NoConstructorButNeeded1::[implicit_constructor]: OK
+Verifying NoConstructorButNeeded2::[implicit_constructor]: OK
 No errors found.

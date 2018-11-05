@@ -4,4 +4,5 @@ Verifying FunctionCall::g: OK
 Verifying FunctionCall::h: OK
 Verifying FunctionCall::sequentialCall: OK
 Verifying FunctionCall::compositeCall: OK
+Verifying FunctionCall::[implicit_constructor]: OK
 No errors found.

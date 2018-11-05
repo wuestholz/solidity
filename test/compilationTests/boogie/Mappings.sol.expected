@@ -1,5 +1,7 @@
 Verifying Mappings::getMyBalance: OK
 Verifying Mappings::setMyBalance: OK
+Verifying Mappings::[implicit_constructor]: OK
 Verifying Nested::getSomething: OK
 Verifying Nested::setSomething: OK
+Verifying Nested::[implicit_constructor]: OK
 No errors found.
