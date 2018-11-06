@@ -5,7 +5,9 @@ contract LocalVars {
 
     function doSomething(uint param) public returns (uint) {
         uint uninitializedVar;
+        assert(uninitializedVar == 0); // default value should be 0
         uninitializedVar = 7;
+        assert(uninitializedVar == 7);
         uint localVar1 = param;
         localVar1 = localVar1 + 2;
         uint localVar2 = 5;

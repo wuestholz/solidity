@@ -1164,6 +1164,25 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			m_context.reportError(&_node, "Assignment to multiple variables is not supported");
 		}
 	}
+	// Otherwise initialize with default value
+	else
+	{
+		for (auto declNode : _node.declarations())
+		{
+			smack::Expr const* defaultVal = defaultValue(declNode->type());
+			if (defaultVal)
+			{
+				m_currentBlocks.top()->addStmt(smack::Stmt::assign(
+									smack::Expr::id(ASTBoogieUtils::mapDeclName(*declNode)),
+									defaultVal));
+			}
+			else
+			{
+				// TODO: maybe this should be an error
+				m_context.reportWarning(&*declNode, "Boogie: Unhandled default value, verification might fail.");
+			}
+		}
+	}
 	return false;
 }
 
