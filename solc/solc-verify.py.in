@@ -79,7 +79,7 @@ def main():
     else:
         solverPath = findSolver(args.solver)
     if solverPath is None:
-        print('Error: cannot find %s' % arg.solver)
+        print('Error: cannot find %s' % args.solver)
         return
     if args.verbose:
        print('Using %s at %s' % (args.solver, solverPath))
