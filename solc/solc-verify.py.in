@@ -91,7 +91,7 @@ def main():
         boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % solverPath
     if args.solver == 'cvc4':
         boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % solverPath
-        if args.boogie_arith == 'mod':
+        if args.boogie_arith == 'mod' or args.boogie_arith == 'mod-overflow':
             boogieArgs += ' /proverOpt:C:"--nl-ext-tplanes --decision=internal --incremental"'
             boogieArgs += ' /proverOpt:LOGIC=QF_AUFNIA'
 
