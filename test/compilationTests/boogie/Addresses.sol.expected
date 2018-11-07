@@ -1,16 +1,13 @@
 Verifying Addresses::thisBalance: OK
-Verifying transfer: OK
 Verifying Addresses::testTransfer: OK
 Verifying Addresses::testTransfer2: OK
 Verifying Addresses::testTransferError: ERROR
  - Source Addresses.sol, line 37, col 9: Assertion might not hold.
-Verifying send: OK
 Verifying Addresses::testSend: OK
 Verifying Addresses::testSend2: OK
 Verifying Addresses::testSend3: OK
 Verifying Addresses::testSendError: ERROR
  - Source Addresses.sol, line 84, col 9: Assertion might not hold.
-Verifying call: OK
 Verifying Addresses::testCall: OK
 Verifying Addresses::literals: OK
 Verifying Addresses::[implicit_constructor]: OK

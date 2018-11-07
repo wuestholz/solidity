@@ -87,17 +87,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
 	transfer->getRequires().push_back(smack::Specification::spec(geqResult.first,
 			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
-	// Postcondition: if sender and receiver is different ether gets transferred, otherwise nothing happens
-	auto subOldSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false);
-	auto addOldBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false);
-	transfer->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
-			smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER)),
-			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, subOldSenderBalance.first),
-					smack::Expr::eq(this_bal, addOldBalance.first)),
-			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
+	transfer->addAttr(smack::Attr::attr("inline", 1));
 	transfer->addAttr(smack::Attr::attr("message", "transfer"));
 	return transfer;
 }
@@ -139,9 +129,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	callBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
 
 	smack::ProcDecl* callProc = smack::Decl::procedure(BOOGIE_CALL, callParams, callReturns, {}, {callBlock});
-	// Postcondition: if result is false nothing happens
-	callProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::or_(result,
-			smack::Expr::eq(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::old(smack::Expr::id(BOOGIE_BALANCE))))));
+	callProc->addAttr(smack::Attr::attr("inline", 1));
 	callProc->addAttr(smack::Attr::attr("message", "call"));
 	return callProc;
 }
@@ -199,18 +187,8 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	sendProc->getRequires().push_back(smack::Specification::spec(
 			senderBalanceGEQ.first,
 			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
-	// Postcondition: if result is true and sender/receiver is different ether gets transferred
-	// otherwise nothing happens
-	auto subOldSender = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, smack::Expr::old(sender_bal), amount, 256, false);
-	auto addOldBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, smack::Expr::old(this_bal), amount, 256, false);
-	sendProc->getEnsures().push_back(smack::Specification::spec(smack::Expr::cond(
-			smack::Expr::and_(result, smack::Expr::neq(smack::Expr::id(BOOGIE_THIS), smack::Expr::id(BOOGIE_MSG_SENDER))),
-			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, subOldSender.first),
-					smack::Expr::eq(this_bal, addOldBalance.first)),
-			smack::Expr::and_(
-					smack::Expr::eq(sender_bal, smack::Expr::old(sender_bal)),
-					smack::Expr::eq(this_bal, smack::Expr::old(this_bal))))));
+
+	sendProc->addAttr(smack::Attr::attr("inline", 1));
 	sendProc->addAttr(smack::Attr::attr("message", "send"));
 	return sendProc;
 }

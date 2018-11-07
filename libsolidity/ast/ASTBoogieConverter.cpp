@@ -491,10 +491,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Solidity functions are mapped to Boogie procedures
 	m_currentFunc = &_node;
 
-	addGlobalComment("");
-	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
-	addGlobalComment("Function: " + _node.name() + funcType);
-
 	// Input parameters
 	list<smack::Binding> params {
 		// Globally available stuff
@@ -716,8 +712,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->getEnsures().push_back(smack::Specification::spec(noOverflow,
 				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
 	}
-
-	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str()), *m_context.currentScanner()));
+	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
+	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
+	addGlobalComment("");
+	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
+	addGlobalComment("Function: " + _node.name() + funcType);
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
 }
