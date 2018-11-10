@@ -1,0 +1,5 @@
+Verifying Overflow::inc: ERROR
+ - Source OverflowSpec.sol, line 10, col 5: Function can terminate with overflow
+Verifying Overflow::set: ERROR
+ - Source OverflowSpec.sol, line 15, col 5: Overflow in computation of invariant 'x == y + 1' at end of function.
+Verifying Overflow::[implicit_constructor]: OK

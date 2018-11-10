@@ -306,7 +306,7 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				{
 					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
 				}
-				exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs));
+				exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs));
 			}
 		}
 	}
@@ -653,10 +653,27 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Create the procedure
 	auto procDecl = smack::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
 
+	// Overflow condition for the code comes first because if there are more errors, this one gets reported
+	if (m_context.overflow())
+	{
+		auto noOverflow = smack::Expr::not_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
+		procDecl->getRequires().push_back(smack::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "An overflow can occur before calling function", *m_context.currentScanner())));
+		procDecl->getEnsures().push_back(smack::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
+	}
+
 	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
+			for (auto oc : invar.ocs)
+			{
+				procDecl->getRequires().push_back(smack::Specification::spec(oc,
+					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' when entering function.", *m_context.currentScanner())));
+				procDecl->getEnsures().push_back(smack::Specification::spec(oc,
+					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' at end of function.", *m_context.currentScanner())));
+			}
 			for (auto tcc : invar.tccs)
 			{
 				procDecl->getRequires().push_back(smack::Specification::spec(tcc,
@@ -692,6 +709,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				procDecl->getEnsures().push_back(smack::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + cInv.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
 			}
+
+			for (auto oc : cInv.ocs)
+			{
+				procDecl->getRequires().push_back(smack::Specification::spec(oc,
+					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' when entering function.", *m_context.currentScanner())));
+				procDecl->getEnsures().push_back(smack::Specification::spec(oc,
+					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' at end of function.", *m_context.currentScanner())));
+			}
 		}
 	}
 
@@ -702,6 +727,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 		for (auto tcc : pre.tccs) { procDecl->getRequires().push_back(smack::Specification::spec(tcc,
 				ASTBoogieUtils::createAttrs(_node.location(), "Variables in precondition '" + pre.exprStr + "' might be out of range when entering function.", *m_context.currentScanner()))); }
+		for (auto oc : pre.ocs) { procDecl->getRequires().push_back(smack::Specification::spec(oc,
+						ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of precondition '" + pre.exprStr + "' when entering function.", *m_context.currentScanner()))); }
 	}
 	for (auto post : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
@@ -709,18 +736,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		for (auto tcc : post.tccs) { procDecl->getEnsures().push_back(smack::Specification::spec(tcc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Variables in postcondition '" + post.exprStr + "' might be out of range at end of function.", *m_context.currentScanner()))); }
+		for (auto oc : post.ocs) { procDecl->getEnsures().push_back(smack::Specification::spec(oc,
+							ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of postcondition '" + post.exprStr + "' at end of function.", *m_context.currentScanner()))); }
 	}
 	// TODO: check that no new sum variables were introduced
 
-	// Overflow conditions
-	if (m_context.overflow())
-	{
-		auto noOverflow = smack::Expr::not_(smack::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
-		procDecl->getRequires().push_back(smack::Specification::spec(noOverflow,
-				ASTBoogieUtils::createAttrs(_node.location(), "An overflow can occur before calling function", *m_context.currentScanner())));
-		procDecl->getEnsures().push_back(smack::Specification::spec(noOverflow,
-				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
-	}
 	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
 	addGlobalComment("");
@@ -973,21 +993,8 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR))
-	{
-		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
-												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
-		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE))
-	{
-		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
-												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
-		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	// TODO: check that invariants did not introduce new sum variables
 
-	// No overflow invariant
+	// No overflow in code
 	if (m_context.overflow())
 	{
 		invars.push_back(smack::Specification::spec(
@@ -995,6 +1002,24 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
 		));
 	}
+
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR))
+	{
+		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
+												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		for (auto oc : invar.ocs) { invars.push_back(smack::Specification::spec(oc,
+												ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE))
+	{
+		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
+												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		for (auto oc : invar.ocs) { invars.push_back(smack::Specification::spec(oc,
+												ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 
@@ -1031,21 +1056,8 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	m_currentBlocks.pop();
 
 	std::list<smack::Specification const*> invars;
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR))
-	{
-		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
-												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
-		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
-	{
-		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
-												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
-		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	// TODO: check that invariants did not introduce new sum variables
 
-	// No overflow invariant
+	// No overflow in code
 	if (m_context.overflow())
 	{
 		invars.push_back(smack::Specification::spec(
@@ -1053,6 +1065,24 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
 		));
 	}
+
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR))
+	{
+		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
+												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		for (auto oc : invar.ocs) { invars.push_back(smack::Specification::spec(oc,
+												ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+	}
+	for (auto invar : getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE))
+	{
+		for (auto tcc : invar.tccs) { invars.push_back(smack::Specification::spec(tcc,
+												ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		for (auto oc : invar.ocs) { invars.push_back(smack::Specification::spec(oc,
+												ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner()))); }
+		invars.push_back(smack::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+	}
+	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(smack::Stmt::while_(cond, body, invars));
 

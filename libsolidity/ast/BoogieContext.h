@@ -33,9 +33,11 @@ public:
 		smack::Expr const* expr; // Expression converted to Boogie
 		std::string exprStr; // Expression in original format
 		std::list<smack::Expr const*> tccs; // TCCs for the expression
+		std::list<smack::Expr const*> ocs; // OCs for the expression
 
-		DocTagExpr(smack::Expr const* expr, std::string exprStr, std::list<smack::Expr const*> tccs) :
-			expr(expr), exprStr(exprStr), tccs(tccs) {}
+		DocTagExpr(smack::Expr const* expr, std::string exprStr, std::list<smack::Expr const*> tccs,
+				std::list<smack::Expr const*> ocs) :
+			expr(expr), exprStr(exprStr), tccs(tccs), ocs(ocs) {}
 	};
 
 private:
