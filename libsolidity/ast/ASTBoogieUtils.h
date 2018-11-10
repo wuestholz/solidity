@@ -122,6 +122,12 @@ public:
 
 
 	static smack::Expr const* checkExplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+
+	/**
+	 * Get the type checking condition for an expression with a given type.
+	 * Depending on the context, the returned TCC can be assumed or asserted.
+	 */
+	static smack::Expr const* getTCCforExpr(smack::Expr const* expr, TypePointer tp);
 };
 
 }

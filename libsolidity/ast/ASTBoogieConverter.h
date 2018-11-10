@@ -79,7 +79,7 @@ private:
 	 * Create default constructor for a contract (it is required when there is no constructor,
 	 * but state variables are initialized when declared)
 	 */
-	void createDefaultConstructor(ContractDefinition const& _node);
+	void createImplicitConstructor(ContractDefinition const& _node);
 
 	/**
 	 * Parse expressions from documentation for a given doctag

@@ -54,25 +54,7 @@ void ASTBoogieExpressionConverter::addTCC(smack::Expr const* expr, TypePointer t
 {
 	if (m_context.encoding() == BoogieContext::Encoding::MOD && ASTBoogieUtils::isBitPreciseType(tp))
 	{
-		unsigned bits = ASTBoogieUtils::getBits(tp);
-		bool isSigned = ASTBoogieUtils::isSigned(tp);
-		if (isSigned)
-		{
-			auto largestSigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
-			auto smallestSigned = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
-			m_tccs.push_back(smack::Expr::and_(
-					smack::Expr::lte(smallestSigned, expr),
-					smack::Expr::lte(expr, largestSigned)));
-		}
-		else
-		{
-			auto largestUnsigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits) - 1);
-			auto smallestUnsigned = smack::Expr::lit(long(0));
-			m_tccs.push_back(smack::Expr::and_(
-					smack::Expr::lte(smallestUnsigned, expr),
-					smack::Expr::lte(expr, largestUnsigned)));
-		}
-
+		m_tccs.push_back(ASTBoogieUtils::getTCCforExpr(expr, tp));
 	}
 }
 

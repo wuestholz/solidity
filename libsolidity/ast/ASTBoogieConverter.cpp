@@ -191,7 +191,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	return ok;
 }
 
-void ASTBoogieConverter::createDefaultConstructor(ContractDefinition const& _node)
+void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _node)
 {
 	addGlobalComment("");
 	addGlobalComment("Default constructor");
@@ -411,6 +411,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		if (!dynamic_cast<VariableDeclaration const*>(&*sn)) { sn->accept(*this); }
 	}
 
+	// If no constructor exists, create an implicit one
 	if (!_node.isLibrary())
 	{
 		bool hasConstructor = false;
@@ -421,7 +422,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 				if (fn->isConstructor()) { hasConstructor = true; break; }
 			}
 		}
-		if (!hasConstructor) { createDefaultConstructor(_node); }
+		if (!hasConstructor) { createImplicitConstructor(_node); }
 	}
 
 	return false;

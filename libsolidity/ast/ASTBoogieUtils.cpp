@@ -690,5 +690,30 @@ smack::Expr const* ASTBoogieUtils::checkExplicitBvConversion(smack::Expr const* 
 	return expr;
 }
 
+smack::Expr const* ASTBoogieUtils::getTCCforExpr(smack::Expr const* expr, TypePointer tp)
+{
+	if (isBitPreciseType(tp))
+	{
+		unsigned bits = getBits(tp);
+		if (isSigned(tp))
+		{
+			auto largestSigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits - 1) - 1);
+			auto smallestSigned = smack::Expr::lit(-boost::multiprecision::pow(smack::bigint(2), bits - 1));
+			return smack::Expr::and_(
+					smack::Expr::lte(smallestSigned, expr),
+					smack::Expr::lte(expr, largestSigned));
+		}
+		else
+		{
+			auto largestUnsigned = smack::Expr::lit(boost::multiprecision::pow(smack::bigint(2), bits) - 1);
+			auto smallestUnsigned = smack::Expr::lit(long(0));
+			return smack::Expr::and_(
+					smack::Expr::lte(smallestUnsigned, expr),
+					smack::Expr::lte(expr, largestUnsigned));
+		}
+	}
+	return smack::Expr::lit(true);
+}
+
 }
 }
