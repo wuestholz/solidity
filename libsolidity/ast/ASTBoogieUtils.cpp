@@ -65,22 +65,39 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	const smack::Expr* amount = smack::Expr::id("amount");
 
 	// balance[this] += amount
+	if (context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
+	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
+	if (context.overflow())
+	{
+		transferImpl->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		transferImpl->addStmt(smack::Stmt::assume(addBalance.second));
+	}
 	transferImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
-			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_THIS),
-					addBalance.first)));
+			smack::Expr::upd(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::id(BOOGIE_THIS), addBalance.first)));
 	// balance[msg.sender] -= amount
+	if (context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
+		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
+	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
+	if (context.overflow())
+	{
+		transferImpl->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		transferImpl->addStmt(smack::Stmt::assume(subSenderBalance.second));
+	}
 	transferImpl->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
-			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_MSG_SENDER),
-					subSenderBalance.first)));
+			smack::Expr::upd(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::id(BOOGIE_MSG_SENDER), subSenderBalance.first)));
 	transferImpl->addStmt(smack::Stmt::comment("TODO: call fallback, exception handling"));
+
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	// Precondition: there is enough ether to transfer
@@ -112,13 +129,21 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 	const smack::Expr* result = smack::Expr::id("__result");
 
 	// balance[this] += msg.value
+	if (context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
+	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false);
+	if (context.overflow())
+	{
+		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		thenBlock->addStmt(smack::Stmt::assume(addBalance.second));
+	}
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
-			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_THIS),
-					addBalance.first)));
+			smack::Expr::upd(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::id(BOOGIE_THIS), addBalance.first)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
@@ -156,21 +181,37 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	const smack::Expr* result = smack::Expr::id("__result");
 
 	// balance[this] += amount
+	if (context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
+	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
+	if (context.overflow())
+	{
+		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		thenBlock->addStmt(smack::Stmt::assume(addBalance.second));
+	}
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
-			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_THIS),
-					addBalance.first)));
+			smack::Expr::upd(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::id(BOOGIE_THIS), addBalance.first)));
 	// balance[msg.sender] -= amount
+	if (context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
+		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
+	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
+	if (context.overflow())
+	{
+		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		thenBlock->addStmt(smack::Stmt::assume(subSenderBalance.second));
+	}
 	thenBlock->addStmt(smack::Stmt::assign(
 			smack::Expr::id(BOOGIE_BALANCE),
-			smack::Expr::upd(
-					smack::Expr::id(BOOGIE_BALANCE),
-					smack::Expr::id(BOOGIE_MSG_SENDER),
-					subSenderBalance.first)));
+			smack::Expr::upd(smack::Expr::id(BOOGIE_BALANCE), smack::Expr::id(BOOGIE_MSG_SENDER), subSenderBalance.first)));
 	thenBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(true)));
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();

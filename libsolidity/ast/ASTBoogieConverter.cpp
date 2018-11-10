@@ -568,16 +568,24 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
+		const smack::Expr* this_bal = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+		const smack::Expr* msg_val = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
 		// balance[this] += msg.value
-		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
-				smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-				smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), 256, false);
+		if (m_context.encoding() == BoogieContext::Encoding::MOD)
+		{
+			TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+			m_currentBlocks.top()->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+			m_currentBlocks.top()->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
+		}
+		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false);
+		if (m_context.overflow())
+		{
+			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+			m_currentBlocks.top()->addStmt(smack::Stmt::assume(addResult.second));
+		}
 		m_currentBlocks.top()->addStmt(smack::Stmt::assign(
 					smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-					smack::Expr::upd(
-							smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-							smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							addResult.first)));
+					smack::Expr::upd(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), addResult.first)));
 	}
 
 	// Modifiers need to be inlined

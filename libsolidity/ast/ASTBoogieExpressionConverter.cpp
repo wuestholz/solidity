@@ -669,9 +669,20 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		addSideEffect(smack::Stmt::assert_(geqResult.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
+		smack::Expr const* this_balance = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+		if (m_context.encoding() == BoogieContext::Encoding::MOD)
+		{
+			TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+			addSideEffect(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
+			addSideEffect(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
+		}
 		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
-												smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-												msgValue, 256, false);
+												this_balance, msgValue, 256, false);
+		if (m_context.overflow())
+		{
+			addSideEffect(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+			addSideEffect(smack::Stmt::assume(subResult.second));
+		}
 		addSideEffect(smack::Stmt::assign(
 				smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 				smack::Expr::upd(
@@ -722,9 +733,20 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			{
 				smack::Block* revert = smack::Block::block();
 				// balance[this] += msg.value
+				smack::Expr const* this_balance =smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+				if (m_context.encoding() == BoogieContext::Encoding::MOD)
+				{
+					TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
+					revert->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
+					revert->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
+				}
 				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
-															smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS),
-															msgValue, 256, false);
+															this_balance, msgValue, 256, false);
+				if (m_context.overflow())
+				{
+					revert->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
+					revert->addStmt(smack::Stmt::assume(addResult.second));
+				}
 				revert->addStmt(smack::Stmt::assign(
 						smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 						smack::Expr::upd(
