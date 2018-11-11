@@ -174,19 +174,24 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 		{
 			if (m_context.currentSumDecls()[lhsId->annotation().referencedDeclaration])
 			{
-				// arr[i] = x becomes arr#sum := arr#sum[this := (arr#sum[this] + x - arr[i])]
+				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
 				auto sumId = smack::Expr::id(ASTBoogieUtils::mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
 
 				unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
 				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
 
 				auto selExpr = smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub, rhs, lhs, bits, isSigned);
-				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, selExpr, subResult.first, bits, isSigned);
-
+				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub, selExpr, lhs, bits, isSigned);
+				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, subResult.first, rhs, bits, isSigned);
+				if (m_context.overflow())
+				{
+					addSideEffect(smack::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
+					addSideEffect(smack::Stmt::assume(subResult.second));
+				}
 				addSideEffect(smack::Stmt::assign(
 						sumId,
 						smack::Expr::upd(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS), updResult.first)));
+
 			}
 		}
 	}
