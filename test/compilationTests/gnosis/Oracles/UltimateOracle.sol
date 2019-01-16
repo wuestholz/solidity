@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity >=0.0;
 import "../Oracles/Oracle.sol";
 import "../Tokens/Token.sol";
 import "../Utils/Math.sol";
@@ -92,7 +92,7 @@ contract UltimateOracle is Oracle {
         // There was no challenge yet or the challenge period expired
         require(   !isChallenged()
                 && !isChallengePeriodOver()
-                && collateralToken.transferFrom(msg.sender, this, challengeAmount));
+                && collateralToken.transferFrom(msg.sender, address(this), challengeAmount));
         outcomeAmounts[msg.sender][_outcome] = challengeAmount;
         totalOutcomeAmounts[_outcome] = challengeAmount;
         totalAmount = challengeAmount;
@@ -113,7 +113,7 @@ contract UltimateOracle is Oracle {
         // Outcome is challenged and front runner period is not over yet and tokens can be transferred
         require(   isChallenged()
                 && !isFrontRunnerPeriodOver()
-                && collateralToken.transferFrom(msg.sender, this, amount));
+                && collateralToken.transferFrom(msg.sender, address(this), amount));
         outcomeAmounts[msg.sender][_outcome] = outcomeAmounts[msg.sender][_outcome].add(amount);
         totalOutcomeAmounts[_outcome] = totalOutcomeAmounts[_outcome].add(amount);
         totalAmount = totalAmount.add(amount);
@@ -144,6 +144,7 @@ contract UltimateOracle is Oracle {
     /// @return Is challenge period over?
     function isChallengePeriodOver()
         public
+        view
         returns (bool)
     {
         return forwardedOutcomeSetTimestamp != 0 && now.sub(forwardedOutcomeSetTimestamp) > challengePeriod;
@@ -153,6 +154,7 @@ contract UltimateOracle is Oracle {
     /// @return Is front runner period over?
     function isFrontRunnerPeriodOver()
         public
+        view
         returns (bool)
     {
         return frontRunnerSetTimestamp != 0 && now.sub(frontRunnerSetTimestamp) > frontRunnerPeriod;
@@ -162,6 +164,7 @@ contract UltimateOracle is Oracle {
     /// @return Is challenged?
     function isChallenged()
         public
+        view
         returns (bool)
     {
         return frontRunnerSetTimestamp != 0;
@@ -171,7 +174,7 @@ contract UltimateOracle is Oracle {
     /// @return Is outcome set?
     function isOutcomeSet()
         public
-        constant
+        view
         returns (bool)
     {
         return    isChallengePeriodOver() && !isChallenged()
@@ -182,7 +185,7 @@ contract UltimateOracle is Oracle {
     /// @return Outcome
     function getOutcome()
         public
-        constant
+        view
         returns (int)
     {
         if (isFrontRunnerPeriodOver())

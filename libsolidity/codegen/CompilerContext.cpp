@@ -21,17 +21,22 @@
  */
 
 #include <libsolidity/codegen/CompilerContext.h>
-#include <libsolidity/codegen/CompilerUtils.h>
+
 #include <libsolidity/ast/AST.h>
+#include <libsolidity/codegen/AsmCodeGen.h>
 #include <libsolidity/codegen/Compiler.h>
+#include <libsolidity/codegen/CompilerUtils.h>
 #include <libsolidity/interface/Version.h>
-#include <libsolidity/interface/ErrorReporter.h>
-#include <libsolidity/interface/SourceReferenceFormatter.h>
-#include <libsolidity/parsing/Scanner.h>
-#include <libsolidity/inlineasm/AsmParser.h>
-#include <libsolidity/inlineasm/AsmCodeGen.h>
-#include <libsolidity/inlineasm/AsmAnalysis.h>
-#include <libsolidity/inlineasm/AsmAnalysisInfo.h>
+
+#include <libyul/AsmParser.h>
+#include <libyul/AsmAnalysis.h>
+#include <libyul/AsmAnalysisInfo.h>
+#include <libyul/backends/evm/EVMDialect.h>
+#include <libyul/YulString.h>
+
+#include <liblangutil/ErrorReporter.h>
+#include <liblangutil/Scanner.h>
+#include <liblangutil/SourceReferenceFormatter.h>
 
 #include <boost/algorithm/string/replace.hpp>
 
@@ -41,11 +46,12 @@
 // Change to "define" to output all intermediate code
 #undef SOL_OUTPUT_ASM
 #ifdef SOL_OUTPUT_ASM
-#include <libsolidity/inlineasm/AsmPrinter.h>
+#include <libyul/AsmPrinter.h>
 #endif
 
 
 using namespace std;
+using namespace langutil;
 
 namespace dev
 {
@@ -127,15 +133,38 @@ void CompilerContext::addVariable(VariableDeclaration const& _declaration,
 								  unsigned _offsetToCurrent)
 {
 	solAssert(m_asm->deposit() >= 0 && unsigned(m_asm->deposit()) >= _offsetToCurrent, "");
+	unsigned sizeOnStack = _declaration.annotation().type->sizeOnStack();
+	// Variables should not have stack size other than [1, 2],
+	// but that might change when new types are introduced.
+	solAssert(sizeOnStack == 1 || sizeOnStack == 2, "");
 	m_localVariables[&_declaration].push_back(unsigned(m_asm->deposit()) - _offsetToCurrent);
 }
 
-void CompilerContext::removeVariable(VariableDeclaration const& _declaration)
+void CompilerContext::removeVariable(Declaration const& _declaration)
 {
 	solAssert(m_localVariables.count(&_declaration) && !m_localVariables[&_declaration].empty(), "");
 	m_localVariables[&_declaration].pop_back();
 	if (m_localVariables[&_declaration].empty())
 		m_localVariables.erase(&_declaration);
+}
+
+void CompilerContext::removeVariablesAboveStackHeight(unsigned _stackHeight)
+{
+	vector<Declaration const*> toRemove;
+	for (auto _var: m_localVariables)
+	{
+		solAssert(!_var.second.empty(), "");
+		solAssert(_var.second.back() <= stackHeight(), "");
+		if (_var.second.back() >= _stackHeight)
+			toRemove.push_back(_var.first);
+	}
+	for (auto _var: toRemove)
+		removeVariable(*_var);
+}
+
+unsigned CompilerContext::numberOfLocalVariables() const
+{
+	return m_localVariables.size();
 }
 
 eth::Assembly const& CompilerContext::compiledContract(const ContractDefinition& _contract) const
@@ -290,32 +319,33 @@ void CompilerContext::resetVisitedNodes(ASTNode const* _node)
 void CompilerContext::appendInlineAssembly(
 	string const& _assembly,
 	vector<string> const& _localVariables,
+	set<string> const&,
 	bool _system
 )
 {
 	int startStackHeight = stackHeight();
 
-	julia::ExternalIdentifierAccess identifierAccess;
+	yul::ExternalIdentifierAccess identifierAccess;
 	identifierAccess.resolve = [&](
-		assembly::Identifier const& _identifier,
-		julia::IdentifierContext,
+		yul::Identifier const& _identifier,
+		yul::IdentifierContext,
 		bool
 	)
 	{
-		auto it = std::find(_localVariables.begin(), _localVariables.end(), _identifier.name);
+		auto it = std::find(_localVariables.begin(), _localVariables.end(), _identifier.name.str());
 		return it == _localVariables.end() ? size_t(-1) : 1;
 	};
 	identifierAccess.generateCode = [&](
-		assembly::Identifier const& _identifier,
-		julia::IdentifierContext _context,
-		julia::AbstractAssembly& _assembly
+		yul::Identifier const& _identifier,
+		yul::IdentifierContext _context,
+		yul::AbstractAssembly& _assembly
 	)
 	{
-		auto it = std::find(_localVariables.begin(), _localVariables.end(), _identifier.name);
+		auto it = std::find(_localVariables.begin(), _localVariables.end(), _identifier.name.str());
 		solAssert(it != _localVariables.end(), "");
 		int stackDepth = _localVariables.end() - it;
 		int stackDiff = _assembly.stackHeight() - startStackHeight + stackDepth;
-		if (_context == julia::IdentifierContext::LValue)
+		if (_context == yul::IdentifierContext::LValue)
 			stackDiff -= 1;
 		if (stackDiff < 1 || stackDiff > 16)
 			BOOST_THROW_EXCEPTION(
@@ -323,7 +353,7 @@ void CompilerContext::appendInlineAssembly(
 				errinfo_sourceLocation(_identifier.location) <<
 				errinfo_comment("Stack too deep (" + to_string(stackDiff) + "), try removing local variables.")
 			);
-		if (_context == julia::IdentifierContext::RValue)
+		if (_context == yul::IdentifierContext::RValue)
 			_assembly.appendInstruction(dupInstruction(stackDiff));
 		else
 		{
@@ -334,20 +364,20 @@ void CompilerContext::appendInlineAssembly(
 
 	ErrorList errors;
 	ErrorReporter errorReporter(errors);
-	auto scanner = make_shared<Scanner>(CharStream(_assembly), "--CODEGEN--");
-	auto parserResult = assembly::Parser(errorReporter, assembly::AsmFlavour::Strict).parse(scanner, false);
+	auto scanner = make_shared<langutil::Scanner>(langutil::CharStream(_assembly, "--CODEGEN--"));
+	auto parserResult = yul::Parser(errorReporter, yul::EVMDialect::strictAssemblyForEVM()).parse(scanner, false);
 #ifdef SOL_OUTPUT_ASM
-	cout << assembly::AsmPrinter()(*parserResult) << endl;
+	cout << yul::AsmPrinter()(*parserResult) << endl;
 #endif
-	assembly::AsmAnalysisInfo analysisInfo;
+	yul::AsmAnalysisInfo analysisInfo;
 	bool analyzerResult = false;
 	if (parserResult)
-		analyzerResult = assembly::AsmAnalyzer(
+		analyzerResult = yul::AsmAnalyzer(
 			analysisInfo,
 			errorReporter,
 			m_evmVersion,
 			boost::none,
-			assembly::AsmFlavour::Strict,
+			yul::EVMDialect::strictAssemblyForEVM(),
 			identifierAccess.resolve
 		).analyze(*parserResult);
 	if (!parserResult || !errorReporter.errors().empty() || !analyzerResult)
@@ -360,8 +390,7 @@ void CompilerContext::appendInlineAssembly(
 		for (auto const& error: errorReporter.errors())
 			message += SourceReferenceFormatter::formatExceptionInformation(
 				*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "Error",
-				[&](string const&) -> Scanner const& { return *scanner; }
+				(error->type() == Error::Type::Warning) ? "Warning" : "Error"
 			);
 		message += "-------------------------------------------\n";
 
@@ -369,7 +398,7 @@ void CompilerContext::appendInlineAssembly(
 	}
 
 	solAssert(errorReporter.errors().empty(), "Failed to analyze inline assembly block.");
-	assembly::CodeGenerator::assemble(*parserResult, analysisInfo, *m_asm, identifierAccess, _system);
+	CodeGenerator::assemble(*parserResult, analysisInfo, *m_asm, identifierAccess, _system);
 
 	// Reset the source location to the one of the node (instead of the CODEGEN source location)
 	updateSourceLocation();
@@ -388,7 +417,7 @@ FunctionDefinition const& CompilerContext::resolveVirtualFunction(
 			if (
 				function->name() == name &&
 				!function->isConstructor() &&
-				FunctionType(*function).hasEqualArgumentTypes(functionType)
+				FunctionType(*function).asCallableFunction(false)->hasEqualParameterTypes(functionType)
 			)
 				return *function;
 	solAssert(false, "Super function " + name + " not found.");

@@ -30,13 +30,13 @@
 #include <libevmasm/Assembly.h>
 
 #include <boost/test/unit_test.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <string>
 #include <tuple>
 #include <memory>
 
 using namespace std;
+using namespace langutil;
 using namespace dev::eth;
 
 namespace dev
@@ -53,7 +53,7 @@ namespace
 		// add dummy locations to each item so that we can check that they are not deleted
 		AssemblyItems input = _input;
 		for (AssemblyItem& item: input)
-			item.setLocation(SourceLocation(1, 3, make_shared<string>("")));
+			item.setLocation({1, 3, nullptr});
 		return input;
 	}
 

@@ -23,26 +23,30 @@
 
 #pragma once
 
-#include <libsolidity/interface/ErrorReporter.h>
 #include <libsolidity/interface/ReadFile.h>
-#include <libsolidity/interface/EVMVersion.h>
 
-#include <libevmasm/SourceLocation.h>
+#include <liblangutil/ErrorReporter.h>
+#include <liblangutil/EVMVersion.h>
+#include <liblangutil/SourceLocation.h>
+
 #include <libevmasm/LinkerObject.h>
 
 #include <libdevcore/Common.h>
 #include <libdevcore/FixedHash.h>
 
+#include <boost/noncopyable.hpp>
 #include <json/json.h>
 
-#include <boost/noncopyable.hpp>
-#include <boost/filesystem.hpp>
-
+#include <functional>
+#include <memory>
 #include <ostream>
 #include <string>
-#include <memory>
 #include <vector>
-#include <functional>
+
+namespace langutil
+{
+class Scanner;
+}
 
 namespace dev
 {
@@ -58,7 +62,6 @@ namespace solidity
 {
 
 // forward declarations
-class Scanner;
 class ASTNode;
 class ContractDefinition;
 class FunctionDefinition;
@@ -66,7 +69,6 @@ class SourceUnit;
 class Compiler;
 class GlobalContext;
 class Natspec;
-class Error;
 class DeclarationContainer;
 
 /**
@@ -85,6 +87,13 @@ public:
 		CompilationSuccessful
 	};
 
+	struct Remapping
+	{
+		std::string context;
+		std::string prefix;
+		std::string target;
+	};
+
 	/// Creates a new compiler stack.
 	/// @param _readFile callback to used to read files for import statements. Must return
 	/// and must not emit exceptions.
@@ -93,8 +102,8 @@ public:
 		m_errorList(),
 		m_errorReporter(m_errorList) {}
 
-	/// @returns the list of errors that occured during parsing and type checking.
-	ErrorList const& errors() const { return m_errorReporter.errors(); }
+	/// @returns the list of errors that occurred during parsing and type checking.
+	langutil::ErrorList const& errors() const { return m_errorReporter.errors(); }
 
 	/// @returns the current state.
 	State state() const { return m_stackState; }
@@ -104,8 +113,11 @@ public:
 	/// All settings, with the exception of remappings, are reset.
 	void reset(bool _keepSources = false);
 
-	/// Sets path remappings in the format "context:prefix=target"
-	void setRemappings(std::vector<std::string> const& _remappings);
+	// Parses a remapping of the format "context:prefix=target".
+	static boost::optional<Remapping> parseRemapping(std::string const& _remapping);
+
+	/// Sets path remappings.
+	void setRemappings(std::vector<Remapping> const& _remappings);
 
 	/// Sets library addresses. Addresses are cleared iff @a _libraries is missing.
 	/// Will not take effect before running compile.
@@ -140,6 +152,9 @@ public:
 	/// @returns true if a source object by the name already existed and was replaced.
 	bool addSource(std::string const& _name, std::string const& _content, bool _isLibrary = false);
 
+	/// Adds a response to an SMTLib2 query (identified by the hash of the query input).
+	void addSMTLib2Response(h256 const& _hash, std::string const& _response) { m_smtlib2Responses[_hash] = _response; }
+
 	/// Parses all source units that were added
 	/// @returns false on error.
 	bool parse();
@@ -165,7 +180,7 @@ public:
 	std::map<std::string, unsigned> sourceIndices() const;
 
 	/// @returns the previously used scanner, useful for counting lines during error reporting.
-	Scanner const& scanner(std::string const& _sourceName) const;
+	langutil::Scanner const& scanner(std::string const& _sourceName) const;
 
 	/// @returns the parsed source unit with the supplied name.
 	SourceUnit const& ast(std::string const& _sourceName) const;
@@ -173,7 +188,11 @@ public:
 	/// Helper function for logs printing. Do only use in error cases, it's quite expensive.
 	/// line and columns are numbered starting from 1 with following order:
 	/// start line, start column, end line, end column
-	std::tuple<int, int, int, int> positionFromSourceLocation(SourceLocation const& _sourceLocation) const;
+	std::tuple<int, int, int, int> positionFromSourceLocation(langutil::SourceLocation const& _sourceLocation) const;
+
+	/// @returns a list of unhandled queries to the SMT solver (has to be supplied in a second run
+	/// by calling @a addSMTLib2Response).
+	std::vector<std::string> const& unhandledSMTLib2Queries() const { return m_unhandledSMTLib2Queries; }
 
 	/// @returns a list of the contract names in the sources.
 	std::vector<std::string> contractNames() const;
@@ -189,12 +208,6 @@ public:
 
 	/// @returns the runtime object for the contract.
 	eth::LinkerObject const& runtimeObject(std::string const& _contractName) const;
-
-	/// @returns the bytecode of a contract that uses an already deployed contract via DELEGATECALL.
-	/// The returned bytes will contain a sequence of 20 bytes of the format "XXX...XXX" which have to
-	/// substituted by the actual address. Note that this sequence starts end ends in three X
-	/// characters but can contain anything in between.
-	eth::LinkerObject const& cloneObject(std::string const& _contractName) const;
 
 	/// @returns normal contract assembly items
 	eth::AssemblyItems const* assemblyItems(std::string const& _contractName) const;
@@ -251,10 +264,14 @@ private:
 	/// The state per source unit. Filled gradually during parsing.
 	struct Source
 	{
-		std::shared_ptr<Scanner> scanner;
+		std::shared_ptr<langutil::Scanner> scanner;
 		std::shared_ptr<SourceUnit> ast;
 		bool isLibrary = false;
-		void reset() { scanner.reset(); ast.reset(); }
+		h256 mutable keccak256HashCached;
+		h256 mutable swarmHashCached;
+		void reset() { *this = Source(); }
+		h256 const& keccak256() const;
+		h256 const& swarmHash() const;
 	};
 
 	/// The state per contract. Filled gradually during compilation.
@@ -264,7 +281,6 @@ private:
 		std::shared_ptr<Compiler> compiler;
 		eth::LinkerObject object; ///< Deployment object (includes the runtime sub-object).
 		eth::LinkerObject runtimeObject; ///< Runtime object.
-		eth::LinkerObject cloneObject; ///< Clone object (deprecated).
 		std::string metadata; ///< The metadata json that will be hashed into the chain.
 		mutable std::unique_ptr<Json::Value const> abi;
 		mutable std::unique_ptr<Json::Value const> userDocumentation;
@@ -279,12 +295,6 @@ private:
 	StringMap loadMissingSources(SourceUnit const& _ast, std::string const& _path);
 	std::string applyRemapping(std::string const& _path, std::string const& _context);
 	void resolveImports();
-
-	/// @returns the absolute path corresponding to @a _path relative to @a _reference.
-	static std::string absolutePath(std::string const& _path, std::string const& _reference);
-
-	/// Helper function to return path converted strings.
-	static std::string sanitizePath(std::string const& _path) { return boost::filesystem::path(_path).generic_string(); }
 
 	/// @returns true if the contract is requested to be compiled.
 	bool isRequestedContract(ContractDefinition const& _contract) const;
@@ -315,7 +325,7 @@ private:
 	std::string createMetadata(Contract const& _contract) const;
 
 	/// @returns the metadata CBOR for the given serialised metadata JSON.
-	static bytes createCBORMetadata(std::string _metadata, bool _experimentalMode);
+	static bytes createCBORMetadata(std::string const& _metadata, bool _experimentalMode);
 
 	/// @returns the computer source mapping string.
 	std::string computeSourceMapping(eth::AssemblyItems const& _items) const;
@@ -339,15 +349,7 @@ private:
 		FunctionDefinition const& _function
 	) const;
 
-	struct Remapping
-	{
-		std::string context;
-		std::string prefix;
-		std::string target;
-	};
-
 	ReadCallback::Callback m_readFile;
-	ReadCallback::Callback m_smtQuery;
 	bool m_optimize = false;
 	unsigned m_optimizeRuns = 200;
 	EVMVersion m_evmVersion;
@@ -357,12 +359,15 @@ private:
 	/// "context:prefix=target"
 	std::vector<Remapping> m_remappings;
 	std::map<std::string const, Source> m_sources;
+	std::vector<std::string> m_unhandledSMTLib2Queries;
+	std::map<h256, std::string> m_smtlib2Responses;
 	std::shared_ptr<GlobalContext> m_globalContext;
-	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	std::vector<Source const*> m_sourceOrder;
+	/// This is updated during compilation.
+	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	std::map<std::string const, Contract> m_contracts;
-	ErrorList m_errorList;
-	ErrorReporter m_errorReporter;
+	langutil::ErrorList m_errorList;
+	langutil::ErrorReporter m_errorReporter;
 	bool m_metadataLiteralSources = false;
 	State m_stackState = Empty;
 };

@@ -22,13 +22,14 @@
 
 #include <string>
 #include <memory>
-#include <libsolidity/parsing/Scanner.h>
+#include <liblangutil/Scanner.h>
 #include <libsolidity/parsing/Parser.h>
-#include <libsolidity/interface/ErrorReporter.h>
+#include <liblangutil/ErrorReporter.h>
 #include <test/Options.h>
 #include <test/libsolidity/ErrorCheck.h>
 
 using namespace std;
+using namespace langutil;
 
 namespace dev
 {
@@ -42,7 +43,7 @@ namespace
 ASTPointer<ContractDefinition> parseText(std::string const& _source, ErrorList& _errors)
 {
 	ErrorReporter errorReporter(_errors);
-	ASTPointer<SourceUnit> sourceUnit = Parser(errorReporter).parse(std::make_shared<Scanner>(CharStream(_source)));
+	ASTPointer<SourceUnit> sourceUnit = Parser(errorReporter).parse(std::make_shared<Scanner>(CharStream(_source, "")));
 	if (!sourceUnit)
 		return ASTPointer<ContractDefinition>();
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
@@ -112,13 +113,30 @@ while(0)
 
 BOOST_AUTO_TEST_SUITE(SolidityParser)
 
+BOOST_AUTO_TEST_CASE(unsatisfied_version)
+{
+	char const* text = R"(
+		pragma solidity ^99.99.0;
+	)";
+	CHECK_PARSE_ERROR(text, "Source file requires different compiler version");
+}
+
+BOOST_AUTO_TEST_CASE(unsatisfied_version_followed_by_invalid_syntax)
+{
+	char const* text = R"(
+		pragma solidity ^99.99.0;
+		this is surely invalid
+	)";
+	CHECK_PARSE_ERROR(text, "Source file requires different compiler version");
+}
+
 BOOST_AUTO_TEST_CASE(function_natspec_documentation)
 {
 	char const* text = R"(
 		contract test {
 			uint256 stateVar;
 			/// This is a test function
-			function functionName(bytes32 input) returns (bytes32 out) {}
+			function functionName(bytes32 input) public returns (bytes32 out) {}
 		}
 	)";
 	BOOST_CHECK(successParse(text));
@@ -138,7 +156,7 @@ BOOST_AUTO_TEST_CASE(function_normal_comments)
 		contract test {
 			uint256 stateVar;
 			// We won't see this comment
-			function functionName(bytes32 input) returns (bytes32 out) {}
+			function functionName(bytes32 input) public returns (bytes32 out) {}
 		}
 	)";
 	BOOST_CHECK(successParse(text));
@@ -157,13 +175,13 @@ BOOST_AUTO_TEST_CASE(multiple_functions_natspec_documentation)
 		contract test {
 			uint256 stateVar;
 			/// This is test function 1
-			function functionName1(bytes32 input) returns (bytes32 out) {}
+			function functionName1(bytes32 input) public returns (bytes32 out) {}
 			/// This is test function 2
-			function functionName2(bytes32 input) returns (bytes32 out) {}
+			function functionName2(bytes32 input) public returns (bytes32 out) {}
 			// nothing to see here
-			function functionName3(bytes32 input) returns (bytes32 out) {}
+			function functionName3(bytes32 input) public returns (bytes32 out) {}
 			/// This is test function 4
-			function functionName4(bytes32 input) returns (bytes32 out) {}
+			function functionName4(bytes32 input) public returns (bytes32 out) {}
 		}
 	)";
 	BOOST_CHECK(successParse(text));
@@ -193,7 +211,7 @@ BOOST_AUTO_TEST_CASE(multiline_function_documentation)
 			uint256 stateVar;
 			/// This is a test function
 			/// and it has 2 lines
-			function functionName1(bytes32 input) returns (bytes32 out) {}
+			function functionName1(bytes32 input) public returns (bytes32 out) {}
 		}
 	)";
 	BOOST_CHECK(successParse(text));
@@ -220,7 +238,7 @@ BOOST_AUTO_TEST_CASE(natspec_comment_in_function_body)
 			}
 			/// This is a test function
 			/// and it has 2 lines
-			function fun(bytes32 input) returns (bytes32 out) {}
+			function fun(bytes32 input) public returns (bytes32 out) {}
 		}
 	)";
 	BOOST_CHECK(successParse(text));

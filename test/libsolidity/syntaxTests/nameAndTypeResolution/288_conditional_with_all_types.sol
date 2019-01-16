@@ -71,7 +71,7 @@ contract C {
         (uint n, uint o) = true ? (1, 2) : (3, 4);
         (n, o) = (o, n); // Avoid unused var warning
         // mapping
-        mapping(uint8 => uint8) p = true ? table1 : table2;
+        mapping(uint8 => uint8) storage p = true ? table1 : table2;
         p[0] = 0; // Avoid unused var warning
         // typetype
         uint32 q = true ? uint32(1) : uint32(2);
@@ -85,7 +85,5 @@ contract C {
 }
 // ----
 // Warning: (1005-1019): This declaration shadows an existing declaration.
-// Warning: (90-116): Function state mutability can be restricted to pure
-// Warning: (121-147): Function state mutability can be restricted to pure
 // Warning: (257-642): Function state mutability can be restricted to pure
 // Warning: (647-1227): Function state mutability can be restricted to pure

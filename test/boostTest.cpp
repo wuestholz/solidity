@@ -28,19 +28,20 @@
 #pragma warning(push)
 #pragma warning(disable:4535) // calling _set_se_translator requires /EHa
 #endif
-#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp>
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
 #pragma GCC diagnostic pop
 
+#include <test/InteractiveTests.h>
 #include <test/Options.h>
-#include <test/libsolidity/SyntaxTest.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
+#include <string>
 
 using namespace boost::unit_test;
 using namespace dev::solidity::test;
@@ -125,12 +126,26 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/[] )
 	master_test_suite_t& master = framework::master_test_suite();
 	master.p_name.value = "SolidityTests";
 	dev::test::Options::get().validate();
-	solAssert(registerTests(
-		master,
-		dev::test::Options::get().testPath / "libsolidity",
-		"syntaxTests",
-		SyntaxTest::create
-	) > 0, "no syntax tests found");
+
+	// Include the interactive tests in the automatic tests as well
+	for (auto const& ts: g_interactiveTestsuites)
+	{
+		auto const& options = dev::test::Options::get();
+
+		if (ts.smt && options.disableSMT)
+			continue;
+
+		if (ts.ipc && options.disableIPC)
+			continue;
+
+		solAssert(registerTests(
+			master,
+			options.testPath / ts.path,
+			ts.subpath,
+			ts.testCaseCreator
+		) > 0, std::string("no ") + ts.title + " tests found");
+	}
+
 	if (dev::test::Options::get().disableIPC)
 	{
 		for (auto suite: {
@@ -139,17 +154,36 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/[] )
 			"SolidityAuctionRegistrar",
 			"SolidityFixedFeeRegistrar",
 			"SolidityWallet",
+#if HAVE_LLL
 			"LLLERC20",
 			"LLLENS",
 			"LLLEndToEndTest",
+#endif
 			"GasMeterTests",
+			"GasCostTests",
 			"SolidityEndToEndTest",
 			"SolidityOptimizer"
 		})
 			removeTestSuite(suite);
 	}
+
 	if (dev::test::Options::get().disableSMT)
 		removeTestSuite("SMTChecker");
 
 	return 0;
 }
+
+// BOOST_TEST_DYN_LINK should be defined if user want to link against shared boost test library
+#ifdef BOOST_TEST_DYN_LINK
+
+// Because we want to have customized initialization function and support shared boost libraries at the same time,
+// we are forced to customize the entry point.
+// see: https://www.boost.org/doc/libs/1_67_0/libs/test/doc/html/boost_test/adv_scenarios/shared_lib_customizations/init_func.html
+
+int main(int argc, char* argv[])
+{
+	auto init_unit_test = []() -> bool { init_unit_test_suite(0, nullptr); return true; };
+	return boost::unit_test::unit_test_main(init_unit_test, argc, argv);
+}
+
+#endif

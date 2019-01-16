@@ -21,8 +21,9 @@
  */
 
 #include <libsolidity/codegen/Compiler.h>
-#include <libevmasm/Assembly.h>
+
 #include <libsolidity/codegen/ContractCompiler.h>
+#include <libevmasm/Assembly.h>
 
 using namespace std;
 using namespace dev;
@@ -34,27 +35,14 @@ void Compiler::compileContract(
 	bytes const& _metadata
 )
 {
-	ContractCompiler runtimeCompiler(nullptr, m_runtimeContext, m_optimize);
+	ContractCompiler runtimeCompiler(nullptr, m_runtimeContext, m_optimize, m_optimizeRuns);
 	runtimeCompiler.compileContract(_contract, _contracts);
 	m_runtimeContext.appendAuxiliaryData(_metadata);
 
 	// This might modify m_runtimeContext because it can access runtime functions at
 	// creation time.
-	ContractCompiler creationCompiler(&runtimeCompiler, m_context, m_optimize);
+	ContractCompiler creationCompiler(&runtimeCompiler, m_context, m_optimize, 1);
 	m_runtimeSub = creationCompiler.compileConstructor(_contract, _contracts);
-
-	m_context.optimise(m_optimize, m_optimizeRuns);
-}
-
-void Compiler::compileClone(
-	ContractDefinition const& _contract,
-	map<ContractDefinition const*, eth::Assembly const*> const& _contracts
-)
-{
-	solAssert(!_contract.isLibrary(), "");
-	ContractCompiler runtimeCompiler(nullptr, m_runtimeContext, m_optimize);
-	ContractCompiler cloneCompiler(&runtimeCompiler, m_context, m_optimize);
-	m_runtimeSub = cloneCompiler.compileClone(_contract, _contracts);
 
 	m_context.optimise(m_optimize, m_optimizeRuns);
 }

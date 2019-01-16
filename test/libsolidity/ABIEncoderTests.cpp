@@ -22,7 +22,7 @@
 #include <string>
 #include <tuple>
 #include <boost/test/unit_test.hpp>
-#include <libsolidity/interface/Exceptions.h>
+#include <liblangutil/Exceptions.h>
 #include <test/libsolidity/SolidityExecutionFramework.h>
 
 #include <test/libsolidity/ABITestsCommon.h>
@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(conversion)
 				int8 c;
 				int16 d;
 				assembly { a := sub(0, 1) c := 0x0101ff d := 0xff01 }
-				emit E(10, x, a, uint8(b), c, int8(d));
+				emit E(bytes4(uint32(10)), x, a, uint8(b), c, int8(d));
 			}
 		}
 	)";
@@ -367,7 +367,7 @@ BOOST_AUTO_TEST_CASE(calldata)
 	string sourceCode = R"(
 		contract C {
 			event E(bytes);
-			function f(bytes a) external {
+			function f(bytes calldata a) external {
 				emit E(a);
 			}
 		}
@@ -417,7 +417,7 @@ BOOST_AUTO_TEST_CASE(structs)
 			struct T { uint64[2] x; }
 			S s;
 			event e(uint16, S);
-			function f() public returns (uint, S) {
+			function f() public returns (uint, S memory) {
 				uint16 x = 7;
 				s.a = 8;
 				s.b = 9;
@@ -454,7 +454,7 @@ BOOST_AUTO_TEST_CASE(structs2)
 			enum E {A, B, C}
 			struct T { uint x; E e; uint8 y; }
 			struct S { C c; T[] t;}
-			function f() public returns (uint a, S[2] s1, S[] s2, uint b) {
+			function f() public returns (uint a, S[2] memory s1, S[] memory s2, uint b) {
 				a = 7;
 				b = 8;
 				s1[0].c = this;

@@ -24,7 +24,6 @@
 
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/codegen/CompilerUtils.h>
-
 #include <libdevcore/Whiskers.h>
 
 #include <boost/algorithm/string/join.hpp>
@@ -49,7 +48,7 @@ string ABIFunctions::tupleEncoder(
 	if (_encodeAsLibraryTypes)
 		functionName += "_library";
 
-	return createFunction(functionName, [&]() {
+	return createExternallyUsedFunction(functionName, [&]() {
 		solAssert(!_givenTypes.empty(), "");
 
 		// Note that the values are in reverse due to the difference in calling semantics.
@@ -113,7 +112,7 @@ string ABIFunctions::tupleDecoder(TypePointers const& _types, bool _fromMemory)
 
 	solAssert(!_types.empty(), "");
 
-	return createFunction(functionName, [&]() {
+	return createExternallyUsedFunction(functionName, [&]() {
 		TypePointers decodingTypes;
 		for (auto const& t: _types)
 			decodingTypes.emplace_back(t->decodingType());
@@ -141,8 +140,8 @@ string ABIFunctions::tupleDecoder(TypePointers const& _types, bool _fromMemory)
 			vector<string> valueNamesLocal;
 			for (size_t j = 0; j < sizeOnStack; j++)
 			{
-				valueNamesLocal.push_back("value" + to_string(stackPos));
-				valueReturnParams.push_back("value" + to_string(stackPos));
+				valueNamesLocal.emplace_back("value" + to_string(stackPos));
+				valueReturnParams.emplace_back("value" + to_string(stackPos));
 				stackPos++;
 			}
 			bool dynamic = decodingTypes[i]->isDynamicallyEncoded();
@@ -176,13 +175,13 @@ string ABIFunctions::tupleDecoder(TypePointers const& _types, bool _fromMemory)
 	});
 }
 
-string ABIFunctions::requestedFunctions()
+pair<string, set<string>> ABIFunctions::requestedFunctions()
 {
 	string result;
 	for (auto const& f: m_requestedFunctions)
 		result += f.second;
 	m_requestedFunctions.clear();
-	return result;
+	return make_pair(result, std::move(m_externallyUsedFunctions));
 }
 
 string ABIFunctions::cleanupFunction(Type const& _type, bool _revertOnFailure)
@@ -197,6 +196,9 @@ string ABIFunctions::cleanupFunction(Type const& _type, bool _revertOnFailure)
 		templ("functionName", functionName);
 		switch (_type.category())
 		{
+		case Type::Category::Address:
+			templ("body", "cleaned := " + cleanupFunction(IntegerType(160)) + "(value)");
+			break;
 		case Type::Category::Integer:
 		{
 			IntegerType const& type = dynamic_cast<IntegerType const&>(_type);
@@ -228,7 +230,8 @@ string ABIFunctions::cleanupFunction(Type const& _type, bool _revertOnFailure)
 			if (type.numBytes() == 32)
 				templ("body", "cleaned := value");
 			else if (type.numBytes() == 0)
-				templ("body", "cleaned := 0");
+				// This is disallowed in the type system.
+				solAssert(false, "");
 			else
 			{
 				size_t numBits = type.numBytes() * 8;
@@ -238,8 +241,14 @@ string ABIFunctions::cleanupFunction(Type const& _type, bool _revertOnFailure)
 			break;
 		}
 		case Type::Category::Contract:
-			templ("body", "cleaned := " + cleanupFunction(IntegerType(160, IntegerType::Modifier::Address)) + "(value)");
+		{
+			AddressType addressType(dynamic_cast<ContractType const&>(_type).isPayable() ?
+				StateMutability::Payable :
+				StateMutability::NonPayable
+			);
+			templ("body", "cleaned := " + cleanupFunction(addressType) + "(value)");
 			break;
+		}
 		case Type::Category::Enum:
 		{
 			size_t members = dynamic_cast<EnumType const&>(_type).numberOfMembers();
@@ -283,6 +292,12 @@ string ABIFunctions::conversionFunction(Type const& _from, Type const& _to)
 		auto fromCategory = _from.category();
 		switch (fromCategory)
 		{
+		case Type::Category::Address:
+			body =
+				Whiskers("converted := <convert>(value)")
+					("convert", conversionFunction(IntegerType(160), _to))
+					.render();
+			break;
 		case Type::Category::Integer:
 		case Type::Category::RationalNumber:
 		case Type::Category::Contract:
@@ -313,16 +328,19 @@ string ABIFunctions::conversionFunction(Type const& _from, Type const& _to)
 					.render();
 			}
 			else if (toCategory == Type::Category::FixedPoint)
-			{
 				solUnimplemented("Not yet implemented - FixedPointType.");
-			}
+			else if (toCategory == Type::Category::Address)
+				body =
+					Whiskers("converted := <convert>(value)")
+						("convert", conversionFunction(_from, IntegerType(160)))
+						.render();
 			else
 			{
 				solAssert(
 					toCategory == Type::Category::Integer ||
 					toCategory == Type::Category::Contract,
 				"");
-				IntegerType const addressType(160, IntegerType::Modifier::Address);
+				IntegerType const addressType(160);
 				IntegerType const& to =
 					toCategory == Type::Category::Integer ?
 					dynamic_cast<IntegerType const&>(_to) :
@@ -374,6 +392,11 @@ string ABIFunctions::conversionFunction(Type const& _from, Type const& _to)
 					("shift", shiftRightFunction(256 - from.numBytes() * 8))
 					("convert", conversionFunction(IntegerType(from.numBytes() * 8), _to))
 					.render();
+			else if (toCategory == Type::Category::Address)
+				body =
+					Whiskers("converted := <convert>(value)")
+						("convert", conversionFunction(_from, IntegerType(160)))
+						.render();
 			else
 			{
 				// clear for conversion to longer bytes
@@ -409,7 +432,7 @@ string ABIFunctions::conversionFunction(Type const& _from, Type const& _to)
 			solAssert(false, "");
 		}
 
-		solAssert(!body.empty(), "");
+		solAssert(!body.empty(), _from.canonicalName() + " to " + _to.canonicalName());
 		templ("body", body);
 		return templ.render();
 	});
@@ -471,13 +494,8 @@ string ABIFunctions::abiEncodingFunction(
 	bool _fromStack
 )
 {
-	solUnimplementedAssert(
-		_to.mobileType() &&
-		_to.mobileType()->interfaceType(_encodeAsLibraryTypes) &&
-		_to.mobileType()->interfaceType(_encodeAsLibraryTypes)->encodingType(),
-		"Encoding type \"" + _to.toString() + "\" not yet implemented."
-	);
-	TypePointer toInterface = _to.mobileType()->interfaceType(_encodeAsLibraryTypes)->encodingType();
+	TypePointer toInterface = _to.fullEncodingType(_encodeAsLibraryTypes, true, false);
+	solUnimplementedAssert(toInterface, "Encoding type \"" + _to.toString() + "\" not yet implemented.");
 	Type const& to = *toInterface;
 
 	if (_from.category() == Type::Category::StringLiteral)
@@ -539,7 +557,7 @@ string ABIFunctions::abiEncodingFunction(
 			// special case: convert storage reference type to value type - this is only
 			// possible for library calls where we just forward the storage reference
 			solAssert(_encodeAsLibraryTypes, "");
-			solAssert(to == IntegerType(256), "");
+			solAssert(to == IntegerType::uint256(), "");
 			templ("cleanupConvert", "value");
 		}
 		else
@@ -886,13 +904,8 @@ string ABIFunctions::abiEncodingFunctionStruct(
 			solAssert(member.type, "");
 			if (!member.type->canLiveOutsideStorage())
 				continue;
-			solUnimplementedAssert(
-				member.type->mobileType() &&
-				member.type->mobileType()->interfaceType(_encodeAsLibraryTypes) &&
-				member.type->mobileType()->interfaceType(_encodeAsLibraryTypes)->encodingType(),
-				"Encoding type \"" + member.type->toString() + "\" not yet implemented."
-			);
-			auto memberTypeTo = member.type->mobileType()->interfaceType(_encodeAsLibraryTypes)->encodingType();
+			TypePointer memberTypeTo = member.type->fullEncodingType(_encodeAsLibraryTypes, true, false);
+			solUnimplementedAssert(memberTypeTo, "Encoding type \"" + member.type->toString() + "\" not yet implemented.");
 			auto memberTypeFrom = _from.memberType(member.name);
 			solAssert(memberTypeFrom, "");
 			bool dynamicMember = memberTypeTo->isDynamicallyEncoded();
@@ -1188,7 +1201,8 @@ string ABIFunctions::abiDecodingFunctionCalldataArray(ArrayType const& _type)
 	solAssert(_type.dataStoredIn(DataLocation::CallData), "");
 	if (!_type.isDynamicallySized())
 		solAssert(_type.length() < u256("0xffffffffffffffff"), "");
-	solAssert(!_type.baseType()->isDynamicallyEncoded(), "");
+	if (_type.baseType()->isDynamicallyEncoded())
+		solUnimplemented("Calldata arrays with non-value base types are not yet supported by Solidity.");
 	solAssert(_type.baseType()->calldataEncodedSize() < u256("0xffffffffffffffff"), "");
 
 	string functionName =
@@ -1680,6 +1694,13 @@ string ABIFunctions::createFunction(string const& _name, function<string ()> con
 		m_requestedFunctions[_name] = fun;
 	}
 	return _name;
+}
+
+string ABIFunctions::createExternallyUsedFunction(string const& _name, function<string ()> const& _creator)
+{
+	string name = createFunction(_name, _creator);
+	m_externallyUsedFunctions.insert(name);
+	return name;
 }
 
 size_t ABIFunctions::headSize(TypePointers const& _targetTypes)

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity >=0.0;
 import "../Events/Event.sol";
 
 
@@ -79,7 +79,7 @@ contract ScalarEvent is Event {
     /// @return Event hash
     function getEventHash()
         public
-        constant
+        view
         returns (bytes32)
     {
         return keccak256(abi.encodePacked(collateralToken, oracle, lowerBound, upperBound));
