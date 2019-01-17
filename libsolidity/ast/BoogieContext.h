@@ -1,11 +1,11 @@
 #pragma once
 
-#include <libsolidity/interface/ErrorReporter.h>
+#include <liblangutil/ErrorReporter.h>
+#include <liblangutil/EVMVersion.h>
+#include <liblangutil/Scanner.h>
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/analysis/DeclarationContainer.h>
-#include <libsolidity/interface/EVMVersion.h>
 #include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/parsing/Scanner.h>
 #include <set>
 
 namespace dev
@@ -45,8 +45,8 @@ private:
 
 	Encoding m_encoding;
 	bool m_overflow;
-	ErrorReporter* m_errorReporter; // Report errors with this member
-	Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
+	langutil::ErrorReporter* m_errorReporter; // Report errors with this member
+	langutil::Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
 
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
@@ -64,15 +64,15 @@ private:
 	bool m_sendIncluded;
 
 public:
-	BoogieContext(Encoding encoding, bool overflow, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
+	BoogieContext(Encoding encoding, bool overflow, langutil::ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
 
 	smack::Program& program() { return m_program; }
 	Encoding encoding() { return m_encoding; }
 	bool isBvEncoding() { return m_encoding == Encoding::BV; }
 	bool overflow() { return m_overflow; }
-	ErrorReporter*& errorReporter() { return m_errorReporter; }
-	Scanner const*& currentScanner() { return m_currentScanner; }
+	langutil::ErrorReporter*& errorReporter() { return m_errorReporter; }
+	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	EVMVersion& evmVersion() { return m_evmVersion; }

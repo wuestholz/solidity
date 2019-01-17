@@ -37,6 +37,9 @@ set(sources
 	ast/AST_accept.h
 	ast/ASTAnnotations.cpp
 	ast/ASTAnnotations.h
+	ast/ASTBoogieConverter.cpp
+	ast/ASTBoogieExpressionConverter.cpp
+	ast/ASTBoogieUtils.cpp
 	ast/ASTEnums.h
 	ast/ASTForward.h
 	ast/ASTJsonConverter.cpp
@@ -44,6 +47,8 @@ set(sources
 	ast/ASTPrinter.cpp
 	ast/ASTPrinter.h
 	ast/ASTVisitor.h
+	ast/BoogieAst.cpp
+	ast/BoogieContext.cpp
 	ast/ExperimentalFeatures.h
 	ast/Types.cpp
 	ast/Types.h

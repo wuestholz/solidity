@@ -40,8 +40,8 @@ class Parser: public langutil::ParserBase
 public:
 	explicit Parser(langutil::ErrorReporter& _errorReporter): ParserBase(_errorReporter) {}
 
-	ASTPointer<SourceUnit> parse(std::shared_ptr<Scanner> const& _scanner);
-	ASTPointer<Expression> parseExpression(std::shared_ptr<Scanner> const& _scanner);
+	ASTPointer<SourceUnit> parse(std::shared_ptr<langutil::Scanner> const& _scanner);
+	ASTPointer<Expression> parseExpression(std::shared_ptr<langutil::Scanner> const& _scanner);
 
 private:
 	class ASTNodeFactory;

@@ -2,10 +2,12 @@
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/AST.h>
+#include <liblangutil/Exceptions.h>
 
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
+using namespace langutil;
 
 namespace dev
 {
@@ -152,7 +154,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	case Token::AssignBitOr: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitOr, lhs, rhs, bits, isSigned); break;
 	case Token::AssignBitXor: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitXor, lhs, rhs, bits, isSigned); break;
 	default:
-		m_context.reportError(&_node, string("Unsupported assignment operator: ") + Token::toString(_node.assignmentOperator()));
+		m_context.reportError(&_node, string("Unsupported assignment operator: ") + TokenTraits::toString(_node.assignmentOperator()));
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		return false;
 	}
@@ -181,8 +183,8 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
 
 				auto selExpr = smack::Expr::sel(sumId, smack::Expr::id(ASTBoogieUtils::BOOGIE_THIS));
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub, selExpr, lhs, bits, isSigned);
-				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, subResult.first, rhs, bits, isSigned);
+				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub, selExpr, lhs, bits, isSigned);
+				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, subResult.first, rhs, bits, isSigned);
 				if (m_context.overflow())
 				{
 					addSideEffect(smack::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
@@ -309,7 +311,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 		}
 		break;
 	default:
-		m_context.reportError(&_node, string("Unsupported unary operator: ") + Token::toString(_node.getOperator()));
+		m_context.reportError(&_node, string("Unsupported unary operator: ") + TokenTraits::toString(_node.getOperator()));
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		break;
 	}
@@ -384,7 +386,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	}
 
 	default:
-		m_context.reportError(&_node, string("Unsupported binary operator ") + Token::toString(_node.getOperator()));
+		m_context.reportError(&_node, string("Unsupported binary operator ") + TokenTraits::toString(_node.getOperator()));
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		break;
 	}
@@ -670,7 +672,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// assert(balance[this] >= msg.value)
 		auto selExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::GreaterThanOrEqual, selExpr, msgValue, 256, false);
+		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
 		addSideEffect(smack::Stmt::assert_(geqResult.first,
 				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
 		// balance[this] -= msg.value
@@ -681,7 +683,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			addSideEffect(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
 			addSideEffect(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 		}
-		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Sub,
+		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
 												this_balance, msgValue, 256, false);
 		if (m_context.overflow())
 		{
@@ -745,7 +747,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 					revert->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
 					revert->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 				}
-				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add,
+				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 															this_balance, msgValue, 256, false);
 				if (m_context.overflow())
 				{

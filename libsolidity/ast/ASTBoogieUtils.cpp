@@ -1,10 +1,12 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/regex.hpp>
 #include <libsolidity/ast/ASTBoogieUtils.h>
+#include <liblangutil/SourceLocation.h>
 
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
+using namespace langutil;
 
 namespace dev
 {
@@ -71,7 +73,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
-	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		transferImpl->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
@@ -87,7 +89,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
 		transferImpl->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
-	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
+	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		transferImpl->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
@@ -101,7 +103,7 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	// Precondition: there is enough ether to transfer
-	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
+	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::GreaterThanOrEqual, sender_bal, amount, 256, false);
 	transfer->getRequires().push_back(smack::Specification::spec(geqResult.first,
 			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	transfer->addAttr(smack::Attr::attr("inline", 1));
@@ -135,7 +137,7 @@ smack::ProcDecl* ASTBoogieUtils::createCallProc(BoogieContext& context)
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 	}
-	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false);
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, msg_val, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
@@ -187,7 +189,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
-	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Add, this_bal, amount, 256, false);
+	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
@@ -203,7 +205,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
 		thenBlock->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
-	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Value::Sub, sender_bal, amount, 256, false);
+	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));
@@ -224,7 +226,7 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	smack::ProcDecl* sendProc = smack::Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
 
 	// Precondition: there is enough ether to transfer
-	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
+	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, Token::GreaterThanOrEqual, sender_bal, amount, 256, false);
 	sendProc->getRequires().push_back(smack::Specification::spec(
 			senderBalanceGEQ.first,
 			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
@@ -312,12 +314,12 @@ list<const smack::Attr*> ASTBoogieUtils::createAttrs(SourceLocation const& loc, 
 	int srcLine, srcCol;
 	tie(srcLine, srcCol) = scanner.translatePositionToLineColumn(loc.start);
 	return {
-		smack::Attr::attr("sourceloc", *loc.sourceName, srcLine + 1, srcCol + 1),
+		smack::Attr::attr("sourceloc", loc.source->name(), srcLine + 1, srcCol + 1),
 		smack::Attr::attr("message", message)
 	};
 }
 
-ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op,
 		 smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned)
 {
 	const smack::Expr* result = nullptr;
@@ -356,7 +358,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			}
 			break;
 		default:
-			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + Token::toString(op));
+			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + TokenTraits::toString(op));
 			result = smack::Expr::id(ERR_EXPR);
 		}
 		break;
@@ -386,7 +388,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			case Token::GreaterThanOrEqual: name = isSigned ? "sge" : "uge"; retType = "bool";  break;
 
 			default:
-				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + Token::toString(op));
+				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
 				result = smack::Expr::id(ERR_EXPR);
 			}
 			if (result == nullptr) { // not computd yet, no error
@@ -490,7 +492,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				result = smack::Expr::gte(lhs, rhs);
 				break;
 			default:
-				context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + Token::toString(op));
+				context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + TokenTraits::toString(op));
 				result = smack::Expr::id(ERR_EXPR);
 			}
 		}
@@ -503,7 +505,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 	return expr_pair(result, ecc);
 }
 
-ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op,
+ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token op,
 		smack::Expr const* subExpr, unsigned bits, bool isSigned)
 {
 	const smack::Expr* result = nullptr;
@@ -517,7 +519,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 		case Token::Add: result = subExpr; break; // Unary plus does not do anything
 		case Token::Sub: result = smack::Expr::neg(subExpr); break;
 		default:
-			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + Token::toString(op));
+			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + TokenTraits::toString(op));
 			result = smack::Expr::id(ERR_EXPR);
 			break;
 		}
@@ -533,7 +535,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 			case Token::Sub: name = "neg"; break;
 			case Token::BitNot: name = "not"; break;
 			default:
-				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + Token::toString(op));
+				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + TokenTraits::toString(op));
 				result = smack::Expr::id(ERR_EXPR);
 				break;
 			}
@@ -574,7 +576,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 			break;
 		}
 		default:
-			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + Token::toString(op));
+			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + TokenTraits::toString(op));
 			result = smack::Expr::id(ERR_EXPR);
 			break;
 		}

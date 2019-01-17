@@ -5,6 +5,7 @@
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
+using namespace langutil;
 
 namespace dev
 {

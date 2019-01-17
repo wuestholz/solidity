@@ -6,11 +6,12 @@
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/parsing/Parser.h>
-#include <libsolidity/interface/SourceReferenceFormatter.h>
+#include <liblangutil/SourceReferenceFormatter.h>
 
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
+using namespace langutil;
 
 namespace dev
 {
@@ -270,8 +271,9 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 
 				// Parse
 				string exprStr = docTag.second.content.substr(_tag.length() + 1);
+				CharStream exprStream(exprStr, "DocString");
 				ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
-						.parseExpression(shared_ptr<Scanner>(new Scanner((CharStream)exprStr, "DocString")));
+						.parseExpression(shared_ptr<Scanner>(new Scanner(exprStream)));
 				// Resolve references, using the given scope
 				m_context.scopes()[&*expr] = m_context.scopes()[_scope];
 				NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), *m_context.errorReporter());
@@ -282,8 +284,7 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
 
 				// Print errors relating to the expression string
-				Scanner sc((CharStream)exprStr, "");
-				SourceReferenceFormatter formatter(cerr, [&](string const&) -> solidity::Scanner const& { return sc; });
+				SourceReferenceFormatter formatter(cerr);
 				for (auto const& error: m_context.errorReporter()->errors())
 				{
 					formatter.printExceptionInformation(*error,
@@ -577,7 +578,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentBlocks.top()->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 			m_currentBlocks.top()->addStmt(smack::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 		}
-		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Value::Add, this_bal, msg_val, 256, false);
+		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, msg_val, 256, false);
 		if (m_context.overflow())
 		{
 			m_currentBlocks.top()->addStmt(smack::Stmt::comment("Implicit assumption that balances cannot overflow"));

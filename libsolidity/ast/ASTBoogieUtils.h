@@ -2,7 +2,7 @@
 
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/BoogieContext.h>
-#include <libsolidity/parsing/Scanner.h>
+#include <liblangutil/Scanner.h>
 #include <string>
 
 namespace dev
@@ -88,14 +88,14 @@ public:
 	/**
 	 * Create attributes for original source location and message
 	 */
-	static std::list<const smack::Attr*> createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
+	static std::list<const smack::Attr*> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
 
 	/** Pair of expressions: first = result, second = correctness condition */
 	typedef std::pair<smack::Expr const*, smack::Expr const*> expr_pair;
 
-	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
+	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
 
-	static expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
+	static expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
 
 	/**
 	 * Check if a type can be represented with bitvectors

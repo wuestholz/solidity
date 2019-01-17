@@ -1116,7 +1116,7 @@ void CommandLineInterface::handleAst(string const& _argStr)
 
 void CommandLineInterface::handleBoogie()
 {
-	cout << endl << "======= Converting to Boogie IVL =======" << endl;
+	sout() << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
 	BoogieContext::Encoding encoding = BoogieContext::Encoding::INT;
@@ -1143,7 +1143,7 @@ void CommandLineInterface::handleBoogie()
 		}
 		else
 		{
-			cerr << "Invalid option for --" + g_strAstBoogieArith + ": " << encodingStr << endl;
+			serr() << "Invalid option for --" + g_strAstBoogieArith + ": " << encodingStr << endl;
 			m_error = true;
 			return;
 		}
@@ -1152,11 +1152,11 @@ void CommandLineInterface::handleBoogie()
 	BoogieContext context(encoding, overflow, &errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
-	SourceReferenceFormatter formatter(cerr, [&](string const& _sourceName) -> solidity::Scanner const& { return m_compiler->scanner(_sourceName); });
+	SourceReferenceFormatter formatter(serr(false));
 
 	for (auto const& sourceCode: m_sourceCodes)
 	{
-		cout << endl << "======= " << sourceCode.first << " =======" << endl;
+		sout() << endl << "======= " << sourceCode.first << " =======" << endl;
 		try
 		{
 			context.currentScanner() = &m_compiler->scanner(sourceCode.first);
@@ -1171,7 +1171,7 @@ void CommandLineInterface::handleBoogie()
 		catch (InternalCompilerError const& _exception)
 		{
 			formatter.printExceptionInformation(_exception, "Boogie internal exception");
-			cerr << "Details:" << endl << boost::diagnostic_information(_exception);
+			serr() << "Details:" << endl << boost::diagnostic_information(_exception);
 			m_error = true;
 			return;
 		}
@@ -1200,7 +1200,7 @@ void CommandLineInterface::handleBoogie()
 	}
 	else
 	{
-		boogieConverter.print(cout);
+		boogieConverter.print(sout());
 	}
 }
 
