@@ -41,7 +41,7 @@ def main():
     parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod', 'mod-overflow'])
 
     parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default='z3', choices=['z3', 'yices2', 'cvc4'])
-    parser.add_argument('--solverBin', type=str, help='Binary of the solver to use', default='@Z3_EXE@')
+    parser.add_argument('--solver-bin', type=str, help='Binary of the solver to use')
     args = parser.parse_args()
 
     solFile = args.file
@@ -74,8 +74,8 @@ def main():
         boogieArgs += ' /proverLog:%s' % args.smtlog
     
     # Solver path 
-    if args.solver == 'z3':
-        solverPath = args.solverBin
+    if args.solver_bin is not None:
+        solverPath = args.solver_bin
     else:
         solverPath = findSolver(args.solver)
     if solverPath is None:
@@ -104,11 +104,14 @@ def main():
     except subprocess.CalledProcessError as err:
         if err.returncode == -9:
             print('Timeout while running verifier')
-            if args.verbose:
-                print('----- Verifier output -----')
-                print(err.output.decode('utf-8'))
-                print('---------------------------')
-            return
+        else:
+            print('Error while running verifier, details:')
+        if err.returncode != -9 or args.verbose:
+            print('----- Verifier output -----')
+            print(err.output.decode('utf-8'))
+            print('---------------------------')
+        timer.cancel()
+        return
 
     verifierOutputStr = verifierOutput.decode('utf-8')
     if re.search('Boogie program verifier finished with', verifierOutputStr) == None:
