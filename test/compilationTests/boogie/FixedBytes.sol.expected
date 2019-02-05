@@ -2,3 +2,4 @@ Verifying FixedBytes::getValue: OK
 Verifying FixedBytes::singleByte: ERROR
  - Source FixedBytes.sol, line 13, col 16: Index may be out of bounds
 Verifying FixedBytes::[implicit_constructor]: OK
+Errors were found by the verifier.

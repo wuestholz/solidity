@@ -4,3 +4,4 @@ Verifying ErrorHandling::abs_unsound: ERROR
 Verifying ErrorHandling::add: OK
 Verifying ErrorHandling::add2: OK
 Verifying ErrorHandling::[implicit_constructor]: OK
+Errors were found by the verifier.

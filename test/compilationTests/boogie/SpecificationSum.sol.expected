@@ -3,3 +3,4 @@ Verifying SomeContract::withdraw: OK
 Verifying SomeContract::withdraw_incorrect: ERROR
  - Source SpecificationSum.sol, line 20, col 5: Invariant '__verifier_sum_uint8(user_balances) == total_supply' might not hold at end of function.
 Verifying SomeContract::[implicit_constructor]: OK
+Errors were found by the verifier.
