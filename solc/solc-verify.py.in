@@ -102,9 +102,12 @@ def main():
         verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
         timer.cancel()
     except subprocess.CalledProcessError as err:
-        verifierOutput = err.output
         if err.returncode == -9:
             print('Timeout while running verifier')
+            if args.verbose:
+                print('----- Verifier output -----')
+                print(err.output.decode('utf-8'))
+                print('---------------------------')
             return
 
     verifierOutputStr = verifierOutput.decode('utf-8')
