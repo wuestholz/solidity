@@ -1,7 +1,6 @@
 Verifying PayableFunctions::receive: OK
 Verifying PayableFunctions::[implicit_constructor]: OK
 Verifying Payable::__verifier_main: OK
-Verifying Payable::transferNested: ERROR
- - Source Payable.sol, line 31, col 55: Calling payable function might fail due to insufficient ether
- - Source Payable.sol, line 31, col 16: Calling payable function might fail due to insufficient ether
+Verifying Payable::transferNested: OK
 Verifying Payable::[implicit_constructor]: OK
+No errors found.

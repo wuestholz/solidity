@@ -64,6 +64,9 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	const smack::Expr* sender_bal = smack::Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
 	const smack::Expr* amount = smack::Expr::id("amount");
 
+	// Precondition: there is enough ether to transfer
+	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
+	transferImpl->addStmt(smack::Stmt::assume(geqResult.first));
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -100,10 +103,6 @@ smack::ProcDecl* ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 	smack::ProcDecl* transfer = smack::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
-	// Precondition: there is enough ether to transfer
-	auto geqResult = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
-	transfer->getRequires().push_back(smack::Specification::spec(geqResult.first,
-			{smack::Attr::attr("message", "Transfer might fail due to insufficient ether")}));
 	transfer->addAttr(smack::Attr::attr("inline", 1));
 	transfer->addAttr(smack::Attr::attr("message", "transfer"));
 	return transfer;
@@ -216,18 +215,16 @@ smack::ProcDecl* ASTBoogieUtils::createSendProc(BoogieContext& context)
 	// Unsuccessful transfer
 	smack::Block* elseBlock = smack::Block::block();
 	elseBlock->addStmt(smack::Stmt::assign(result, smack::Expr::lit(false)));
-	// Nondeterministic choice between success and failure
+
 	smack::Block* transferBlock = smack::Block::block();
+	// Precondition: there is enough ether to transfer
+	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
+	transferBlock->addStmt(smack::Stmt::assume(senderBalanceGEQ.first));
+	// Nondeterministic choice between success and failure
 	transferBlock->addStmt(smack::Stmt::comment("TODO: call fallback"));
 	transferBlock->addStmt(smack::Stmt::ifelse(smack::Expr::id("*"), thenBlock, elseBlock));
 
 	smack::ProcDecl* sendProc = smack::Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
-
-	// Precondition: there is enough ether to transfer
-	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, Token::Value::GreaterThanOrEqual, sender_bal, amount, 256, false);
-	sendProc->getRequires().push_back(smack::Specification::spec(
-			senderBalanceGEQ.first,
-			{smack::Attr::attr("message", "Send might fail due to insufficient ether")}));
 
 	sendProc->addAttr(smack::Attr::attr("inline", 1));
 	sendProc->addAttr(smack::Attr::attr("message", "send"));

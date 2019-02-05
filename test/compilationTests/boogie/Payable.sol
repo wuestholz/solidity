@@ -27,7 +27,8 @@ contract Payable {
         require(address(this).balance >= amount + 3);
         // Calling a payable function multiple times with checking for balance
         // only in the beginning will fail, because the called function might
-        // modify our balance as well.
+        // modify our balance as well. However, this is an expected failure and
+        // currently we are not reporting it.
         return p.receive.value(p.receive.value(1)(2))(p.receive.value(amount)(3));
     }
 }
