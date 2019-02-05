@@ -149,6 +149,8 @@ def main():
 
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print('No errors found.')
+    else:
+        print('Errors were found by the verifier.')
 
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
