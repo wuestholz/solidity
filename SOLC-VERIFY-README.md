@@ -14,7 +14,7 @@ sudo apt install -y mono-complete
 sudo apt install -y cmake
 sudo apt install -y libboost-all-dev
 sudo apt install -y python3
-sudo apt install python3-pip
+sudo apt install -y python3-pip
 pip3 install psutil
 sudo apt install -y libgmp3-dev
 sudo apt install -y m4
