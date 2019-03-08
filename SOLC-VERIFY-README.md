@@ -122,7 +122,7 @@ Some examples are located under the `test/compilationTests/boogie/examples` fold
 
 ### Specifictaion Annotations
 
-This example (`Annotations.sol`) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 10) are not checked against the contract-level invariant, but can be annotated with pre- and postconditions explicitly. Furthermore, loops can be annotated with loop invariants (such as in line 18). This contract is correct and can be verified by the following command:
+This example (`Annotations.sol`) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 10) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Furthermore, loops can be annotated with loop invariants (such as in line 18). This contract is correct and can be verified by the following command:
 ```
 solc-verify.py Annotations.sol
 ```
