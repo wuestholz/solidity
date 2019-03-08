@@ -21,7 +21,6 @@
 #include <libsolidity/formal/VariableUsage.h>
 #include <libsolidity/formal/SymbolicTypes.h>
 
-#include <liblangutil/ErrorReporter.h>
 #include <libdevcore/StringUtils.h>
 
 #include <boost/range/adaptor/map.hpp>
@@ -34,7 +33,8 @@ using namespace dev::solidity;
 
 SMTChecker::SMTChecker(ErrorReporter& _errorReporter, map<h256, string> const& _smtlib2Responses):
 	m_interface(make_shared<smt::SMTPortfolio>(_smtlib2Responses)),
-	m_errorReporter(_errorReporter)
+	m_errorReporterReference(_errorReporter),
+	m_errorReporter(m_smtErrors)
 {
 #if defined (HAVE_Z3) || defined (HAVE_CVC4)
 	if (!_smtlib2Responses.empty())
@@ -53,6 +53,25 @@ void SMTChecker::analyze(SourceUnit const& _source, shared_ptr<Scanner> const& _
 	m_scanner = _scanner;
 	if (_source.annotation().experimentalFeatures.count(ExperimentalFeature::SMTChecker))
 		_source.accept(*this);
+
+	solAssert(m_interface->solvers() > 0, "");
+	// If this check is true, Z3 and CVC4 are not available
+	// and the query answers were not provided, since SMTPortfolio
+	// guarantees that SmtLib2Interface is the first solver.
+	if (!m_interface->unhandledQueries().empty() && m_interface->solvers() == 1)
+	{
+		if (!m_noSolverWarning)
+		{
+			m_noSolverWarning = true;
+			m_errorReporterReference.warning(
+				SourceLocation(),
+				"SMTChecker analysis was not possible since no integrated SMT solver (Z3 or CVC4) was found."
+			);
+		}
+	}
+	else
+		m_errorReporterReference.append(m_errorReporter.errors());
+	m_errorReporter.clear();
 }
 
 bool SMTChecker::visit(ContractDefinition const& _contract)
@@ -89,6 +108,7 @@ bool SMTChecker::visit(FunctionDefinition const& _function)
 		m_expressions.clear();
 		m_globalContext.clear();
 		m_uninterpretedTerms.clear();
+		m_overflowTargets.clear();
 		resetStateVariables();
 		initializeLocalVariables(_function);
 		m_loopExecutionHappened = false;
@@ -106,7 +126,10 @@ void SMTChecker::endVisit(FunctionDefinition const&)
 	// Otherwise we remove any local variables from the context and
 	// keep the state variables.
 	if (isRootFunction())
+	{
+		checkUnderOverflow();
 		removeLocalVariables();
+	}
 	m_functionPath.pop_back();
 }
 
@@ -296,21 +319,56 @@ void SMTChecker::endVisit(TupleExpression const& _tuple)
 		defineExpr(_tuple, expr(*_tuple.components()[0]));
 }
 
-void SMTChecker::checkUnderOverflow(smt::Expression _value, IntegerType const& _type, SourceLocation const& _location)
+void SMTChecker::addOverflowTarget(
+	OverflowTarget::Type _type,
+	TypePointer _intType,
+	smt::Expression _value,
+	SourceLocation const& _location
+)
 {
-	checkCondition(
-		_value < minValue(_type),
-		_location,
-		"Underflow (resulting value less than " + formatNumberReadable(_type.minValue()) + ")",
-		"<result>",
-		&_value
+	m_overflowTargets.emplace_back(
+		_type,
+		std::move(_intType),
+		std::move(_value),
+		currentPathConditions(),
+		_location
 	);
+}
+
+void SMTChecker::checkUnderOverflow()
+{
+	for (auto& target: m_overflowTargets)
+	{
+		if (target.type != OverflowTarget::Type::Overflow)
+			checkUnderflow(target);
+		if (target.type != OverflowTarget::Type::Underflow)
+			checkOverflow(target);
+	}
+}
+
+void SMTChecker::checkUnderflow(OverflowTarget& _target)
+{
+	solAssert(_target.type != OverflowTarget::Type::Overflow, "");
+	auto intType = dynamic_cast<IntegerType const*>(_target.intType.get());
 	checkCondition(
-		_value > maxValue(_type),
-		_location,
-		"Overflow (resulting value larger than " + formatNumberReadable(_type.maxValue()) + ")",
+		_target.path && _target.value < minValue(*intType),
+		_target.location,
+		"Underflow (resulting value less than " + formatNumberReadable(intType->minValue()) + ")",
 		"<result>",
-		&_value
+		&_target.value
+	);
+}
+
+void SMTChecker::checkOverflow(OverflowTarget& _target)
+{
+	solAssert(_target.type != OverflowTarget::Type::Underflow, "");
+	auto intType = dynamic_cast<IntegerType const*>(_target.intType.get());
+	checkCondition(
+		_target.path && _target.value > maxValue(*intType),
+		_target.location,
+		"Overflow (resulting value larger than " + formatNumberReadable(intType->maxValue()) + ")",
+		"<result>",
+		&_target.value
 	);
 }
 
@@ -356,8 +414,13 @@ void SMTChecker::endVisit(UnaryOperation const& _op)
 	case Token::Sub: // -
 	{
 		defineExpr(_op, 0 - expr(_op.subExpression()));
-		if (auto intType = dynamic_cast<IntegerType const*>(_op.annotation().type.get()))
-			checkUnderOverflow(expr(_op), *intType, _op.location());
+		if (_op.annotation().type->category() == Type::Category::Integer)
+			addOverflowTarget(
+				OverflowTarget::Type::All,
+				_op.annotation().type,
+				expr(_op),
+				_op.location()
+			);
 		break;
 	}
 	default:
@@ -386,12 +449,18 @@ void SMTChecker::endVisit(BinaryOperation const& _op)
 void SMTChecker::endVisit(FunctionCall const& _funCall)
 {
 	solAssert(_funCall.annotation().kind != FunctionCallKind::Unset, "");
-	if (_funCall.annotation().kind != FunctionCallKind::FunctionCall)
+	if (_funCall.annotation().kind == FunctionCallKind::StructConstructorCall)
 	{
 		m_errorReporter.warning(
 			_funCall.location(),
 			"Assertion checker does not yet implement this expression."
 		);
+		return;
+	}
+
+	if (_funCall.annotation().kind == FunctionCallKind::TypeConversion)
+	{
+		visitTypeConversion(_funCall);
 		return;
 	}
 
@@ -411,6 +480,10 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 		break;
 	case FunctionType::Kind::Internal:
 		inlineFunctionCall(_funCall);
+		break;
+	case FunctionType::Kind::External:
+		resetStateVariables();
+		resetStorageReferences();
 		break;
 	case FunctionType::Kind::KECCAK256:
 	case FunctionType::Kind::ECRecover:
@@ -460,13 +533,6 @@ void SMTChecker::visitGasLeft(FunctionCall const& _funCall)
 	setUnknownValue(*symbolicVar);
 	if (index > 0)
 		m_interface->addAssertion(symbolicVar->currentValue() <= symbolicVar->valueAtIndex(index - 1));
-}
-
-void SMTChecker::eraseArrayKnowledge()
-{
-	for (auto const& var: m_variables)
-		if (var.first->annotation().type->category() == Type::Category::Mapping)
-			newValue(*var.first);
 }
 
 void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
@@ -552,10 +618,8 @@ void SMTChecker::endVisit(Identifier const& _identifier)
 	{
 		// Will be translated as part of the node that requested the lvalue.
 	}
-	else if (dynamic_cast<FunctionType const*>(_identifier.annotation().type.get()))
-	{
+	else if (_identifier.annotation().type->category() == Type::Category::Function)
 		visitFunctionIdentifier(_identifier);
-	}
 	else if (isSupportedType(_identifier.annotation().type->category()))
 	{
 		if (VariableDeclaration const* decl = dynamic_cast<VariableDeclaration const*>(_identifier.annotation().referencedDeclaration))
@@ -568,6 +632,43 @@ void SMTChecker::endVisit(Identifier const& _identifier)
 				_identifier.location(),
 				"Assertion checker does not yet support the type of this variable."
 			);
+	}
+}
+
+void SMTChecker::visitTypeConversion(FunctionCall const& _funCall)
+{
+	solAssert(_funCall.annotation().kind == FunctionCallKind::TypeConversion, "");
+	solAssert(_funCall.arguments().size() == 1, "");
+	auto argument = _funCall.arguments().at(0);
+	unsigned argSize = argument->annotation().type->storageBytes();
+	unsigned castSize = _funCall.annotation().type->storageBytes();
+	if (argSize == castSize)
+		defineExpr(_funCall, expr(*argument));
+	else
+	{
+		createExpr(_funCall);
+		setUnknownValue(*m_expressions.at(&_funCall));
+		auto const& funCallCategory = _funCall.annotation().type->category();
+		// TODO: truncating and bytesX needs a different approach because of right padding.
+		if (funCallCategory == Type::Category::Integer || funCallCategory == Type::Category::Address)
+		{
+			if (argSize < castSize)
+				defineExpr(_funCall, expr(*argument));
+			else
+			{
+				auto const& intType = dynamic_cast<IntegerType const&>(*m_expressions.at(&_funCall)->type());
+				defineExpr(_funCall, smt::Expression::ite(
+					expr(*argument) >= minValue(intType) && expr(*argument) <= maxValue(intType),
+					expr(*argument),
+					expr(_funCall)
+				));
+			}
+		}
+
+		m_errorReporter.warning(
+			_funCall.location(),
+			"Type conversion is not yet fully supported and might yield false positives."
+		);
 	}
 }
 
@@ -587,19 +688,29 @@ void SMTChecker::visitFunctionIdentifier(Identifier const& _identifier)
 
 void SMTChecker::endVisit(Literal const& _literal)
 {
+	solAssert(_literal.annotation().type, "Expected type for AST node");
 	Type const& type = *_literal.annotation().type;
 	if (isNumber(type.category()))
-
 		defineExpr(_literal, smt::Expression(type.literalValue(&_literal)));
 	else if (isBool(type.category()))
 		defineExpr(_literal, smt::Expression(_literal.token() == Token::TrueLiteral ? true : false));
 	else
+	{
+		if (type.category() == Type::Category::StringLiteral)
+		{
+			auto stringType = make_shared<ArrayType>(DataLocation::Memory, true);
+			auto stringLit = dynamic_cast<StringLiteralType const*>(_literal.annotation().type.get());
+			solAssert(stringLit, "");
+			auto result = newSymbolicVariable(*stringType, stringLit->richIdentifier(), *m_interface);
+			m_expressions.emplace(&_literal, result.second);
+		}
 		m_errorReporter.warning(
 			_literal.location(),
 			"Assertion checker does not yet support the type of this literal (" +
 			_literal.annotation().type->toString() +
 			")."
 		);
+	}
 }
 
 void SMTChecker::endVisit(Return const& _return)
@@ -625,9 +736,9 @@ bool SMTChecker::visit(MemberAccess const& _memberAccess)
 
 	auto const& exprType = _memberAccess.expression().annotation().type;
 	solAssert(exprType, "");
+	auto identifier = dynamic_cast<Identifier const*>(&_memberAccess.expression());
 	if (exprType->category() == Type::Category::Magic)
 	{
-		auto identifier = dynamic_cast<Identifier const*>(&_memberAccess.expression());
 		string accessedName;
 		if (identifier)
 			accessedName = identifier->name();
@@ -639,12 +750,23 @@ bool SMTChecker::visit(MemberAccess const& _memberAccess)
 		defineGlobalVariable(accessedName + "." + _memberAccess.memberName(), _memberAccess);
 		return false;
 	}
+	else if (exprType->category() == Type::Category::TypeType)
+	{
+		if (identifier && dynamic_cast<EnumDefinition const*>(identifier->annotation().referencedDeclaration))
+		{
+			auto enumType = dynamic_cast<EnumType const*>(accessType.get());
+			solAssert(enumType, "");
+			defineExpr(_memberAccess, enumType->memberValue(_memberAccess.memberName()));
+		}
+		return false;
+	}
 	else
 		m_errorReporter.warning(
 			_memberAccess.location(),
 			"Assertion checker does not yet support this expression."
 		);
 
+	createExpr(_memberAccess);
 	return true;
 }
 
@@ -687,7 +809,6 @@ void SMTChecker::endVisit(IndexAccess const& _indexAccess)
 void SMTChecker::arrayAssignment()
 {
 	m_arrayAssignmentHappened = true;
-	eraseArrayKnowledge();
 }
 
 void SMTChecker::arrayIndexAssignment(Assignment const& _assignment)
@@ -697,12 +818,48 @@ void SMTChecker::arrayIndexAssignment(Assignment const& _assignment)
 	{
 		auto const& varDecl = dynamic_cast<VariableDeclaration const&>(*id->annotation().referencedDeclaration);
 		solAssert(knownVariable(varDecl), "");
+
+		if (varDecl.hasReferenceOrMappingType())
+			resetVariables([&](VariableDeclaration const& _var) {
+				if (_var == varDecl)
+					return false;
+				TypePointer prefix = _var.type();
+				TypePointer originalType = typeWithoutPointer(varDecl.type());
+				while (
+					prefix->category() == Type::Category::Mapping ||
+					prefix->category() == Type::Category::Array
+				)
+				{
+					if (*originalType == *typeWithoutPointer(prefix))
+						return true;
+					if (prefix->category() == Type::Category::Mapping)
+					{
+						auto mapPrefix = dynamic_cast<MappingType const*>(prefix.get());
+						solAssert(mapPrefix, "");
+						prefix = mapPrefix->valueType();
+					}
+					else
+					{
+						auto arrayPrefix = dynamic_cast<ArrayType const*>(prefix.get());
+						solAssert(arrayPrefix, "");
+						prefix = arrayPrefix->baseType();
+					}
+				}
+				return false;
+			});
+
 		smt::Expression store = smt::Expression::store(
 			m_variables[&varDecl]->currentValue(),
 			expr(*indexAccess.indexExpression()),
 			expr(_assignment.rightHandSide())
 		);
 		m_interface->addAssertion(newValue(varDecl) == store);
+		// Update the SMT select value after the assignment,
+		// necessary for sound models.
+		defineExpr(indexAccess, smt::Expression::select(
+			m_variables[&varDecl]->currentValue(),
+			expr(*indexAccess.indexExpression())
+		));
 	}
 	else if (dynamic_cast<IndexAccess const*>(&indexAccess.baseExpression()))
 		m_errorReporter.warning(
@@ -786,9 +943,28 @@ void SMTChecker::arithmeticOperation(BinaryOperation const& _op)
 			m_interface->addAssertion(right != 0);
 		}
 
-		checkUnderOverflow(value, intType, _op.location());
+		addOverflowTarget(
+			OverflowTarget::Type::All,
+			_op.annotation().commonType,
+			value,
+			_op.location()
+		);
 
-		defineExpr(_op, value);
+		smt::Expression intValueRange = (0 - minValue(intType)) + maxValue(intType) + 1;
+		defineExpr(_op, smt::Expression::ite(
+			value > maxValue(intType) || value < minValue(intType),
+			value % intValueRange,
+			value
+		));
+		if (intType.isSigned())
+		{
+			defineExpr(_op, smt::Expression::ite(
+				expr(_op) > maxValue(intType),
+				expr(_op) - intValueRange,
+				expr(_op)
+			));
+		}
+
 		break;
 	}
 	default:
@@ -877,11 +1053,11 @@ void SMTChecker::assignment(VariableDeclaration const& _variable, Expression con
 void SMTChecker::assignment(VariableDeclaration const& _variable, smt::Expression const& _value, SourceLocation const& _location)
 {
 	TypePointer type = _variable.type();
-	if (auto const* intType = dynamic_cast<IntegerType const*>(type.get()))
-		checkUnderOverflow(_value, *intType, _location);
-	else if (dynamic_cast<AddressType const*>(type.get()))
-		checkUnderOverflow(_value, IntegerType(160), _location);
-	else if (dynamic_cast<MappingType const*>(type.get()))
+	if (type->category() == Type::Category::Integer)
+		addOverflowTarget(OverflowTarget::Type::All, type,	_value,	_location);
+	else if (type->category() == Type::Category::Address)
+		addOverflowTarget(OverflowTarget::Type::All, make_shared<IntegerType>(160), _value, _location);
+	else if (type->category() == Type::Category::Mapping)
 		arrayAssignment();
 	m_interface->addAssertion(newValue(_variable) == _value);
 }
@@ -1151,25 +1327,42 @@ void SMTChecker::removeLocalVariables()
 	}
 }
 
+void SMTChecker::resetVariable(VariableDeclaration const& _variable)
+{
+	newValue(_variable);
+	setUnknownValue(_variable);
+}
+
 void SMTChecker::resetStateVariables()
 {
-	for (auto const& variable: m_variables)
-	{
-		if (variable.first->isStateVariable())
-		{
-			newValue(*variable.first);
-			setUnknownValue(*variable.first);
-		}
-	}
+	resetVariables([&](VariableDeclaration const& _variable) { return _variable.isStateVariable(); });
+}
+
+void SMTChecker::resetStorageReferences()
+{
+	resetVariables([&](VariableDeclaration const& _variable) { return _variable.hasReferenceOrMappingType(); });
 }
 
 void SMTChecker::resetVariables(vector<VariableDeclaration const*> _variables)
 {
 	for (auto const* decl: _variables)
+		resetVariable(*decl);
+}
+
+void SMTChecker::resetVariables(function<bool(VariableDeclaration const&)> const& _filter)
+{
+	for_each(begin(m_variables), end(m_variables), [&](auto _variable)
 	{
-		newValue(*decl);
-		setUnknownValue(*decl);
-	}
+		if (_filter(*_variable.first))
+			this->resetVariable(*_variable.first);
+	});
+}
+
+TypePointer SMTChecker::typeWithoutPointer(TypePointer const& _type)
+{
+	if (auto refType = dynamic_cast<ReferenceType const*>(_type.get()))
+		return ReferenceType::copyForLocationIfReference(refType->location(), _type);
+	return _type;
 }
 
 void SMTChecker::mergeVariables(vector<VariableDeclaration const*> const& _variables, smt::Expression const& _condition, VariableIndices const& _indicesEndTrue, VariableIndices const& _indicesEndFalse)
@@ -1294,7 +1487,7 @@ void SMTChecker::createExpr(Expression const& _e)
 void SMTChecker::defineExpr(Expression const& _e, smt::Expression _value)
 {
 	createExpr(_e);
-	solAssert(isSupportedType(*_e.annotation().type), "Equality operator applied to type that is not fully supported");
+	solAssert(smtKind(_e.annotation().type->category()) != smt::Kind::Function, "Equality operator applied to type that is not fully supported");
 	m_interface->addAssertion(expr(_e) == _value);
 }
 

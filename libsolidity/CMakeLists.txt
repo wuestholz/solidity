@@ -56,8 +56,6 @@ set(sources
 	codegen/ABIFunctions.h
 	codegen/ArrayUtils.cpp
 	codegen/ArrayUtils.h
-	codegen/AsmCodeGen.cpp
-	codegen/AsmCodeGen.h
 	codegen/Compiler.cpp
 	codegen/Compiler.h
 	codegen/CompilerContext.cpp
@@ -70,6 +68,10 @@ set(sources
 	codegen/ExpressionCompiler.h
 	codegen/LValue.cpp
 	codegen/LValue.h
+	codegen/MultiUseYulFunctionCollector.h
+	codegen/MultiUseYulFunctionCollector.cpp
+	codegen/YulUtilFunctions.h
+	codegen/YulUtilFunctions.cpp
 	formal/SMTChecker.cpp
 	formal/SMTChecker.h
 	formal/SMTLib2Interface.cpp
@@ -87,14 +89,13 @@ set(sources
 	formal/VariableUsage.h
 	interface/ABI.cpp
 	interface/ABI.h
-	interface/AssemblyStack.cpp
-	interface/AssemblyStack.h
 	interface/CompilerStack.cpp
 	interface/CompilerStack.h
 	interface/GasEstimator.cpp
 	interface/GasEstimator.h
 	interface/Natspec.cpp
 	interface/Natspec.h
+	interface/OptimiserSettings.h
 	interface/ReadFile.h
 	interface/StandardCompiler.cpp
 	interface/StandardCompiler.h
@@ -107,7 +108,7 @@ set(sources
 	parsing/Token.h
 )
 
-find_package(Z3 QUIET)
+find_package(Z3 4.6.0)
 if (${Z3_FOUND})
   add_definitions(-DHAVE_Z3)
   message("Z3 SMT solver found. This enables optional SMT checking with Z3.")

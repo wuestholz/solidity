@@ -1,7 +1,7 @@
 set(sources
 	Algorithms.h
+	AnsiColorized.h
 	Assertions.h
-	boost_multiprecision_number_compare_bug_workaround.hpp
 	Common.h
 	CommonData.cpp
 	CommonData.h

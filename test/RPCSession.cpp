@@ -137,11 +137,18 @@ string IPCSocket::sendRequest(string const& _req)
 #endif
 }
 
-RPCSession& RPCSession::instance(const string& _path)
+RPCSession& RPCSession::instance(string const& _path)
 {
-	static RPCSession session(_path);
-	BOOST_REQUIRE_EQUAL(session.m_ipcSocket.path(), _path);
-	return session;
+	try
+	{
+		static RPCSession session(_path);
+		BOOST_REQUIRE_EQUAL(session.m_ipcSocket.path(), _path);
+		return session;
+	}
+	catch (std::exception const&)
+	{
+		BOOST_THROW_EXCEPTION(std::runtime_error("Error creating RPC session for socket: " + _path));
+	}
 }
 
 string RPCSession::eth_getCode(string const& _address, string const& _blockNumber)
@@ -230,17 +237,19 @@ string RPCSession::personal_newAccount(string const& _password)
 void RPCSession::test_setChainParams(vector<string> const& _accounts)
 {
 	string forks;
-	if (test::Options::get().evmVersion() >= solidity::EVMVersion::tangerineWhistle())
+	if (test::Options::get().evmVersion() >= langutil::EVMVersion::tangerineWhistle())
 		forks += "\"EIP150ForkBlock\": \"0x00\",\n";
-	if (test::Options::get().evmVersion() >= solidity::EVMVersion::spuriousDragon())
+	if (test::Options::get().evmVersion() >= langutil::EVMVersion::spuriousDragon())
 		forks += "\"EIP158ForkBlock\": \"0x00\",\n";
-	if (test::Options::get().evmVersion() >= solidity::EVMVersion::byzantium())
+	if (test::Options::get().evmVersion() >= langutil::EVMVersion::byzantium())
 	{
 		forks += "\"byzantiumForkBlock\": \"0x00\",\n";
 		m_receiptHasStatusField = true;
 	}
-	if (test::Options::get().evmVersion() >= solidity::EVMVersion::constantinople())
+	if (test::Options::get().evmVersion() >= langutil::EVMVersion::constantinople())
 		forks += "\"constantinopleForkBlock\": \"0x00\",\n";
+	if (test::Options::get().evmVersion() >= langutil::EVMVersion::petersburg())
+		forks += "\"constantinopleFixForkBlock\": \"0x00\",\n";
 	static string const c_configString = R"(
 	{
 		"sealEngine": "NoProof",
@@ -324,7 +333,15 @@ Json::Value RPCSession::rpcCall(string const& _methodName, vector<string> const&
 	Json::Value result;
 	string errorMsg;
 	if (!jsonParseStrict(reply, result, &errorMsg))
-		BOOST_REQUIRE_MESSAGE(false, errorMsg);
+		BOOST_FAIL("Failed to parse JSON-RPC response: " + errorMsg);
+
+	if (!result.isMember("id") || !result["id"].isUInt())
+		BOOST_FAIL("Badly formatted JSON-RPC response (missing or non-integer \"id\")");
+	if (result["id"].asUInt() != (m_rpcSequence - 1))
+		BOOST_FAIL(
+			"Response identifier mismatch. "
+			"Expected " + to_string(m_rpcSequence - 1) + " but got " + to_string(result["id"].asUInt()) + "."
+		);
 
 	if (result.isMember("error"))
 	{
@@ -350,7 +367,7 @@ string const& RPCSession::accountCreateIfNotExists(size_t _id)
 	return m_accounts[_id];
 }
 
-RPCSession::RPCSession(const string& _path):
+RPCSession::RPCSession(string const& _path):
 	m_ipcSocket(_path)
 {
 	accountCreate();

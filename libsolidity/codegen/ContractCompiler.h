@@ -28,8 +28,10 @@
 #include <functional>
 #include <ostream>
 
-namespace dev {
-namespace solidity {
+namespace dev
+{
+namespace solidity
+{
 
 /**
  * Code generator at the contract level. Can be used to generate code for exactly one contract
@@ -38,24 +40,26 @@ namespace solidity {
 class ContractCompiler: private ASTConstVisitor
 {
 public:
-	explicit ContractCompiler(ContractCompiler* _runtimeCompiler, CompilerContext& _context, bool _optimise, size_t _optimise_runs = 200):
-		m_optimise(_optimise),
-		m_optimise_runs(_optimise_runs),
+	explicit ContractCompiler(
+		ContractCompiler* _runtimeCompiler,
+		CompilerContext& _context,
+		OptimiserSettings _optimiserSettings
+	):
+		m_optimiserSettings(std::move(_optimiserSettings)),
 		m_runtimeCompiler(_runtimeCompiler),
 		m_context(_context)
 	{
-		m_context = CompilerContext(_context.evmVersion(), _runtimeCompiler ? &_runtimeCompiler->m_context : nullptr);
 	}
 
 	void compileContract(
 		ContractDefinition const& _contract,
-		std::map<ContractDefinition const*, eth::Assembly const*> const& _contracts
+		std::map<ContractDefinition const*, std::shared_ptr<Compiler const>> const& _otherCompilers
 	);
 	/// Compiles the constructor part of the contract.
 	/// @returns the identifier of the runtime sub-assembly.
 	size_t compileConstructor(
 		ContractDefinition const& _contract,
-		std::map<ContractDefinition const*, eth::Assembly const*> const& _contracts
+		std::map<ContractDefinition const*, std::shared_ptr<Compiler const>> const& _otherCompilers
 	);
 
 private:
@@ -63,7 +67,7 @@ private:
 	/// information about the contract like the AST annotations.
 	void initializeContext(
 		ContractDefinition const& _contract,
-		std::map<ContractDefinition const*, eth::Assembly const*> const& _compiledContracts
+		std::map<ContractDefinition const*, std::shared_ptr<Compiler const>> const& _otherCompilers
 	);
 	/// Adds the code that is run at creation time. Should be run after exchanging the run-time context
 	/// with a new and initialized context. Adds the constructor code.
@@ -130,8 +134,7 @@ private:
 	/// Sets the stack height for the visited loop.
 	void storeStackHeight(ASTNode const* _node);
 
-	bool const m_optimise;
-	size_t const m_optimise_runs = 200;
+	OptimiserSettings const m_optimiserSettings;
 	/// Pointer to the runtime compiler in case this is a creation compiler.
 	ContractCompiler* m_runtimeCompiler = nullptr;
 	CompilerContext& m_context;

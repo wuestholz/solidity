@@ -140,6 +140,12 @@ inline bytes toCompactBigEndian(uint8_t _val, unsigned _min = 0)
 	return (_min || _val) ? bytes{ _val } : bytes{};
 }
 
+/// Workarounds shift left bug in boost <1.65.1.
+template <class S> S bigintShiftLeftWorkaround(S const& _a, unsigned _b)
+{
+	return (S)(bigint(_a) << _b);
+}
+
 /// Convenience function for conversion of a u256 to hex
 inline std::string toHex(u256 val, HexPrefix prefix = HexPrefix::DontAdd)
 {
@@ -175,9 +181,6 @@ inline std::string toCompactHexWithPrefix(u256 val)
 
 // Algorithms for string and string-like collections.
 
-/// Escapes a string into the C-string representation.
-/// @p _all if true will escape all characters, not just the unprintable ones.
-std::string escaped(std::string const& _s, bool _all = true);
 /// Determine bytes required to encode the given integer value. @returns 0 if @a _i is zero.
 template <class T>
 inline unsigned bytesRequired(T _i)
@@ -240,7 +243,7 @@ bool contains(T const& _t, V const& _v)
 /// place at the end, but already visited elements might be invalidated.
 /// If nothing is replaced, no copy is performed.
 template <typename T, typename F>
-void iterateReplacing(std::vector<T>& _vector, const F& _f)
+void iterateReplacing(std::vector<T>& _vector, F const& _f)
 {
 	// Concept: _f must be Callable, must accept param T&, must return optional<vector<T>>
 	bool useModified = false;
@@ -263,6 +266,59 @@ void iterateReplacing(std::vector<T>& _vector, const F& _f)
 		_vector = std::move(modifiedVector);
 }
 
+
+namespace detail
+{
+template <typename T, typename F, std::size_t... I>
+void iterateReplacingWindow(std::vector<T>& _vector, F const& _f, std::index_sequence<I...>)
+{
+	// Concept: _f must be Callable, must accept sizeof...(I) parameters of type T&, must return optional<vector<T>>
+	bool useModified = false;
+	std::vector<T> modifiedVector;
+	size_t i = 0;
+	for (; i + sizeof...(I) <= _vector.size(); ++i)
+	{
+		if (boost::optional<std::vector<T>> r = _f(_vector[i + I]...))
+		{
+			if (!useModified)
+			{
+				std::move(_vector.begin(), _vector.begin() + i, back_inserter(modifiedVector));
+				useModified = true;
+			}
+			modifiedVector += std::move(*r);
+			i += sizeof...(I) - 1;
+		}
+		else if (useModified)
+			modifiedVector.emplace_back(std::move(_vector[i]));
+	}
+	if (useModified)
+	{
+		for (; i < _vector.size(); ++i)
+			modifiedVector.emplace_back(std::move(_vector[i]));
+		_vector = std::move(modifiedVector);
+	}
+}
+
+}
+
+/// Function that iterates over the vector @param _vector,
+/// calling the function @param _f on sequences of @tparam N of its
+/// elements. If @param _f returns a vector, these elements are replaced by
+/// the returned vector and the iteration continues with the next @tparam N elements.
+/// If the function does not return a vector, the iteration continues with an overlapping
+/// sequence of @tparam N elements that starts with the second element of the previous
+/// iteration.
+/// During the iteration, the original vector is only valid
+/// on the current element and after that. The actual replacement takes
+/// place at the end, but already visited elements might be invalidated.
+/// If nothing is replaced, no copy is performed.
+template <std::size_t N, typename T, typename F>
+void iterateReplacingWindow(std::vector<T>& _vector, F const& _f)
+{
+	// Concept: _f must be Callable, must accept N parameters of type T&, must return optional<vector<T>>
+	detail::iterateReplacingWindow(_vector, _f, std::make_index_sequence<N>{});
+}
+
 /// @returns true iff @a _str passess the hex address checksum test.
 /// @param _strict if false, hex strings with only uppercase or only lowercase letters
 /// are considered valid.
@@ -281,4 +337,11 @@ bool containerEqual(Container const& _lhs, Container const& _rhs, Compare&& _com
 	return std::equal(std::begin(_lhs), std::end(_lhs), std::begin(_rhs), std::end(_rhs), std::forward<Compare>(_compare));
 }
 
+inline std::string findAnyOf(std::string const& _haystack, std::vector<std::string> const& _needles)
+{
+	for (std::string const& needle: _needles)
+		if (_haystack.find(needle) != std::string::npos)
+			return needle;
+	return "";
+}
 }

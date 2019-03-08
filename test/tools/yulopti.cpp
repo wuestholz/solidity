@@ -46,9 +46,12 @@
 #include <libyul/optimiser/UnusedPruner.h>
 #include <libyul/optimiser/ExpressionJoiner.h>
 #include <libyul/optimiser/RedundantAssignEliminator.h>
+#include <libyul/optimiser/SSAReverser.h>
 #include <libyul/optimiser/SSATransform.h>
+#include <libyul/optimiser/StackCompressor.h>
 #include <libyul/optimiser/StructuralSimplifier.h>
 #include <libyul/optimiser/VarDeclInitializer.h>
+#include <libyul/optimiser/VarNameCleaner.h>
 
 #include <libyul/backends/evm/EVMDialect.h>
 
@@ -97,7 +100,6 @@ public:
 		AsmAnalyzer analyzer(
 			*m_analysisInfo,
 			errorReporter,
-			EVMVersion::byzantium(),
 			langutil::Error::Type::SyntaxError,
 			m_dialect
 		);
@@ -127,9 +129,10 @@ public:
 				disambiguated = true;
 			}
 			cout << "(q)quit/(f)flatten/(c)se/initialize var(d)ecls/(x)plit/(j)oin/(g)rouper/(h)oister/" << endl;
-			cout << "  (e)xpr inline/(i)nline/(s)implify/(u)nusedprune/ss(a) transform/" << endl;
+			cout << "  (e)xpr inline/(i)nline/(s)implify/varname c(l)eaner/(u)nusedprune/ss(a) transform/" << endl;
 			cout << "  (r)edundant assign elim./re(m)aterializer/f(o)r-loop-pre-rewriter/" << endl;
-			cout << "  s(t)ructural simplifier/equi(v)alent function combiner? " << endl;
+			cout << "  s(t)ructural simplifier/equi(v)alent function combiner/ssa re(V)erser/? " << endl;
+			cout << "  stack com(p)ressor? " << endl;
 			cout.flush();
 			int option = readStandardInputChar();
 			cout << ' ' << char(option) << endl;
@@ -148,6 +151,9 @@ public:
 				break;
 			case 'd':
 				(VarDeclInitializer{})(*m_ast);
+				break;
+			case 'l':
+				VarNameCleaner{*m_ast, *m_dialect}(*m_ast);
 				break;
 			case 'x':
 				ExpressionSplitter{*m_dialect, *m_nameDispenser}(*m_ast);
@@ -188,6 +194,12 @@ public:
 			case 'v':
 				EquivalentFunctionCombiner::run(*m_ast);
 				break;
+			case 'V':
+				SSAReverser::run(*m_ast);
+				break;
+			case 'p':
+				StackCompressor::run(m_dialect, *m_ast);
+				break;
 			default:
 				cout << "Unknown option." << endl;
 			}
@@ -198,7 +210,7 @@ public:
 private:
 	ErrorList m_errors;
 	shared_ptr<yul::Block> m_ast;
-	shared_ptr<Dialect> m_dialect{EVMDialect::strictAssemblyForEVMObjects()};
+	shared_ptr<Dialect> m_dialect{EVMDialect::strictAssemblyForEVMObjects(EVMVersion{})};
 	shared_ptr<AsmAnalysisInfo> m_analysisInfo;
 	shared_ptr<NameDispenser> m_nameDispenser;
 };

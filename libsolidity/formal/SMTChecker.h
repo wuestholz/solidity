@@ -23,6 +23,7 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/interface/ReadFile.h>
+#include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Scanner.h>
 
 #include <string>
@@ -86,6 +87,7 @@ private:
 	void visitAssert(FunctionCall const& _funCall);
 	void visitRequire(FunctionCall const& _funCall);
 	void visitGasLeft(FunctionCall const& _funCall);
+	void visitTypeConversion(FunctionCall const& _funCall);
 	/// Visits the FunctionDefinition of the called function
 	/// if available and inlines the return value.
 	void inlineFunctionCall(FunctionCall const& _funCall);
@@ -101,8 +103,6 @@ private:
 	void arrayAssignment();
 	/// Handles assignment to SMT array index.
 	void arrayIndexAssignment(Assignment const& _assignment);
-	/// Erases information about SMT arrays.
-	void eraseArrayKnowledge();
 
 	/// Division expression in the given type. Requires special treatment because
 	/// of rounding for signed division.
@@ -135,9 +135,33 @@ private:
 		Expression const& _condition,
 		std::string const& _description
 	);
-	/// Checks that the value is in the range given by the type.
-	void checkUnderOverflow(smt::Expression _value, IntegerType const& _Type, langutil::SourceLocation const& _location);
 
+	struct OverflowTarget
+	{
+		enum class Type { Underflow, Overflow, All } type;
+		TypePointer intType;
+		smt::Expression value;
+		smt::Expression path;
+		langutil::SourceLocation const& location;
+
+		OverflowTarget(Type _type, TypePointer _intType, smt::Expression _value, smt::Expression _path, langutil::SourceLocation const& _location):
+			type(_type),
+			intType(_intType),
+			value(_value),
+			path(_path),
+			location(_location)
+		{
+			solAssert(dynamic_cast<IntegerType const*>(intType.get()), "");
+		}
+	};
+
+	/// Checks that the value is in the range given by the type.
+	void checkUnderflow(OverflowTarget& _target);
+	void checkOverflow(OverflowTarget& _target);
+	/// Calls the functions above for all elements in m_overflowTargets accordingly.
+	void checkUnderOverflow();
+	/// Adds an overflow target for lazy check at the end of the function.
+	void addOverflowTarget(OverflowTarget::Type _type, TypePointer _intType, smt::Expression _value, langutil::SourceLocation const& _location);
 
 	std::pair<smt::CheckResult, std::vector<std::string>>
 	checkSatisfiableAndGenerateModel(std::vector<smt::Expression> const& _expressionsToEvaluate);
@@ -146,8 +170,14 @@ private:
 
 	void initializeLocalVariables(FunctionDefinition const& _function);
 	void initializeFunctionCallParameters(FunctionDefinition const& _function, std::vector<smt::Expression> const& _callArgs);
+	void resetVariable(VariableDeclaration const& _variable);
 	void resetStateVariables();
+	void resetStorageReferences();
 	void resetVariables(std::vector<VariableDeclaration const*> _variables);
+	void resetVariables(std::function<bool(VariableDeclaration const&)> const& _filter);
+	/// @returns the type without storage pointer information if it has it.
+	TypePointer typeWithoutPointer(TypePointer const& _type);
+
 	/// Given two different branches and the touched variables,
 	/// merge the touched variables into after-branch ite variables
 	/// using the branch condition as guard.
@@ -211,6 +241,8 @@ private:
 	std::shared_ptr<VariableUsage> m_variableUsage;
 	bool m_loopExecutionHappened = false;
 	bool m_arrayAssignmentHappened = false;
+	// True if the "No SMT solver available" warning was already created.
+	bool m_noSolverWarning = false;
 	/// An Expression may have multiple smt::Expression due to
 	/// repeated calls to the same function.
 	std::unordered_map<Expression const*, std::shared_ptr<SymbolicVariable>> m_expressions;
@@ -221,7 +253,13 @@ private:
 	/// Used to retrieve models.
 	std::set<Expression const*> m_uninterpretedTerms;
 	std::vector<smt::Expression> m_pathConditions;
-	langutil::ErrorReporter& m_errorReporter;
+	/// ErrorReporter that comes from CompilerStack.
+	langutil::ErrorReporter& m_errorReporterReference;
+	/// Local SMTChecker ErrorReporter.
+	/// This is necessary to show the "No SMT solver available"
+	/// warning before the others in case it's needed.
+	langutil::ErrorReporter m_errorReporter;
+	langutil::ErrorList m_smtErrors;
 	std::shared_ptr<langutil::Scanner> m_scanner;
 
 	/// Stores the current path of function calls.
@@ -231,6 +269,8 @@ private:
 	bool isRootFunction();
 	/// Returns true if _funDef was already visited.
 	bool visitedFunction(FunctionDefinition const* _funDef);
+
+	std::vector<OverflowTarget> m_overflowTargets;
 };
 
 }

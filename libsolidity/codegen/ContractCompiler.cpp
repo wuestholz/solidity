@@ -21,14 +21,16 @@
  */
 
 #include <libsolidity/ast/AST.h>
-#include <libsolidity/codegen/AsmCodeGen.h>
 #include <libsolidity/codegen/CompilerUtils.h>
 #include <libsolidity/codegen/ContractCompiler.h>
 #include <libsolidity/codegen/ExpressionCompiler.h>
 
+#include <libyul/backends/evm/AsmCodeGen.h>
+
 #include <libevmasm/Instruction.h>
 #include <libevmasm/Assembly.h>
 #include <libevmasm/GasMeter.h>
+
 #include <liblangutil/ErrorReporter.h>
 
 #include <boost/range/adaptor/reversed.hpp>
@@ -60,7 +62,7 @@ private:
 
 void ContractCompiler::compileContract(
 	ContractDefinition const& _contract,
-	std::map<const ContractDefinition*, eth::Assembly const*> const& _contracts
+	map<ContractDefinition const*, shared_ptr<Compiler const>> const& _otherCompilers
 )
 {
 	CompilerContext::LocationSetter locationSetter(m_context, _contract);
@@ -70,7 +72,7 @@ void ContractCompiler::compileContract(
 		// This has to be the first code in the contract.
 		appendDelegatecallCheck();
 
-	initializeContext(_contract, _contracts);
+	initializeContext(_contract, _otherCompilers);
 	// This generates the dispatch function for externally visible functions
 	// and adds the function to the compilation queue. Additionally internal functions,
 	// which are referenced directly or indirectly will be added.
@@ -81,7 +83,7 @@ void ContractCompiler::compileContract(
 
 size_t ContractCompiler::compileConstructor(
 	ContractDefinition const& _contract,
-	std::map<const ContractDefinition*, eth::Assembly const*> const& _contracts
+	std::map<ContractDefinition const*, shared_ptr<Compiler const>> const& _otherCompilers
 )
 {
 	CompilerContext::LocationSetter locationSetter(m_context, _contract);
@@ -89,18 +91,18 @@ size_t ContractCompiler::compileConstructor(
 		return deployLibrary(_contract);
 	else
 	{
-		initializeContext(_contract, _contracts);
+		initializeContext(_contract, _otherCompilers);
 		return packIntoContractCreator(_contract);
 	}
 }
 
 void ContractCompiler::initializeContext(
 	ContractDefinition const& _contract,
-	map<ContractDefinition const*, eth::Assembly const*> const& _compiledContracts
+	map<ContractDefinition const*, shared_ptr<Compiler const>> const& _otherCompilers
 )
 {
 	m_context.setExperimentalFeatures(_contract.sourceUnit().annotation().experimentalFeatures);
-	m_context.setCompiledContracts(_compiledContracts);
+	m_context.setOtherCompilers(_otherCompilers);
 	m_context.setInheritanceHierarchy(_contract.annotation().linearizedBaseContracts);
 	CompilerUtils(m_context).initialiseFreeMemoryPointer();
 	registerStateVariables(_contract);
@@ -175,6 +177,7 @@ size_t ContractCompiler::deployLibrary(ContractDefinition const& _contract)
 	solAssert(m_context.runtimeSub() != size_t(-1), "Runtime sub not registered");
 	m_context.pushSubroutineSize(m_context.runtimeSub());
 	m_context.pushSubroutineOffset(m_context.runtimeSub());
+	// This code replaces the address added by appendDeployTimeAddress().
 	m_context.appendInlineAssembly(R"(
 	{
 		// If code starts at 11, an mstore(0) writes to the full PUSH20 plus data
@@ -182,8 +185,7 @@ size_t ContractCompiler::deployLibrary(ContractDefinition const& _contract)
 		let codepos := 11
 		codecopy(codepos, subOffset, subSize)
 		// Check that the first opcode is a PUSH20
-		switch eq(0x73, byte(0, mload(codepos)))
-		case 0 { invalid() }
+		if iszero(eq(0x73, byte(0, mload(codepos)))) { invalid() }
 		mstore(0, address())
 		mstore8(codepos, 0x73)
 		return(codepos, subSize)
@@ -353,7 +355,7 @@ bool hasPayableFunctions(ContractDefinition const& _contract)
 void ContractCompiler::appendFunctionSelector(ContractDefinition const& _contract)
 {
 	map<FixedHash<4>, FunctionTypePointer> interfaceFunctions = _contract.interfaceFunctions();
-	map<FixedHash<4>, const eth::AssemblyItem> callDataUnpackerEntryPoints;
+	map<FixedHash<4>, eth::AssemblyItem const> callDataUnpackerEntryPoints;
 
 	if (_contract.isLibrary())
 	{
@@ -389,7 +391,7 @@ void ContractCompiler::appendFunctionSelector(ContractDefinition const& _contrac
 			sortedIDs.emplace_back(it.first);
 		}
 		std::sort(sortedIDs.begin(), sortedIDs.end());
-		appendInternalSelector(callDataUnpackerEntryPoints, sortedIDs, notFound, m_optimise_runs);
+		appendInternalSelector(callDataUnpackerEntryPoints, sortedIDs, notFound, m_optimiserSettings.expectedExecutionsPerDeployment);
 	}
 
 	m_context << notFound;
@@ -482,7 +484,7 @@ void ContractCompiler::initializeStateVariables(ContractDefinition const& _contr
 	solAssert(!_contract.isLibrary(), "Tried to initialize state variables of library.");
 	for (VariableDeclaration const* variable: _contract.stateVariables())
 		if (variable->value() && !variable->isConstant())
-			ExpressionCompiler(m_context, m_optimise).appendStateVariableInitialization(*variable);
+			ExpressionCompiler(m_context, m_optimiserSettings.runOrderLiterals).appendStateVariableInitialization(*variable);
 }
 
 bool ContractCompiler::visit(VariableDeclaration const& _variableDeclaration)
@@ -495,9 +497,9 @@ bool ContractCompiler::visit(VariableDeclaration const& _variableDeclaration)
 	m_continueTags.clear();
 
 	if (_variableDeclaration.isConstant())
-		ExpressionCompiler(m_context, m_optimise).appendConstStateVariableAccessor(_variableDeclaration);
+		ExpressionCompiler(m_context, m_optimiserSettings.runOrderLiterals).appendConstStateVariableAccessor(_variableDeclaration);
 	else
-		ExpressionCompiler(m_context, m_optimise).appendStateVariableAccessor(_variableDeclaration);
+		ExpressionCompiler(m_context, m_optimiserSettings.runOrderLiterals).appendStateVariableAccessor(_variableDeclaration);
 
 	return false;
 }
@@ -713,10 +715,11 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 		}
 	};
 	solAssert(_inlineAssembly.annotation().analysisInfo, "");
-	CodeGenerator::assemble(
+	yul::CodeGenerator::assemble(
 		_inlineAssembly.operations(),
 		*_inlineAssembly.annotation().analysisInfo,
-		m_context.nonConstAssembly(),
+		*m_context.assemblyPtr(),
+		m_context.evmVersion(),
 		identifierAccess
 	);
 	m_context.setStackOffset(startStackHeight);
@@ -975,7 +978,13 @@ void ContractCompiler::appendMissingFunctions()
 	m_context.appendMissingLowLevelFunctions();
 	auto abiFunctions = m_context.abiFunctions().requestedFunctions();
 	if (!abiFunctions.first.empty())
-		m_context.appendInlineAssembly("{" + move(abiFunctions.first) + "}", {}, abiFunctions.second, true);
+		m_context.appendInlineAssembly(
+			"{" + move(abiFunctions.first) + "}",
+			{},
+			abiFunctions.second,
+			true,
+			m_optimiserSettings.runYulOptimiser
+		);
 }
 
 void ContractCompiler::appendModifierOrFunctionCode()
@@ -1050,7 +1059,7 @@ void ContractCompiler::appendStackVariableInitialisation(VariableDeclaration con
 
 void ContractCompiler::compileExpression(Expression const& _expression, TypePointer const& _targetType)
 {
-	ExpressionCompiler expressionCompiler(m_context, m_optimise);
+	ExpressionCompiler expressionCompiler(m_context, m_optimiserSettings.runOrderLiterals);
 	expressionCompiler.compile(_expression);
 	if (_targetType)
 		CompilerUtils(m_context).convertType(*_expression.annotation().type, *_targetType);

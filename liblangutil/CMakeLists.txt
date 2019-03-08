@@ -1,5 +1,6 @@
 # Solidity Commons Library (Solidity related sharing bits between libsolidity and libyul)
 set(sources
+	Common.h
 	CharStream.cpp
 	CharStream.h
 	ErrorReporter.cpp
@@ -16,6 +17,8 @@ set(sources
 	SourceReferenceExtractor.h
 	SourceReferenceFormatter.cpp
 	SourceReferenceFormatter.h
+	SourceReferenceFormatterHuman.cpp
+	SourceReferenceFormatterHuman.h
 	Token.cpp
 	Token.h
 	UndefMacros.h

@@ -65,7 +65,7 @@ smt::Expression SymbolicVariable::increaseIndex()
 SymbolicBoolVariable::SymbolicBoolVariable(
 	TypePointer _type,
 	string const& _uniqueName,
-	smt::SolverInterface&_interface
+	smt::SolverInterface& _interface
 ):
 	SymbolicVariable(move(_type), _uniqueName, _interface)
 {
@@ -102,7 +102,7 @@ SymbolicFixedBytesVariable::SymbolicFixedBytesVariable(
 SymbolicFunctionVariable::SymbolicFunctionVariable(
 	TypePointer _type,
 	string const& _uniqueName,
-	smt::SolverInterface&_interface
+	smt::SolverInterface& _interface
 ):
 	SymbolicVariable(move(_type), _uniqueName, _interface),
 	m_declaration(m_interface.newVariable(currentName(), smtSort(*m_type)))
@@ -135,4 +135,24 @@ SymbolicMappingVariable::SymbolicMappingVariable(
 	SymbolicVariable(move(_type), _uniqueName, _interface)
 {
 	solAssert(isMapping(m_type->category()), "");
+}
+
+SymbolicArrayVariable::SymbolicArrayVariable(
+	TypePointer _type,
+	string const& _uniqueName,
+	smt::SolverInterface& _interface
+):
+	SymbolicVariable(move(_type), _uniqueName, _interface)
+{
+	solAssert(isArray(m_type->category()), "");
+}
+
+SymbolicEnumVariable::SymbolicEnumVariable(
+	TypePointer _type,
+	string const& _uniqueName,
+	smt::SolverInterface& _interface
+):
+	SymbolicVariable(move(_type), _uniqueName, _interface)
+{
+	solAssert(isEnum(m_type->category()), "");
 }

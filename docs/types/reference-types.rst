@@ -49,7 +49,7 @@ Data locations are not only relevant for persistency of data, but also for the s
 
 ::
 
-    pragma solidity >=0.4.0 <0.6.0;
+    pragma solidity >=0.4.0 <0.7.0;
 
     contract C {
         uint[] x; // the data location of x is storage
@@ -106,12 +106,22 @@ Array elements can be of any type, including mapping or struct. The general
 restrictions for types apply, in that mappings can only be stored in the
 ``storage`` data location and publicly-visible functions need parameters that are :ref:`ABI types <ABI>`.
 
+It is possible to mark state variable arrays ``public`` and have Solidity create a :ref:`getter <visibility-and-getters>`.
+The numeric index becomes a required parameter for the getter.
+
 Accessing an array past its end causes a failing assertion. You can use the ``.push()`` method to append a new element at the end or assign to the ``.length`` :ref:`member <array-members>` to change the size (see below for caveats).
 method or increase the ``.length`` :ref:`member <array-members>` to add elements.
+
+``bytes`` and ``strings`` as Arrays
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Variables of type ``bytes`` and ``string`` are special arrays. A ``bytes`` is similar to ``byte[]``,
 but it is packed tightly in calldata and memory. ``string`` is equal to ``bytes`` but does not allow
 length or index access.
+
+Solidity does not have string manipulation functions, but there are
+third-party string libraries. You can also compare two strings by their keccak256-hash using
+``keccak256(abi.encodePacked(s1)) == keccak256(abi.encodePacked(s2))`` and concatenate two strings using ``abi.encodePacked(s1, s2)``.
 
 You should use ``bytes`` over ``byte[]`` because it is cheaper, since ``byte[]`` adds 31 padding bytes between the elements. As a general rule,
 use ``bytes`` for arbitrary-length raw byte data and ``string`` for arbitrary-length
@@ -124,22 +134,19 @@ always use one of the value types ``bytes1`` to ``bytes32`` because they are muc
     that you are accessing the low-level bytes of the UTF-8 representation,
     and not the individual characters.
 
-It is possible to mark arrays ``public`` and have Solidity create a :ref:`getter <visibility-and-getters>`.
-The numeric index becomes a required parameter for the getter.
-
 .. index:: ! array;allocating, new
 
 Allocating Memory Arrays
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can use the ``new`` keyword to create arrays with a runtime-dependent length in memory.
+You must use the ``new`` keyword to create arrays with a runtime-dependent length in memory.
 As opposed to storage arrays, it is **not** possible to resize memory arrays (e.g. by assigning to
 the ``.length`` member). You either have to calculate the required size in advance
 or create a new memory array and copy every element.
 
 ::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract C {
         function f(uint len) public pure {
@@ -168,7 +175,7 @@ In the example below, the type of ``[1, 2, 3]`` is
 
 ::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract C {
         function f() public pure {
@@ -183,7 +190,7 @@ Fixed size memory arrays cannot be assigned to dynamically-sized memory arrays, 
 
 ::
 
-    pragma solidity >=0.4.0 <0.6.0;
+    pragma solidity >=0.4.0 <0.7.0;
 
     // This will not compile.
     contract C {
@@ -241,7 +248,7 @@ Array Members
 
 ::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract ArrayContract {
         uint[2**20] m_aLotOfIntegers;
@@ -340,7 +347,7 @@ shown in the following example:
 
 ::
 
-    pragma solidity >=0.4.11 <0.6.0;
+    pragma solidity >=0.4.11 <0.7.0;
 
     contract CrowdFunding {
         // Defines a new type with two fields.

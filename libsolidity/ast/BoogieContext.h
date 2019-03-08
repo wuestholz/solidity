@@ -53,7 +53,7 @@ private:
 	std::vector<Declaration const*> m_globalDecls;
 	std::vector<MagicVariableDeclaration*> m_verifierSum;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
-	EVMVersion m_evmVersion;
+	langutil::EVMVersion m_evmVersion;
 
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
@@ -65,7 +65,7 @@ private:
 
 public:
 	BoogieContext(Encoding encoding, bool overflow, langutil::ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
+			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, langutil::EVMVersion evmVersion);
 
 	smack::Program& program() { return m_program; }
 	Encoding encoding() { return m_encoding; }
@@ -75,7 +75,7 @@ public:
 	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
-	EVMVersion& evmVersion() { return m_evmVersion; }
+	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 

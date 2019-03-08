@@ -39,6 +39,11 @@ Operators:
 * Shift operators: ``<<`` (left shift), ``>>`` (right shift)
 * Arithmetic operators: ``+``, ``-``, unary ``-``, ``*``, ``/``, ``%`` (modulo), ``**`` (exponentiation)
 
+.. warning::
+
+  Integers in Solidity are restricted to a certain range. For example, with ``uint32``, this is ``0`` up to ``2**32 - 1``.
+  If the result of some operation on those numbers does not fit inside this range, it is truncated. These truncations can have
+  serious consequences that you should :ref:`be aware of and mitigate against<underflow-overflow>`.
 
 Comparisons
 ^^^^^^^^^^^
@@ -300,8 +305,7 @@ Contract Types
 
 Every :ref:`contract<contracts>` defines its own type.
 You can implicitly convert contracts to contracts they inherit from.
-Contracts can be explicitly converted to and from all other contract types
-and the ``address`` type.
+Contracts can be explicitly converted to and from the ``address`` type.
 
 Explicit conversion to and from the ``address payable`` type
 is only possible if the contract type has a payable fallback function.
@@ -328,6 +332,9 @@ Contracts do not support any operators.
 
 The members of contract types are the external functions of the contract
 including public state variables.
+
+For a contract ``C`` you can use ``type(C)`` to access
+:ref:`type information<meta-type>` about the contract.
 
 .. index:: byte array, bytes32
 
@@ -510,7 +517,7 @@ subsequent unsigned integer values starting from ``0``.
 
 ::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract test {
         enum ActionChoices { GoLeft, GoRight, GoStraight, SitStill }
@@ -606,20 +613,28 @@ just use ``f``, if you want to use its external form, use ``this.f``.
 
 Members:
 
-Public (or external) functions also have a special member called ``selector``,
-which returns the :ref:`ABI function selector <abi_function_selector>`::
+Public (or external) functions have the following members:
 
-    pragma solidity >=0.4.16 <0.6.0;
+* ``.selector`` returns the :ref:`ABI function selector <abi_function_selector>`
+* ``.gas(uint)`` returns a callable function object which, when called, will send the specified amount of gas to the target function. See :ref:`External Function Calls <external-function-calls>` for more information.
+* ``.value(uint)`` returns a callable function object which, when called, will send the specified amount of wei to the target function. See :ref:`External Function Calls <external-function-calls>` for more information.
 
-    contract Selector {
-      function f() public pure returns (bytes4) {
+Example that shows how to use the members::
+
+    pragma solidity >=0.4.16 <0.7.0;
+
+    contract Example {
+      function f() public payable returns (bytes4) {
         return this.f.selector;
+      }
+      function g() public {
+        this.f.gas(10).value(800)();
       }
     }
 
 Example that shows how to use internal function types::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     library ArrayUtils {
       // internal functions can be used in internal library functions because
@@ -670,7 +685,7 @@ Example that shows how to use internal function types::
 
 Another example that uses external function types::
 
-    pragma solidity >=0.4.22 <0.6.0;
+    pragma solidity >=0.4.22 <0.7.0;
 
     contract Oracle {
       struct Request {

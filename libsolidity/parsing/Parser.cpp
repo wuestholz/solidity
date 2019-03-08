@@ -1,18 +1,18 @@
 /*
-    This file is part of solidity.
+	This file is part of solidity.
 
-    solidity is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+	solidity is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
 
-    solidity is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	solidity is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with solidity.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with solidity.  If not, see <http://www.gnu.org/licenses/>.
 */
 /**
  * @author Christian <c@ethdev.com>
@@ -239,6 +239,8 @@ ASTPointer<ImportDirective> Parser::parseImportDirective()
 			fatalParserError("Expected import path.");
 		path = getLiteralAndAdvance();
 	}
+	if (path->empty())
+		fatalParserError("Import path cannot be empty.");
 	nodeFactory.markEndPosition();
 	expectToken(Token::Semicolon);
 	return nodeFactory.createNode<ImportDirective>(path, unitAlias, move(symbolAliases));
@@ -1057,8 +1059,11 @@ ASTPointer<InlineAssembly> Parser::parseInlineAssembly(ASTPointer<ASTString> con
 		m_scanner->next();
 	}
 
-	yul::Parser asmParser(m_errorReporter, yul::EVMDialect::looseAssemblyForEVM());
+	// Using latest EVM Version for now, it will be run again later.
+	yul::Parser asmParser(m_errorReporter, yul::EVMDialect::looseAssemblyForEVM(EVMVersion{}));
 	shared_ptr<yul::Block> block = asmParser.parse(m_scanner, true);
+	if (block == nullptr)
+		BOOST_THROW_EXCEPTION(FatalError());
 	nodeFactory.markEndPosition();
 	return nodeFactory.createNode<InlineAssembly>(_docString, block);
 }
@@ -1568,6 +1573,12 @@ ASTPointer<Expression> Parser::parsePrimaryExpression()
 	case Token::Identifier:
 		nodeFactory.markEndPosition();
 		expression = nodeFactory.createNode<Identifier>(getLiteralAndAdvance());
+		break;
+	case Token::Type:
+		// Inside expressions "type" is the name of a special, globally-available function.
+		nodeFactory.markEndPosition();
+		m_scanner->next();
+		expression = nodeFactory.createNode<Identifier>(make_shared<ASTString>("type"));
 		break;
 	case Token::LParen:
 	case Token::LBrack:

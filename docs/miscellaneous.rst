@@ -62,7 +62,7 @@ non-elementary type, the positions are found by adding an offset of ``keccak256(
 
 So for the following contract snippet::
 
-    pragma solidity >=0.4.0 <0.6.0;
+    pragma solidity >=0.4.0 <0.7.0;
 
     contract C {
       struct s { uint a; uint b; }
@@ -351,7 +351,7 @@ Global Variables
 
 - ``abi.decode(bytes memory encodedData, (...)) returns (...)``: :ref:`ABI <ABI>`-decodes the provided data. The types are given in parentheses as second argument. Example: ``(uint a, uint[2] memory b, bytes memory c) = abi.decode(data, (uint, uint[2], bytes))``
 - ``abi.encode(...) returns (bytes memory)``: :ref:`ABI <ABI>`-encodes the given arguments
-- ``abi.encodePacked(...) returns (bytes memory)``: Performs :ref:`packed encoding <abi_packed_mode>` of the given arguments
+- ``abi.encodePacked(...) returns (bytes memory)``: Performs :ref:`packed encoding <abi_packed_mode>` of the given arguments. Note that this encoding can be ambiguous!
 - ``abi.encodeWithSelector(bytes4 selector, ...) returns (bytes memory)``: :ref:`ABI <ABI>`-encodes the given arguments
    starting from the second and prepends the given four-byte selector
 - ``abi.encodeWithSignature(string memory signature, ...) returns (bytes memory)``: Equivalent to ``abi.encodeWithSelector(bytes4(keccak256(bytes(signature)), ...)```
@@ -385,6 +385,9 @@ Global Variables
 - ``<address>.balance`` (``uint256``): balance of the :ref:`address` in Wei
 - ``<address payable>.send(uint256 amount) returns (bool)``: send given amount of Wei to :ref:`address`, returns ``false`` on failure
 - ``<address payable>.transfer(uint256 amount)``: send given amount of Wei to :ref:`address`, throws on failure
+- ``type(C).name`` (``string``): the name of the contract
+- ``type(C).creationCode`` (``bytes memory``): creation bytecode of the given contract, see :ref:`Type Information<meta-type>`.
+- ``type(C).runtimeCode`` (``bytes memory``): runtime bytecode of the given contract, see :ref:`Type Information<meta-type>`.
 
 .. note::
     Do not rely on ``block.timestamp``, ``now`` and ``blockhash`` as a source of randomness,
@@ -445,7 +448,7 @@ These keywords are reserved in Solidity. They might become part of the syntax in
 ``abstract``, ``after``, ``alias``, ``apply``, ``auto``, ``case``, ``catch``, ``copyof``, ``default``,
 ``define``, ``final``, ``immutable``, ``implements``, ``in``, ``inline``, ``let``, ``macro``, ``match``,
 ``mutable``, ``null``, ``of``, ``override``, ``partial``, ``promise``, ``reference``, ``relocatable``,
-``sealed``, ``sizeof``, ``static``, ``supports``, ``switch``, ``try``, ``type``, ``typedef``, ``typeof``,
+``sealed``, ``sizeof``, ``static``, ``supports``, ``switch``, ``try``, ``typedef``, ``typeof``,
 ``unchecked``.
 
 Language Grammar

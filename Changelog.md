@@ -1,17 +1,121 @@
-### 0.5.3 (unreleased)
+### 0.6.0 (unreleased)
 
 Language Features:
+ * Allow calldata arrays with dynamically encoded base types with ABIEncoderV2.
+
+
+Compiler Features:
+ * Peephole Optimizer: Remove double ``iszero`` before ``jumpi``.
+ * SMTChecker: Support enums without typecast.
+ * SMTChecker: Support one-dimensional arrays.
+ * Yul Optimizer: Add rule to remove empty default switch cases
+ * Yul Optimizer: Add rule to remove empty cases if no default exists
+ * Yul Optimizer: Add rule to replace a switch with no cases with pop(expression)
+
+
+Bugfixes:
+ * Type system: Detect if a contract's base uses types that require the experimental abi encoder while the contract still uses the old encoder
+ * Yul Optimizer: Fix visitation order bug for the structural simplifier.
+
+
+Build System:
+ * Soltest: Add support for arrays in function signatures.
+
+
+### 0.5.5 (2019-03-05)
+
+Language Features:
+ * Add support for getters of mappings with ``string`` or ``bytes`` key types.
+ * Meta programming: Provide access to the name of contracts via ``type(C).name``.
+
+
+Compiler Features:
+ * Support ``petersburg`` as ``evmVersion`` and set as default.
+ * Commandline Interface: Option to activate the experimental yul optimizer using ``-optimize-yul``.
+ * Inline Assembly: Consider ``extcodehash`` as part of Constantinople.
+ * Inline Assembly: Instructions unavailable to the currently configured EVM are errors now.
+ * SMTChecker: Do not report underflow/overflow if they always revert. This removes false positives when using ``SafeMath``.
+ * Standard JSON Interface: Allow retrieving metadata without triggering bytecode generation.
+ * Standard JSON Interface: Provide fine-grained control over the optimizer via the settings.
+ * Static Analyzer: Warn about expressions with custom types when they have no effect.
+ * Optimizer: Add new rules with constants including ``LT``, ``GT``, ``AND`` and ``BYTE``.
+ * Optimizer: Add rule for shifts with constants for Constantinople.
+ * Optimizer: Combine multiple shifts with constant shift-by values into one.
+ * Optimizer: Do not mask with 160-bits after ``CREATE`` and ``CREATE2`` as they are guaranteed to return an address or 0.
+ * Optimizer: Support shifts in the constant optimiser for Constantinople.
+ * Yul Optimizer: Add rule to replace switch statements with literals by matching case body.
+
+
+Bugfixes:
+ * ABIEncoderV2: Fix internal error related to bare delegatecall.
+ * ABIEncoderV2: Fix internal error related to ecrecover.
+ * ABIEncoderV2: Fix internal error related to mappings as library parameters.
+ * ABIEncoderV2: Fix invalid signature for events containing structs emitted in libraries.
+ * Inline Assembly: Proper error message for missing variables.
+ * Optimizer: Fix internal error related to unused tag removal across assemblies. This never generated any invalid code.
+ * SMTChecker: Fix crash related to statically-sized arrays.
+ * TypeChecker: Fix internal error and disallow index access on contracts and libraries.
+ * Yul: Properly detect name clashes with functions before their declaration.
+ * Yul: Take built-in functions into account in the compilability checker.
+ * Yul Optimizer: Properly take reassignments to variables in sub-expressions into account when replacing in the ExpressionSimplifier.
+
+
+Build System:
+ * Soltest: Add support for left-aligned, padded hex literals.
+ * Soltest: Add support for right-aligned, padded boolean literals.
+
+### 0.5.4 (2019-02-12)
+
+Language Features:
+ * Allow calldata structs without dynamically encoded members with ABIEncoderV2.
+
+
+Compiler Features:
+ * ABIEncoderV2: Implement packed encoding.
+ * C API (``libsolc`` / raw ``soljson.js``): Introduce ``solidity_free`` method which releases all internal buffers to save memory.
+ * Commandline Interface: Adds new option ``--new-reporter`` for improved diagnostics formatting
+   along with ``--color`` and ``--no-color`` for colorized output to be forced (or explicitly disabled).
+
+
+Bugfixes:
+ * Code Generator: Defensively pad allocation of creationCode and runtimeCode to multiples of 32 bytes.
+ * Commandline Interface: Allow yul optimizer only for strict assembly.
+ * Parser: Disallow empty import statements.
+ * Type Checker: Disallow mappings with data locations other than ``storage``.
+ * Type Checker: Fix internal error when a struct array index does not fit into a uint256.
+ * Type System: Properly report packed encoded size for arrays and structs (mostly unused until now).
+
+
+Build System:
+ * Add support for continuous fuzzing via Google oss-fuzz
+ * SMT: If using Z3, require version 4.6.0 or newer.
+ * Soltest: Add parser that is used in the file-based unit test environment.
+ * Ubuntu PPA Packages: Use CVC4 as SMT solver instead of Z3
+
+
+### 0.5.3 (2019-01-22)
+
+Language Features:
+ * Provide access to creation and runtime code of contracts via ``type(C).creationCode`` / ``type(C).runtimeCode``.
 
 
 Compiler Features:
  * Control Flow Graph: Warn about unreachable code.
+ * SMTChecker: Support basic typecasts without truncation.
+ * SMTChecker: Support external function calls and erase all knowledge regarding storage variables and references.
 
 
 Bugfixes:
+ * Emscripten: Split simplification rule initialization up further to work around issues with soljson.js in some browsers.
+ * Type Checker: Disallow calldata structs until implemented.
+ * Type Checker: Return type error if fixed point encoding is attempted instead of throwing ``UnimplementedFeatureError``.
  * Yul: Check that arguments to ``dataoffset`` and ``datasize`` are literals at parse time and properly take this into account in the optimizer.
+ * Yul: Parse number literals for detecting duplicate switch cases.
+ * Yul: Require switch cases to have the same type.
 
 
 Build System:
+ * Emscripten: Upgrade to emscripten 1.38.8 on travis and circleci.
 
 
 ### 0.5.2 (2018-12-19)

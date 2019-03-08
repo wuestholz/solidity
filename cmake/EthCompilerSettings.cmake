@@ -74,7 +74,6 @@ if (("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" MA
 			# into errors, which makes sense.
 			# http://stackoverflow.com/questions/21617158/how-to-silence-unused-command-line-argument-error-with-clang-without-disabling-i
 			add_compile_options(-Qunused-arguments)
-
 		elseif(EMSCRIPTEN)
 			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --memory-init-file 0")
 			# Leave only exported symbols as public and aggressively remove others
@@ -98,7 +97,13 @@ if (("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" MA
 			# Abort if linking results in any undefined symbols
 			# Note: this is on by default in the CMake Emscripten module which we aren't using
 			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ERROR_ON_UNDEFINED_SYMBOLS=1")
-			add_definitions(-DETH_EMSCRIPTEN=1)
+			# Disallow deprecated emscripten build options.
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s STRICT=1")
+			# Export the Emscripten-generated auxiliary methods which are needed by solc-js.
+			# Which methods of libsolc itself are exported is specified in libsolc/CMakeLists.txt.
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap','addFunction','removeFunction','Pointer_stringify','lengthBytesUTF8','_malloc','stringToUTF8','setValue']")
+			# Do not build as a WebAssembly target - we need an asm.js output.
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s WASM=0")
 		endif()
 	endif()
 
@@ -118,6 +123,7 @@ elseif (DEFINED MSVC)
 	add_compile_options(/wd4800)					# disable forcing value to bool 'true' or 'false' (performance warning) (4800)
 	add_compile_options(-D_WIN32_WINNT=0x0600)		# declare Windows Vista API requirement
 	add_compile_options(-DNOMINMAX)					# undefine windows.h MAX && MIN macros cause it cause conflicts with std::min && std::max functions
+	add_compile_options(/utf-8)					# enable utf-8 encoding (solves warning 4819)
 
 	# disable empty object file warning
 	set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4221")

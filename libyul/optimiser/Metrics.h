@@ -28,7 +28,7 @@ namespace yul
 /**
  * Metric for the size of code.
  * More specifically, the number of AST nodes.
- * Ignores function definitions while traversing the AST.
+ * Ignores function definitions while traversing the AST by default.
  * If you want to know the size of a function, you have to invoke this on its body.
  *
  * As an exception, the following AST elements have a cost of zero:
@@ -44,14 +44,16 @@ public:
 	static size_t codeSize(Statement const& _statement);
 	static size_t codeSize(Expression const& _expression);
 	static size_t codeSize(Block const& _block);
+	static size_t codeSizeIncludingFunctions(Block const& _block);
 
 private:
-	CodeSize() {}
+	CodeSize(bool _ignoreFunctions = true): m_ignoreFunctions(_ignoreFunctions) {}
 
 	void visit(Statement const& _statement) override;
 	void visit(Expression const& _expression) override;
 
 private:
+	bool m_ignoreFunctions;
 	size_t m_size = 0;
 };
 
@@ -75,6 +77,20 @@ private:
 
 private:
 	size_t m_cost = 0;
+};
+
+/**
+ * Counts the number of assignments to every variable.
+ * Only works after running the Disambiguator.
+ */
+class AssignmentCounter: public ASTWalker
+{
+public:
+	using ASTWalker::operator();
+	void operator()(Assignment const& _assignment) override;
+	std::size_t assignmentCount(YulString _name) const;
+private:
+	std::map<YulString, size_t> m_assignmentCounters;
 };
 
 }

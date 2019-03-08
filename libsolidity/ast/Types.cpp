@@ -1,18 +1,18 @@
 /*
-    This file is part of solidity.
+	This file is part of solidity.
 
-    solidity is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+	solidity is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
 
-    solidity is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	solidity is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with solidity.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with solidity.  If not, see <http://www.gnu.org/licenses/>.
 */
 /**
  * @author Christian <c@ethdev.com>
@@ -415,7 +415,7 @@ MemberList const& Type::members(ContractDefinition const* _currentScope) const
 	return *m_members[_currentScope];
 }
 
-TypePointer Type::fullEncodingType(bool _inLibraryCall, bool _encoderV2, bool _packed) const
+TypePointer Type::fullEncodingType(bool _inLibraryCall, bool _encoderV2, bool) const
 {
 	TypePointer encodingType = mobileType();
 	if (encodingType)
@@ -423,7 +423,7 @@ TypePointer Type::fullEncodingType(bool _inLibraryCall, bool _encoderV2, bool _p
 	if (encodingType)
 		encodingType = encodingType->encodingType();
 	// Structs are fine in the following circumstances:
-	// - ABIv2 without packed encoding or,
+	// - ABIv2 or,
 	// - storage struct for a library
 	if (_inLibraryCall && encodingType->dataStoredIn(DataLocation::Storage))
 		return encodingType;
@@ -431,7 +431,7 @@ TypePointer Type::fullEncodingType(bool _inLibraryCall, bool _encoderV2, bool _p
 	while (auto const* arrayType = dynamic_cast<ArrayType const*>(baseType.get()))
 		baseType = arrayType->baseType();
 	if (dynamic_cast<StructType const*>(baseType.get()))
-		if (!_encoderV2 || _packed)
+		if (!_encoderV2)
 			return TypePointer();
 	return encodingType;
 }
@@ -496,8 +496,8 @@ BoolResult AddressType::isExplicitlyConvertibleTo(Type const& _convertTo) const
 	if (auto const* contractType = dynamic_cast<ContractType const*>(&_convertTo))
 		return (m_stateMutability >= StateMutability::Payable) || !contractType->isPayable();
 	return isImplicitlyConvertibleTo(_convertTo) ||
-		   _convertTo.category() == Category::Integer ||
-		   (_convertTo.category() == Category::FixedBytes && 160 == dynamic_cast<FixedBytesType const&>(_convertTo).numBytes() * 8);
+		_convertTo.category() == Category::Integer ||
+		(_convertTo.category() == Category::FixedBytes && 160 == dynamic_cast<FixedBytesType const&>(_convertTo).numBytes() * 8);
 }
 
 string AddressType::toString(bool) const
@@ -1380,7 +1380,7 @@ string StringLiteralType::richIdentifier() const
 	return "t_stringliteral_" + toHex(keccak256(m_value).asBytes());
 }
 
-bool StringLiteralType::operator==(const Type& _other) const
+bool StringLiteralType::operator==(Type const& _other) const
 {
 	if (_other.category() != category())
 		return false;
@@ -1463,7 +1463,7 @@ TypeResult FixedBytesType::binaryOperatorResult(Token _operator, TypePointer con
 	return TypePointer();
 }
 
-MemberList::MemberMap FixedBytesType::nativeMembers(const ContractDefinition*) const
+MemberList::MemberMap FixedBytesType::nativeMembers(ContractDefinition const*) const
 {
 	return MemberList::MemberMap{MemberList::Member{"length", make_shared<IntegerType>(8)}};
 }
@@ -1611,7 +1611,7 @@ string ReferenceType::identifierLocationSuffix() const
 	return id;
 }
 
-BoolResult ArrayType::isImplicitlyConvertibleTo(const Type& _convertTo) const
+BoolResult ArrayType::isImplicitlyConvertibleTo(Type const& _convertTo) const
 {
 	if (_convertTo.category() != category())
 		return false;
@@ -1651,7 +1651,7 @@ BoolResult ArrayType::isImplicitlyConvertibleTo(const Type& _convertTo) const
 	}
 }
 
-BoolResult ArrayType::isExplicitlyConvertibleTo(const Type& _convertTo) const
+BoolResult ArrayType::isExplicitlyConvertibleTo(Type const& _convertTo) const
 {
 	if (isImplicitlyConvertibleTo(_convertTo))
 		return true;
@@ -1707,8 +1707,8 @@ bool ArrayType::operator==(Type const& _other) const
 bool ArrayType::validForCalldata() const
 {
 	if (auto arrayBaseType = dynamic_cast<ArrayType const*>(baseType().get()))
-        if (!arrayBaseType->validForCalldata())
-            return false;
+		if (!arrayBaseType->validForCalldata())
+			return false;
 	return unlimitedCalldataEncodedSize(true) <= numeric_limits<unsigned>::max();
 }
 
@@ -1716,8 +1716,10 @@ bigint ArrayType::unlimitedCalldataEncodedSize(bool _padded) const
 {
 	if (isDynamicallySized())
 		return 32;
-	bigint size = bigint(length()) * (isByteArray() ? 1 : baseType()->calldataEncodedSize(_padded));
-	size = ((size + 31) / 32) * 32;
+	// Array elements are always padded.
+	bigint size = bigint(length()) * (isByteArray() ? 1 : baseType()->calldataEncodedSize(true));
+	if (_padded)
+		size = ((size + 31) / 32) * 32;
 	return size;
 }
 
@@ -1834,8 +1836,8 @@ MemberList::MemberMap ArrayType::nativeMembers(ContractDefinition const*) const
 			members.emplace_back("pop", make_shared<FunctionType>(
 				TypePointers{},
 				TypePointers{},
-				strings{string()},
-				strings{string()},
+				strings{},
+				strings{},
 				FunctionType::Kind::ArrayPop
 			));
 		}
@@ -2008,7 +2010,7 @@ vector<tuple<VariableDeclaration const*, u256, unsigned>> ContractType::stateVar
 	return variablesAndOffsets;
 }
 
-BoolResult StructType::isImplicitlyConvertibleTo(const Type& _convertTo) const
+BoolResult StructType::isImplicitlyConvertibleTo(Type const& _convertTo) const
 {
 	if (_convertTo.category() != category())
 		return false;
@@ -2034,7 +2036,7 @@ bool StructType::operator==(Type const& _other) const
 	return ReferenceType::operator==(other) && other.m_struct == m_struct;
 }
 
-unsigned StructType::calldataEncodedSize(bool _padded) const
+unsigned StructType::calldataEncodedSize(bool) const
 {
 	unsigned size = 0;
 	for (auto const& member: members(nullptr))
@@ -2042,12 +2044,31 @@ unsigned StructType::calldataEncodedSize(bool _padded) const
 			return 0;
 		else
 		{
-			unsigned memberSize = member.type->calldataEncodedSize(_padded);
+			// Struct members are always padded.
+			unsigned memberSize = member.type->calldataEncodedSize(true);
 			if (memberSize == 0)
 				return 0;
 			size += memberSize;
 		}
 	return size;
+}
+
+unsigned StructType::calldataOffsetOfMember(std::string const& _member) const
+{
+	unsigned offset = 0;
+	for (auto const& member: members(nullptr))
+	{
+		solAssert(member.type->canLiveOutsideStorage(), "");
+		if (member.name == _member)
+			return offset;
+		{
+			// Struct members are always padded.
+			unsigned memberSize = member.type->calldataEncodedSize(true);
+			solAssert(memberSize != 0, "");
+			offset += memberSize;
+		}
+	}
+	solAssert(false, "Struct member not found.");
 }
 
 bool StructType::isDynamicallyEncoded() const
@@ -2188,7 +2209,7 @@ FunctionTypePointer StructType::constructorType() const
 		paramTypes,
 		TypePointers{copyForLocation(DataLocation::Memory, false)},
 		paramNames,
-		strings(),
+		strings(1, ""),
 		FunctionType::Kind::Internal
 	);
 }
@@ -2420,6 +2441,16 @@ FunctionType::FunctionType(FunctionDefinition const& _function, bool _isInternal
 		m_returnParameterNames.push_back(var->name());
 		m_returnParameterTypes.push_back(var->annotation().type);
 	}
+
+	solAssert(
+		m_parameterNames.size() == m_parameterTypes.size(),
+		"Parameter names list must match parameter types list!"
+	);
+
+	solAssert(
+		m_returnParameterNames.size() == m_returnParameterTypes.size(),
+		"Return parameter names list must match return parameter types list!"
+	);
 }
 
 FunctionType::FunctionType(VariableDeclaration const& _varDecl):
@@ -2476,6 +2507,15 @@ FunctionType::FunctionType(VariableDeclaration const& _varDecl):
 		));
 		m_returnParameterNames.emplace_back("");
 	}
+
+	solAssert(
+			m_parameterNames.size() == m_parameterTypes.size(),
+			"Parameter names list must match parameter types list!"
+			);
+	solAssert(
+			m_returnParameterNames.size() == m_returnParameterTypes.size(),
+			"Return parameter names list must match return parameter types list!"
+			);
 }
 
 FunctionType::FunctionType(EventDefinition const& _event):
@@ -2488,9 +2528,20 @@ FunctionType::FunctionType(EventDefinition const& _event):
 		m_parameterNames.push_back(var->name());
 		m_parameterTypes.push_back(var->annotation().type);
 	}
+
+	solAssert(
+			m_parameterNames.size() == m_parameterTypes.size(),
+			"Parameter names list must match parameter types list!"
+			);
+	solAssert(
+			m_returnParameterNames.size() == m_returnParameterTypes.size(),
+			"Return parameter names list must match return parameter types list!"
+			);
 }
 
 FunctionType::FunctionType(FunctionTypeName const& _typeName):
+	m_parameterNames(_typeName.parameterTypes().size(), ""),
+	m_returnParameterNames(_typeName.returnParameterTypes().size(), ""),
 	m_kind(_typeName.visibility() == VariableDeclaration::Visibility::External ? Kind::External : Kind::Internal),
 	m_stateMutability(_typeName.stateMutability())
 {
@@ -2516,6 +2567,15 @@ FunctionType::FunctionType(FunctionTypeName const& _typeName):
 			);
 		m_returnParameterTypes.push_back(t->annotation().type);
 	}
+
+	solAssert(
+			m_parameterNames.size() == m_parameterTypes.size(),
+			"Parameter names list must match parameter types list!"
+			);
+	solAssert(
+			m_returnParameterNames.size() == m_returnParameterTypes.size(),
+			"Return parameter names list must match return parameter types list!"
+			);
 }
 
 FunctionTypePointer FunctionType::newExpressionType(ContractDefinition const& _contract)
@@ -2525,7 +2585,7 @@ FunctionTypePointer FunctionType::newExpressionType(ContractDefinition const& _c
 	strings parameterNames;
 	StateMutability stateMutability = StateMutability::NonPayable;
 
-	solAssert(_contract.contractKind() != ContractDefinition::ContractKind::Interface, "");
+	solAssert(!_contract.isInterface(), "");
 
 	if (constructor)
 	{
@@ -2626,6 +2686,7 @@ string FunctionType::richIdentifier() const
 	case Kind::ABIEncodeWithSelector: id += "abiencodewithselector"; break;
 	case Kind::ABIEncodeWithSignature: id += "abiencodewithsignature"; break;
 	case Kind::ABIDecode: id += "abidecode"; break;
+	case Kind::MetaType: id += "metatype"; break;
 	}
 	id += "_" + stateMutabilityToString(m_stateMutability);
 	id += identifierList(m_parameterTypes) + "returns" + identifierList(m_returnParameterTypes);
@@ -2852,8 +2913,8 @@ MemberList::MemberMap FunctionType::nativeMembers(ContractDefinition const*) con
 					make_shared<FunctionType>(
 						parseElementaryTypeVector({"uint"}),
 						TypePointers{copyAndSetGasOrValue(false, true)},
-						strings(),
-						strings(),
+						strings(1, ""),
+						strings(1, ""),
 						Kind::SetValue,
 						false,
 						StateMutability::NonPayable,
@@ -2869,8 +2930,8 @@ MemberList::MemberMap FunctionType::nativeMembers(ContractDefinition const*) con
 				make_shared<FunctionType>(
 					parseElementaryTypeVector({"uint"}),
 					TypePointers{copyAndSetGasOrValue(true, false)},
-					strings(),
-					strings(),
+					strings(1, ""),
+					strings(1, ""),
 					Kind::SetGas,
 					false,
 					StateMutability::NonPayable,
@@ -3001,7 +3062,8 @@ string FunctionType::externalSignature() const
 		solAssert(false, "Invalid function type for requesting external signature.");
 	}
 
-	bool const inLibrary = dynamic_cast<ContractDefinition const&>(*m_declaration->scope()).isLibrary();
+	// "inLibrary" is only relevant if this is not an event.
+	bool const inLibrary = kind() != Kind::Event && dynamic_cast<ContractDefinition const&>(*m_declaration->scope()).isLibrary();
 	FunctionTypePointer external = interfaceFunctionType();
 	solAssert(!!external, "External function type requested.");
 	auto parameterTypes = external->parameterTypes();
@@ -3023,8 +3085,8 @@ u256 FunctionType::externalIdentifier() const
 
 bool FunctionType::isPure() const
 {
-	// FIXME: replace this with m_stateMutability == StateMutability::Pure once
-	//        the callgraph analyzer is in place
+	// TODO: replace this with m_stateMutability == StateMutability::Pure once
+	//       the callgraph analyzer is in place
 	return
 		m_kind == Kind::KECCAK256 ||
 		m_kind == Kind::ECRecover ||
@@ -3037,7 +3099,8 @@ bool FunctionType::isPure() const
 		m_kind == Kind::ABIEncodePacked ||
 		m_kind == Kind::ABIEncodeWithSelector ||
 		m_kind == Kind::ABIEncodeWithSignature ||
-		m_kind == Kind::ABIDecode;
+		m_kind == Kind::ABIDecode ||
+		m_kind == Kind::MetaType;
 }
 
 TypePointers FunctionType::parseElementaryTypeVector(strings const& _types)
@@ -3236,7 +3299,7 @@ MemberList::MemberMap TypeType::nativeMembers(ContractDefinition const* _current
 	return members;
 }
 
-ModifierType::ModifierType(const ModifierDefinition& _modifier)
+ModifierType::ModifierType(ModifierDefinition const& _modifier)
 {
 	TypePointers params;
 	params.reserve(_modifier.parameters().size());
@@ -3265,8 +3328,12 @@ bool ModifierType::operator==(Type const& _other) const
 		return false;
 	auto typeCompare = [](TypePointer const& _a, TypePointer const& _b) -> bool { return *_a == *_b; };
 
-	if (!equal(m_parameterTypes.cbegin(), m_parameterTypes.cend(),
-			   other.m_parameterTypes.cbegin(), typeCompare))
+	if (!equal(
+		m_parameterTypes.cbegin(),
+		m_parameterTypes.cend(),
+		other.m_parameterTypes.cbegin(),
+		typeCompare
+	))
 		return false;
 	return true;
 }
@@ -3305,6 +3372,14 @@ string ModuleType::toString(bool) const
 	return string("module \"") + m_sourceUnit.annotation().path + string("\"");
 }
 
+shared_ptr<MagicType> MagicType::metaType(TypePointer _type)
+{
+	solAssert(_type && _type->category() == Type::Category::Contract, "Only contracts supported for now.");
+	auto t = make_shared<MagicType>(Kind::MetaType);
+	t->m_typeArgument = std::move(_type);
+	return t;
+}
+
 string MagicType::richIdentifier() const
 {
 	switch (m_kind)
@@ -3317,6 +3392,9 @@ string MagicType::richIdentifier() const
 		return "t_magic_transaction";
 	case Kind::ABI:
 		return "t_magic_abi";
+	case Kind::MetaType:
+		solAssert(m_typeArgument, "");
+		return "t_magic_meta_type_" + m_typeArgument->richIdentifier();
 	}
 	return "";
 }
@@ -3361,7 +3439,7 @@ MemberList::MemberMap MagicType::nativeMembers(ContractDefinition const*) const
 				TypePointers(),
 				TypePointers{make_shared<ArrayType>(DataLocation::Memory)},
 				strings{},
-				strings{},
+				strings{1, ""},
 				FunctionType::Kind::ABIEncode,
 				true,
 				StateMutability::Pure
@@ -3370,7 +3448,7 @@ MemberList::MemberMap MagicType::nativeMembers(ContractDefinition const*) const
 				TypePointers(),
 				TypePointers{make_shared<ArrayType>(DataLocation::Memory)},
 				strings{},
-				strings{},
+				strings{1, ""},
 				FunctionType::Kind::ABIEncodePacked,
 				true,
 				StateMutability::Pure
@@ -3378,8 +3456,8 @@ MemberList::MemberMap MagicType::nativeMembers(ContractDefinition const*) const
 			{"encodeWithSelector", make_shared<FunctionType>(
 				TypePointers{make_shared<FixedBytesType>(4)},
 				TypePointers{make_shared<ArrayType>(DataLocation::Memory)},
-				strings{},
-				strings{},
+				strings{1, ""},
+				strings{1, ""},
 				FunctionType::Kind::ABIEncodeWithSelector,
 				true,
 				StateMutability::Pure
@@ -3387,8 +3465,8 @@ MemberList::MemberMap MagicType::nativeMembers(ContractDefinition const*) const
 			{"encodeWithSignature", make_shared<FunctionType>(
 				TypePointers{make_shared<ArrayType>(DataLocation::Memory, true)},
 				TypePointers{make_shared<ArrayType>(DataLocation::Memory)},
-				strings{},
-				strings{},
+				strings{1, ""},
+				strings{1, ""},
 				FunctionType::Kind::ABIEncodeWithSignature,
 				true,
 				StateMutability::Pure
@@ -3403,12 +3481,28 @@ MemberList::MemberMap MagicType::nativeMembers(ContractDefinition const*) const
 				StateMutability::Pure
 			)}
 		});
-	default:
-		solAssert(false, "Unknown kind of magic.");
+	case Kind::MetaType:
+	{
+		solAssert(
+			m_typeArgument && m_typeArgument->category() == Type::Category::Contract,
+			"Only contracts supported for now"
+		);
+		ContractDefinition const& contract = dynamic_cast<ContractType const&>(*m_typeArgument).contractDefinition();
+		if (contract.canBeDeployed())
+			return MemberList::MemberMap({
+				{"creationCode", make_shared<ArrayType>(DataLocation::Memory)},
+				{"runtimeCode", make_shared<ArrayType>(DataLocation::Memory)},
+				{"name", make_shared<ArrayType>(DataLocation::Memory, true)},
+			});
+		else
+			return {};
 	}
+	}
+	solAssert(false, "Unknown kind of magic.");
+	return {};
 }
 
-string MagicType::toString(bool) const
+string MagicType::toString(bool _short) const
 {
 	switch (m_kind)
 	{
@@ -3420,7 +3514,17 @@ string MagicType::toString(bool) const
 		return "tx";
 	case Kind::ABI:
 		return "abi";
-	default:
-		solAssert(false, "Unknown kind of magic.");
+	case Kind::MetaType:
+		solAssert(m_typeArgument, "");
+		return "type(" + m_typeArgument->toString(_short) + ")";
 	}
+	solAssert(false, "Unknown kind of magic.");
+	return {};
+}
+
+TypePointer MagicType::typeArgument() const
+{
+	solAssert(m_kind == Kind::MetaType, "");
+	solAssert(m_typeArgument, "");
+	return m_typeArgument;
 }

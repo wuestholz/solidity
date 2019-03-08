@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(enum_external_type)
 		}
 }
 
-BOOST_AUTO_TEST_CASE(external_structs)
+BOOST_AUTO_TEST_CASE(external_struct_signatures)
 {
 	char const* text = R"(
 		pragma experimental ABIEncoderV2;
@@ -213,7 +213,10 @@ BOOST_AUTO_TEST_CASE(external_structs)
 			function i(Nested[] calldata) external {}
 		}
 	)";
-	SourceUnit const* sourceUnit = parseAndAnalyse(text);
+	// Ignore analysis errors. This test only checks that correct signatures
+	// are generated for external structs, but they are not yet supported
+	// in code generation and therefore cause an error in the TypeChecker.
+	SourceUnit const* sourceUnit = parseAnalyseAndReturnError(text, false, true, true).first;
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
 		if (ContractDefinition* contract = dynamic_cast<ContractDefinition*>(node.get()))
 		{
@@ -226,7 +229,7 @@ BOOST_AUTO_TEST_CASE(external_structs)
 		}
 }
 
-BOOST_AUTO_TEST_CASE(external_structs_in_libraries)
+BOOST_AUTO_TEST_CASE(external_struct_signatures_in_libraries)
 {
 	char const* text = R"(
 		pragma experimental ABIEncoderV2;
@@ -241,7 +244,10 @@ BOOST_AUTO_TEST_CASE(external_structs_in_libraries)
 			function i(Nested[] calldata) external {}
 		}
 	)";
-	SourceUnit const* sourceUnit = parseAndAnalyse(text);
+	// Ignore analysis errors. This test only checks that correct signatures
+	// are generated for external structs, but calldata structs are not yet supported
+	// in code generation and therefore cause an error in the TypeChecker.
+	SourceUnit const* sourceUnit = parseAnalyseAndReturnError(text, false, true, true).first;
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
 		if (ContractDefinition* contract = dynamic_cast<ContractDefinition*>(node.get()))
 		{
@@ -385,7 +391,7 @@ BOOST_AUTO_TEST_CASE(returndatasize_as_variable)
 		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
 	});
 	if (!dev::test::Options::get().evmVersion().supportsReturndata())
-		expectations.emplace_back(make_pair(Error::Type::Warning, std::string("\"returndatasize\" instruction is only available for Byzantium-compatible VMs.")));
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"returndatasize\" instruction is only available for Byzantium-compatible VMs")));
 	CHECK_ALLOW_MULTI(text, expectations);
 }
 
@@ -400,7 +406,7 @@ BOOST_AUTO_TEST_CASE(create2_as_variable)
 		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
 	});
 	if (!dev::test::Options::get().evmVersion().hasCreate2())
-		expectations.emplace_back(make_pair(Error::Type::Warning, std::string("\"create2\" instruction is only available for Constantinople-compatible VMs.")));
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"create2\" instruction is only available for Constantinople-compatible VMs")));
 	CHECK_ALLOW_MULTI(text, expectations);
 }
 
@@ -411,10 +417,12 @@ BOOST_AUTO_TEST_CASE(extcodehash_as_variable)
 	)";
 	// This needs special treatment, because the message mentions the EVM version,
 	// so cannot be run via isoltest.
-	CHECK_ALLOW_MULTI(text, (std::vector<std::pair<Error::Type, std::string>>{
-		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"},
-		{Error::Type::Warning, "The \"extcodehash\" instruction is not supported by the VM version"},
-	}));
+	vector<pair<Error::Type, std::string>> expectations(vector<pair<Error::Type, std::string>>{
+		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
+	});
+	if (!dev::test::Options::get().evmVersion().hasExtCodeHash())
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"extcodehash\" instruction is only available for Constantinople-compatible VMs")));
+	CHECK_ALLOW_MULTI(text, expectations);
 }
 
 BOOST_AUTO_TEST_CASE(getter_is_memory_type)
@@ -465,7 +473,7 @@ BOOST_AUTO_TEST_CASE(address_staticcall_value)
 				}
 			}
 		)";
-		CHECK_ERROR(sourceCode, TypeError, "Member \"value\" not found or not visible after argument-dependent lookup");
+		CHECK_ERROR(sourceCode, TypeError, "Member \"value\" is only available for payable functions.");
 	}
 }
 

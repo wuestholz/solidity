@@ -76,7 +76,7 @@ idea is that assembly libraries will be used to enhance the Solidity language.
 
 .. code::
 
-    pragma solidity >=0.4.0 <0.6.0;
+    pragma solidity >=0.4.0 <0.7.0;
 
     library GetCode {
         function at(address _addr) public view returns (bytes memory o_code) {
@@ -101,7 +101,7 @@ efficient code, for example:
 
 .. code::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     library VectorSum {
         // This function is less efficient because the optimizer currently fails to
@@ -162,7 +162,6 @@ Note that the order of arguments can be seen to be reversed in non-functional st
 Opcodes marked with ``-`` do not push an item onto the stack (do not return a result),
 those marked with ``*`` are special and all others push exactly one item onto the stack (their "return value").
 Opcodes marked with ``F``, ``H``, ``B`` or ``C`` are present since Frontier, Homestead, Byzantium or Constantinople, respectively.
-Constantinople is still in planning and all instructions marked as such will result in an invalid instruction exception.
 
 In the following, ``mem[a...b)`` signifies the bytes of memory starting at position ``a`` up to
 but not including position ``b`` and ``storage[p]`` signifies the storage contents at position ``p``.
@@ -395,7 +394,7 @@ Local Solidity variables are available for assignments, for example:
 
 .. code::
 
-    pragma solidity >=0.4.11 <0.6.0;
+    pragma solidity >=0.4.11 <0.7.0;
 
     contract C {
         uint b;
@@ -434,7 +433,7 @@ be just ``0``, but it can also be a complex functional-style expression.
 
 .. code::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract C {
         function f(uint x) public view returns (uint b) {
@@ -691,7 +690,7 @@ Example:
 We will follow an example compilation from Solidity to assembly.
 We consider the runtime bytecode of the following Solidity program::
 
-    pragma solidity >=0.4.16 <0.6.0;
+    pragma solidity >=0.4.16 <0.7.0;
 
     contract C {
       function f(uint x) public pure returns (uint y) {

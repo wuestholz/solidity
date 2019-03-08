@@ -34,6 +34,12 @@
 
 set -ev
 
+if test -z "$1"; then
+	BUILD_DIR="emscripten_build"
+else
+	BUILD_DIR="$1"
+fi
+
 if ! type git &>/dev/null; then
     # We need git for extracting the commit hash
     apt-get update
@@ -49,11 +55,11 @@ fi
 WORKSPACE=/root/project
 
 # Increase nodejs stack size
-if [ -e ~/.emscripten ]
+if ! [ -e /emsdk_portable/node/bin/node_orig ]
 then
-    sed -i -e 's/NODE_JS="nodejs"/NODE_JS=["nodejs", "--stack_size=8192"]/' ~/.emscripten
-else
-    echo 'NODE_JS=["nodejs", "--stack_size=8192"]' > ~/.emscripten
+  mv /emsdk_portable/node/bin/node /emsdk_portable/node/bin/node_orig
+  echo -e '#!/bin/sh\nexec /emsdk_portable/node/bin/node_orig --stack-size=8192 $@' > /emsdk_portable/node/bin/node
+  chmod 755 /emsdk_portable/node/bin/node
 fi
 
 # Boost
@@ -76,8 +82,8 @@ echo -en 'travis_fold:end:install_cmake.sh\\r'
 # Build dependent components and solidity itself
 echo -en 'travis_fold:start:compiling_solidity\\r'
 cd $WORKSPACE
-mkdir -p build
-cd build
+mkdir -p $BUILD_DIR
+cd $BUILD_DIR
 cmake \
   -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/emscripten.cmake \
   -DCMAKE_BUILD_TYPE=Release \
@@ -96,8 +102,10 @@ make -j 4
 
 cd ..
 mkdir -p upload
-cp build/libsolc/soljson.js upload/
-cp build/libsolc/soljson.js ./
+# Patch soljson.js to provide backwards-compatibility with older emscripten versions
+echo ";/* backwards compatibility */ Module['Runtime'] = Module;" >> $BUILD_DIR/libsolc/soljson.js
+cp $BUILD_DIR/libsolc/soljson.js upload/
+cp $BUILD_DIR/libsolc/soljson.js ./
 
 OUTPUT_SIZE=`ls -la soljson.js`
 

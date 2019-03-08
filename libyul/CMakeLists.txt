@@ -1,7 +1,6 @@
 add_library(yul
 	AsmAnalysis.cpp
 	AsmAnalysis.h
-	AsmAnalysisInfo.cpp
 	AsmAnalysisInfo.h
 	AsmData.h
 	AsmDataForward.h
@@ -13,7 +12,10 @@ add_library(yul
 	AsmScope.h
 	AsmScopeFiller.cpp
 	AsmScopeFiller.h
-	Dialect.cpp
+	AssemblyStack.h
+	AssemblyStack.cpp
+	CompilabilityChecker.cpp
+	CompilabilityChecker.h
 	Dialect.h
 	Exceptions.h
 	Object.cpp
@@ -24,6 +26,8 @@ add_library(yul
 	Utilities.h
 	YulString.h
 	backends/evm/AbstractAssembly.h
+	backends/evm/AsmCodeGen.h
+	backends/evm/AsmCodeGen.cpp
 	backends/evm/EVMAssembly.cpp
 	backends/evm/EVMAssembly.h
 	backends/evm/EVMCodeTransform.cpp
@@ -32,6 +36,8 @@ add_library(yul
 	backends/evm/EVMDialect.h
 	backends/evm/EVMObjectCompiler.cpp
 	backends/evm/EVMObjectCompiler.h
+	backends/evm/NoOutputAssembly.h
+	backends/evm/NoOutputAssembly.cpp
 	optimiser/ASTCopier.cpp
 	optimiser/ASTCopier.h
 	optimiser/ASTWalker.cpp
@@ -80,6 +86,8 @@ add_library(yul
 	optimiser/RedundantAssignEliminator.h
 	optimiser/Rematerialiser.cpp
 	optimiser/Rematerialiser.h
+	optimiser/SSAReverser.cpp
+	optimiser/SSAReverser.h
 	optimiser/SSATransform.cpp
 	optimiser/SSATransform.h
 	optimiser/SSAValueTracker.cpp
@@ -88,6 +96,8 @@ add_library(yul
 	optimiser/Semantics.h
 	optimiser/SimplificationRules.cpp
 	optimiser/SimplificationRules.h
+	optimiser/StackCompressor.cpp
+	optimiser/StackCompressor.h
 	optimiser/StructuralSimplifier.cpp
 	optimiser/StructuralSimplifier.h
 	optimiser/Substitution.cpp
@@ -100,5 +110,7 @@ add_library(yul
 	optimiser/UnusedPruner.h
 	optimiser/VarDeclInitializer.cpp
 	optimiser/VarDeclInitializer.h
+	optimiser/VarNameCleaner.cpp
+	optimiser/VarNameCleaner.h
 )
 target_link_libraries(yul PUBLIC evmasm devcore langutil)
