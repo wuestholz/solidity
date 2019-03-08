@@ -79,7 +79,7 @@
                     					
                     <sourceEntries>
                         						
-                        <entry excluding="solc|libdevcore|libevmasm|libjulia|liblll|libsolc|libsolidity|lllc" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+                        <entry excluding="liblll|libsolidity|libevmasm|libdevcore|libjulia|lllc|libsolc|solc" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
                         						
                         <entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="libdevcore"/>
                         						

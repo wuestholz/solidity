@@ -34,6 +34,7 @@ WORKDIR=`mktemp -d`
 IPC_ENABLED=true
 ALETH_PID=
 CMDLINE_PID=
+SOLCVERIFY_PID=
 
 if [[ "$OSTYPE" == "darwin"* ]]
 then
@@ -82,6 +83,10 @@ cleanup() {
     then
         safe_kill $CMDLINE_PID "Commandline tests"
     fi
+    if [[ -n "$SOLCVERIFY_PID" ]]
+    then
+        safe_kill $SOLCVERIFY_PID "solc-verify tests"
+    fi
 
     echo "Cleaning up working directory ${WORKDIR} ..."
     rm -rf "$WORKDIR" || true
@@ -117,6 +122,20 @@ then
     CMDLINE_PID=$!
 else
     if ! $REPO_ROOT/test/cmdlineTests.sh
+    then
+        printError "Commandline tests FAILED"
+        exit 1
+    fi
+fi
+
+printTask "Running solc-verify tests..."
+# Only run in parallel if this is run on CI infrastructure
+if [[ -n "$CI" ]]
+then
+    "$REPO_ROOT/test/solc-verify/tests.sh" &
+    SOLCVERIFY_PID=$!
+else
+    if ! $REPO_ROOT/test/solc-verify/tests.sh
     then
         printError "Commandline tests FAILED"
         exit 1
