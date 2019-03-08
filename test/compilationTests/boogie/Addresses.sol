@@ -1,10 +1,10 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract Addresses {
     
     function thisBalance(uint amount) public view returns (bool) {
         // 'this.balance' is deprecated but some older contracts use it
-        return this.balance > amount;
+        return address(this).balance > amount;
     }
 
     function testTransfer(uint amount) public {
@@ -17,7 +17,7 @@ contract Addresses {
     }
 
     function testTransfer2(uint amount) public {
-        require(this != msg.sender); // We require the sender and receiver to be different
+        require(address(this) != msg.sender); // We require the sender and receiver to be different
         uint oldThisBalance = address(this).balance;
         uint oldSenderBalance = msg.sender.balance;
 
@@ -60,7 +60,7 @@ contract Addresses {
     }
 
     function testSend3(uint amount) public {
-        require(this != msg.sender); // We require the sender and receiver to be different
+        require(address(this) != msg.sender); // We require the sender and receiver to be different
         uint oldThisBalance = address(this).balance;
         uint oldSenderBalance = msg.sender.balance;
 
@@ -85,7 +85,8 @@ contract Addresses {
     }
 
     function testCall(address addr) public returns (bool){
-        return addr.call("");
+        (bool success, bytes memory returnData) = addr.call("");
+        return success;
     }
 
     function literals() public pure {
