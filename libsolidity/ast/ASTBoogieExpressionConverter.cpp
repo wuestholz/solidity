@@ -672,9 +672,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// assert(balance[this] >= msg.value)
 		auto selExpr = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
-		addSideEffect(smack::Stmt::assert_(geqResult.first,
-				ASTBoogieUtils::createAttrs(_node.location(), "Calling payable function might fail due to insufficient ether", *m_context.currentScanner())));
+		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
+		addSideEffect(smack::Stmt::comment("Implicit assumption that we have enough ether"));
+		addSideEffect(smack::Stmt::assume(geqResult.first));
 		// balance[this] -= msg.value
 		smack::Expr const* this_balance = smack::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)

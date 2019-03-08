@@ -9,3 +9,4 @@ Verifying SpecificationLoopInvar::forLoop: OK
 Verifying SpecificationLoopInvar::[implicit_constructor]: OK
 Verifying ContractInvarOnLoop::increase: OK
 Verifying ContractInvarOnLoop::[implicit_constructor]: OK
+Errors were found by the verifier.
