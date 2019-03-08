@@ -23,20 +23,6 @@ When deploying contracts, you should use the latest released version of Solidity
 
 ## Build and Install
 
-<<<<<<< HEAD
-Any contributions are welcome!
-
-# Formal Verification Extension
-
-This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
-
-<<<<<<< HEAD
-The extension requires [Z3](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/boogie-org/boogie). The compiler can be [built as usual](https://solidity.readthedocs.io/en/latest/installing-solidity.html#building-from-source), but the path to the Boogie binary has to be supplied to `cmake` in the `-DBOOGIE_BIN` argument, e.g., use `cmake -DBOOGIE_BIN="boogie/Binaries" ..` instead of `cmake ..`.
-
-After a successful build, the Python script `solc-verify.py` under `build/solc/` is the entry point for verification. For example: `./build/solc/solc-verify.py ./test/compilationTests/boogie/demo/DemoSpec.sol`. This will compile the contract (and its annotations) to the input language of Boogie, run Boogie and map the results back to the original file. For more information use the `-h` flag of the script and for more examples check the `test/compilationTests/boogie/` directory.
-
-Optionally, you can use [CVC4](http://cvc4.cs.stanford.edu) instead of Z3, or you can also use [Yices2](https://github.com/SRI-CSL/yices2), but that requires an [extended version](https://github.com/dddejan/boogie) of Boogie.
-=======
 Instructions about how to build and install the Solidity compiler can be found in the [Solidity documentation](https://solidity.readthedocs.io/en/latest/installing-solidity.html#building-from-source)
 
 
@@ -81,7 +67,17 @@ if you want to help.
 Solidity is licensed under [GNU General Public License v3.0](LICENSE.txt)
 
 Some third-party code has its [own licensing terms](cmake/templates/license.h.in).
->>>>>>> develop
-=======
+
+Any contributions are welcome!
+
+# Formal Verification Extension
+
+This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
+
+The extension requires [Z3](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/boogie-org/boogie). The compiler can be [built as usual](https://solidity.readthedocs.io/en/latest/installing-solidity.html#building-from-source), but the path to the Boogie binary has to be supplied to `cmake` in the `-DBOOGIE_BIN` argument, e.g., use `cmake -DBOOGIE_BIN="boogie/Binaries" ..` instead of `cmake ..`.
+
+After a successful build, the Python script `solc-verify.py` under `build/solc/` is the entry point for verification. For example: `./build/solc/solc-verify.py ./test/compilationTests/boogie/demo/DemoSpec.sol`. This will compile the contract (and its annotations) to the input language of Boogie, run Boogie and map the results back to the original file. For more information use the `-h` flag of the script and for more examples check the `test/compilationTests/boogie/` directory.
+
+Optionally, you can use [CVC4](http://cvc4.cs.stanford.edu) instead of Z3, or you can also use [Yices2](https://github.com/SRI-CSL/yices2), but that requires an [extended version](https://github.com/dddejan/boogie) of Boogie.
+
 For more information on building, installing and examples, see [SOLC-VERIFY-README.md](SOLC-VERIFY-README.md).
->>>>>>> 6b72e4f3e8afa477a6fa44119632dfca6828f32d
