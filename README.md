@@ -72,7 +72,7 @@ Any contributions are welcome!
 
 # Formal Verification Extension
 
-This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
+This is an extended version of the compiler (v0.5) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
 
 The extension requires [Z3](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/boogie-org/boogie). The compiler can be [built as usual](https://solidity.readthedocs.io/en/latest/installing-solidity.html#building-from-source), but the path to the Boogie binary has to be supplied to `cmake` in the `-DBOOGIE_BIN` argument, e.g., use `cmake -DBOOGIE_BIN="boogie/Binaries" ..` instead of `cmake ..`.
 
