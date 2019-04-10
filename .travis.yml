@@ -26,6 +26,9 @@
 
 language: cpp
 
+notifications:
+  slack: solc-verify:vCRlVpI1halElL9o2UNHtqO7
+
 branches:
     # We need to whitelist the branches which we want to have "push" automation,
     # this includes tags (which are treated as branches by travis).
@@ -40,8 +43,10 @@ env:
         - SOLC_BUILD_TYPE=RelWithDebInfo
         - SOLC_EMSCRIPTEN=Off
         - SOLC_INSTALL_DEPS_TRAVIS=On
+        - SOLC_VERIFY_INSTALL_DEPS_TRAVIS=On
         - SOLC_RELEASE=On
         - SOLC_TESTS=On
+        - SOLC_VERIFY_TESTS=On
         - SOLC_STOREBYTECODE=Off
         - SOLC_DOCKER=Off
 
@@ -64,6 +69,7 @@ matrix:
               - sudo apt-get install -qq libleveldb1
               - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
               - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
+              - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
 
         - os: linux
           dist: trusty
@@ -82,6 +88,7 @@ matrix:
               - sudo apt-get install -qq libleveldb1
               - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
               - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
+              - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
 
         # Docker target, which generates a statically linked alpine image
         # - os: linux
@@ -196,7 +203,7 @@ before_script:
     - echo -n "$TRAVIS_COMMIT" > commit_hash.txt
     - test $SOLC_EMSCRIPTEN != On || (scripts/build_emscripten.sh)
     - test $SOLC_DOCKER != On || (scripts/docker_build.sh)
-    - test $SOLC_RELEASE != On || (scripts/build.sh $SOLC_BUILD_TYPE -DBoost_USE_STATIC_LIBS=OFF && scripts/create_source_tarball.sh)
+    - test $SOLC_RELEASE != On || (scripts/build.sh $SOLC_BUILD_TYPE -DBoost_USE_STATIC_LIBS=OFF -DBOOGIE_BIN=$HOME/boogie/Binaries && scripts/create_source_tarball.sh)
 
 script:
     - test $SOLC_EMSCRIPTEN != On -o $SOLC_TESTS != On || (scripts/test_emscripten.sh)
