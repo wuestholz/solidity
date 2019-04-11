@@ -209,6 +209,7 @@ script:
     - test $SOLC_EMSCRIPTEN != On -o $SOLC_TESTS != On || (scripts/test_emscripten.sh)
     - test $SOLC_TESTS != On || (cd $TRAVIS_BUILD_DIR && scripts/tests.sh)
     - test $SOLC_STOREBYTECODE != On || (cd $TRAVIS_BUILD_DIR && scripts/bytecodecompare/storebytecode.sh)
+    - test $SOLC_VERIFY_TESTS != On || (cd $TRAVIS_BUILD_DIR && test/solc-verify/tests.sh)
 
 deploy:
     # This is the deploy target for the Emscripten build.
