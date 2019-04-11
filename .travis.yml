@@ -203,7 +203,7 @@ before_script:
     - echo -n "$TRAVIS_COMMIT" > commit_hash.txt
     - test $SOLC_EMSCRIPTEN != On || (scripts/build_emscripten.sh)
     - test $SOLC_DOCKER != On || (scripts/docker_build.sh)
-    - test $SOLC_RELEASE != On || (scripts/build.sh $SOLC_BUILD_TYPE -DBoost_USE_STATIC_LIBS=OFF -DBOOGIE_BIN=$HOME/boogie/Binaries && scripts/create_source_tarball.sh)
+    - test $SOLC_RELEASE != On || (scripts/build.sh $SOLC_BUILD_TYPE -DBoost_USE_STATIC_LIBS=OFF -DBOOGIE_BIN=$TRAVIS_BUILD_DIR/boogie/Binaries && scripts/create_source_tarball.sh)
 
 script:
     - test $SOLC_EMSCRIPTEN != On -o $SOLC_TESTS != On || (scripts/test_emscripten.sh)

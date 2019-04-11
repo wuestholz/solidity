@@ -4,35 +4,17 @@
 # Shell script for installing solc-verify testing dependencies
 #
 
-sudo apt-get install -y mono-complete
-sudo apt-get install -y python3
-sudo apt-get install -y python3-pip
-pip3 install psutil
-sudo apt-get install -y libgmp3-dev
-sudo apt-get install -y m4
-sudo apt-get install -y automake
-sudo apt-get install -y default-jre
-sudo apt-get install -y gperf
+sudo apt-get install -y \
+	automake \
+	default-jre \
+	gperf \
+	libgmp3-dev \
+	m4 \
+	mono-complete \
+	python3 \
+	python3-pip 
 
-# Yices2
-pushd .
-git clone https://github.com/SRI-CSL/yices2.git
-cd yices2
-autoconf
-./configure
-make
-sudo make install
-popd 
-
-# Z3 
-pushd .
-git clone https://github.com/Z3Prover/z3.git
-cd z3
-python scripts/mk_make.py
-cd build
-make
-sudo make install
-popd
+sudo pip3 install psutil
 
 # CVC4
 pushd .
