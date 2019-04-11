@@ -5,8 +5,6 @@
 #
 
 sudo apt-get install -y mono-complete
-sudo apt-get install -y cmake
-sudo apt-get install -y libboost-all-dev
 sudo apt-get install -y python3
 sudo apt-get install -y python3-pip
 pip3 install psutil
