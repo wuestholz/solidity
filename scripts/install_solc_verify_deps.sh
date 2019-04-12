@@ -5,27 +5,23 @@
 #
 
 sudo apt-get install -y \
-	automake \
-	default-jre \
-	gperf \
-	libgmp3-dev \
-	m4 \
 	mono-complete \
 	python3 \
-	python3-pip \
-	realpath
+	python3-pip
 
 sudo pip3 install psutil
 
-# CVC4
+# CVC4 1.7
+wget https://github.com/CVC4/CVC4/releases/download/1.7/cvc4-1.7-x86_64-linux-opt -O cvc4
+sudo install cvc4 /usr/bin/cvc4
+
+# Yices2 2.6.1
 pushd .
-git clone https://github.com/CVC4/CVC4.git
-cd CVC4
-./contrib/get-antlr-3.4
-./configure.sh --gpl
-cd build
-make
-sudo make install
+wget http://yices.csl.sri.com/releases/2.6.1/yices-2.6.1-x86_64-pc-linux-gnu-static-gmp.tar.gz
+tar xzvf yices*
+rm yices*.tar.gz
+cd yices*
+sudo ./install-yices
 popd
 
 # Boogie
@@ -35,5 +31,4 @@ cd boogie
 wget https://nuget.org/nuget.exe
 mono ./nuget.exe restore Source/Boogie.sln
 xbuild Source/Boogie.sln
-ln -s /usr/bin/z3 Binaries/z3.exe
 popd
