@@ -813,15 +813,16 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 	}
 	// Type of the expression
-	string typeStr = _node.expression().annotation().type->toString();
+	TypePointer type = _node.expression().annotation().type;
+	Type::Category typeCategory = type->category();
 
 	// Handle special members/functions
 
 	// address.balance / this.balance
+	bool isAddress = typeCategory == Type::Category::Address;
 	if (_node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
 	{
-		if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
-		{
+		if (isAddress) {
 			m_currentExpr = smack::Expr::sel(smack::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
 			addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
 			return false;
@@ -837,41 +838,44 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 	}
 	// address.transfer()
-	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
+	if (isAddress && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
 	{
 		m_context.includeTransferFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_TRANSFER);
 		return false;
 	}
 	// address.send()
-	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
+	if (isAddress && _node.memberName() == ASTBoogieUtils::SOLIDITY_SEND)
 	{
 		m_context.includeSendFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_SEND);
 		return false;
 	}
 	// address.call()
-	if (typeStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
+	if (isAddress && _node.memberName() == ASTBoogieUtils::SOLIDITY_CALL)
 	{
 		m_context.includeCallFunction();
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_CALL);
 		return false;
 	}
 	// msg.sender
-	if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
+	auto magicType = std::dynamic_pointer_cast<MagicType const>(type);
+	bool isMessage = magicType != nullptr && magicType->kind() == MagicType::Kind::Message;
+	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER);
 		return false;
 	}
 	// msg.value
-	if (typeStr == ASTBoogieUtils::SOLIDITY_MSG && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
+	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
 		m_currentExpr = smack::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
 		addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
 		return false;
 	}
 	// array.length
-	if (_node.expression().annotation().type->category() == Type::Category::Array && _node.memberName() == "length")
+	bool isArray = type->category() == Type::Category::Array;
+	if (isArray && _node.memberName() == "length")
 	{
 		m_currentExpr = getArrayLength(expr, _node);
 		return false;
