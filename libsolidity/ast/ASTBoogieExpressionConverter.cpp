@@ -996,34 +996,45 @@ bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _no
 
 bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 {
-	string tpStr = _node.annotation().type->toString();
-	if (boost::starts_with(tpStr, "int_const"))
-	{
-		m_currentExpr = smack::Expr::lit(smack::bigint(_node.value()));
-		return false;
+	TypePointer type = _node.annotation().type;
+	Type::Category typeCategory = type->category();
+
+	switch (typeCategory) {
+	case Type::Category::RationalNumber: {
+		auto rationalType = std::dynamic_pointer_cast<RationalNumberType const>(type);
+		if (rationalType != nullptr) {
+			// For now, just the integers
+			if (!rationalType->isFractional()) {
+				m_currentExpr = smack::Expr::lit(smack::bigint(_node.value()));
+				return false;
+			}
+		}
+		break;
 	}
-	if (tpStr == "bool")
-	{
+	case Type::Category::Bool:
 		m_currentExpr = smack::Expr::lit(_node.value() == "true");
 		return false;
-	}
-	if (tpStr == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
-	{
+	case Type::Category::Address: {
 		string name = "address_" + _node.value();
 		m_newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 		m_currentExpr = smack::Expr::id(name);
 		return false;
 	}
-	if (boost::starts_with(tpStr, "literal_string"))
-	{
+	case Type::Category::StringLiteral: {
 		string name = "literal_string#" + to_string(_node.id());
 		m_newConstants.push_back(smack::Decl::constant(name, ASTBoogieUtils::BOOGIE_STRING_TYPE, true));
 		m_currentExpr = smack::Expr::id(name);
 		return false;
 	}
+	default: {
+		// Report unsupported
+		string tpStr = type->toString();
+		m_context.reportError(&_node, "Unsupported literal for type " + tpStr.substr(0, tpStr.find(' ')));
+		m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
+		break;
+	}
+	}
 
-	m_context.reportError(&_node, "Unsupported literal for type " + tpStr.substr(0, tpStr.find(' ')));
-	m_currentExpr = smack::Expr::id(ASTBoogieUtils::ERR_EXPR);
 	return false;
 }
 
