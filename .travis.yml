@@ -49,8 +49,7 @@ env:
         - SOLC_VERIFY_TESTS=On
         - SOLC_STOREBYTECODE=Off
         - SOLC_DOCKER=Off
-        - MAKEFLAGS="-j 2"
-        
+
 matrix:
     include:
         - os: linux
@@ -84,8 +83,11 @@ matrix:
               - sudo add-apt-repository -y ppa:mhier/libboost-latest
               - sudo apt-get update -qq
           install:
+              - sudo apt-get install -qq g++-8 gcc-8
               - sudo apt-get install -qq libboost1.67-dev
               - sudo apt-get install -qq libleveldb1
+              - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
+              - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
               - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
 
         # Docker target, which generates a statically linked alpine image
