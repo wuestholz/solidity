@@ -1,5 +1,5 @@
 Verifying SpecificationPrePost::test: OK
 Verifying SpecificationPrePost::violatePrecondition: ERROR
- - Source SpecificationPrePost.sol, line 13, col 9: Precondition 'y >= 0' might not hold when entering function.
+ - Source test/solc-verify/SpecificationPrePost.sol, line 13, col 9: Precondition 'y >= 0' might not hold when entering function.
 Verifying SpecificationPrePost::[implicit_constructor]: OK
 Errors were found by the verifier.

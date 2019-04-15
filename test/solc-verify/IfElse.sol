@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract IfElse {
     function ifthenelse(uint param) private pure returns (uint) {

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract BitPreciseArith {
     function add8u(uint8 x, uint8 y) private pure returns (uint8) { return x + y; }

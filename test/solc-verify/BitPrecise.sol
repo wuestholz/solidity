@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract BitPrecise {
     function add128(uint128 a, uint128 b) public pure returns (uint128) {

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity >=0.5.0;
 
 /**
  * @notice invariant bal == this.balance
@@ -6,7 +6,7 @@ pragma solidity ^0.4.24;
 contract Overflow {
     uint256 bal;
 
-    constructor() {
+    constructor() public {
         bal = 0;
     }
 

@@ -28,8 +28,8 @@
 
 ## GLOBAL VARIABLES
 
-SOLCVERIFY_TESTS=$(cd $(dirname "$0") && pwd)
 REPO_ROOT=$(cd $(dirname "$0")/../.. && pwd)
+SOLCVERIFY_TESTS="test/solc-verify"
 SOLCVERIFY="$REPO_ROOT/build/solc/solc-verify.py"
 
 ## COLORS
@@ -69,7 +69,7 @@ function reportSuccess() {
     echo -n "$test_name "
     echo -n $GREEN
     echo PASS [$elapsed s]
-    echo -n $black
+    echo -n $BLACK
     PASS=$((PASS+1))
 }
 
@@ -89,7 +89,7 @@ function solcverify_check()
     [[ !  -z  $solcverify_args  ]] && test_string="$test_string [ $solcverify_args ]"
 
     # Run it
-    (time "$SOLCVERIFY" "${filename}" ${solc_args} >& $OUT_PATH) >& $TIME_PATH
+    (time "$SOLCVERIFY" "${filename}" ${solcverify_args} >& $OUT_PATH) >& $TIME_PATH
     elapsed=$(cat $TIME_PATH)
     
     # Check output
@@ -103,6 +103,7 @@ function solcverify_check()
 }
 
 # Run the tests
+cd $REPO_ROOT
 for filename in $SOLCVERIFY_TESTS/*.sol; do
     # Flags to use
     flags=""

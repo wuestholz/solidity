@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity >=0.5.0;
 
 contract ModTccs {
     function f(int16 x) public pure {
@@ -13,7 +13,7 @@ contract ModTccs {
         assert(z >= y);
     }
 
-    function h(uint32[] arr) public {
+    function h(uint32[] memory arr) public {
         require(arr[0] < 10 && arr[1] < 10);
         uint32 z;
         z = arr[0] + arr[1];

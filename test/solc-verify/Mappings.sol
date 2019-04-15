@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract Mappings {
     mapping(address=>uint) user_balances;

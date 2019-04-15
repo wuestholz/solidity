@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 /**
  * @notice invariant __verifier_sum_uint8(user_balances) == total_supply

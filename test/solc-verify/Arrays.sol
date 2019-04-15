@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract Arrays {
     uint[] arr;
@@ -18,12 +18,12 @@ contract Arrays {
     //    return paramArr[i];
     //}
 
-    function readParamArr(uint[] paramArr, uint i) pure public returns (uint) {
+    function readParamArr(uint[] memory paramArr, uint i) pure public returns (uint) {
         if (i < paramArr.length) return paramArr[i];
         return 0;
     }
 
-    function callWithLocalArray(uint[] paramArr) pure public returns (uint) {
+    function callWithLocalArray(uint[] memory paramArr) pure public returns (uint) {
         return readParamArr(paramArr, 123);
     }
 

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract A {
     address owner;
@@ -39,7 +39,7 @@ contract A {
         _;
     }
 
-    function costs(uint y) priced(x) public {
+    function costs(uint y) priced(x) public payable {
         x += y;
     }
 }

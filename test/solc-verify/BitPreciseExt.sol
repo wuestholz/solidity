@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 contract BitPreciseExt {
     function u32tou40(uint32 x) private pure returns (uint40) { return x; }

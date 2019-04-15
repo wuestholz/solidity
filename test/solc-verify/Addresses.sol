@@ -39,7 +39,10 @@ contract Addresses {
 
     function testSend(uint amount) public {
         uint oldSum = address(this).balance + msg.sender.balance;
-        if (address(this).balance >= amount) msg.sender.send(amount);
+        if (address(this).balance >= amount) {
+            bool ok = msg.sender.send(amount);
+            if (!ok) { return; }
+        }
         uint newSum = address(this).balance + msg.sender.balance;
         assert(oldSum == newSum);
     }
@@ -49,8 +52,9 @@ contract Addresses {
         uint oldSenderBalance = msg.sender.balance;
 
         bool success = false;
-        if (address(this).balance >= amount) success = msg.sender.send(amount);
-        
+        if (address(this).balance >= amount) {
+            success = msg.sender.send(amount);
+        }
         if (success) {
             assert(oldThisBalance + oldSenderBalance == address(this).balance + msg.sender.balance);
         } else {
@@ -79,13 +83,16 @@ contract Addresses {
 
     function testSendError(uint amount) public {
         uint oldSum = address(this).balance + msg.sender.balance;
-        if (address(this).balance >= amount) msg.sender.send(amount);
+        if (address(this).balance >= amount) {
+            bool ok = msg.sender.send(amount);
+            if (!ok) return;
+        }
         uint newSum = address(this).balance + msg.sender.balance;
         assert(oldSum == (newSum + 1234)); // This assertion should fail
     }
 
     function testCall(address addr) public returns (bool){
-        (bool success, bytes memory returnData) = addr.call("");
+        (bool success, ) = addr.call("");
         return success;
     }
 
