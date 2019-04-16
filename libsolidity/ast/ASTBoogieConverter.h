@@ -23,21 +23,21 @@ private:
 	unsigned long m_currentModifier; // Index of the current modifier being processed
 
 	// Collect local variable declarations (Boogie requires them at the beginning of the function).
-	std::list<smack::Decl*> m_localDecls;
+	std::list<boogie::Decl::Ref> m_localDecls;
 
 	// Collect initializers for state variables to be added to the beginning of the constructor
 	// If there is no constructor, but there are initializers, we create one
-	std::list<smack::Stmt const*> m_stateVarInitializers;
+	std::list<boogie::Stmt::Ref> m_stateVarInitializers;
 
 	// Collect variables to be initialized to default values
 	std::list<VariableDeclaration const*> m_stateVarsToInitialize;
 
 	// Current block(s) where statements are appended, stack is needed due to nested blocks
-	std::stack<smack::Block*> m_currentBlocks;
+	std::stack<boogie::Block::Ref> m_currentBlocks;
 
 	// Return statement in Solidity is mapped to an assignment to the return
 	// variables in Boogie, which is described by currentRet
-	const smack::Expr* m_currentRet;
+	boogie::Expr::Ref m_currentRet;
 	// Current label to jump to when encountering a return. This is needed because modifiers
 	// are inlined and their returns should not jump out of the whole function.
 	std::string m_currentReturnLabel;
@@ -58,12 +58,12 @@ private:
 	 * Helper method to convert an expression using the dedicated expression converter class,
 	 * it also handles side-effect statements and declarations introduced by the conversion
 	 */
-	const smack::Expr* convertExpression(Expression const& _node);
+	boogie::Expr::Ref convertExpression(Expression const& _node);
 
 	/**
 	 * Helper method to give a default value for a type.
 	 */
-	const smack::Expr* defaultValue(TypePointer _type);
+	boogie::Expr::Ref defaultValue(TypePointer _type);
 
 	/**
 	 * Helper method to get all Boogie IDs of a given type in the current scope.
@@ -73,7 +73,7 @@ private:
 	/**
 	 * Helper method to produce statement assigning a default value for a declared variable.
 	 */
-	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::list<smack::Stmt const*>& output);
+	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::list<boogie::Stmt::Ref>& output);
 
 	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,

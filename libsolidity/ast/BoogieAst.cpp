@@ -8,335 +8,335 @@
 #include <iostream>
 #include <set>
 
-namespace smack {
+namespace boogie {
 
 unsigned Decl::uniqueId = 0;
 
-const Expr* Expr::exists(std::list<Binding> vars, const Expr* e) {
-  return new QuantExpr(QuantExpr::Exists, vars, e);
+Expr::Ref Expr::exists(std::list<Binding> vars, Ref e) {
+  return std::make_shared<QuantExpr const>(QuantExpr::Exists, vars, e);
 }
 
-const Expr* Expr::forall(std::list<Binding> vars, const Expr* e) {
-  return new QuantExpr(QuantExpr::Forall, vars, e);
+Expr::Ref Expr::forall(std::list<Binding> vars, Ref e) {
+  return std::make_shared<QuantExpr const>(QuantExpr::Forall, vars, e);
 }
 
-const Expr* Expr::and_(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::And, l, r);
+Expr::Ref Expr::and_(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::And, l, r);
 }
 
-const Expr* Expr::or_(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Or, l, r);
+Expr::Ref Expr::or_(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Or, l, r);
 }
 
-const Expr* Expr::cond(const Expr* c, const Expr* t, const Expr* e) {
-  return new CondExpr(c,t,e);
+Expr::Ref Expr::cond(Ref c, Ref t, Ref e) {
+  return std::make_shared<CondExpr const>(c,t,e);
 }
 
-const Expr* Expr::eq(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Eq, l, r);
+Expr::Ref Expr::eq(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Eq, l, r);
 }
 
-const Expr* Expr::lt(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Lt, l, r);
+Expr::Ref Expr::lt(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Lt, l, r);
 }
 
-const Expr* Expr::gt(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Gt, l, r);
+Expr::Ref Expr::gt(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Gt, l, r);
 }
 
-const Expr* Expr::lte(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Lte, l, r);
+Expr::Ref Expr::lte(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Lte, l, r);
 }
 
-const Expr* Expr::gte(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Gte, l, r);
+Expr::Ref Expr::gte(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Gte, l, r);
 }
 
-const Expr* Expr::plus(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Plus, l, r);
+Expr::Ref Expr::plus(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Plus, l, r);
 }
 
-const Expr* Expr::minus(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Minus, l, r);
+Expr::Ref Expr::minus(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Minus, l, r);
 }
 
-const Expr* Expr::div(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Div, l, r);
+Expr::Ref Expr::div(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Div, l, r);
 }
 
-const Expr* Expr::intdiv(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::IntDiv, l, r);
+Expr::Ref Expr::intdiv(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::IntDiv, l, r);
 }
 
-const Expr* Expr::times(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Times, l, r);
+Expr::Ref Expr::times(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Times, l, r);
 }
 
-const Expr* Expr::mod(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Mod, l, r);
+Expr::Ref Expr::mod(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Mod, l, r);
 }
 
-const Expr* Expr::exp(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Exp, l, r);
+Expr::Ref Expr::exp(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Exp, l, r);
 }
 
-const Expr* Expr::fn(std::string f, std::list<const Expr*> args) {
-  return new FunExpr(f, args);
+Expr::Ref Expr::fn(std::string f, const std::list<Ref>& args) {
+  return std::make_shared<FunExpr const>(f, args);
 }
 
-const Expr* Expr::fn(std::string f, const Expr* x) {
-  return new FunExpr(f, std::list<const Expr*>(1, x));
+Expr::Ref Expr::fn(std::string f, Ref x) {
+  return std::make_shared<FunExpr const>(f, std::list<Ref>(1, x));
 }
 
-const Expr* Expr::fn(std::string f, const Expr* x, const Expr* y) {
-  std::list<const Expr*> ps;
+Expr::Ref Expr::fn(std::string f, Ref x, Ref y) {
+  std::list<Ref> ps;
   ps.push_back(x);
   ps.push_back(y);
-  return new FunExpr(f, ps);
+  return std::make_shared<FunExpr const>(f, ps);
 }
 
-const Expr* Expr::fn(std::string f, const Expr* x, const Expr* y, const Expr* z) {
-  std::list<const Expr*> ps;
+Expr::Ref Expr::fn(std::string f, Ref x, Ref y, Ref z) {
+  std::list<Ref> ps;
   ps.push_back(x);
   ps.push_back(y);
   ps.push_back(z);
-  return new FunExpr(f, ps);
+  return std::make_shared<FunExpr const>(f, ps);
 }
 
-const Expr* Expr::id(std::string s) {
-  return new VarExpr(s);
+Expr::Ref Expr::id(std::string s) {
+  return std::make_shared<VarExpr const>(s);
 }
 
-const Expr* Expr::impl(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Imp, l, r);
+Expr::Ref Expr::impl(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Imp, l, r);
 }
 
-const Expr* Expr::iff(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Iff, l, r);
+Expr::Ref Expr::iff(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Iff, l, r);
 }
 
-const Expr* Expr::lit(bool b) {
-  return new BoolLit(b);
+Expr::Ref Expr::lit(bool b) {
+  return std::make_shared<BoolLit const>(b);
 }
 
-const Expr* Expr::lit(std::string v) {
-  return new StringLit(v);
+Expr::Ref Expr::lit(std::string v) {
+  return std::make_shared<StringLit const>(v);
 }
 
-const Expr* Expr::lit(unsigned long v) {
-  return new IntLit(v);
+Expr::Ref Expr::lit(unsigned long v) {
+  return std::make_shared<IntLit const>(v);
 }
 
-const Expr* Expr::lit(long v) {
-  return new IntLit(v);
+Expr::Ref Expr::lit(long v) {
+  return std::make_shared<IntLit const>(v);
 }
 
-const Expr* Expr::lit(bigint v) {
-  return new IntLit(v);
+Expr::Ref Expr::lit(bigint v) {
+  return std::make_shared<IntLit const>(v);
 }
 
-const Expr* Expr::lit(std::string v, unsigned w) {
-  return w ? (const Expr*) new BvLit(v,w) : (const Expr*) new IntLit(v);
+Expr::Ref Expr::lit(std::string v, unsigned w) {
+  return w ? (Ref) new BvLit(v,w) : (Ref) new IntLit(v);
 }
 
-const Expr* Expr::lit(bigint v, unsigned w) {
-  return new BvLit(v,w);
+Expr::Ref Expr::lit(bigint v, unsigned w) {
+  return std::make_shared<BvLit const>(v,w);
 }
 
-const Expr* Expr::lit(bool n, std::string s, std::string e, unsigned ss, unsigned es) {
-  return new FPLit(n, s, e, ss, es);
+Expr::Ref Expr::lit(bool n, std::string s, std::string e, unsigned ss, unsigned es) {
+  return std::make_shared<FPLit const>(n, s, e, ss, es);
 }
 
-const Expr* Expr::neq(const Expr* l, const Expr* r) {
-  return new BinExpr(BinExpr::Neq, l, r);
+Expr::Ref Expr::neq(Ref l, Ref r) {
+  return std::make_shared<BinExpr const>(BinExpr::Neq, l, r);
 }
 
-const Expr* Expr::not_(const Expr* e) {
-  return new NotExpr(e);
+Expr::Ref Expr::not_(Ref e) {
+  return std::make_shared<NotExpr const>(e);
 }
 
-const Expr* Expr::neg(const Expr* e) {
-  return new NegExpr(e);
+Expr::Ref Expr::neg(Ref e) {
+  return std::make_shared<NegExpr const>(e);
 }
 
-const Expr* Expr::sel(const Expr* b, const Expr* i) {
-  return new SelExpr(b, i);
+Expr::Ref Expr::sel(Ref b, Ref i) {
+  return std::make_shared<SelExpr const>(b, i);
 }
 
-const Expr* Expr::sel(std::string b, std::string i) {
-  return new SelExpr(id(b), id(i));
+Expr::Ref Expr::sel(std::string b, std::string i) {
+  return std::make_shared<SelExpr const>(id(b), id(i));
 }
 
-const Expr* Expr::sel(const Expr* b, std::list<const Expr*> i) {
-  return new SelExpr(b, i);
+Expr::Ref Expr::sel(Ref b, const std::list<Ref>& i) {
+  return std::make_shared<SelExpr const>(b, i);
 }
 
-const Expr* Expr::upd(const Expr* b, const Expr* i, const Expr* v) {
-  return new UpdExpr(b, i, v);
+Expr::Ref Expr::upd(Ref b, Ref i, Ref v) {
+  return std::make_shared<UpdExpr const>(b, i, v);
 }
 
-const Expr* Expr::upd(const Expr* b, std::list<const Expr*> i, const Expr* v) {
-  return new UpdExpr(b, i, v);
+Expr::Ref Expr::upd(Ref b, const std::list<Ref>& i, Ref v) {
+  return std::make_shared<UpdExpr const>(b, i, v);
 }
 
-const Expr* Expr::if_then_else(const Expr* c, const Expr* t, const Expr* e) {
-  return new IfThenElseExpr(c, t, e);
+Expr::Ref Expr::if_then_else(Ref c, Ref t, Ref e) {
+  return std::make_shared<IfThenElseExpr const>(c, t, e);
 }
 
-const Expr* Expr::old(const Expr* expr) {
-  return new OldExpr(expr);
+Expr::Ref Expr::old(Ref expr) {
+  return std::make_shared<OldExpr const>(expr);
 }
 
-const Attr* Attr::attr(std::string s, std::initializer_list<const Expr*> vs) {
-  return new Attr(s,vs);
+Attr::Ref Attr::attr(std::string s, std::initializer_list<Expr::Ref> vs) {
+  return std::make_shared<Attr const>(s,vs);
 }
 
-const Attr* Attr::attr(std::string s, std::list<const Expr*> vs) {
-  return new Attr(s,vs);
+Attr::Ref Attr::attr(std::string s, const std::list<Expr::Ref>& vs) {
+  return std::make_shared<Attr const>(s,vs);
 }
 
-const Attr* Attr::attr(std::string s) {
+Attr::Ref Attr::attr(std::string s) {
   return attr(s, {});
 }
 
-const Attr* Attr::attr(std::string s, std::string v) {
-  return new Attr(s, {Expr::lit(v)});
+Attr::Ref Attr::attr(std::string s, std::string v) {
+  return Attr::Ref(new Attr(s, { Expr::lit(v) }));
 }
 
-const Attr* Attr::attr(std::string s, int v) {
+Attr::Ref Attr::attr(std::string s, int v) {
   return attr(s, {Expr::lit((long) v)});
 }
 
-const Attr* Attr::attr(std::string s, std::string v, int i) {
+Attr::Ref Attr::attr(std::string s, std::string v, int i) {
   return attr(s, {Expr::lit(v), Expr::lit((long) i)});
 }
 
-const Attr* Attr::attr(std::string s, std::string v, int i, int j) {
+Attr::Ref Attr::attr(std::string s, std::string v, int i, int j) {
   return attr(s, {Expr::lit(v), Expr::lit((long) i), Expr::lit((long) j)});
 }
 
-const Stmt* Stmt::annot(std::list<const Attr*> attrs) {
+Stmt::Ref Stmt::annot(std::list<Attr::Ref> attrs) {
   AssumeStmt* s = new AssumeStmt(Expr::lit(true));
   for (auto A : attrs)
     s->add(A);
-  return s;
+  return std::shared_ptr<AssumeStmt const>(s);
 }
 
-const Stmt* Stmt::annot(const Attr* a) {
-  return Stmt::annot(std::list<const Attr*>(1, a));
+Stmt::Ref Stmt::annot(Attr::Ref a) {
+  return Stmt::annot(std::list<Attr::Ref>(1, a));
 }
 
-const Stmt* Stmt::assert_(const Expr* e, std::list<const Attr*> attrs) {
-  return new AssertStmt(e, attrs);
+Stmt::Ref Stmt::assert_(Expr::Ref e, std::list<Attr::Ref> attrs) {
+  return std::make_shared<AssertStmt const>(e, attrs);
 }
 
-const Stmt* Stmt::assign(const Expr* e, const Expr* f) {
-  return new AssignStmt(std::list<const Expr*>(1, e), std::list<const Expr*>(1, f));
+Stmt::Ref Stmt::assign(Expr::Ref e, Expr::Ref f) {
+  return std::make_shared<AssignStmt const>(std::list<Expr::Ref>(1, e), std::list<Expr::Ref>(1, f));
 }
 
-const Stmt* Stmt::assign(std::list<const Expr*> lhs, std::list<const Expr*> rhs) {
-  return new AssignStmt(lhs, rhs);
+Stmt::Ref Stmt::assign(const std::list<Expr::Ref>& lhs, const std::list<Expr::Ref>& rhs) {
+  return std::make_shared<AssignStmt const>(lhs, rhs);
 }
 
-const Stmt* Stmt::assume(const Expr* e) {
-  return new AssumeStmt(e);
+Stmt::Ref Stmt::assume(Expr::Ref e) {
+  return std::make_shared<AssumeStmt const>(e);
 }
 
-const Stmt* Stmt::assume(const Expr* e, const Attr* a) {
+Stmt::Ref Stmt::assume(Expr::Ref e, Attr::Ref a) {
   AssumeStmt* s = new AssumeStmt(e);
   s->add(a);
-  return (const AssumeStmt*) s;
+  return std::shared_ptr<AssumeStmt const>(s);
 }
 
-const Stmt* Stmt::call(std::string p, std::list<const Expr*> args, std::list<std::string> rets,
-    std::list<const Attr*> attrs) {
-  return new CallStmt(p, attrs, args, rets);
+Stmt::Ref Stmt::call(std::string p, const std::list<Expr::Ref>& args, const std::list<std::string>& rets,
+    const std::list<Attr::Ref>& attrs) {
+  return std::make_shared<CallStmt const>(p, attrs, args, rets);
 }
 
-const Stmt* Stmt::comment(std::string s) {
-  return new Comment(s);
+Stmt::Ref Stmt::comment(std::string s) {
+  return std::make_shared<Comment const>(s);
 }
 
-const Stmt* Stmt::goto_(std::list<std::string> ts) {
-  return new GotoStmt(ts);
+Stmt::Ref Stmt::goto_(std::list<std::string> ts) {
+  return std::make_shared<GotoStmt const>(ts);
 }
 
-const Stmt* Stmt::havoc(std::string x) {
-  return new HavocStmt(std::list<std::string>(1, x));
+Stmt::Ref Stmt::havoc(std::string x) {
+  return std::make_shared<HavocStmt const>(std::list<std::string>(1, x));
 }
 
-const Stmt* Stmt::return_(const Expr* e) {
-  return new ReturnStmt(e);
+Stmt::Ref Stmt::return_(Expr::Ref e) {
+  return std::make_shared<ReturnStmt const>(e);
 }
 
-const Stmt* Stmt::return_() {
-  return new ReturnStmt();
+Stmt::Ref Stmt::return_() {
+  return std::make_shared<ReturnStmt const>();
 }
 
-const Stmt* Stmt::skip() {
-  return new AssumeStmt(Expr::lit(true));
+Stmt::Ref Stmt::skip() {
+  return std::make_shared<AssumeStmt const>(Expr::lit(true));
 }
 
-const Stmt* Stmt::code(std::string s) {
-  return new CodeStmt(s);
+Stmt::Ref Stmt::code(std::string s) {
+  return std::make_shared<CodeStmt const>(s);
 }
 
-const Stmt* Stmt::ifelse(const Expr* cond, const Block* then, const Block* elze) {
-  return new IfElseStmt(cond, then, elze);
+Stmt::Ref Stmt::ifelse(Expr::Ref cond, Block::ConstRef then, Block::ConstRef elze) {
+  return std::make_shared<IfElseStmt const>(cond, then, elze);
 }
 
-const Stmt* Stmt::while_(const Expr* cond, const Block* body, std::list<const Specification*> invars) {
-  return new WhileStmt(cond, body, invars);
+Stmt::Ref Stmt::while_(Expr::Ref cond, Block::ConstRef body, const std::list<Specification::Ref>& invars) {
+  return std::make_shared<WhileStmt const>(cond, body, invars);
 }
 
-const Stmt* Stmt::break_() {
-  return new BreakStmt();
+Stmt::Ref Stmt::break_() {
+  return std::make_shared<BreakStmt const>();
 }
 
-const Stmt* Stmt::label(std::string s) {
-  return new LabelStmt(s);
+Stmt::Ref Stmt::label(std::string s) {
+  return std::make_shared<LabelStmt const>(s);
 }
 
-Decl* Decl::typee(std::string name, std::string type, std::list<const Attr*> attrs) {
-  return new TypeDecl(name,type,attrs);
+Decl::Ref Decl::typee(std::string name, std::string type, std::list<Attr::Ref> attrs) {
+  return std::make_shared<TypeDecl>(name,type,attrs);
 }
-Decl* Decl::axiom(const Expr* e, std::string name) {
-  return new AxiomDecl(name, e);
+Decl::Ref Decl::axiom(Expr::Ref e, std::string name) {
+  return std::make_shared<AxiomDecl>(name, e);
 }
-FuncDecl* Decl::function(std::string name, std::list<Binding> args,
-    std::string type, const Expr* e, std::list<const Attr*> attrs) {
-  return new FuncDecl(name,attrs,args,type,e);
+FuncDeclRef Decl::function(std::string name, std::list<Binding> args,
+    std::string type, Expr::Ref e, std::list<Attr::Ref> attrs) {
+  return std::make_shared<FuncDecl>(name,attrs,args,type,e);
 }
-Decl* Decl::constant(std::string name, std::string type) {
-  return Decl::constant(name, type, std::list<const Attr*>(), false);
+Decl::Ref Decl::constant(std::string name, std::string type) {
+  return Decl::constant(name, type, std::list<Attr::Ref>(), false);
 }
-Decl* Decl::constant(std::string name, std::string type, bool unique) {
-  return Decl::constant(name, type, std::list<const Attr*>(), unique);
+Decl::Ref Decl::constant(std::string name, std::string type, bool unique) {
+  return Decl::constant(name, type, std::list<Attr::Ref>(), unique);
 }
-Decl* Decl::constant(std::string name, std::string type, std::list<const Attr*> ax, bool unique) {
-  return new ConstDecl(name, type, ax, unique);
+Decl::Ref Decl::constant(std::string name, std::string type, std::list<Attr::Ref> ax, bool unique) {
+  return std::make_shared<ConstDecl>(name, type, ax, unique);
 }
-Decl* Decl::variable(std::string name, std::string type) {
-  return new VarDecl(name, type);
+Decl::Ref Decl::variable(std::string name, std::string type) {
+  return std::make_shared<VarDecl>(name, type);
 }
-ProcDecl* Decl::procedure(std::string name,
+ProcDeclRef Decl::procedure(std::string name,
     std::list<Binding> args, std::list<Binding> rets,
-    std::list<Decl*> decls, std::list<Block*> blocks) {
-  return new ProcDecl(name, args, rets, decls, blocks);
+    std::list<Decl::Ref> decls, std::list<Block::Ref> blocks) {
+  return std::make_shared<ProcDecl>(name, args, rets, decls, blocks);
 }
-Decl* Decl::code(std::string name, std::string s) {
-  return new CodeDecl(name, s);
+Decl::Ref Decl::code(std::string name, std::string s) {
+  return std::make_shared<CodeDecl>(name, s);
 }
 
-FuncDecl* Decl::code(ProcDecl* P) {
-  std::list<Decl*> decls;
-  std::list<Block*> blocks;
+FuncDeclRef Decl::code(ProcDeclRef P) {
+  std::list<Decl::Ref> decls;
+  std::list<Block::Ref> blocks;
   for (auto B : *P) {
     blocks.push_back(Block::block(B->getName()));
     for (auto S : *B) {
-      const Stmt* SS;
+      Stmt::Ref SS;
       // Original version was: if (llvm::isa<ReturnStmt>(S))
-      if (dynamic_cast<const ReturnStmt*>(S))
+      if (std::dynamic_pointer_cast<ReturnStmt const>(S))
         SS = Stmt::return_(Expr::neq(Expr::id(P->getReturns().front().first),Expr::lit(0U)));
       else
         SS = S;
@@ -353,31 +353,35 @@ FuncDecl* Decl::code(ProcDecl* P) {
     decls.push_back(Decl::variable(R.first, R.second));
 
   return Decl::function(
-    P->getName(), P->getParameters(), "bool", new CodeExpr(decls, blocks),
+    P->getName(), P->getParameters(), "bool", std::make_shared<CodeExpr const>(decls, blocks),
     {Attr::attr("inline")}
   );
 }
-Decl* Decl::comment(std::string name, std::string str) {
-  return new CommentDecl(name, str);
+Decl::Ref Decl::comment(std::string name, std::string str) {
+  return std::make_shared<CommentDecl>(name, str);
 }
 
 std::ostream& operator<<(std::ostream& os, const Expr& e) {
   e.print(os);
   return os;
 }
-std::ostream& operator<<(std::ostream& os, const Expr* e) {
+std::ostream& operator<<(std::ostream& os, Expr::Ref e) {
   e->print(os);
   return os;
 }
-std::ostream& operator<<(std::ostream& os, const Attr* a) {
+std::ostream& operator<<(std::ostream& os, Attr::Ref a) {
   a->print(os);
   return os;
 }
-std::ostream& operator<<(std::ostream& os, const Stmt* s) {
+std::ostream& operator<<(std::ostream& os, Stmt::Ref s) {
   s->print(os);
   return os;
 }
-std::ostream& operator<<(std::ostream& os, const Block* b) {
+std::ostream& operator<<(std::ostream& os, Block::ConstRef b) {
+  b->print(os);
+  return os;
+}
+std::ostream& operator<<(std::ostream& os, Block::Ref b) {
   b->print(os);
   return os;
 }
@@ -385,7 +389,11 @@ std::ostream& operator<<(std::ostream& os, Decl& d) {
   d.print(os);
   return os;
 }
-std::ostream& operator<<(std::ostream& os, Decl* d) {
+std::ostream& operator<<(std::ostream& os, Decl::Ref d) {
+  d->print(os);
+  return os;
+}
+std::ostream& operator<<(std::ostream& os, Decl::ConstRef d) {
   d->print(os);
   return os;
 }
@@ -407,32 +415,41 @@ template<class T,class U> std::ostream& operator<<(std::ostream& os, std::pair<T
   return os;
 }
 
-template<class T> void print_seq(std::ostream& os, std::list<T> ts,
-                                 std::string init, std::string sep, std::string term) {
-
+template<class T>
+void print_seq(std::ostream& os, const std::list<T>& ts, std::string init, std::string sep, std::string term) {
   os << init;
-  for (typename std::list<T>::iterator i = ts.begin(); i != ts.end(); ++i)
+  for (typename std::list<T>::const_iterator i = ts.begin(); i != ts.end(); ++i) {
     os << (i == ts.begin() ? "" : sep) << *i;
+  }
   os << term;
 }
-template<class T> void print_seq(std::ostream& os, std::list<T> ts, std::string sep) {
+
+template<class T>
+void print_seq(std::ostream& os, const std::list<T>& ts, std::string sep) {
   print_seq<T>(os, ts, "", sep, "");
 }
-template<class T> void print_seq(std::ostream& os, std::list<T> ts) {
+
+template<class T>
+void print_seq(std::ostream& os, const std::list<T>& ts) {
   print_seq<T>(os, ts, "", "", "");
 }
-template<class T, class C> void print_set(std::ostream& os, std::set<T,C> ts,
-                                 std::string init, std::string sep, std::string term) {
 
+template<class T, class C>
+void print_set(std::ostream& os, const std::set<T,C>& ts, std::string init, std::string sep, std::string term) {
   os << init;
-  for (typename std::set<T,C>::iterator i = ts.begin(); i != ts.end(); ++i)
+  for (typename std::set<T,C>::const_iterator i = ts.begin(); i != ts.end(); ++i) {
     os << (i == ts.begin() ? "" : sep) << *i;
+  }
   os << term;
 }
-template<class T, class C> void print_set(std::ostream& os, std::set<T,C> ts, std::string sep) {
+
+template<class T, class C>
+void print_set(std::ostream& os, const std::set<T,C>& ts, std::string sep) {
   print_set<T,C>(os, ts, "", sep, "");
 }
-template<class T, class C> void print_set(std::ostream& os, std::set<T,C> ts) {
+
+template<class T, class C>
+void print_set(std::ostream& os, const std::set<T,C>& ts) {
   print_set<T,C>(os, ts, "", "", "");
 }
 
@@ -506,7 +523,7 @@ void CondExpr::print(std::ostream& os) const {
 
 void FunExpr::print(std::ostream& os) const {
   os << fun;
-  print_seq<const Expr*>(os, args, "(", ", ", ")");
+  print_seq<Expr::Ref>(os, args, "(", ", ", ")");
 }
 
 void BoolLit::print(std::ostream& os) const {
@@ -549,12 +566,12 @@ void QuantExpr::print(std::ostream& os) const {
 
 void SelExpr::print(std::ostream& os) const {
   os << base;
-  print_seq<const Expr*>(os, idxs, "[", ", ", "]");
+  print_seq<Expr::Ref>(os, idxs, "[", ", ", "]");
 }
 
 void UpdExpr::print(std::ostream& os) const {
   os << base << "[";
-  print_seq<const Expr*>(os, idxs, ", ");
+  print_seq<Expr::Ref>(os, idxs, ", ");
   os << " := " << val << "]";
 }
 
@@ -571,8 +588,8 @@ void OldExpr::print(std::ostream& os) const {
 void CodeExpr::print(std::ostream& os) const {
   os << "|{" << "\n";
   if (decls.size() > 0)
-    print_seq<Decl*>(os, decls, "  ", "\n  ", "\n");
-  print_seq<Block*>(os, blocks, "\n");
+    print_seq<Decl::Ref>(os, decls, "  ", "\n  ", "\n");
+  print_seq<Block::Ref>(os, blocks, "\n");
   os << "\n" << "}|";
 }
 
@@ -587,39 +604,39 @@ void StringLit::print(std::ostream& os) const {
 void Attr::print(std::ostream& os) const {
   os << "{:" << name;
   if (vals.size() > 0)
-    print_seq<const Expr*>(os, vals, " ", ", ", "");
+    print_seq<Expr::Ref>(os, vals, " ", ", ", "");
   os << "}";
 }
 
 void AssertStmt::print(std::ostream& os) const {
   os << "assert ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << expr << ";";
 }
 
 void AssignStmt::print(std::ostream& os) const {
-  print_seq<const Expr*>(os, lhs, ", ");
+  print_seq<Expr::Ref>(os, lhs, ", ");
   os << " := ";
-  print_seq<const Expr*>(os, rhs, ", ");
+  print_seq<Expr::Ref>(os, rhs, ", ");
   os << ";";
 }
 
 void AssumeStmt::print(std::ostream& os) const {
   os << "assume ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << expr << ";";
 }
 
 void CallStmt::print(std::ostream& os) const {
   os << "call ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   if (returns.size() > 0)
     print_seq<std::string>(os, returns, "", ", ", " := ");
   os << proc;
-  print_seq<const Expr*>(os, params, "(", ", ", ")");
+  print_seq<Expr::Ref>(os, params, "(", ", ", ")");
   os << ";";
 }
 
@@ -691,7 +708,7 @@ void LabelStmt::print(std::ostream& os) const {
 void TypeDecl::print(std::ostream& os) const {
   os << "type ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << name;
   if (alias != "")
     os << " = " << alias;
@@ -701,21 +718,21 @@ void TypeDecl::print(std::ostream& os) const {
 void AxiomDecl::print(std::ostream& os) const {
   os << "axiom ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << expr << ";";
 }
 
 void ConstDecl::print(std::ostream& os) const {
   os << "const ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << (unique ? "unique " : "") << name << ": " << type << ";";
 }
 
 void FuncDecl::print(std::ostream& os) const {
   os << "function ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << name << "(";
   for (auto P = params.begin(), E = params.end(); P != E; ++P)
     os << (P == params.begin() ? "" : ", ") << (P->first != "" ? P->first + ": " : "") << P->second;
@@ -729,29 +746,29 @@ void FuncDecl::print(std::ostream& os) const {
 void VarDecl::print(std::ostream& os) const {
   os << "var ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << name << ": " << type << ";";
 }
 
 void Specification::print(std::ostream& os, std::string kind) const {
   os << "  " << kind << " ";
   if (attrs.size() > 0)
-      print_seq<const Attr*>(os, attrs, "", " ", " ");
+      print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << expr << ";\n";
 }
 
-Specification const* Specification::spec(const Expr* e, std::list<const Attr*> ax){
-  return new Specification(e, ax);
+Specification::Ref Specification::spec(Expr::Ref e, const std::list<Attr::Ref>& ax){
+  return std::make_shared<Specification const>(e, ax);
 }
 
-Specification const* Specification::spec(const Expr* e){
-  return Specification::spec(e, std::list<const Attr*>());
+Specification::Ref Specification::spec(Expr::Ref e){
+  return Specification::spec(e, std::list<Attr::Ref>());
 }
 
 void ProcDecl::print(std::ostream& os) const {
   os << "procedure ";
   if (attrs.size() > 0)
-    print_seq<const Attr*>(os, attrs, "", " ", " ");
+    print_seq<Attr::Ref>(os, attrs, "", " ", " ");
   os << name << "(";
   for (auto P = params.begin(), E = params.end(); P != E; ++P)
     os << (P == params.begin() ? "" : ", ") << P->first << ": " << P->second;
@@ -782,8 +799,8 @@ void ProcDecl::print(std::ostream& os) const {
     os << "\n";
     os << "{" << "\n";
     if (decls.size() > 0)
-      print_seq<Decl*>(os, decls, "  ", "\n  ", "\n");
-    print_seq<Block*>(os, blocks, "\n");
+      print_seq<Decl::Ref>(os, decls, "  ", "\n  ", "\n");
+    print_seq<Block::Ref>(os, blocks, "\n");
     os << "\n" << "}";
   }
   os << "\n";
@@ -800,12 +817,12 @@ void CommentDecl::print(std::ostream& os) const {
 void Block::print(std::ostream& os) const {
   if (name != "")
     os << name << ":" << "\n";
-  print_seq<const Stmt*>(os, stmts, "  ", "\n  ", "");
+  print_seq<Stmt::Ref>(os, stmts, "  ", "\n  ", "");
 }
 
 void Program::print(std::ostream& os) const {
   os << prelude;
-  print_seq<Decl*>(os, decls, "\n");
+  print_seq<Decl::Ref>(os, decls, "\n");
   os << "\n";
 }
 }

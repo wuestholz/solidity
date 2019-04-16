@@ -15,7 +15,7 @@
 
 
 
-namespace smack {
+namespace boogie {
 
 using bigint = boost::multiprecision::int1024_t;
 
@@ -23,51 +23,55 @@ typedef std::pair<std::string, std::string> Binding;
 
 class Expr {
 public:
+
+  /** Reference to expressions */
+  using Ref = std::shared_ptr<Expr const>;
+
   virtual ~Expr() {}
   virtual void print(std::ostream& os) const = 0;
-  static const Expr* exists(std::list<Binding>, const Expr* e);
-  static const Expr* forall(std::list<Binding>, const Expr* e);
-  static const Expr* and_(const Expr* l, const Expr* r);
-  static const Expr* or_(const Expr* l, const Expr* r);
-  static const Expr* cond(const Expr* c, const Expr* t, const Expr* e);
-  static const Expr* eq(const Expr* l, const Expr* r);
-  static const Expr* lt(const Expr* l, const Expr* r);
-  static const Expr* gt(const Expr* l, const Expr* r);
-  static const Expr* lte(const Expr* l, const Expr* r);
-  static const Expr* gte(const Expr* l, const Expr* r);
-  static const Expr* plus(const Expr* l, const Expr* r);
-  static const Expr* minus(const Expr* l, const Expr* r);
-  static const Expr* div(const Expr* l, const Expr* r);
-  static const Expr* intdiv(const Expr* l, const Expr* r);
-  static const Expr* times(const Expr* l, const Expr* r);
-  static const Expr* mod(const Expr* l, const Expr* r);
-  static const Expr* exp(const Expr* l, const Expr* r);
-  static const Expr* fn(std::string f, const Expr* x);
-  static const Expr* fn(std::string f, const Expr* x, const Expr* y);
-  static const Expr* fn(std::string f, const Expr* x, const Expr* y, const Expr* z);
-  static const Expr* fn(std::string f, std::list<const Expr*> args);
-  static const Expr* id(std::string x);
-  static const Expr* impl(const Expr* l, const Expr* r);
-  static const Expr* iff(const Expr* l, const Expr* r);
-  static const Expr* lit(bool b);
-  static const Expr* lit(std::string v);
-  static const Expr* lit(unsigned v) { return lit((unsigned long) v); }
-  static const Expr* lit(unsigned long v);
-  static const Expr* lit(long v);
-  static const Expr* lit(bigint v);
-  static const Expr* lit(std::string v, unsigned w);
-  static const Expr* lit(bigint v, unsigned w);
-  static const Expr* lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
-  static const Expr* neq(const Expr* l, const Expr* r);
-  static const Expr* not_(const Expr* e);
-  static const Expr* neg(const Expr* e);
-  static const Expr* sel(const Expr* b, const Expr* i);
-  static const Expr* sel(std::string b, std::string i);
-  static const Expr* sel(const Expr* a, std::list<const Expr*> i);
-  static const Expr* upd(const Expr* b, const Expr* i, const Expr* v);
-  static const Expr* upd(const Expr* a, std::list<const Expr*> i, const Expr* v);
-  static const Expr* if_then_else(const Expr* c, const Expr* t, const Expr* e);
-  static const Expr* old(const Expr* expr);
+  static Ref exists(std::list<Binding>, Ref e);
+  static Ref forall(std::list<Binding>, Ref e);
+  static Ref and_(Ref l, Ref r);
+  static Ref or_(Ref l, Ref r);
+  static Ref cond(Ref c, Ref t, Ref e);
+  static Ref eq(Ref l, Ref r);
+  static Ref lt(Ref l, Ref r);
+  static Ref gt(Ref l, Ref r);
+  static Ref lte(Ref l, Ref r);
+  static Ref gte(Ref l, Ref r);
+  static Ref plus(Ref l, Ref r);
+  static Ref minus(Ref l, Ref r);
+  static Ref div(Ref l, Ref r);
+  static Ref intdiv(Ref l, Ref r);
+  static Ref times(Ref l, Ref r);
+  static Ref mod(Ref l, Ref r);
+  static Ref exp(Ref l, Ref r);
+  static Ref fn(std::string f, Ref x);
+  static Ref fn(std::string f, Ref x, Ref y);
+  static Ref fn(std::string f, Ref x, Ref y, Ref z);
+  static Ref fn(std::string f, const std::list<Ref>& args);
+  static Ref id(std::string x);
+  static Ref impl(Ref l, Ref r);
+  static Ref iff(Ref l, Ref r);
+  static Ref lit(bool b);
+  static Ref lit(std::string v);
+  static Ref lit(unsigned v) { return lit((unsigned long) v); }
+  static Ref lit(unsigned long v);
+  static Ref lit(long v);
+  static Ref lit(bigint v);
+  static Ref lit(std::string v, unsigned w);
+  static Ref lit(bigint v, unsigned w);
+  static Ref lit(bool n, std::string s, std::string e, unsigned ss, unsigned es);
+  static Ref neq(Ref l, Ref r);
+  static Ref not_(Ref e);
+  static Ref neg(Ref e);
+  static Ref sel(Ref b, Ref i);
+  static Ref sel(std::string b, std::string i);
+  static Ref sel(Ref a, const std::list<Ref>& i);
+  static Ref upd(Ref b, Ref i, Ref v);
+  static Ref upd(Ref a, const std::list<Ref>& i, Ref v);
+  static Ref if_then_else(Ref c, Ref t, Ref e);
+  static Ref old(Ref expr);
 };
 
 class BinExpr : public Expr {
@@ -77,28 +81,28 @@ public:
               };
 private:
   const Binary op;
-  const Expr* lhs;
-  const Expr* rhs;
+  Expr::Ref lhs;
+  Expr::Ref rhs;
 public:
-  BinExpr(const Binary b, const Expr* l, const Expr* r) : op(b), lhs(l), rhs(r) {}
+  BinExpr(const Binary op, Expr::Ref l, Expr::Ref r) : op(op), lhs(l), rhs(r) {}
   void print(std::ostream& os) const;
 };
 
 class CondExpr : public Expr {
-  const Expr* cond;
-  const Expr* then;
-  const Expr* else_;
+  Expr::Ref cond;
+  Expr::Ref then;
+  Expr::Ref else_;
 public:
-  CondExpr(const Expr* c, const Expr* t, const Expr* e)
+  CondExpr(Expr::Ref c, Expr::Ref t, Expr::Ref e)
     : cond(c), then(t), else_(e) {}
   void print(std::ostream& os) const;
 };
 
 class FunExpr : public Expr {
   std::string fun;
-  std::list<const Expr*> args;
+  std::list<Ref> args;
 public:
-  FunExpr(std::string f, std::list<const Expr*> xs) : fun(f), args(xs) {}
+  FunExpr(std::string f, const std::list<Ref>& xs) : fun(f), args(xs) {}
   void print(std::ostream& os) const;
 };
 
@@ -152,16 +156,16 @@ public:
 };
 
 class NegExpr : public Expr {
-  const Expr* expr;
+  Expr::Ref expr;
 public:
-  NegExpr(const Expr* e) : expr(e) {}
+  NegExpr(Expr::Ref e) : expr(e) {}
   void print(std::ostream& os) const;
 };
 
 class NotExpr : public Expr {
-  const Expr* expr;
+  Expr::Ref expr;
 public:
-  NotExpr(const Expr* e) : expr(e) {}
+  NotExpr(Expr::Ref e) : expr(e) {}
   void print(std::ostream& os) const;
 };
 
@@ -171,33 +175,33 @@ public:
 private:
   Quantifier quant;
   std::list<Binding> vars;
-  const Expr* expr;
+  Ref expr;
 public:
-  QuantExpr(Quantifier q, std::list<Binding> vs, const Expr* e) : quant(q), vars(vs), expr(e) {}
+  QuantExpr(Quantifier q, std::list<Binding> vs, Ref e) : quant(q), vars(vs), expr(e) {}
   void print(std::ostream& os) const;
 };
 
 class SelExpr : public Expr {
-  const Expr* base;
-  std::list<const Expr*> idxs;
+  Ref base;
+  std::list<Ref> idxs;
 public:
-  SelExpr(const Expr* a, std::list<const Expr*> i) : base(a), idxs(i) {}
-  SelExpr(const Expr* a, const Expr* i) : base(a), idxs(std::list<const Expr*>(1, i)) {}
-  const Expr* getBase() const { return base; }
-  std::list<const Expr*> getIdxs() const { return idxs; }
+  SelExpr(Ref a, const std::list<Ref>& i) : base(a), idxs(i) {}
+  SelExpr(Ref a, Ref i) : base(a), idxs(std::list<Ref>(1, i)) {}
+  Ref getBase() const { return base; }
+  const std::list<Ref>& getIdxs() const { return idxs; }
   void print(std::ostream& os) const;
 };
 
 class UpdExpr : public Expr {
-  const Expr* base;
-  std::list<const Expr*> idxs;
-  const Expr* val;
+  Ref base;
+  std::list<Ref> idxs;
+  Ref val;
 public:
-  UpdExpr(const Expr* a, std::list<const Expr*> i, const Expr* v)
+  UpdExpr(Ref a, const std::list<Ref>& i, Expr::Ref v)
     : base(a), idxs(i), val(v) {}
-  UpdExpr(const Expr* a, const Expr* i, const Expr* v)
-    : base(a), idxs(std::list<const Expr*>(1, i)), val(v) {}
-  const Expr* getBase() const { return base; }
+  UpdExpr(Ref a, Ref i, Ref v)
+    : base(a), idxs(std::list<Ref>(1, i)), val(v) {}
+  Ref getBase() const { return base; }
   void print(std::ostream& os) const;
 };
 
@@ -210,18 +214,18 @@ public:
 };
 
 class OldExpr : public Expr {
-  const Expr* expr;
+  Ref expr;
 public:
-  OldExpr(const Expr* expr) : expr(expr) {}
+  OldExpr(Ref expr) : expr(expr) {}
   void print(std::ostream& os) const;
 };
 
 class IfThenElseExpr : public Expr {
-  const Expr* cond;
-  const Expr* true_value;
-  const Expr* false_value;
+  Ref cond;
+  Ref true_value;
+  Ref false_value;
 public:
-  IfThenElseExpr(const Expr* c, const Expr* t, const Expr* e)
+  IfThenElseExpr(Ref c, Ref t, Ref e)
     : cond(c), true_value(t), false_value(e) {}
   void print(std::ostream& os) const;
 };
@@ -229,30 +233,40 @@ public:
 class Attr {
 protected:
   std::string name;
-  std::list<const Expr*> vals;
+  std::list<Expr::Ref> vals;
 public:
-  Attr(std::string n, std::initializer_list<const Expr*> vs) : name(n), vals(vs) {}
-  Attr(std::string n, std::list<const Expr*> vs) : name(n), vals(vs) {}
+
+  using Ref = std::shared_ptr<Attr const>;
+
+  Attr(std::string n, std::initializer_list<Expr::Ref> vs) : name(n), vals(vs) {}
+  Attr(std::string n, const std::list<Expr::Ref>& vs) : name(n), vals(vs) {}
   void print(std::ostream& os) const;
   std::string getName() const { return name; }
 
-  static const Attr* attr(std::string s);
-  static const Attr* attr(std::string s, std::string v);
-  static const Attr* attr(std::string s, int v);
-  static const Attr* attr(std::string s, std::string v, int i);
-  static const Attr* attr(std::string s, std::string v, int i, int j);
-  static const Attr* attr(std::string s, std::initializer_list<const Expr*> vs);
-  static const Attr* attr(std::string s, std::list<const Expr*> vs);
+  static Ref attr(std::string s);
+  static Ref attr(std::string s, std::string v);
+  static Ref attr(std::string s, int v);
+  static Ref attr(std::string s, std::string v, int i);
+  static Ref attr(std::string s, std::string v, int i, int j);
+  static Ref attr(std::string s, std::initializer_list<Expr::Ref> vs);
+  static Ref attr(std::string s, const std::list<Expr::Ref>& vs);
 };
 
 class Block;
+using BlockRef = std::shared_ptr<Block>;
+using BlockConstRef = std::shared_ptr<Block const>;
+
 class Specification;
+using SpecificationRef = std::shared_ptr<Specification const>;
 
 class Stmt {
 public:
   enum Kind {
     ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK, LABEL
   };
+
+  using Ref = std::shared_ptr<Stmt const>;
+
 private:
   const Kind kind;
 protected:
@@ -262,62 +276,62 @@ public:
 
  public:
   virtual ~Stmt() {}
-  static const Stmt* annot(std::list<const Attr*> attrs);
-  static const Stmt* annot(const Attr* a);
-  static const Stmt* assert_(const Expr* e,
-    std::list<const Attr*> attrs = std::list<const Attr*>());
-  static const Stmt* assign(const Expr* e, const Expr* f);
-  static const Stmt* assign(std::list<const Expr*> lhs, std::list<const Expr*> rhs);
-  static const Stmt* assume(const Expr* e);
-  static const Stmt* assume(const Expr* e, const Attr* attr);
-  static const Stmt* call(
+  static Ref annot(std::list<Attr::Ref> attrs);
+  static Ref annot(Attr::Ref a);
+  static Ref assert_(Expr::Ref e,
+    std::list<Attr::Ref> attrs = std::list<Attr::Ref>());
+  static Ref assign(Expr::Ref e, Expr::Ref f);
+  static Ref assign(const std::list<Expr::Ref>& lhs, const std::list<Expr::Ref>& rhs);
+  static Ref assume(Expr::Ref e);
+  static Ref assume(Expr::Ref e, Attr::Ref attr);
+  static Ref call(
     std::string p,
-    std::list<const Expr*> args = std::list<const Expr*>(),
-    std::list<std::string> rets = std::list<std::string>(),
-    std::list<const Attr*> attrs = std::list<const Attr*>());
-  static const Stmt* comment(std::string c);
-  static const Stmt* goto_(std::list<std::string> ts);
-  static const Stmt* havoc(std::string x);
-  static const Stmt* return_();
-  static const Stmt* return_(const Expr* e);
-  static const Stmt* skip();
-  static const Stmt* code(std::string s);
-  static const Stmt* ifelse(const Expr* cond, const Block* then, const Block* elze = nullptr);
-  static const Stmt* while_(
-		  const Expr* cond,
-		  const Block* body,
-		  std::list<const Specification*> invars = std::list<const Specification*>());
-  static const Stmt* break_();
-  static const Stmt* label(std::string name);
+    const std::list<Expr::Ref>& args = std::list<Expr::Ref>(),
+    const std::list<std::string>& rets = std::list<std::string>(),
+    const std::list<Attr::Ref>& attrs = std::list<Attr::Ref>());
+  static Ref comment(std::string c);
+  static Ref goto_(std::list<std::string> ts);
+  static Ref havoc(std::string x);
+  static Ref return_();
+  static Ref return_(Expr::Ref e);
+  static Ref skip();
+  static Ref code(std::string s);
+  static Ref ifelse(Expr::Ref cond, BlockConstRef then, BlockConstRef elze = nullptr);
+  static Ref while_(
+		  Expr::Ref cond,
+		  BlockConstRef body,
+		  const std::list<SpecificationRef>& invars = std::list<SpecificationRef>());
+  static Ref break_();
+  static Ref label(std::string name);
   virtual void print(std::ostream& os) const = 0;
 };
 
 class AssertStmt : public Stmt {
-  const Expr* expr;
-  std::list<const Attr*> attrs;
+  Expr::Ref expr;
+  std::list<Attr::Ref> attrs;
 public:
-  AssertStmt(const Expr* e, std::list<const Attr*> ax)
+  AssertStmt(Expr::Ref e, std::list<Attr::Ref> ax)
     : Stmt(ASSERT), expr(e), attrs(ax) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == ASSERT; }
+  static bool classof(Ref S) { return S->getKind() == ASSERT; }
 };
 
 class AssignStmt : public Stmt {
-  std::list<const Expr*> lhs;
-  std::list<const Expr*> rhs;
+  std::list<Expr::Ref> lhs;
+  std::list<Expr::Ref> rhs;
 public:
-  AssignStmt(std::list<const Expr*> lhs, std::list<const Expr*> rhs)
+  AssignStmt(const std::list<Expr::Ref>& lhs, const std::list<Expr::Ref>& rhs)
     : Stmt(ASSIGN), lhs(lhs), rhs(rhs) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == ASSIGN; }
+  static bool classof(Ref S) { return S->getKind() == ASSIGN; }
 };
 
 class AssumeStmt : public Stmt {
-  const Expr* expr;
-  std::list<const Attr*> attrs;
+  Expr::Ref expr;
+  std::list<Attr::Ref> attrs;
 public:
-  AssumeStmt(const Expr* e) : Stmt(ASSUME), expr(e) {}
-  void add(const Attr* a) {
+  AssumeStmt(Expr::Ref e) : Stmt(ASSUME), expr(e) {}
+  void add(Attr::Ref a) {
     attrs.push_back(a);
   }
   bool hasAttr(std::string name) const {
@@ -328,23 +342,23 @@ public:
     return false;
   }
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == ASSUME; }
+  static bool classof(Ref S) { return S->getKind() == ASSUME; }
 };
 
 class CallStmt : public Stmt {
   std::string proc;
-  std::list<const Attr*> attrs;
-  std::list<const Expr*> params;
+  std::list<Attr::Ref> attrs;
+  std::list<Expr::Ref> params;
   std::list<std::string> returns;
 public:
   CallStmt(std::string p,
-    std::list<const Attr*> attrs,
-    std::list<const Expr*> args,
+    std::list<Attr::Ref> attrs,
+    const std::list<Expr::Ref>& args,
     std::list<std::string> rets)
     : Stmt(CALL), proc(p), attrs(attrs), params(args), returns(rets) {}
 
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == CALL; }
+  static bool classof(Ref S) { return S->getKind() == CALL; }
 };
 
 class Comment : public Stmt {
@@ -352,7 +366,7 @@ class Comment : public Stmt {
 public:
   Comment(std::string s) : Stmt(COMMENT), str(s) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == COMMENT; }
+  static bool classof(Ref S) { return S->getKind() == COMMENT; }
 };
 
 class GotoStmt : public Stmt {
@@ -360,7 +374,7 @@ class GotoStmt : public Stmt {
 public:
   GotoStmt(std::list<std::string> ts) : Stmt(GOTO), targets(ts) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == GOTO; }
+  static bool classof(Ref S) { return S->getKind() == GOTO; }
 };
 
 class HavocStmt : public Stmt {
@@ -368,15 +382,15 @@ class HavocStmt : public Stmt {
 public:
   HavocStmt(std::list<std::string> vs) : Stmt(HAVOC), vars(vs) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == HAVOC; }
+  static bool classof(Ref S) { return S->getKind() == HAVOC; }
 };
 
 class ReturnStmt : public Stmt {
-  const Expr* expr;
+  Expr::Ref expr;
 public:
-  ReturnStmt(const Expr* e = nullptr) : Stmt(RETURN), expr(e) {}
+  ReturnStmt(Expr::Ref e = nullptr) : Stmt(RETURN), expr(e) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == RETURN; }
+  static bool classof(Ref S) { return S->getKind() == RETURN; }
 };
 
 class CodeStmt : public Stmt {
@@ -384,36 +398,36 @@ class CodeStmt : public Stmt {
 public:
   CodeStmt(std::string s) : Stmt(CODE), code(s) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == CODE; }
+  static bool classof(Ref S) { return S->getKind() == CODE; }
 };
 
 class IfElseStmt : public Stmt {
-  const Expr* cond;
-  const Block* then;
-  const Block* elze;
+  Expr::Ref cond;
+  BlockConstRef then;
+  BlockConstRef elze;
 public:
-  IfElseStmt(const Expr* cond, const Block* then, const Block* elze)
+  IfElseStmt(Expr::Ref cond, BlockConstRef then, BlockConstRef elze)
     : Stmt(IFELSE), cond(cond), then(then), elze(elze) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == IFELSE; }
+  static bool classof(Ref S) { return S->getKind() == IFELSE; }
 };
 
 class WhileStmt : public Stmt {
-  const Expr* cond;
-  const Block* body;
-  std::list<const Specification*> invars;
+  Expr::Ref cond;
+  BlockConstRef body;
+  std::list<SpecificationRef> invars;
 public:
-  WhileStmt(const Expr* cond, const Block* body, std::list<const Specification*> invars)
+  WhileStmt(Expr::Ref cond, BlockConstRef body, std::list<SpecificationRef> const& invars)
     : Stmt(WHILE), cond(cond), body(body), invars(invars) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == WHILE; }
+  static bool classof(Ref S) { return S->getKind() == WHILE; }
 };
 
 class BreakStmt : public Stmt {
 public:
   BreakStmt() : Stmt(BREAK) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == BREAK; }
+  static bool classof(Ref S) { return S->getKind() == BREAK; }
 };
 
 class LabelStmt : public Stmt {
@@ -421,11 +435,13 @@ class LabelStmt : public Stmt {
 public:
   LabelStmt(std::string s) : Stmt(LABEL), str(s) {}
   void print(std::ostream& os) const;
-  static bool classof(const Stmt* S) { return S->getKind() == LABEL; }
+  static bool classof(Ref S) { return S->getKind() == LABEL; }
 };
 
 class ProcDecl;
+using ProcDeclRef = std::shared_ptr<ProcDecl>;
 class FuncDecl;
+using FuncDeclRef = std::shared_ptr<FuncDecl>;
 
 class Decl {
 public:
@@ -441,78 +457,82 @@ private:
 protected:
   unsigned id;
   std::string name;
-  std::list<const Attr*> attrs;
-  Decl(Kind k, std::string n, std::list<const Attr*> ax)
+  std::list<Attr::Ref> attrs;
+  Decl(Kind k, std::string n, std::list<Attr::Ref> ax)
     : kind(k), id(uniqueId++), name(n), attrs(ax) { }
 public:
+
+  using Ref = std::shared_ptr<Decl>;
+  using ConstRef = std::shared_ptr<Decl const>;
+
   virtual ~Decl() {}
   virtual void print(std::ostream& os) const = 0;
   unsigned getId() const { return id; }
   std::string getName() const { return name; }
-  void addAttr(const Attr* a) { attrs.push_back(a); }
-  void addAttrs(std::list<const Attr*> ax) { for (auto a : ax) addAttr(a); }
+  void addAttr(Attr::Ref a) { attrs.push_back(a); }
+  void addAttrs(std::list<Attr::Ref> ax) { for (auto a : ax) addAttr(a); }
 
-  static Decl* typee(std::string name, std::string type = "",
-    std::list<const Attr*> attrs = std::list<const Attr*>());
-  static Decl* axiom(const Expr* e, std::string name = "");
-  static FuncDecl* function(
+  static Ref typee(std::string name, std::string type = "",
+    std::list<Attr::Ref> attrs = std::list<Attr::Ref>());
+  static Ref axiom(Expr::Ref e, std::string name = "");
+  static FuncDeclRef function(
     std::string name,
     std::list<Binding> args,
     std::string type,
-    const Expr* e = NULL,
-    std::list<const Attr*> attrs = std::list<const Attr*>());
-  static Decl* constant(std::string name, std::string type);
-  static Decl* constant(std::string name, std::string type, bool unique);
-  static Decl* constant(std::string name, std::string type, std::list<const Attr*> ax, bool unique);
-  static Decl* variable(std::string name, std::string type);
-  static ProcDecl* procedure(std::string name,
+    Expr::Ref e = NULL,
+    std::list<Attr::Ref> attrs = std::list<Attr::Ref>());
+  static Ref constant(std::string name, std::string type);
+  static Ref constant(std::string name, std::string type, bool unique);
+  static Ref constant(std::string name, std::string type, std::list<Attr::Ref> ax, bool unique);
+  static Ref variable(std::string name, std::string type);
+  static ProcDeclRef procedure(std::string name,
     std::list<Binding> params = std::list<Binding>(),
     std::list<Binding> rets = std::list<Binding>(),
-    std::list<Decl*> decls = std::list<Decl*>(),
-    std::list<Block*> blocks = std::list<Block*>());
-  static Decl* code(std::string name, std::string s);
-  static FuncDecl* code(ProcDecl* P);
-  static Decl* comment(std::string name, std::string str);
+    std::list<Ref> decls = std::list<Ref>(),
+    std::list<BlockRef> blocks = std::list<BlockRef>());
+  static Ref code(std::string name, std::string s);
+  static FuncDeclRef code(ProcDeclRef P);
+  static Ref comment(std::string name, std::string str);
 };
 
 class TypeDecl : public Decl {
   std::string alias;
 public:
-  TypeDecl(std::string n, std::string t, std::list<const Attr*> ax)
+  TypeDecl(std::string n, std::string t, std::list<Attr::Ref> ax)
     : Decl(TYPE, n, ax), alias(t) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == TYPE; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == TYPE; }
 };
 
 class AxiomDecl : public Decl {
-  const Expr* expr;
+  Expr::Ref expr;
   static int uniqueId;
 public:
-  AxiomDecl(std::string n, const Expr* e) : Decl(AXIOM, n, {}), expr(e) {}
+  AxiomDecl(std::string n, Expr::Ref e) : Decl(AXIOM, n, {}), expr(e) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == AXIOM; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == AXIOM; }
 };
 
 class ConstDecl : public Decl {
   std::string type;
   bool unique;
 public:
-  ConstDecl(std::string n, std::string t, std::list<const Attr*> ax, bool u)
+  ConstDecl(std::string n, std::string t, std::list<Attr::Ref> ax, bool u)
     : Decl(CONSTANT, n, ax), type(t), unique(u) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == CONSTANT; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == CONSTANT; }
 };
 
 class FuncDecl : public Decl {
   std::list<Binding> params;
   std::string type;
-  const Expr* body;
+  Expr::Ref body;
 public:
-  FuncDecl(std::string n, std::list<const Attr*> ax, std::list<Binding> ps,
-    std::string t, const Expr* b)
+  FuncDecl(std::string n, std::list<Attr::Ref> ax, std::list<Binding> ps,
+    std::string t, Expr::Ref b)
     : Decl(FUNCTION, n, ax), params(ps), type(t), body(b) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == FUNCTION; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == FUNCTION; }
 };
 
 class VarDecl : public Decl {
@@ -520,27 +540,33 @@ class VarDecl : public Decl {
 public:
   VarDecl(std::string n, std::string t) : Decl(VARIABLE, n, {}), type(t) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == VARIABLE; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == VARIABLE; }
 };
 
 class Block {
   std::string name;
-  typedef std::list<const Stmt*> StatementList;
+  typedef std::list<Stmt::Ref> StatementList;
   StatementList stmts;
 public:
-  static Block* block(std::string n = "", std::list<const Stmt*> stmts = std::list<const Stmt*>()) {
-    return new Block(n,stmts);
+
+  using Ref = std::shared_ptr<Block>;
+  using ConstRef = std::shared_ptr<Block const>;
+
+  static
+  Ref block(std::string n = "", std::list<Stmt::Ref> const& stmts = std::list<Stmt::Ref>()) {
+    return std::make_shared<Block>(n,stmts);
   }
-  Block(std::string n, std::list<const Stmt*> stmts) : name(n), stmts(stmts) {}
+
+  Block(std::string n, std::list<Stmt::Ref> const& stmts) : name(n), stmts(stmts) {}
   void print(std::ostream& os) const;
   typedef StatementList::iterator iterator;
   iterator begin() { return stmts.begin(); }
   iterator end() { return stmts.end(); }
   StatementList &getStatements() { return stmts; }
-  void insert(const Stmt* s) {
+  void insert(Stmt::Ref s) {
     stmts.insert(stmts.begin(), s);
   }
-  void addStmt(const Stmt* s) {
+  void addStmt(Stmt::Ref s) {
     stmts.push_back(s);
   }
   std::string getName() {
@@ -550,8 +576,8 @@ public:
 
 class CodeContainer {
 protected:
-  typedef std::list<Decl*> DeclarationList;
-  typedef std::list<Block*> BlockList;
+  typedef std::list<Decl::Ref> DeclarationList;
+  typedef std::list<Block::Ref> BlockList;
   typedef std::list<std::string> ModifiesList;
   DeclarationList decls;
   BlockList blocks;
@@ -573,7 +599,7 @@ public:
   mod_iterator mod_end() { return mods.end(); }
   ModifiesList& getModifies() { return mods; }
 
-  void insert(const Stmt* s) {
+  void insert(Stmt::Ref s) {
     blocks.front()->insert(s);
   }
 };
@@ -585,20 +611,24 @@ public:
 };
 
 class Specification {
-  const Expr* expr;
-  std::list<const Attr*> attrs;
+  Expr::Ref expr;
+  std::list<Attr::Ref> attrs;
 public:
-  Specification(const Expr* e, std::list<const Attr*> ax)
+
+  using Ref = std::shared_ptr<Specification const>;
+
+  Specification(Expr::Ref e, std::list<Attr::Ref> ax)
     : expr(e), attrs(ax) {}
+
   void print(std::ostream& os, std::string kind) const;
-  static Specification const* spec(const Expr* e, std::list<const Attr*> ax);
-  static Specification const* spec(const Expr* e);
+  static Ref spec(Expr::Ref e, const std::list<Attr::Ref>& ax);
+  static Ref spec(Expr::Ref e);
 };
 
 class ProcDecl : public Decl, public CodeContainer {
   typedef Binding Parameter;
   typedef std::list<Parameter> ParameterList;
-  typedef std::list<const Specification*> SpecificationList;
+  typedef std::list<Specification::Ref> SpecificationList;
 
   ParameterList params;
   ParameterList rets;
@@ -627,7 +657,7 @@ public:
   SpecificationList &getEnsures() { return ensures; }
 
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == PROCEDURE; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == PROCEDURE; }
 };
 
 class CodeDecl : public Decl {
@@ -635,7 +665,7 @@ class CodeDecl : public Decl {
 public:
   CodeDecl(std::string name, std::string s) : Decl(CODE, name, {}), code(s) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == CODE; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == CODE; }
 };
 
 class CommentDecl : public Decl {
@@ -643,7 +673,7 @@ class CommentDecl : public Decl {
 public:
   CommentDecl(std::string name, std::string str) : Decl(COMMENT, name, {}), str(str) {}
   void print(std::ostream& os) const;
-  static bool classof(const Decl* D) { return D->getKind() == COMMENT; }
+  static bool classof(Decl::ConstRef D) { return D->getKind() == COMMENT; }
 };
 
 class Program {
@@ -651,7 +681,7 @@ class Program {
   // declarations, putting the Prelude in a CodeDeclaration does not work,
   // and I do not yet understand why; see below. --mje
   std::string prelude;
-  typedef std::list<Decl*> DeclarationList;
+  typedef std::list<Decl::Ref> DeclarationList;
   DeclarationList decls;
 public:
   Program() {}
@@ -666,10 +696,11 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& os, const Expr& e);
-std::ostream& operator<<(std::ostream& os, const Expr* e);
+std::ostream& operator<<(std::ostream& os, Expr::Ref e);
 
 std::ostream& operator<<(std::ostream& os, Decl& e);
-std::ostream& operator<<(std::ostream& os, Decl* e);
+std::ostream& operator<<(std::ostream& os, Decl::Ref e);
+std::ostream& operator<<(std::ostream& os, Decl::ConstRef e);
 
 }
 

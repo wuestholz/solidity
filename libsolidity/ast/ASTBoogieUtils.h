@@ -63,39 +63,47 @@ public:
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */
-	static smack::ProcDecl* createTransferProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createTransferProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.call()
 	 */
-	static smack::ProcDecl* createCallProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createCallProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.send()
 	 */
-	static smack::ProcDecl* createSendProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createSendProc(BoogieContext& context);
 
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */
-	static std::string mapDeclName(Declaration const& decl);
+	static
+	std::string mapDeclName(Declaration const& decl);
 
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
+	static
+	std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
 
 	/**
 	 * Create attributes for original source location and message
 	 */
-	static std::list<const smack::Attr*> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
+	static
+	std::list<boogie::Attr::Ref> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
 
 	/** Pair of expressions: first = result, second = correctness condition */
-	typedef std::pair<smack::Expr const*, smack::Expr const*> expr_pair;
+	typedef std::pair<boogie::Expr::Ref, boogie::Expr::Ref> expr_pair;
 
-	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
+	static
+	expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, unsigned bits, bool isSigned);
 
-	static expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
+	static
+	expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref subExpr, unsigned bits, bool isSigned);
 
 	/**
 	 * Check if a type can be represented with bitvectors
@@ -118,16 +126,19 @@ public:
 	 * returned unchanged. For example, if exprType is uint32 and targetType is uint40,
 	 * then we return an extension of 8 bits to expr.
 	 */
-	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+	static
+	boogie::Expr::Ref checkImplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
 
-	static smack::Expr const* checkExplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+	static
+	boogie::Expr::Ref checkExplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
 	/**
 	 * Get the type checking condition for an expression with a given type.
 	 * Depending on the context, the returned TCC can be assumed or asserted.
 	 */
-	static smack::Expr const* getTCCforExpr(smack::Expr const* expr, TypePointer tp);
+	static
+	boogie::Expr::Ref getTCCforExpr(boogie::Expr::Ref expr, TypePointer tp);
 };
 
 }

@@ -35,7 +35,6 @@ BoogieContext::BoogieContext(Encoding encoding, bool overflow, ErrorReporter* er
 		for (int i = 8; i <= 256; i += 8)
 		{
 			string type = sign + "int" + to_string(i);
-			// TODO: should be deleted in destructor of context
 			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + type,
 									std::make_shared<FunctionType>(strings{}, strings{type},
 											FunctionType::Kind::Internal, true, StateMutability::Pure));
@@ -46,7 +45,14 @@ BoogieContext::BoogieContext(Encoding encoding, bool overflow, ErrorReporter* er
 
 }
 
-void BoogieContext::includeBuiltInFunction(std::string name, smack::FuncDecl* decl)
+BoogieContext::~BoogieContext() {
+	for (auto it = m_verifierSum.begin(); it != m_verifierSum.end(); ++ it) {
+		delete *it;
+	}
+}
+
+
+void BoogieContext::includeBuiltInFunction(std::string name, boogie::FuncDeclRef decl)
 {
 	if (m_builtinFunctions.find(name) != m_builtinFunctions.end()) return;
 	m_builtinFunctions.insert(name);

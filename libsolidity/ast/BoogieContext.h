@@ -30,18 +30,19 @@ public:
 	};
 
 	struct DocTagExpr {
-		smack::Expr const* expr; // Expression converted to Boogie
+		boogie::Expr::Ref expr; // Expression converted to Boogie
 		std::string exprStr; // Expression in original format
-		std::list<smack::Expr const*> tccs; // TCCs for the expression
-		std::list<smack::Expr const*> ocs; // OCs for the expression
+		std::list<boogie::Expr::Ref> tccs; // TCCs for the expression
+		std::list<boogie::Expr::Ref> ocs; // OCs for the expression
 
-		DocTagExpr(smack::Expr const* expr, std::string exprStr, std::list<smack::Expr const*> tccs,
-				std::list<smack::Expr const*> ocs) :
+		DocTagExpr(boogie::Expr::Ref expr, std::string exprStr,
+				std::list<boogie::Expr::Ref> const& tccs,
+				std::list<boogie::Expr::Ref> const& ocs) :
 			expr(expr), exprStr(exprStr), tccs(tccs), ocs(ocs) {}
 	};
 
 private:
-	smack::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
+	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 
 	Encoding m_encoding;
 	bool m_overflow;
@@ -67,7 +68,9 @@ public:
 	BoogieContext(Encoding encoding, bool overflow, langutil::ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, langutil::EVMVersion evmVersion);
 
-	smack::Program& program() { return m_program; }
+	~BoogieContext();
+
+	boogie::Program& program() { return m_program; }
 	Encoding encoding() { return m_encoding; }
 	bool isBvEncoding() { return m_encoding == Encoding::BV; }
 	bool overflow() { return m_overflow; }
@@ -79,7 +82,7 @@ public:
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
-	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);
+	void includeBuiltInFunction(std::string name, boogie::FuncDeclRef decl);
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
