@@ -65,10 +65,7 @@ boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type) {
 	boogie::Stmt::Ref defaultValue(TypePointer type);
 	switch (type->category()) {
 	case Type::Category::Integer: {
-		// Zero
-		if (type->toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE) {
-			return boogie::Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
-		} else if (m_context.isBvEncoding()) {
+		if (m_context.isBvEncoding()) {
 			unsigned bits = ASTBoogieUtils::getBits(type);
 			return boogie::Expr::lit("0", bits);
 		} else {

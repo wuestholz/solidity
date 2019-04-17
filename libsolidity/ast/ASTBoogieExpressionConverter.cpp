@@ -409,7 +409,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Converting to address
 		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
 		{
-			if (expr->typeName().toString() == ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE)
+			if (expr->typeName().token() == Token::Address)
 			{
 				arg->accept(*this);
 				if (auto lit = dynamic_pointer_cast<boogie::IntLit const>(m_currentExpr))

@@ -2,6 +2,7 @@
 #include <boost/regex.hpp>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <liblangutil/SourceLocation.h>
+#include <libsolidity/ast/Types.h>
 
 using namespace std;
 using namespace dev;
@@ -12,7 +13,6 @@ namespace dev
 {
 namespace solidity
 {
-const string ASTBoogieUtils::SOLIDITY_ADDRESS_TYPE = "address";
 const string ASTBoogieUtils::BOOGIE_ADDRESS_TYPE = "address_t";
 const string ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
 const string ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
@@ -24,7 +24,6 @@ const string ASTBoogieUtils::SOLIDITY_CALL = "call";
 const string ASTBoogieUtils::BOOGIE_CALL = "__call";
 const string ASTBoogieUtils::SOLIDITY_SUPER = "super";
 
-const string ASTBoogieUtils::SOLIDITY_MSG = "msg";
 const string ASTBoogieUtils::SOLIDITY_SENDER = "sender";
 const string ASTBoogieUtils::SOLIDITY_VALUE = "value";
 const string ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
@@ -42,6 +41,9 @@ const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
 const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
+const string ASTBoogieUtils::BOOGIE_BOOL_TYPE = "bool";
+const string ASTBoogieUtils::BOOGIE_INT_TYPE = "int";
+const string ASTBoogieUtils::BOOGIE_INT_CONST_TYPE = "int_const";
 const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
 const string ASTBoogieUtils::SOLIDITY_NOW = "now";
@@ -249,60 +251,76 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
+string ASTBoogieUtils::boogieBVType(unsigned n) {
+	return "bv" + to_string(n);
+}
+
 string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context)
 {
-	string tpStr = tp->toString();
-	if (tpStr == SOLIDITY_ADDRESS_TYPE) return BOOGIE_ADDRESS_TYPE;
-	if (tpStr == "string storage ref") return BOOGIE_STRING_TYPE;
-	if (tpStr == "string memory") return BOOGIE_STRING_TYPE;
-	if (tpStr == "bool") return "bool";
-	// For literals we return 'int_const' even in bit-precise mode, they will be
-	// converted to appropriate type when assigned to something (or implicitly converted)
-	if (boost::algorithm::starts_with(tpStr, "int_const ")) return "int_const";
-	for (int i = 8; i <= 256; ++i)
-	{
-		if (tpStr == "int" + to_string(i)) return context.isBvEncoding() ? "bv" + to_string(i) : "int";
-		if (tpStr == "uint" + to_string(i)) return context.isBvEncoding() ? "bv" + to_string(i) : "int";
-	}
-	if (boost::algorithm::starts_with(tpStr, "contract ")) return BOOGIE_ADDRESS_TYPE;
+	Type::Category tpCategory = tp->category();
 
-	if (tp->category() == Type::Category::Array)
-	{
+	switch (tpCategory) {
+	case Type::Category::Address:
+		return BOOGIE_ADDRESS_TYPE;
+	case Type::Category::StringLiteral:
+		return BOOGIE_STRING_TYPE;
+	case Type::Category::Bool:
+		return BOOGIE_BOOL_TYPE;
+	case Type::Category::RationalNumber: {
+		auto tpRational = dynamic_pointer_cast<RationalNumberType const>(tp);
+		if (!tpRational->isFractional()) {
+			return BOOGIE_INT_CONST_TYPE;
+		} else {
+			context.reportError(&_associatedNode, "Fractional numbers are not supported");
+		}
+		break;
+	}
+	case Type::Category::Integer: {
+		auto tpInteger = dynamic_pointer_cast<IntegerType const>(tp);
+		if (context.isBvEncoding()) {
+			return boogieBVType(tpInteger->numBits());
+		} else {
+			return BOOGIE_INT_TYPE;
+		}
+	}
+	case Type::Category::Contract:
+		return BOOGIE_ADDRESS_TYPE;
+	case Type::Category::Array: {
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		return "[" + string(context.isBvEncoding() ? "bv256" : "int") + "]" + mapType(arrType->baseType(), _associatedNode, context);
+		if (arrType->isString()) {
+			return BOOGIE_STRING_TYPE;
+		} else {
+			if (context.isBvEncoding()) {
+				return "[" + boogieBVType(256) + "]" + mapType(arrType->baseType(), _associatedNode, context);
+			} else {
+				return "[" + BOOGIE_INT_TYPE + "]" + mapType(arrType->baseType(), _associatedNode, context);
+			}
+		}
 	}
-
-	if (tp->category() == Type::Category::Mapping)
-	{
+	case Type::Category::Mapping: {
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
 		return "[" + mapType(mappingType->keyType(), _associatedNode, context) + "]"
 				+ mapType(mappingType->valueType(), _associatedNode, context);
 	}
-
-	if (tp->category() == Type::Category::FixedBytes)
-	{
+	case Type::Category::FixedBytes: {
+		// up to 32 bytes
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
-		if (context.isBvEncoding())
-		{
-			if (fbType->numBytes() == 1) return "bv8";
-			else return "[bv256]bv8";
-		}
-		else
-		{
-			if (fbType->numBytes() == 1) return "int";
-			else return "[int]int";
+		if (context.isBvEncoding()) {
+			return boogieBVType(fbType->numBytes() * 8);
+		} else {
+			if (fbType->numBytes() == 1) return BOOGIE_INT_TYPE;
+			else return "[" + BOOGIE_INT_TYPE + "]" + BOOGIE_INT_TYPE;
 		}
 	}
-
-	// Unsupported types
-	if (boost::algorithm::starts_with(tpStr, "tuple("))
-	{
+	case Type::Category::Tuple:
 		context.reportError(&_associatedNode, "Tuples are not supported");
-	}
-	else
-	{
+		break;
+	default: {
+		std::string tpStr = tp->toString();
 		context.reportError(&_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
+	}
+
 	return ERR_TYPE;
 }
 

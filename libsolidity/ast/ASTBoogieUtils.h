@@ -16,9 +16,8 @@ namespace solidity
 class ASTBoogieUtils
 {
 public:
+
 	// Identifiers related to the 'address' type
-	static const std::string SOLIDITY_ADDRESS_TYPE;
-	static const std::string BOOGIE_ADDRESS_TYPE;
 	static const std::string SOLIDITY_BALANCE;
 	static const std::string BOOGIE_BALANCE;
 	static const std::string SOLIDITY_TRANSFER;
@@ -27,10 +26,12 @@ public:
 	static const std::string BOOGIE_SEND;
 	static const std::string SOLIDITY_CALL;
 	static const std::string BOOGIE_CALL;
+
+	// Constract related identifiers
 	static const std::string SOLIDITY_SUPER;
+	static const std::string SOLIDITY_THIS;
 
 	// Identifiers related to 'msg'
-	static const std::string SOLIDITY_MSG;
 	static const std::string SOLIDITY_SENDER;
 	static const std::string SOLIDITY_VALUE;
 	static const std::string BOOGIE_MSG_SENDER;
@@ -42,16 +43,21 @@ public:
 	static const std::string SOLIDITY_REVERT;
 	// no constant required for 'throw' because it is a separate statement
 
+	// Boogie types
+	static const std::string BOOGIE_ADDRESS_TYPE;
+	static const std::string BOOGIE_STRING_TYPE;
+	static const std::string BOOGIE_BOOL_TYPE;
+	static const std::string BOOGIE_INT_TYPE;
+	static const std::string BOOGIE_INT_CONST_TYPE;
+	static const std::string ERR_TYPE;
+
 	// Other identifiers
-	static const std::string SOLIDITY_THIS;
 	static const std::string BOOGIE_THIS;
 	static const std::string VERIFIER_MAIN;
 	static const std::string VERIFIER_SUM;
 	static const std::string BOOGIE_CONSTRUCTOR;
 	static const std::string BOOGIE_LENGTH;
 	static const std::string BOOGIE_SUM;
-	static const std::string BOOGIE_STRING_TYPE;
-	static const std::string ERR_TYPE;
 	static const std::string BOOGIE_ZERO_ADDRESS;
 	static const std::string SOLIDITY_NOW;
 	static const std::string BOOGIE_NOW;
@@ -89,6 +95,12 @@ public:
 	 */
 	static
 	std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
+
+	/**
+	 * Return Boogie's BV type of given size.
+	 */
+	static
+	std::string boogieBVType(unsigned n);
 
 	/**
 	 * Create attributes for original source location and message
