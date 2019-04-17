@@ -383,16 +383,16 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			string retType;
 
 			switch (op) {
-			case Token::Add: name = "add"; retType = "bv" + to_string(bits); break;
-			case Token::Sub: name = "sub"; retType = "bv" + to_string(bits); break;
-			case Token::Mul: name = "mul"; retType = "bv" + to_string(bits); break;
-			case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = "bv" + to_string(bits); break;
+			case Token::Add: name = "add"; retType = boogieBVType(bits); break;
+			case Token::Sub: name = "sub"; retType = boogieBVType(bits); break;
+			case Token::Mul: name = "mul"; retType = boogieBVType(bits); break;
+			case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = boogieBVType(bits); break;
 
-			case Token::BitAnd: name = "and"; retType = "bv" + to_string(bits); break;
-			case Token::BitOr: name = "or"; retType = "bv" + to_string(bits); break;
-			case Token::BitXor: name = "xor"; retType = "bv" + to_string(bits); break;
-			case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = "bv" + to_string(bits); break;
-			case Token::SHL: name = "shl"; retType = "bv" + to_string(bits); break;
+			case Token::BitAnd: name = "and"; retType = boogieBVType(bits); break;
+			case Token::BitOr: name = "or"; retType = boogieBVType(bits); break;
+			case Token::BitXor: name = "xor"; retType = boogieBVType(bits); break;
+			case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = boogieBVType(bits); break;
+			case Token::SHL: name = "shl"; retType = boogieBVType(bits); break;
 
 			case Token::Equal: result = boogie::Expr::eq(lhs, rhs); break;
 			case Token::NotEqual: result = boogie::Expr::neq(lhs, rhs); break;
@@ -407,9 +407,9 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				result = boogie::Expr::id(ERR_EXPR);
 			}
 			if (result == nullptr) { // not computd yet, no error
-				string fullName = "bv" + to_string(bits) + name;
+				string fullName = boogieBVType(bits) + name;
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-							fullName, {{"", "bv"+to_string(bits)}, {"", "bv"+to_string(bits)}}, retType, nullptr,
+							fullName, {{"", boogieBVType(bits)}, {"", boogieBVType(bits)}}, retType, nullptr,
 							{boogie::Attr::attr("bvbuiltin", "bv" + name)}));
 				result = boogie::Expr::fn(fullName, lhs, rhs);
 			}
@@ -556,9 +556,9 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 			}
 			if (!result)
 			{
-				string fullName = "bv" + to_string(bits) + name;
+				string fullName = boogieBVType(bits) + name;
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-								fullName, {{"", "bv"+to_string(bits)}}, "bv"+to_string(bits), nullptr,
+								fullName, {{"", boogieBVType(bits)}}, boogieBVType(bits), nullptr,
 								{boogie::Attr::attr("bvbuiltin", "bv" + name)}));
 
 				result = boogie::Expr::fn(fullName, subExpr);
@@ -638,9 +638,9 @@ boogie::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(boogie::Expr::Ref ex
 		{
 			if (exprLit->getVal() < 0) // Negative literals are tricky
 			{
-				string fullName = "bv" + to_string(targetBits) + "neg";
+				string fullName = boogieBVType(targetBits) + "neg";
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-								fullName, {{"", "bv"+to_string(targetBits)}}, "bv"+to_string(targetBits), nullptr,
+								fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
 								{boogie::Attr::attr("bvbuiltin", "bvneg")}));
 				return boogie::Expr::fn(fullName, boogie::Expr::lit(-exprLit->getVal(), targetBits));
 			}
@@ -668,7 +668,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(boogie::Expr::Ref ex
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-						fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+						fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
 						{boogie::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))}));
 				return boogie::Expr::fn(fullName, expr);
 			}
@@ -676,7 +676,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(boogie::Expr::Ref ex
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-						fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+						fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
 						{boogie::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
 				return boogie::Expr::fn(fullName, expr);
 			}
@@ -723,7 +723,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(boogie::Expr::Ref ex
 				{
 					string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
 					context.includeBuiltInFunction(fullName, boogie::Decl::function(
-							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+							fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
 							{boogie::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
 					return boogie::Expr::fn(fullName, expr);
 				}
@@ -732,7 +732,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(boogie::Expr::Ref ex
 				{
 					string fullName = "extract" + to_string(targetBits) + "from" + to_string(exprBits);
 					context.includeBuiltInFunction(fullName, boogie::Decl::function(
-							fullName, {{"", "bv"+to_string(exprBits)}}, "bv"+to_string(targetBits), nullptr,
+							fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
 							{boogie::Attr::attr("bvbuiltin", "(_ extract " + to_string(targetBits - 1) + " 0)")}));
 					return boogie::Expr::fn(fullName, expr);
 				}
