@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <list>
+#include <memory>
 
 #include "libdevcore/Common.h"
 
