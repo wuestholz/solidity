@@ -42,6 +42,7 @@ public:
 	};
 
 private:
+
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 
 	Encoding m_encoding;
@@ -65,8 +66,13 @@ private:
 	bool m_sendIncluded;
 
 public:
-	BoogieContext(Encoding encoding, bool overflow, langutil::ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, langutil::EVMVersion evmVersion);
+
+	BoogieContext(Encoding encoding,
+			bool overflow,
+			langutil::ErrorReporter* errorReporter,
+			std::vector<Declaration const*> globalDecls,
+			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
+			langutil::EVMVersion evmVersion);
 
 	~BoogieContext();
 

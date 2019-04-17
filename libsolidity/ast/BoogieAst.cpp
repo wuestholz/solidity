@@ -12,11 +12,11 @@ namespace boogie {
 
 unsigned Decl::uniqueId = 0;
 
-Expr::Ref Expr::exists(std::list<Binding> vars, Ref e) {
+Expr::Ref Expr::exists(std::list<Binding> const& vars, Ref e) {
   return std::make_shared<QuantExpr const>(QuantExpr::Exists, vars, e);
 }
 
-Expr::Ref Expr::forall(std::list<Binding> vars, Ref e) {
+Expr::Ref Expr::forall(std::list<Binding> const& vars, Ref e) {
   return std::make_shared<QuantExpr const>(QuantExpr::Forall, vars, e);
 }
 
@@ -80,7 +80,7 @@ Expr::Ref Expr::exp(Ref l, Ref r) {
   return std::make_shared<BinExpr const>(BinExpr::Exp, l, r);
 }
 
-Expr::Ref Expr::fn(std::string f, const std::list<Ref>& args) {
+Expr::Ref Expr::fn(std::string f, std::list<Ref> const& args) {
   return std::make_shared<FunExpr const>(f, args);
 }
 
@@ -167,7 +167,7 @@ Expr::Ref Expr::sel(std::string b, std::string i) {
   return std::make_shared<SelExpr const>(id(b), id(i));
 }
 
-Expr::Ref Expr::sel(Ref b, const std::list<Ref>& i) {
+Expr::Ref Expr::sel(Ref b, std::list<Ref> const& i) {
   return std::make_shared<SelExpr const>(b, i);
 }
 
@@ -175,7 +175,7 @@ Expr::Ref Expr::upd(Ref b, Ref i, Ref v) {
   return std::make_shared<UpdExpr const>(b, i, v);
 }
 
-Expr::Ref Expr::upd(Ref b, const std::list<Ref>& i, Ref v) {
+Expr::Ref Expr::upd(Ref b, std::list<Ref> const& i, Ref v) {
   return std::make_shared<UpdExpr const>(b, i, v);
 }
 
@@ -191,7 +191,7 @@ Attr::Ref Attr::attr(std::string s, std::initializer_list<Expr::Ref> vs) {
   return std::make_shared<Attr const>(s,vs);
 }
 
-Attr::Ref Attr::attr(std::string s, const std::list<Expr::Ref>& vs) {
+Attr::Ref Attr::attr(std::string s, std::list<Expr::Ref> const& vs) {
   return std::make_shared<Attr const>(s,vs);
 }
 
@@ -215,7 +215,7 @@ Attr::Ref Attr::attr(std::string s, std::string v, int i, int j) {
   return attr(s, {Expr::lit(v), Expr::lit((long) i), Expr::lit((long) j)});
 }
 
-Stmt::Ref Stmt::annot(std::list<Attr::Ref> attrs) {
+Stmt::Ref Stmt::annot(std::list<Attr::Ref> const& attrs) {
   AssumeStmt* s = new AssumeStmt(Expr::lit(true));
   for (auto A : attrs)
     s->add(A);
@@ -226,7 +226,7 @@ Stmt::Ref Stmt::annot(Attr::Ref a) {
   return Stmt::annot(std::list<Attr::Ref>(1, a));
 }
 
-Stmt::Ref Stmt::assert_(Expr::Ref e, std::list<Attr::Ref> attrs) {
+Stmt::Ref Stmt::assert_(Expr::Ref e, std::list<Attr::Ref> const& attrs) {
   return std::make_shared<AssertStmt const>(e, attrs);
 }
 
@@ -234,7 +234,7 @@ Stmt::Ref Stmt::assign(Expr::Ref e, Expr::Ref f) {
   return std::make_shared<AssignStmt const>(std::list<Expr::Ref>(1, e), std::list<Expr::Ref>(1, f));
 }
 
-Stmt::Ref Stmt::assign(const std::list<Expr::Ref>& lhs, const std::list<Expr::Ref>& rhs) {
+Stmt::Ref Stmt::assign(std::list<Expr::Ref> const& lhs, std::list<Expr::Ref> const& rhs) {
   return std::make_shared<AssignStmt const>(lhs, rhs);
 }
 
@@ -248,8 +248,8 @@ Stmt::Ref Stmt::assume(Expr::Ref e, Attr::Ref a) {
   return std::shared_ptr<AssumeStmt const>(s);
 }
 
-Stmt::Ref Stmt::call(std::string p, const std::list<Expr::Ref>& args, const std::list<std::string>& rets,
-    const std::list<Attr::Ref>& attrs) {
+Stmt::Ref Stmt::call(std::string p, std::list<Expr::Ref> const& args, std::list<std::string> const& rets,
+    std::list<Attr::Ref> const& attrs) {
   return std::make_shared<CallStmt const>(p, attrs, args, rets);
 }
 
@@ -257,7 +257,7 @@ Stmt::Ref Stmt::comment(std::string s) {
   return std::make_shared<Comment const>(s);
 }
 
-Stmt::Ref Stmt::goto_(std::list<std::string> ts) {
+Stmt::Ref Stmt::goto_(std::list<std::string> const& ts) {
   return std::make_shared<GotoStmt const>(ts);
 }
 
@@ -285,7 +285,7 @@ Stmt::Ref Stmt::ifelse(Expr::Ref cond, Block::ConstRef then, Block::ConstRef elz
   return std::make_shared<IfElseStmt const>(cond, then, elze);
 }
 
-Stmt::Ref Stmt::while_(Expr::Ref cond, Block::ConstRef body, const std::list<Specification::Ref>& invars) {
+Stmt::Ref Stmt::while_(Expr::Ref cond, Block::ConstRef body, std::list<Specification::Ref> const& invars) {
   return std::make_shared<WhileStmt const>(cond, body, invars);
 }
 
@@ -297,14 +297,14 @@ Stmt::Ref Stmt::label(std::string s) {
   return std::make_shared<LabelStmt const>(s);
 }
 
-Decl::Ref Decl::typee(std::string name, std::string type, std::list<Attr::Ref> attrs) {
+Decl::Ref Decl::typee(std::string name, std::string type, std::list<Attr::Ref> const& attrs) {
   return std::make_shared<TypeDecl>(name,type,attrs);
 }
 Decl::Ref Decl::axiom(Expr::Ref e, std::string name) {
   return std::make_shared<AxiomDecl>(name, e);
 }
-FuncDeclRef Decl::function(std::string name, std::list<Binding> args,
-    std::string type, Expr::Ref e, std::list<Attr::Ref> attrs) {
+FuncDeclRef Decl::function(std::string name, std::list<Binding> const& args,
+    std::string type, Expr::Ref e, std::list<Attr::Ref> const& attrs) {
   return std::make_shared<FuncDecl>(name,attrs,args,type,e);
 }
 Decl::Ref Decl::constant(std::string name, std::string type) {
@@ -313,15 +313,15 @@ Decl::Ref Decl::constant(std::string name, std::string type) {
 Decl::Ref Decl::constant(std::string name, std::string type, bool unique) {
   return Decl::constant(name, type, std::list<Attr::Ref>(), unique);
 }
-Decl::Ref Decl::constant(std::string name, std::string type, std::list<Attr::Ref> ax, bool unique) {
+Decl::Ref Decl::constant(std::string name, std::string type, std::list<Attr::Ref> const& ax, bool unique) {
   return std::make_shared<ConstDecl>(name, type, ax, unique);
 }
 Decl::Ref Decl::variable(std::string name, std::string type) {
   return std::make_shared<VarDecl>(name, type);
 }
 ProcDeclRef Decl::procedure(std::string name,
-    std::list<Binding> args, std::list<Binding> rets,
-    std::list<Decl::Ref> decls, std::list<Block::Ref> blocks) {
+    std::list<Binding> const& args, std::list<Binding> const& rets,
+    std::list<Decl::Ref> const& decls, std::list<Block::Ref> const& blocks) {
   return std::make_shared<ProcDecl>(name, args, rets, decls, blocks);
 }
 Decl::Ref Decl::code(std::string name, std::string s) {
@@ -416,7 +416,7 @@ template<class T,class U> std::ostream& operator<<(std::ostream& os, std::pair<T
 }
 
 template<class T>
-void print_seq(std::ostream& os, const std::list<T>& ts, std::string init, std::string sep, std::string term) {
+void print_seq(std::ostream& os, std::list<T> const& ts, std::string init, std::string sep, std::string term) {
   os << init;
   for (typename std::list<T>::const_iterator i = ts.begin(); i != ts.end(); ++i) {
     os << (i == ts.begin() ? "" : sep) << *i;
@@ -425,12 +425,12 @@ void print_seq(std::ostream& os, const std::list<T>& ts, std::string init, std::
 }
 
 template<class T>
-void print_seq(std::ostream& os, const std::list<T>& ts, std::string sep) {
+void print_seq(std::ostream& os, std::list<T> const& ts, std::string sep) {
   print_seq<T>(os, ts, "", sep, "");
 }
 
 template<class T>
-void print_seq(std::ostream& os, const std::list<T>& ts) {
+void print_seq(std::ostream& os, std::list<T> const& ts) {
   print_seq<T>(os, ts, "", "", "");
 }
 
@@ -757,7 +757,7 @@ void Specification::print(std::ostream& os, std::string kind) const {
   os << expr << ";\n";
 }
 
-Specification::Ref Specification::spec(Expr::Ref e, const std::list<Attr::Ref>& ax){
+Specification::Ref Specification::spec(Expr::Ref e, std::list<Attr::Ref> const& ax){
   return std::make_shared<Specification const>(e, ax);
 }
 
