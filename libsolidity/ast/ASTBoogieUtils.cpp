@@ -668,7 +668,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(boogie::Expr::Ref ex
 			{
 				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-						fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
+						fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
 						{boogie::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))}));
 				return boogie::Expr::fn(fullName, expr);
 			}
@@ -676,7 +676,7 @@ boogie::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(boogie::Expr::Ref ex
 			{
 				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
 				context.includeBuiltInFunction(fullName, boogie::Decl::function(
-						fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
+						fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
 						{boogie::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
 				return boogie::Expr::fn(fullName, expr);
 			}
