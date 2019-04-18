@@ -246,15 +246,14 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	_node.subExpression().accept(*this);
 	bg::Expr::Ref subExpr = m_currentExpr;
 
-	unsigned bits = ASTBoogieUtils::getBits(_node.annotation().type);
-	bool isSigned = ASTBoogieUtils::isSigned(_node.annotation().type);
-
 	switch (_node.getOperator()) {
 	case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
 	case Token::Not: m_currentExpr = bg::Expr::not_(subExpr); break;
 
 	case Token::Sub:
 	case Token::BitNot: {
+		unsigned bits = ASTBoogieUtils::getBits(_node.annotation().type);
+		bool isSigned = ASTBoogieUtils::isSigned(_node.annotation().type);
 		auto exprResult = ASTBoogieUtils::encodeArithUnaryOp(m_context, &_node, _node.getOperator(), subExpr, bits, isSigned);
 		m_currentExpr = exprResult.first;
 		if (m_context.overflow() && exprResult.second)
@@ -266,6 +265,8 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	case Token::Inc:
 	case Token::Dec:
 		{
+			unsigned bits = ASTBoogieUtils::getBits(_node.annotation().type);
+			bool isSigned = ASTBoogieUtils::isSigned(_node.annotation().type);
 			bg::Expr::Ref lhs = subExpr;
 			auto rhsResult =
 					ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node,
@@ -327,9 +328,6 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	// the common type is uint64, but the type of the node is bool
 	auto commonType = _node.leftExpression().annotation().type->binaryOperatorResult(_node.getOperator(), _node.rightExpression().annotation().type);
 
-	unsigned bits = ASTBoogieUtils::getBits(commonType);
-	bool isSigned = ASTBoogieUtils::isSigned(commonType);
-
 	// Check implicit conversion for bitvectors
 	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(commonType))
 	{
@@ -337,11 +335,14 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightExpression().annotation().type, commonType, m_context);
 	}
 
-	switch(_node.getOperator())
+	auto op = _node.getOperator();
+	switch(op)
 	{
 	// Non-arithmetic operations
 	case Token::And: m_currentExpr = bg::Expr::and_(lhs, rhs); break;
 	case Token::Or: m_currentExpr = bg::Expr::or_(lhs, rhs); break;
+	case Token::Equal: m_currentExpr = bg::Expr::eq(lhs, rhs); break;
+	case Token::NotEqual: m_currentExpr = bg::Expr::neq(lhs, rhs); break;
 
 	// Arithmetic operations
 	case Token::Add:
@@ -351,8 +352,6 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::Mod:
 	case Token::Exp:
 
-	case Token::Equal:
-	case Token::NotEqual:
 	case Token::LessThan:
 	case Token::GreaterThan:
 	case Token::LessThanOrEqual:
@@ -363,6 +362,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	case Token::BitXor:
 	case Token::SHL:
 	case Token::SAR: {
+		unsigned bits = ASTBoogieUtils::getBits(commonType);
+		bool isSigned = ASTBoogieUtils::isSigned(commonType);
 		auto exprResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, _node.getOperator(), lhs, rhs, bits, isSigned);
 		m_currentExpr = exprResult.first;
 		if (m_context.overflow() && exprResult.second)

@@ -3,6 +3,7 @@
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <liblangutil/SourceLocation.h>
 #include <libsolidity/ast/Types.h>
+#include <liblangutil/Exceptions.h>
 
 using namespace std;
 using namespace dev;
@@ -341,8 +342,6 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 		case Token::Div: result = bg::Expr::intdiv(lhs, rhs); break;
 		case Token::Mod: result = bg::Expr::mod(lhs, rhs); break;
 
-		case Token::Equal: result = bg::Expr::eq(lhs, rhs); break;
-		case Token::NotEqual: result = bg::Expr::neq(lhs, rhs); break;
 		case Token::LessThan: result = bg::Expr::lt(lhs, rhs); break;
 		case Token::GreaterThan: result = bg::Expr::gt(lhs, rhs); break;
 		case Token::LessThanOrEqual: result = bg::Expr::lte(lhs, rhs); break;
@@ -387,8 +386,6 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				else { result = context.bvLShr(bits, lhs, rhs); }
 				break;
 			case Token::SHL: result = context.bvShl(bits, lhs, rhs); break;
-			case Token::Equal: result = bg::Expr::eq(lhs, rhs); break;
-			case Token::NotEqual: result = bg::Expr::neq(lhs, rhs); break;
 			case Token::LessThan:
 				if (isSigned) { result = context.bvSlt(bits, lhs, rhs); }
 				else { result = context.bvUlt(bits, lhs, rhs); }
@@ -592,23 +589,28 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 
 bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 {
-	if (!type) { return false; }
-	boost::regex regex{"u?int\\d(\\d)?(\\d?)"}; // uintXXX and intXXX
-	return boost::regex_match(type->toString(), regex);
+	switch (type->category()) {
+	case Type::Category::Integer:
+	case Type::Category::FixedBytes:
+		return true;
+	default:
+		return false;
+	}
+	return true;
 }
 
 unsigned ASTBoogieUtils::getBits(TypePointer type)
 {
-	if (!isBitPreciseType(type)) { return 0; }
-	string typeStr = type->toString();
-	return stoi(typeStr.substr(typeStr.find("t") + 1)); // Parse stuff after the last 't' in 'int' or 'uint'
+	auto intType = std::dynamic_pointer_cast<IntegerType const>(type);
+	solAssert(intType, "");
+	return intType->numBits();
 }
 
 bool ASTBoogieUtils::isSigned(TypePointer type)
 {
-	if (!isBitPreciseType(type)) { return false; }
-	string typeStr = type->toString();
-	return typeStr[0] == 'i'; // Check if 'int' or 'uint'
+	auto intType = std::dynamic_pointer_cast<IntegerType const>(type);
+	solAssert(intType, "");
+	return intType->isSigned();
 }
 
 bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
