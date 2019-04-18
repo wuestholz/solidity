@@ -104,6 +104,13 @@ void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string mes
 	}
 }
 
+std::string BoogieContext::intType(unsigned size) const {
+	if (isBvEncoding()) {
+		return ASTBoogieUtils::boogieBVType(size);
+	} else {
+		return ASTBoogieUtils::BOOGIE_INT_TYPE;
+	}
+}
 
 }
 }

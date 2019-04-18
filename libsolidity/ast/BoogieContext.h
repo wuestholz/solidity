@@ -77,9 +77,9 @@ public:
 	~BoogieContext();
 
 	boogie::Program& program() { return m_program; }
-	Encoding encoding() { return m_encoding; }
-	bool isBvEncoding() { return m_encoding == Encoding::BV; }
-	bool overflow() { return m_overflow; }
+	Encoding encoding() const { return m_encoding; }
+	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
+	bool overflow() const { return m_overflow; }
 	langutil::ErrorReporter*& errorReporter() { return m_errorReporter; }
 	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
 	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
@@ -95,6 +95,10 @@ public:
 
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
+
+	/** Returns the integer type corresponding to the encoding */
+	std::string intType(unsigned size) const;
+
 };
 
 }
