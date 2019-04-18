@@ -60,7 +60,11 @@ private:
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
-	std::set<std::string> m_builtinFunctions;
+	typedef std::map<std::string, boogie::Decl::ConstRef> builtin_cache;
+	builtin_cache m_builtinFunctions;
+
+	void addBuiltinFunction(boogie::FuncDeclRef fnDecl);
+
 	bool m_transferIncluded;
 	bool m_callIncluded;
 	bool m_sendIncluded;
@@ -88,7 +92,6 @@ public:
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
-	void includeBuiltInFunction(std::string name, boogie::FuncDeclRef decl);
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
@@ -98,6 +101,43 @@ public:
 
 	/** Returns the integer type corresponding to the encoding */
 	std::string intType(unsigned size) const;
+
+	/** Slice of an integer corresponding to the encoding */
+	boogie::Expr::Ref intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low);
+
+	// Parametrized BV operations
+	boogie::Expr::Ref bvExtract(boogie::Expr::Ref expr, unsigned size, unsigned high, unsigned low);
+	boogie::Expr::Ref bvZeroExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize);
+	boogie::Expr::Ref bvSignExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize);
+
+	// Binary BV operations
+	boogie::Expr::Ref bvAdd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSub(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvMul(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvAnd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvOr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvXor(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvAShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvLShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvShl(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+
+	// Unary BV operation
+	boogie::Expr::Ref bvNeg(unsigned bits, boogie::Expr::Ref expr);
+	boogie::Expr::Ref bvNot(unsigned bits, boogie::Expr::Ref expr);
+
+	// Low lever interface
+	boogie::Expr::Ref bvBinaryOp(std::string name, unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, std::string resultType = "");
+	boogie::Expr::Ref bvUnaryOp(std::string name, unsigned bits, boogie::Expr::Ref expr);
 
 };
 

@@ -1,5 +1,7 @@
-Verifying FixedBytes::getValue: OK
+Verifying FixedBytes::getValueSafe: OK
+Verifying FixedBytes::getValueUnsafe: ERROR
+ - Source test/solc-verify/FixedBytes.sol, line 14, col 16: Index may be out of bounds
 Verifying FixedBytes::singleByte: ERROR
- - Source test/solc-verify/FixedBytes.sol, line 13, col 16: Index may be out of bounds
+ - Source test/solc-verify/FixedBytes.sol, line 20, col 16: Index may be out of bounds
 Verifying FixedBytes::[implicit_constructor]: OK
 Errors were found by the verifier.

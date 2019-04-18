@@ -372,35 +372,42 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			string retType;
 
 			switch (op) {
-			case Token::Add: name = "add"; retType = boogieBVType(bits); break;
-			case Token::Sub: name = "sub"; retType = boogieBVType(bits); break;
-			case Token::Mul: name = "mul"; retType = boogieBVType(bits); break;
-			case Token::Div: name = isSigned ? "sdiv" : "udiv"; retType = boogieBVType(bits); break;
-
-			case Token::BitAnd: name = "and"; retType = boogieBVType(bits); break;
-			case Token::BitOr: name = "or"; retType = boogieBVType(bits); break;
-			case Token::BitXor: name = "xor"; retType = boogieBVType(bits); break;
-			case Token::SAR: name = isSigned ? "ashr" : "lshr"; retType = boogieBVType(bits); break;
-			case Token::SHL: name = "shl"; retType = boogieBVType(bits); break;
-
+			case Token::Add: result = context.bvAdd(bits, lhs, rhs); break;
+			case Token::Sub: result = context.bvSub(bits, lhs, rhs); break;
+			case Token::Mul: result = context.bvMul(bits, lhs, rhs); break;
+			case Token::Div:
+				if (isSigned) { result = context.bvSDiv(bits, lhs, rhs); }
+				else { result = context.bvUDiv(bits, lhs, rhs); }
+				break;
+			case Token::BitAnd: result = context.bvAnd(bits, lhs, rhs); break;
+			case Token::BitOr: result = context.bvOr(bits, lhs, rhs); break;
+			case Token::BitXor: result = context.bvXor(bits, lhs, rhs); break;
+			case Token::SAR:
+				if (isSigned) { result = context.bvAShr(bits, lhs, rhs); }
+				else { result = context.bvLShr(bits, lhs, rhs); }
+				break;
+			case Token::SHL: result = context.bvShl(bits, lhs, rhs); break;
 			case Token::Equal: result = bg::Expr::eq(lhs, rhs); break;
 			case Token::NotEqual: result = bg::Expr::neq(lhs, rhs); break;
-
-			case Token::LessThan: name = isSigned ? "slt" : "ult"; retType = "bool"; break;
-			case Token::GreaterThan: name = isSigned ? "sgt" : "ugt"; retType = "bool";  break;
-			case Token::LessThanOrEqual: name = isSigned ? "sle" : "ule"; retType = "bool";  break;
-			case Token::GreaterThanOrEqual: name = isSigned ? "sge" : "uge"; retType = "bool";  break;
-
+			case Token::LessThan:
+				if (isSigned) { result = context.bvSlt(bits, lhs, rhs); }
+				else { result = context.bvUlt(bits, lhs, rhs); }
+				break;
+			case Token::GreaterThan:
+				if (isSigned) { result = context.bvSgt(bits, lhs, rhs); }
+				else { result = context.bvUgt(bits, lhs, rhs); }
+				break;
+			case Token::LessThanOrEqual:
+				if (isSigned) { result = context.bvSle(bits, lhs, rhs); }
+				else { result = context.bvUle(bits, lhs, rhs); }
+				break;
+			case Token::GreaterThanOrEqual:
+				if (isSigned) { result = context.bvSge(bits, lhs, rhs); }
+				else { result = context.bvUge(bits, lhs, rhs); }
+				break;
 			default:
 				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
 				result = bg::Expr::id(ERR_EXPR);
-			}
-			if (result == nullptr) { // not computd yet, no error
-				string fullName = boogieBVType(bits) + name;
-				context.includeBuiltInFunction(fullName, bg::Decl::function(
-							fullName, {{"", boogieBVType(bits)}, {"", boogieBVType(bits)}}, retType, nullptr,
-							{bg::Attr::attr("bvbuiltin", "bv" + name)}));
-				result = bg::Expr::fn(fullName, lhs, rhs);
 			}
 		}
 		break;
@@ -535,22 +542,12 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& cont
 			switch (op)
 			{
 			case Token::Add: result = subExpr; break; // Unary plus does not do anything
-
-			case Token::Sub: name = "neg"; break;
-			case Token::BitNot: name = "not"; break;
+			case Token::Sub: result = context.bvNeg(bits, subExpr); break;
+			case Token::BitNot: result = context.bvNot(bits, subExpr); break;
 			default:
 				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + TokenTraits::toString(op));
 				result = bg::Expr::id(ERR_EXPR);
 				break;
-			}
-			if (!result)
-			{
-				string fullName = boogieBVType(bits) + name;
-				context.includeBuiltInFunction(fullName, bg::Decl::function(
-								fullName, {{"", boogieBVType(bits)}}, boogieBVType(bits), nullptr,
-								{bg::Attr::attr("bvbuiltin", "bv" + name)}));
-
-				result = bg::Expr::fn(fullName, subExpr);
 			}
 		}
 		break;
@@ -626,17 +623,9 @@ bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, Type
 		if (auto exprLit = dynamic_pointer_cast<bg::IntLit const>(expr))
 		{
 			if (exprLit->getVal() < 0) // Negative literals are tricky
-			{
-				string fullName = boogieBVType(targetBits) + "neg";
-				context.includeBuiltInFunction(fullName, bg::Decl::function(
-								fullName, {{"", boogieBVType(targetBits)}}, boogieBVType(targetBits), nullptr,
-								{bg::Attr::attr("bvbuiltin", "bvneg")}));
-				return bg::Expr::fn(fullName, bg::Expr::lit(-exprLit->getVal(), targetBits));
-			}
+				return context.bvNeg(targetBits, bg::Expr::lit(-exprLit->getVal(), targetBits));
 			else
-			{
 				return bg::Expr::lit(exprLit->getVal(), targetBits);
-			}
 		}
 		else if (isBitPreciseType(exprType))
 		{
@@ -654,22 +643,10 @@ bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, Type
 			}
 
 			if (!exprSigned) // Unsigned can be converted to larger (signed or unsigned) with zero extension
-			{
-				string fullName = "bvzeroext" + to_string(exprBits) + "to" + to_string(targetBits);
-				context.includeBuiltInFunction(fullName, bg::Decl::function(
-						fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
-						{bg::Attr::attr("bvbuiltin", "zero_extend " + to_string(targetBits - exprBits))}));
-				return bg::Expr::fn(fullName, expr);
-			}
+				return context.bvZeroExt(expr, exprBits, targetBits);
 			else if (targetSigned) // Signed can only be converted to signed with sign extension
-			{
-				string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
-				context.includeBuiltInFunction(fullName, bg::Decl::function(
-						fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
-						{bg::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
-				return bg::Expr::fn(fullName, expr);
-			}
-			else // Signed to unsigned should have alrady been detected by the compiler
+				return context.bvSignExt(expr, exprBits, targetBits);
+			else // Signed to unsigned should have already been detected by the compiler
 			{
 				BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion from signed to unsigned"));
 				return nullptr;
@@ -706,25 +683,14 @@ bg::Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(bg::Expr::Ref expr, Type
 			if (targetBits < exprBits || (exprSigned && !targetSigned) || (targetBits == exprBits && !exprSigned && targetSigned))
 			{
 				// Nothing to do for same size, since Boogie bitvectors do not have signs
-				if (targetBits == exprBits) { return expr; }
+				if (targetBits == exprBits)
+					return expr;
 				// For larger sizes, sign extension is done
 				else if (targetBits > exprBits)
-				{
-					string fullName = "bvsignext" + to_string(exprBits) + "to" + to_string(targetBits);
-					context.includeBuiltInFunction(fullName, bg::Decl::function(
-							fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
-							{bg::Attr::attr("bvbuiltin", "sign_extend " + to_string(targetBits - exprBits))}));
-					return bg::Expr::fn(fullName, expr);
-				}
+					return context.bvSignExt(expr, exprBits, targetBits);
 				// For smaller sizes, higher-order bits are discarded
 				else
-				{
-					string fullName = "extract" + to_string(targetBits) + "from" + to_string(exprBits);
-					context.includeBuiltInFunction(fullName, bg::Decl::function(
-							fullName, {{"", boogieBVType(exprBits)}}, boogieBVType(targetBits), nullptr,
-							{bg::Attr::attr("bvbuiltin", "(_ extract " + to_string(targetBits - 1) + " 0)")}));
-					return bg::Expr::fn(fullName, expr);
-				}
+					return context.bvExtract(expr, exprBits,targetBits-1, 0);
 			}
 			// Otherwise the implicit will handle it
 			else
