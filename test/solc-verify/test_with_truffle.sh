@@ -1,35 +1,51 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# directory of the script
-BOOGIE_TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd $BOOGIE_TEST_DIR
+#------------------------------------------------------------------------------
+# Bash script to run solc-verify tests.
+#
+# The documentation for solidity is hosted at:
+#
+#     https://solidity.readthedocs.org
+#
+# ------------------------------------------------------------------------------
+# This file is part of solidity.
+#
+# solidity is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# solidity is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with solidity.  If not, see <http://www.gnu.org/licenses/>
+#
+# (c) 2016 solidity contributors.
+#------------------------------------------------------------------------------
 
-if [ ! -d ".env" ]; then
-  echo "We need truffle to run these tests"
-  echo pip install nodeenv
-  echo nodeenv --requirements=node-requirements.txt .env
-  exit 1
-fi
+## GLOBAL VARIABLES
 
-# Load up truffle
-source .env/bin/activate
+REPO_ROOT=$(cd $(dirname "$0")/../.. && pwd)
+SOLCVERIFY_TESTS="test/solc-verify"
+SOLC_BIN="$REPO_ROOT/build/solc"
 
-# Make the truffle project
-if [ ! -d "truffle" ]; then
-  pushd .
-  mkdir truffle
-  cd truffle
-  truffle init
-  popd 
-fi
+cd $REPO_ROOT/$SOLCVERIFY_TESTS
 
-CONTRACTS_WITH_MAIN=`grep -l verifier_main $BOOGIE_TEST_DIR/*.sol`
+# Setup the truffle project
+rm -Rf truffle
+pushd .
+mkdir truffle
+cd truffle
+truffle init
+popd 
+cp truffle-config.js truffle
 
-# Copy contracts to truffle/contracts
-for c in $CONTRACTS_WITH_MAIN
-do
-  cp $c truffle/contracts/
-done
+# Copy the contracts to the truffle
+CONTRACTS_WITH_MAIN=`grep -l verifier_main *.sol`
+cp $CONTRACTS_WITH_MAIN truffle/contracts/
 
 # Add to migrations
 DEPLOY=truffle/migrations/2_deploy_contracts.js
@@ -76,6 +92,9 @@ do
 done
 echo "});"
 ) > $TEST
+
+# Make sure to use the compiled SOLC
+export PATH="$SOLC_BIN:$PATH"
 
 # Now actually test
 cd truffle
