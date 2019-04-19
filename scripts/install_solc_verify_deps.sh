@@ -32,3 +32,8 @@ wget https://nuget.org/nuget.exe
 mono ./nuget.exe restore Source/Boogie.sln
 xbuild Source/Boogie.sln
 popd
+
+# Truffle
+sudo curl -sL https://deb.nodesource.com/setup_9.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm install -g truffle

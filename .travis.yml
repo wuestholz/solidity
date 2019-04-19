@@ -71,24 +71,24 @@ matrix:
               - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
               - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
 
-        - os: linux
-          dist: trusty
-          sudo: required
-          compiler: clang
-          env:
-              - ZIP_SUFFIX=ubuntu-trusty-clang
-              - SOLC_STOREBYTECODE=On
-          before_install:
-              - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-              - sudo add-apt-repository -y ppa:mhier/libboost-latest
-              - sudo apt-get update -qq
-          install:
-              - sudo apt-get install -qq g++-8 gcc-8
-              - sudo apt-get install -qq libboost1.67-dev
-              - sudo apt-get install -qq libleveldb1
-              - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
-              - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
-              - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
+        # - os: linux
+        #   dist: trusty
+        #   sudo: required
+        #   compiler: clang
+        #   env:
+        #       - ZIP_SUFFIX=ubuntu-trusty-clang
+        #       - SOLC_STOREBYTECODE=On
+        #   before_install:
+        #       - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+        #       - sudo add-apt-repository -y ppa:mhier/libboost-latest
+        #       - sudo apt-get update -qq
+        #   install:
+        #       - sudo apt-get install -qq g++-8 gcc-8
+        #       - sudo apt-get install -qq libboost1.67-dev
+        #       - sudo apt-get install -qq libleveldb1
+        #       - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
+        #       - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 90
+        #       - test $SOLC_VERIFY_INSTALL_DEPS_TRAVIS != On || (scripts/install_solc_verify_deps.sh)
 
         # Docker target, which generates a statically linked alpine image
         # - os: linux
