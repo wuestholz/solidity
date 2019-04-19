@@ -1448,9 +1448,7 @@ void CommandLineInterface::outputCompilationResults()
 	handleAst(g_argAstJson);
 	handleAst(g_argAstCompactJson);
 	if (m_args.count(g_argAstBoogie))
-	{
 		handleBoogie();
-	}
 
 	vector<string> contracts = m_compiler->contractNames();
 	for (string const& contract: contracts)

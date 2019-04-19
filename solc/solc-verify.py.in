@@ -7,12 +7,13 @@ import os
 import threading
 import signal
 import psutil
+import tempfile
+
 
 def kill():
     parent = psutil.Process(os.getpid())
     for child in parent.children(recursive=True):  # or parent.children() for recursive=False
         child.kill()
-    #parent.kill()
 
 def findSolver(solver):
     # Name of the solver
@@ -26,14 +27,14 @@ def findSolver(solver):
         if os.path.isfile(solverPath) and os.access(solverPath, os.X_OK):
             return solverPath
     
-def main():
+def main(tmpDir):
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('file', type=str, help='Path to the input file')
     parser.add_argument('--timeout', type=int, help='Timeout for running Boogie (in seconds)', default=10)
-    parser.add_argument('--output', type=str, help='Output directory', default='.')
+    parser.add_argument('--output', type=str, help='Output directory for the Boogie program')
     parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
-    parser.add_argument('--smtlog', type=str, help='Log input for the SMT solver')
+    parser.add_argument('--smt-log', type=str, help='Log input for the SMT solver')
     parser.add_argument('--errors-only', action='store_true', help='Only display error messages')
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
@@ -45,10 +46,14 @@ def main():
     args = parser.parse_args()
 
     solFile = args.file
-    bplFile = args.output + '/' + os.path.basename(solFile) + '.bpl'
-
+    
+    # BPL file if requested, otherwise a temporary
+    if args.output: outDir = args.output
+    else: outDir = tmpDir
+    bplFile = outDir + '/' + os.path.basename(solFile) + '.bpl'
+    
     # First convert .sol to .bpl
-    solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, args.output, args.boogie_arith)
+    solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, outDir, args.boogie_arith)
     convertCommand = args.solc + ' ' + solcArgs
     if args.verbose:
         print("Solc command: " + convertCommand)
@@ -70,8 +75,8 @@ def main():
     # Run verification, get result
     timer.start()
     boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0 /useArrayTheory /trace'
-    if args.smtlog:
-        boogieArgs += ' /proverLog:%s' % args.smtlog
+    if args.smt_log:
+        boogieArgs += ' /proverLog:%s' % args.smt_log
     
     # Solver path 
     if args.solver_bin is not None:
@@ -186,4 +191,5 @@ def getFunctionName(boogieName, bplFile):
     return '[Unknown function]'
 
 if __name__== '__main__':
-    main()
+    with tempfile.TemporaryDirectory() as tmpDir:
+        main(tmpDir)
