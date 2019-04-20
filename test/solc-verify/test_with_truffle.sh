@@ -98,9 +98,5 @@ export PATH="$SOLC_BIN:$PATH"
 
 # Now actually test
 cd truffle
-env
-which node
-node --version
-which truffle
-truffle version
+nvm use node
 truffle test
