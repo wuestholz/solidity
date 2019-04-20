@@ -32,6 +32,8 @@ REPO_ROOT=$(cd $(dirname "$0")/../.. && pwd)
 SOLCVERIFY_TESTS="test/solc-verify"
 SOLC_BIN="$REPO_ROOT/build/solc"
 
+nvm use node
+
 cd $REPO_ROOT/$SOLCVERIFY_TESTS
 
 # Setup the truffle project
@@ -98,5 +100,4 @@ export PATH="$SOLC_BIN:$PATH"
 
 # Now actually test
 cd truffle
-nvm use node
 truffle test
