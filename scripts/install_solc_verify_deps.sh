@@ -33,6 +33,7 @@ mono ./nuget.exe restore Source/Boogie.sln
 xbuild Source/Boogie.sln
 popd
 
-# Truffle (use nvm)
-nvm install node # Latest node
+# Truffle (use nvm, latest node)
+source ~/.nvm/nvm.sh
+nvm install node 
 npm install -g truffle
