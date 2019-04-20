@@ -32,6 +32,7 @@ REPO_ROOT=$(cd $(dirname "$0")/../.. && pwd)
 SOLCVERIFY_TESTS="test/solc-verify"
 SOLC_BIN="$REPO_ROOT/build/solc"
 
+source ~/.nvm/nvm.sh
 nvm use node
 
 cd $REPO_ROOT/$SOLCVERIFY_TESTS
