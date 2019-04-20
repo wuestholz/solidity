@@ -33,7 +33,6 @@ mono ./nuget.exe restore Source/Boogie.sln
 xbuild Source/Boogie.sln
 popd
 
-# Truffle
-curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-sudo apt-get install -y nodejs
-sudo npm install -g truffle
+# Truffle (use nvm)
+nvm install node # Latest node
+npm install -g truffle
