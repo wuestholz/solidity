@@ -335,12 +335,22 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 	case BoogieContext::Encoding::INT:
 		switch(op)
 		{
-		case Token::Add: result = bg::Expr::plus(lhs, rhs); break;
-		case Token::Sub: result = bg::Expr::minus(lhs, rhs); break;
-		case Token::Mul: result = bg::Expr::times(lhs, rhs); break;
+		case Token::Add:
+		case Token::AssignAdd:
+			result = bg::Expr::plus(lhs, rhs); break;
+		case Token::Sub:
+		case Token::AssignSub:
+			result = bg::Expr::minus(lhs, rhs); break;
+		case Token::Mul:
+		case Token::AssignMul:
+			result = bg::Expr::times(lhs, rhs); break;
 		// TODO: returning integer division is fine, because Solidity does not support floats yet
-		case Token::Div: result = bg::Expr::intdiv(lhs, rhs); break;
-		case Token::Mod: result = bg::Expr::mod(lhs, rhs); break;
+		case Token::Div:
+		case Token::AssignDiv:
+			result = bg::Expr::intdiv(lhs, rhs); break;
+		case Token::Mod:
+		case Token::AssignMod:
+			result = bg::Expr::mod(lhs, rhs); break;
 
 		case Token::LessThan: result = bg::Expr::lt(lhs, rhs); break;
 		case Token::GreaterThan: result = bg::Expr::gt(lhs, rhs); break;
@@ -371,21 +381,39 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			string retType;
 
 			switch (op) {
-			case Token::Add: result = context.bvAdd(bits, lhs, rhs); break;
-			case Token::Sub: result = context.bvSub(bits, lhs, rhs); break;
-			case Token::Mul: result = context.bvMul(bits, lhs, rhs); break;
+			case Token::Add:
+			case Token::AssignAdd:
+				result = context.bvAdd(bits, lhs, rhs); break;
+			case Token::Sub:
+			case Token::AssignSub:
+				result = context.bvSub(bits, lhs, rhs); break;
+			case Token::Mul:
+			case Token::AssignMul:
+				result = context.bvMul(bits, lhs, rhs); break;
 			case Token::Div:
+			case Token::AssignDiv:
 				if (isSigned) { result = context.bvSDiv(bits, lhs, rhs); }
 				else { result = context.bvUDiv(bits, lhs, rhs); }
 				break;
-			case Token::BitAnd: result = context.bvAnd(bits, lhs, rhs); break;
-			case Token::BitOr: result = context.bvOr(bits, lhs, rhs); break;
-			case Token::BitXor: result = context.bvXor(bits, lhs, rhs); break;
+
+			case Token::BitAnd:
+			case Token::AssignBitAnd:
+				result = context.bvAnd(bits, lhs, rhs); break;
+			case Token::BitOr:
+			case Token::AssignBitOr:
+				result = context.bvOr(bits, lhs, rhs); break;
+			case Token::BitXor:
+			case Token::AssignBitXor:
+				result = context.bvXor(bits, lhs, rhs); break;
 			case Token::SAR:
+			case Token::AssignSar:
 				if (isSigned) { result = context.bvAShr(bits, lhs, rhs); }
 				else { result = context.bvLShr(bits, lhs, rhs); }
 				break;
-			case Token::SHL: result = context.bvShl(bits, lhs, rhs); break;
+			case Token::SHL:
+			case Token::AssignShl:
+				result = context.bvShl(bits, lhs, rhs); break;
+
 			case Token::LessThan:
 				if (isSigned) { result = context.bvSlt(bits, lhs, rhs); }
 				else { result = context.bvUlt(bits, lhs, rhs); }
@@ -416,6 +444,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 			switch(op)
 			{
 			case Token::Add:
+			case Token::AssignAdd:
 			{
 				auto sum = bg::Expr::plus(lhs, rhs);
 				if (isSigned)
@@ -432,6 +461,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				break;
 			}
 			case Token::Sub:
+			case Token::AssignSub:
 			{
 				auto diff = bg::Expr::minus(lhs, rhs);
 				if (isSigned)
@@ -448,6 +478,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				break;
 			}
 			case Token::Mul:
+			case Token::AssignMul:
 			{
 				auto prod = bg::Expr::times(lhs, rhs);
 				if (isSigned)
@@ -465,6 +496,7 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				break;
 			}
 			case Token::Div:
+			case Token::AssignDiv:
 			{
 				auto div = bg::Expr::intdiv(lhs, rhs);
 				if (isSigned)
@@ -481,12 +513,6 @@ ASTBoogieUtils::expr_pair ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& con
 				break;
 			}
 
-			case Token::Equal:
-				result = bg::Expr::eq(lhs, rhs);
-				break;
-			case Token::NotEqual:
-				result = bg::Expr::neq(lhs, rhs);
-				break;
 			case Token::LessThan:
 				result = bg::Expr::lt(lhs, rhs);
 				break;

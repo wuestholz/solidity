@@ -114,49 +114,47 @@ bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
 
 bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 {
+	ASTBoogieUtils::expr_pair result;
+
 	// Get lhs recursively
 	_node.leftHandSide().accept(*this);
-	bg::Expr::Ref lhs = m_currentExpr;
+	bg::Expr::Ref lhsExpr = m_currentExpr;
 
 	// Get rhs recursively
 	_node.rightHandSide().accept(*this);
-	bg::Expr::Ref rhs = m_currentExpr;
+	bg::Expr::Ref rhsExpr = m_currentExpr;
 
 	// Result will be the LHS (for chained assignments like x = y = 5)
-	m_currentExpr = lhs;
+	m_currentExpr = lhsExpr;
 
-	unsigned bits = ASTBoogieUtils::getBits(_node.leftHandSide().annotation().type);
-	bool isSigned = ASTBoogieUtils::isSigned(_node.leftHandSide().annotation().type);
+	// What kind of assignment
+	Token assignType = _node.assignmentOperator();
+
+	// Types
+	TypePointer lhsType = _node.leftHandSide().annotation().type;
+	TypePointer rhsType = _node.rightHandSide().annotation().type;
 
 	// Bit-precise mode
-	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.leftHandSide().annotation().type))
+	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(lhsType))
 		// Check for implicit conversion
-		rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, _node.rightHandSide().annotation().type, _node.leftHandSide().annotation().type, m_context);
+		rhsExpr = ASTBoogieUtils::checkImplicitBvConversion(rhsExpr, rhsType, lhsType, m_context);
 
-	// Transform rhs based on the operator, e.g., a += b becomes a := bvadd(a, b)
-	ASTBoogieUtils::expr_pair result;
-	switch(_node.assignmentOperator())
+	if (assignType == Token::Assign)
+		// rhs already contains the result
+		result.first = rhsExpr;
+	else
 	{
-	case Token::Assign: result.first = rhs; break; // rhs already contains the result
-	case Token::AssignAdd: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, lhs, rhs, bits, isSigned); break;
-	case Token::AssignSub: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, lhs, rhs, bits, isSigned); break;
-	case Token::AssignMul: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Mul, lhs, rhs, bits, isSigned); break;
-	case Token::AssignDiv: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Div, lhs, rhs, bits, isSigned); break;
-	case Token::AssignMod: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Mod, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitAnd: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitAnd, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitOr: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitOr, lhs, rhs, bits, isSigned); break;
-	case Token::AssignBitXor: result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::BitXor, lhs, rhs, bits, isSigned); break;
-	default:
-		m_context.reportError(&_node, string("Unsupported assignment operator: ") + TokenTraits::toString(_node.assignmentOperator()));
-		m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-		return false;
+		// Transform rhs based on the operator, e.g., a += b becomes a := bvadd(a, b)
+		unsigned bits = ASTBoogieUtils::getBits(lhsType);
+		bool isSigned = ASTBoogieUtils::isSigned(lhsType);
+		result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, assignType, lhsExpr, rhsExpr, bits, isSigned);
 	}
 
 	if (m_context.overflow() && result.second)
 		m_ocs.push_back(result.second);
 
 	// Create the assignment with the helper method
-	createAssignment(_node.leftHandSide(), lhs, result.first);
+	createAssignment(_node.leftHandSide(), lhsExpr, result.first);
 	return false;
 }
 
