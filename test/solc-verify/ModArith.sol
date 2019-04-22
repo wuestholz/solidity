@@ -20,7 +20,7 @@ contract ModArith {
     function gt8u(uint8 x, uint8 y) private pure returns (bool) { return x > y; }
     function ge8u(uint8 x, uint8 y) private pure returns (bool) { return x >= y; }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(add8u(128, 127) == 255);
         assert(add8u(128, 128) == 0);
         assert(sub8u(5, 3) == 2);

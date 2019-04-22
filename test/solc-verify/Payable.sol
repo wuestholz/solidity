@@ -11,15 +11,20 @@ contract PayableFunctions {
 }
 
 contract Payable {
+    
     PayableFunctions p;
+
+    function() external payable {
+        assert(transfer(1) == 2);
+    }
+
+    constructor() public {
+        p = new PayableFunctions();
+    }
 
     function transfer(uint amount) private returns (uint) {
         require(address(this).balance >= amount);
-        return p.receive.gas(5000).value(amount)(1);
-    }
-
-    function __verifier_main() public {
-        assert(transfer(1) == 2);
+        return p.receive.value(amount)(1);
     }
 
     function transferNested(uint amount) public returns (uint) {

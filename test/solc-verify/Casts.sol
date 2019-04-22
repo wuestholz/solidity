@@ -8,7 +8,7 @@ contract Casts {
         return x;
     }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(literalCast() == 123);
     }
 }

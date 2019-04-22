@@ -22,7 +22,7 @@ contract IfElse {
         return param > 10 ? 10 : 0;
     }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(ifthenelse(5) == 10);
         assert(ifthenelse(15) == 20);
         assert(ifthenelse(25) == 30);

@@ -52,7 +52,7 @@ contract Assignments {
         return (++x) + (x++);
     }
 
-    function __verifier_main() public {
+    function() external payable {
         init();
         assert(doSomething(20) == 35);
         assert(doSomething(10) == 50);

@@ -46,7 +46,7 @@ contract Loops {
         return result;
     }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(whileLoopFunc(5) == 15);
         assert(forLoopFunc(9) == 19);
         assert(breakLoop(5) == 15);

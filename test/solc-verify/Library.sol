@@ -18,7 +18,7 @@ contract Library {
         return MathLib.add(1, 2);
     }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(someFunc() == 15);
         assert(otherFunc() == 3);
     }

@@ -78,7 +78,7 @@ contract Arithmetic {
         return a >= b;
     }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(and(true, true) == true);
         assert(and(true, false) == false);
         assert(and(false, true) == false);

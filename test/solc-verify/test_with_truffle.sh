@@ -32,8 +32,8 @@ REPO_ROOT=$(cd $(dirname "$0")/../.. && pwd)
 SOLCVERIFY_TESTS="test/solc-verify"
 SOLC_BIN="$REPO_ROOT/build/solc"
 
-source ~/.nvm/nvm.sh
-nvm use node
+# source ~/.nvm/nvm.sh
+# nvm use node
 
 cd $REPO_ROOT/$SOLCVERIFY_TESTS
 
@@ -47,7 +47,7 @@ popd
 cp truffle-config.js truffle
 
 # Copy the contracts to the truffle
-CONTRACTS_WITH_MAIN=`grep -l verifier_main *.sol`
+CONTRACTS_WITH_MAIN=`grep -l 'function() external payable' *.sol`
 cp $CONTRACTS_WITH_MAIN truffle/contracts/
 
 # Add to migrations
@@ -82,6 +82,7 @@ done
 echo
 echo "contract('All', function(accounts) {"
 echo "  var contract"
+echo "  var user = accounts[0]"
 echo 
 for c in $CONTRACTS_WITH_MAIN
 do 
@@ -89,7 +90,9 @@ do
   c_name=${c_basename%.*}   
   echo "  it('$c_name', function() {"
   echo "    return $c_name.deployed().then(function(instance) {"
-  echo "      return instance.__verifier_main();"
+  echo "      contract = instance"
+  echo "      let amount = web3.utils.toWei('1', 'ether')"
+  echo "      return web3.eth.sendTransaction({ from: user, to: contract.address, gas: 500000, value: amount });"
   echo "    });"
   echo "  });"
 done

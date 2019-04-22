@@ -5,7 +5,7 @@ contract BitPreciseExt {
     function s16tos48(int16 x) private pure returns (int48) { return x; }
     function u32tos40(uint32 x) private pure returns (int40)  { return x; }
 
-    function __verifier_main() public pure {
+    function() external payable {
         assert(u32tou40(123) == 123);
         assert(s16tos48(123) == 123);
         assert(s16tos48(-123) == -123);
