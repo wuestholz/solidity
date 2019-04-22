@@ -242,11 +242,13 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 {
 	list<BoogieContext::DocTagExpr> exprs;
 
-	// We use a different error reporter for the type checker to ignore
-	// error messages related to our special functions like the __verifier_sum
-	ErrorList typeCheckerErrList;
-	ErrorReporter typeCheckerErrReporter(typeCheckerErrList);
-	TypeChecker typeChecker(m_context.evmVersion(), typeCheckerErrReporter, m_currentContract);
+	// We temporarily replace the error reporter in the context, because the locations
+	// are pointing to positions in the docstring
+	ErrorList errorList;
+	ErrorReporter errorReporter(errorList);
+
+	// Typechecker
+	TypeChecker typeChecker(m_context.evmVersion(), errorReporter, m_currentContract);
 
 	for (auto docTag : _annot.docTags)
 	{
@@ -259,26 +261,45 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 			}
 			else // Normal tags just parse the expression afterwards
 			{
-				// We temporarily replace the error reporter in the context, because the locations
-				// are pointing to positions in the docstring
-				ErrorList exprErrList;
-				ErrorReporter exprErrReporter(exprErrList);
 				ErrorReporter* originalErrReporter = m_context.errorReporter();
-				m_context.errorReporter() = &exprErrReporter;
+				m_context.errorReporter() = &errorReporter;
 
-				// Parse
-				string exprStr = docTag.second.content.substr(_tag.length() + 1);
-				CharStream exprStream(exprStr, "DocString");
-				ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
+				try
+				{
+					// Parse
+					string exprStr = docTag.second.content.substr(_tag.length() + 1);
+					CharStream exprStream(exprStr, "DocString");
+					ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
 						.parseExpression(shared_ptr<Scanner>(new Scanner(exprStream)));
-				// Resolve references, using the given scope
-				m_context.scopes()[&*expr] = m_context.scopes()[_scope];
-				NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), *m_context.errorReporter());
-				resolver.resolveNamesAndTypes(*expr);
-				// Do type checking
-				typeChecker.checkTypeRequirements(*expr);
-				// Convert expression to Boogie representation
-				auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
+
+					// Resolve references, using the given scope
+					m_context.scopes()[&*expr] = m_context.scopes()[_scope];
+					NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), *m_context.errorReporter());
+					if (resolver.resolveNamesAndTypes(*expr))
+					{
+						// Do type checking
+						if (typeChecker.checkTypeRequirements(*expr))
+						{
+							// Convert expression to Boogie representation
+							auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
+
+							// Report unsupported cases
+							if (!result.newStatements.empty()) // Make sure that there are no side effects
+							{
+								m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
+							}
+							if (!result.newDecls.empty()) // Make sure that there are no side effects
+							{
+								m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
+							}
+
+							// Success
+							exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs));
+						}
+					}
+				}
+				catch (langutil::FatalError const& fe)
+				{}
 
 				// Print errors relating to the expression string
 				SourceReferenceFormatter formatter(cerr);
@@ -291,20 +312,10 @@ list<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode 
 				// Restore error reporter
 				m_context.errorReporter() = originalErrReporter;
 				// Add a single error in the original reporter if there were errors
-				if (!Error::containsOnlyWarnings(exprErrList))
+				if (!Error::containsOnlyWarnings(errorList))
 				{
 					m_context.reportError(&_node, "Error while processing annotation for node");
 				}
-
-				if (!result.newStatements.empty()) // Make sure that there are no side effects
-				{
-					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
-				}
-				if (!result.newDecls.empty()) // Make sure that there are no side effects
-				{
-					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-				}
-				exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs));
 			}
 		}
 	}

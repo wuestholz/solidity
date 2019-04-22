@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /**
- * @notice invariant bal == this.balance
+ * @notice invariant bal == address(this).balance
  */
 contract Overflow {
     uint256 bal;
