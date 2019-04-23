@@ -65,6 +65,10 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		{"amount", context.intType(256) }
 	};
 
+	// Type to pass around
+	IntegerType uint256(256);
+	TypePointer tp_uint256 = &uint256;
+
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
 	bg::Expr::Ref this_bal = bg::Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
@@ -77,7 +81,6 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
@@ -93,7 +96,6 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
 		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
@@ -124,6 +126,10 @@ bg::ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 		{BOOGIE_MSG_VALUE, context.intType(256) }
 	};
 
+	// Type to pass around
+	IntegerType uint256(256);
+	TypePointer tp_uint256 = &uint256;
+
 	// Return value
 	list<bg::Binding> callReturns{ {"__result", "bool"} };
 
@@ -137,7 +143,6 @@ bg::ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// balance[this] += msg.value
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 	}
@@ -175,6 +180,10 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		{"amount", context.intType(256) }
 	};
 
+	// Type to pass around
+	IntegerType uint256(256);
+	TypePointer tp_uint256 = &uint256;
+
 	// Return value
 	list<bg::Binding> sendReturns{ {"__result", "bool"} };
 
@@ -189,7 +198,6 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
@@ -205,7 +213,6 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
 		thenBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
@@ -270,7 +277,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 	case Type::Category::Bool:
 		return BOOGIE_BOOL_TYPE;
 	case Type::Category::RationalNumber: {
-		auto tpRational = dynamic_pointer_cast<RationalNumberType const>(tp);
+		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
 		if (!tpRational->isFractional()) {
 			return BOOGIE_INT_CONST_TYPE;
 		} else {
@@ -279,7 +286,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 		break;
 	}
 	case Type::Category::Integer: {
-		auto tpInteger = dynamic_pointer_cast<IntegerType const>(tp);
+		auto tpInteger = dynamic_cast<IntegerType const*>(tp);
 		return context.intType(tpInteger->numBits());
 	}
 	case Type::Category::Contract:
@@ -627,22 +634,22 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 
 unsigned ASTBoogieUtils::getBits(TypePointer type)
 {
-	auto intType = std::dynamic_pointer_cast<IntegerType const>(type);
+	auto intType = dynamic_cast<IntegerType const*>(type);
 	solAssert(intType, "");
 	return intType->numBits();
 }
 
 bool ASTBoogieUtils::isSigned(TypePointer type)
 {
-	auto intType = std::dynamic_pointer_cast<IntegerType const>(type);
+	auto intType = dynamic_cast<IntegerType const*>(type);
 	solAssert(intType, "");
 	return intType->isSigned();
 }
 
 bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
-	// Do nothing if any of the types is unknown
-	if (!targetType || !exprType) { return expr; }
+	solAssert(exprType, "");
+	solAssert(targetType, "");
 
 	if (isBitPreciseType(targetType))
 	{

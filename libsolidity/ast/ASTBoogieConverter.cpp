@@ -62,7 +62,6 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 
 boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type) {
 
-	boogie::Stmt::Ref defaultValue(TypePointer type);
 	switch (type->category()) {
 	case Type::Category::Integer: {
 		if (m_context.isBvEncoding()) {
@@ -201,6 +200,10 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.isBvEncoding() ? "bv256" : "int"} // msg.value
 	};
 
+	// Type to pass around
+	IntegerType uint256(256);
+	TypePointer tp_uint256 = &uint256;
+
 	boogie::Block::Ref block = boogie::Block::block();
 	// this.balance = 0
 	block->addStmt(boogie::Stmt::assign(
@@ -208,7 +211,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 			boogie::Expr::upd(
 					boogie::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 					boogie::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-					defaultValue(make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned)))));
+					defaultValue(tp_uint256))));
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers) { block->addStmt(i); }
 	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
@@ -501,6 +504,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Solidity functions are mapped to Boogie procedures
 	m_currentFunc = &_node;
 
+	// Type to pass around
+	IntegerType uint256(256);
+	TypePointer tp_uint256 = &uint256;
+
 	// Input parameters
 	list<boogie::Binding> params {
 		// Globally available stuff
@@ -532,13 +539,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Boogie treats return as an assignment to the return variable(s)
 	if (_node.returnParameters().empty())
-	{
 		m_currentRet = nullptr;
-	}
 	else if (_node.returnParameters().size() == 1)
-	{
 		m_currentRet = boogie::Expr::id(rets.begin()->first);
-	}
 	else
 	{
 		m_context.reportError(&_node, "Multiple return values are not supported");
@@ -558,7 +561,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				boogie::Expr::upd(
 						boogie::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 						boogie::Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-						defaultValue(make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned)))));
+						defaultValue(tp_uint256))));
 		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
 		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 		// Assign uninitialized state variables to default values
@@ -582,7 +585,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		// balance[this] += msg.value
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
-			TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
 			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
 			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 		}

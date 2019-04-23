@@ -380,6 +380,8 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
+	IntegerType uint256(256);
+
 	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
@@ -468,7 +470,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (m_context.isBvEncoding())
 			{
 				m_currentMsgValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentMsgValue,
-						arg->annotation().type, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned), m_context);
+						arg->annotation().type, &uint256, m_context);
 			}
 
 			// Continue with the rest of the AST
@@ -643,9 +645,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		bg::Expr::Ref this_balance = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
-			TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
-			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
-			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
+			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, &uint256)));
+			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, &uint256)));
 		}
 		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
 												this_balance, msgValue, 256, false);
@@ -707,9 +708,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				bg::Expr::Ref this_balance = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 				if (m_context.encoding() == BoogieContext::Encoding::MOD)
 				{
-					TypePointer tp_uint256 = make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned);
-					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
-					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
+					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, &uint256)));
+					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, &uint256)));
 				}
 				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 															this_balance, msgValue, 256, false);
@@ -778,6 +778,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	Type::Category typeCategory = type->category();
 
 	// Handle special members/functions
+	IntegerType u256(256);
 
 	// address.balance / this.balance
 	bool isAddress = typeCategory == Type::Category::Address;
@@ -785,7 +786,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		if (isAddress) {
 			m_currentExpr = bg::Expr::sel(bg::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
-			addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
+			addTCC(m_currentExpr, &u256);
 			return false;
 		}
 		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
@@ -793,7 +794,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
 				m_currentExpr = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-				addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
+				addTCC(m_currentExpr, &u256);
 				return false;
 			}
 		}
@@ -820,7 +821,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		return false;
 	}
 	// msg.sender
-	auto magicType = std::dynamic_pointer_cast<MagicType const>(type);
+	auto magicType = dynamic_cast<MagicType const*>(type);
 	bool isMessage = magicType != nullptr && magicType->kind() == MagicType::Kind::Message;
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
@@ -831,7 +832,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
 		m_currentExpr = bg::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
-		addTCC(m_currentExpr, make_shared<IntegerType>(256, IntegerType::Modifier::Unsigned));
+		IntegerType uint256(256);
+		addTCC(m_currentExpr, &uint256);
 		return false;
 	}
 	// array.length
@@ -881,16 +883,21 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 
 bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 {
-	_node.baseExpression().accept(*this);
+	Expression const& base = _node.baseExpression();
+	base.accept(*this);
 	bg::Expr::Ref baseExpr = m_currentExpr;
 
-	_node.indexExpression()->accept(*this); // TODO: can this be a nullptr?
+	Expression const* index = _node.indexExpression();
+	index->accept(*this); // TODO: can this be a nullptr?
 	bg::Expr::Ref indexExpr = m_currentExpr;
 
+	TypePointer baseType = base.annotation().type;
+	TypePointer indexType = index->annotation().type;
+
 	// Fixed size byte arrays
-	if (_node.baseExpression().annotation().type->category() == Type::Category::FixedBytes)
+	if (baseType->category() == Type::Category::FixedBytes)
 	{
-		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.baseExpression().annotation().type);
+		auto fbType = dynamic_cast<FixedBytesType const*>(baseType);
 		unsigned fbSize = fbType->numBytes();
 
 		// Check bounds (typechecked for unsigned, so >= 0)
@@ -915,9 +922,11 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		return false;
 	}
 
-	if (_node.baseExpression().annotation().type->category() == Type::Category::Array && m_context.isBvEncoding())
+	if (baseType->category() == Type::Category::Array && m_context.isBvEncoding())
 	{
-		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, _node.indexExpression()->annotation().type, make_shared<IntegerType>(256), m_context);
+		// For arrays, cast to uint
+		IntegerType uint256(256);
+		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, &uint256, m_context);
 	}
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
@@ -974,7 +983,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 
 	switch (typeCategory) {
 	case Type::Category::RationalNumber: {
-		auto rationalType = std::dynamic_pointer_cast<RationalNumberType const>(type);
+		auto rationalType = dynamic_cast<RationalNumberType const*>(type);
 		if (rationalType != nullptr) {
 			// For now, just the integers
 			if (!rationalType->isFractional()) {

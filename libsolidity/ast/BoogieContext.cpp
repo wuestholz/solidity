@@ -35,10 +35,10 @@ BoogieContext::BoogieContext(Encoding encoding, bool overflow, ErrorReporter* er
 	{
 		for (int i = 8; i <= 256; i += 8)
 		{
-			string type = sign + "int" + to_string(i);
-			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + type,
-									std::make_shared<FunctionType>(strings{}, strings{type},
-											FunctionType::Kind::Internal, true, StateMutability::Pure));
+			string resultType = sign + "int" + to_string(i);
+			auto funType = new FunctionType(strings{}, strings{resultType}, FunctionType::Kind::Internal, true, StateMutability::Pure);
+			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
+			m_verifierSumTypes.push_back(funType);
 			m_verifierSum.push_back(sum);
 			m_globalDecls.push_back(sum);
 		}
@@ -49,6 +49,9 @@ BoogieContext::BoogieContext(Encoding encoding, bool overflow, ErrorReporter* er
 BoogieContext::~BoogieContext()
 {
 	for (auto it = m_verifierSum.begin(); it != m_verifierSum.end(); ++ it) {
+		delete *it;
+	}
+	for (auto it = m_verifierSumTypes.begin(); it != m_verifierSumTypes.end(); ++ it) {
 		delete *it;
 	}
 }
