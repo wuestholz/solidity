@@ -1,8 +1,9 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/regex.hpp>
 #include <libsolidity/ast/ASTBoogieUtils.h>
-#include <liblangutil/SourceLocation.h>
 #include <libsolidity/ast/Types.h>
+#include <libsolidity/ast/TypeProvider.h>
+#include <liblangutil/SourceLocation.h>
 #include <liblangutil/Exceptions.h>
 
 using namespace std;
@@ -66,8 +67,7 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	};
 
 	// Type to pass around
-	IntegerType uint256(256);
-	TypePointer tp_uint256 = &uint256;
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
@@ -127,8 +127,7 @@ bg::ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	};
 
 	// Type to pass around
-	IntegerType uint256(256);
-	TypePointer tp_uint256 = &uint256;
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
 	list<bg::Binding> callReturns{ {"__result", "bool"} };
@@ -181,8 +180,7 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	};
 
 	// Type to pass around
-	IntegerType uint256(256);
-	TypePointer tp_uint256 = &uint256;
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
 	list<bg::Binding> sendReturns{ {"__result", "bool"} };

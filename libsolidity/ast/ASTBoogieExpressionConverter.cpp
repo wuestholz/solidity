@@ -2,6 +2,7 @@
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
 #include <libsolidity/ast/AST.h>
+#include <libsolidity/ast/TypeProvider.h>
 #include <liblangutil/Exceptions.h>
 
 using namespace std;
@@ -380,7 +381,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
-	IntegerType uint256(256);
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
@@ -470,7 +471,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (m_context.isBvEncoding())
 			{
 				m_currentMsgValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentMsgValue,
-						arg->annotation().type, &uint256, m_context);
+						arg->annotation().type, tp_uint256, m_context);
 			}
 
 			// Continue with the rest of the AST
@@ -645,8 +646,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		bg::Expr::Ref this_balance = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
-			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, &uint256)));
-			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, &uint256)));
+			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
+			addSideEffect(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 		}
 		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
 												this_balance, msgValue, 256, false);
@@ -708,8 +709,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				bg::Expr::Ref this_balance = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 				if (m_context.encoding() == BoogieContext::Encoding::MOD)
 				{
-					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, &uint256)));
-					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, &uint256)));
+					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
+					revert->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 				}
 				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 															this_balance, msgValue, 256, false);
@@ -778,7 +779,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	Type::Category typeCategory = type->category();
 
 	// Handle special members/functions
-	IntegerType u256(256);
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// address.balance / this.balance
 	bool isAddress = typeCategory == Type::Category::Address;
@@ -786,7 +787,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		if (isAddress) {
 			m_currentExpr = bg::Expr::sel(bg::Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
-			addTCC(m_currentExpr, &u256);
+			addTCC(m_currentExpr, tp_uint256);
 			return false;
 		}
 		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
@@ -794,7 +795,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
 				m_currentExpr = bg::Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-				addTCC(m_currentExpr, &u256);
+				addTCC(m_currentExpr, tp_uint256);
 				return false;
 			}
 		}
@@ -832,8 +833,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
 		m_currentExpr = bg::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
-		IntegerType uint256(256);
-		addTCC(m_currentExpr, &uint256);
+		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+		addTCC(m_currentExpr, tp_uint256);
 		return false;
 	}
 	// array.length
@@ -925,8 +926,8 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 	if (baseType->category() == Type::Category::Array && m_context.isBvEncoding())
 	{
 		// For arrays, cast to uint
-		IntegerType uint256(256);
-		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, &uint256, m_context);
+		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, tp_uint256, m_context);
 	}
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but

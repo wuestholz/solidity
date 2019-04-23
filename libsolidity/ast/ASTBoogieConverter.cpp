@@ -5,6 +5,7 @@
 #include <libsolidity/ast/ASTBoogieConverter.h>
 #include <libsolidity/ast/ASTBoogieExpressionConverter.h>
 #include <libsolidity/ast/ASTBoogieUtils.h>
+#include <libsolidity/ast/TypeProvider.h>
 #include <libsolidity/parsing/Parser.h>
 #include <liblangutil/SourceReferenceFormatter.h>
 
@@ -201,8 +202,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	};
 
 	// Type to pass around
-	IntegerType uint256(256);
-	TypePointer tp_uint256 = &uint256;
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	boogie::Block::Ref block = boogie::Block::block();
 	// this.balance = 0
@@ -505,8 +505,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentFunc = &_node;
 
 	// Type to pass around
-	IntegerType uint256(256);
-	TypePointer tp_uint256 = &uint256;
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Input parameters
 	list<boogie::Binding> params {

@@ -53,7 +53,6 @@ private:
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
 	std::vector<Declaration const*> m_globalDecls;
-	std::vector<FunctionType*> m_verifierSumTypes;
 	std::vector<MagicVariableDeclaration*> m_verifierSum;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	langutil::EVMVersion m_evmVersion;
