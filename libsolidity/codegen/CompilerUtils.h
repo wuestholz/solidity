@@ -23,6 +23,8 @@
 #pragma once
 
 #include <libsolidity/ast/ASTForward.h>
+#include <libsolidity/ast/TypeProvider.h>
+#include <libsolidity/codegen/CompilerContext.h>
 #include <libsolidity/codegen/CompilerContext.h>
 
 namespace dev {
@@ -65,6 +67,13 @@ public:
 	/// Stack post:
 	void revertWithStringData(Type const& _argumentType);
 
+	/// Computes the absolute calldata offset of a tail given a base reference and the (absolute)
+	/// offset of the tail pointer. Performs bounds checks. If @a _type is a dynamically sized array it also
+	/// returns the array length on the stack.
+	/// Stack pre: base_ref tail_ptr
+	/// Stack post: tail_ref [length]
+	void accessCalldataTail(Type const& _type);
+
 	/// Loads data from memory to the stack.
 	/// @param _offset offset in memory (or calldata)
 	/// @param _type data type to load
@@ -73,7 +82,7 @@ public:
 	/// @returns the number of bytes consumed in memory.
 	unsigned loadFromMemory(
 		unsigned _offset,
-		Type const& _type = IntegerType::uint256(),
+		Type const& _type = *TypeProvider::uint256(),
 		bool _fromCalldata = false,
 		bool _padToWords = false
 	);
@@ -257,7 +266,7 @@ public:
 
 	template <class T>
 	static unsigned sizeOnStack(std::vector<T> const& _variables);
-	static unsigned sizeOnStack(std::vector<std::shared_ptr<Type const>> const& _variableTypes);
+	static unsigned sizeOnStack(std::vector<Type const*> const& _variableTypes);
 
 	/// Helper function to shift top value on the stack to the left.
 	/// Stack pre: <value> <shift_by_bits>
@@ -291,9 +300,6 @@ public:
 	static size_t const generalPurposeMemoryStart;
 
 private:
-	/// Address of the precompiled identity contract.
-	static unsigned const identityContractAddress;
-
 	/// Appends code that cleans higher-order bits for integer types.
 	void cleanHigherOrderBits(IntegerType const& _typeOnStack);
 

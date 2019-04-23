@@ -284,6 +284,17 @@ tuple<bytes, ABIType, string> TestFileParser::parseABITypeLiteral()
 			rawString += parsed;
 			result = applyAlign(alignment, abiType, convertHexNumber(parsed));
 		}
+		else if (accept(Token::Hex, true))
+		{
+			if (isSigned)
+				throw Error(Error::Type::ParserError, "Invalid hex string literal.");
+			if (alignment != DeclaredAlignment::None)
+				throw Error(Error::Type::ParserError, "Hex string literals cannot be aligned or padded.");
+			string parsed = parseHexNumber();
+			rawString += "hex\"" + parsed + "\"";
+			result = convertHexString(parsed);
+			abiType = ABIType{ABIType::HexString, ABIType::AlignNone, result.size()};
+		}
 		else if (accept(Token::Number))
 		{
 			auto type = isSigned ? ABIType::SignedDec : ABIType::UnsignedDec;
@@ -310,7 +321,7 @@ tuple<bytes, ABIType, string> TestFileParser::parseABITypeLiteral()
 	}
 	catch (std::exception const&)
 	{
-		throw Error(Error::Type::ParserError, "Number encoding invalid.");
+		throw Error(Error::Type::ParserError, "Literal encoding invalid.");
 	}
 }
 
@@ -318,10 +329,8 @@ string TestFileParser::parseIdentifierOrTuple()
 {
 	string identOrTuple;
 
-	if (accept(Token::Identifier))
+	auto parseArrayDimensions = [&]()
 	{
-		identOrTuple = m_scanner.currentLiteral();
-		expect(Token::Identifier);
 		while (accept(Token::LBrack))
 		{
 			identOrTuple += formatToken(Token::LBrack);
@@ -331,6 +340,13 @@ string TestFileParser::parseIdentifierOrTuple()
 			identOrTuple += formatToken(Token::RBrack);
 			expect(Token::RBrack);
 		}
+	};
+
+	if (accept(Token::Identifier))
+	{
+		identOrTuple = m_scanner.currentLiteral();
+		expect(Token::Identifier);
+		parseArrayDimensions();
 		return identOrTuple;
 	}
 	expect(Token::LParen);
@@ -345,6 +361,8 @@ string TestFileParser::parseIdentifierOrTuple()
 	}
 	expect(Token::RParen);
 	identOrTuple += formatToken(Token::RParen);
+
+	parseArrayDimensions();
 	return identOrTuple;
 }
 
@@ -418,6 +436,21 @@ bytes TestFileParser::convertHexNumber(string const& _literal)
 	}
 }
 
+bytes TestFileParser::convertHexString(string const& _literal)
+{
+	try
+	{
+		if (_literal.size() % 2)
+			throw Error(Error::Type::ParserError, "Hex string encoding invalid.");
+		else
+			return fromHex(_literal);
+	}
+	catch (std::exception const&)
+	{
+		throw Error(Error::Type::ParserError, "Hex string encoding invalid.");
+	}
+}
+
 void TestFileParser::Scanner::readStream(istream& _stream)
 {
 	std::string line;
@@ -428,6 +461,8 @@ void TestFileParser::Scanner::readStream(istream& _stream)
 
 void TestFileParser::Scanner::scanNextToken()
 {
+	using namespace langutil;
+
 	// Make code coverage happy.
 	assert(formatToken(Token::NUM_TOKENS) == "");
 
@@ -437,6 +472,7 @@ void TestFileParser::Scanner::scanNextToken()
 		if (_literal == "ether") return TokenDesc{Token::Ether, _literal};
 		if (_literal == "left") return TokenDesc{Token::Left, _literal};
 		if (_literal == "right") return TokenDesc{Token::Right, _literal};
+		if (_literal == "hex") return TokenDesc{Token::Hex, _literal};
 		if (_literal == "FAILURE") return TokenDesc{Token::Failure, _literal};
 		return TokenDesc{Token::Identifier, _literal};
 	};
@@ -488,13 +524,18 @@ void TestFileParser::Scanner::scanNextToken()
 		case ']':
 			token = selectToken(Token::RBrack);
 			break;
+		case '\"':
+			advance();
+			token = selectToken(Token::HexNumber, scanHexNumber());
+			advance();
+			break;
 		default:
-			if (langutil::isIdentifierStart(current()))
+			if (isIdentifierStart(current()))
 			{
 				TokenDesc detectedToken = detectKeyword(scanIdentifierOrKeyword());
 				token = selectToken(detectedToken.first, detectedToken.second);
 			}
-			else if (langutil::isDecimalDigit(current()))
+			else if (isDecimalDigit(current()))
 			{
 				if (current() == '0' && peek() == 'x')
 				{
@@ -505,10 +546,15 @@ void TestFileParser::Scanner::scanNextToken()
 				else
 					token = selectToken(Token::Number, scanDecimalNumber());
 			}
-			else if (langutil::isWhiteSpace(current()))
+			else if (isWhiteSpace(current()))
 				token = selectToken(Token::Whitespace);
 			else if (isEndOfLine())
 				token = selectToken(Token::EOS);
+			else
+				throw Error(
+					Error::Type::ParserError,
+					"Unexpected character: '" + string{current()} + "'"
+				);
 			break;
 		}
 	}

@@ -25,6 +25,7 @@
 #include <libyul/AsmScope.h>
 #include <libyul/AsmAnalysisInfo.h>
 #include <libyul/Utilities.h>
+#include <libyul/Exceptions.h>
 
 #include <liblangutil/ErrorReporter.h>
 
@@ -33,15 +34,16 @@
 
 #include <memory>
 #include <functional>
+#include <utility>
 
 using namespace std;
 using namespace dev;
 using namespace langutil;
 using namespace yul;
 using namespace dev;
-using namespace dev::solidity;
 
-namespace {
+namespace
+{
 
 set<string> const builtinTypes{"bool", "u8", "s8", "u32", "s32", "u64", "s64", "u128", "s128", "u256", "s256"};
 
@@ -84,7 +86,7 @@ bool AsmAnalyzer::operator()(Label const& _label)
 		"The use of labels is disallowed. Please use \"if\", \"switch\", \"for\" or function calls instead."
 	);
 	m_info.stackHeightInfo[&_label] = m_stackHeight;
-	warnOnInstructions(solidity::Instruction::JUMPDEST, _label.location);
+	warnOnInstructions(dev::eth::Instruction::JUMPDEST, _label.location);
 	return true;
 }
 
@@ -434,21 +436,27 @@ bool AsmAnalyzer::operator()(Switch const& _switch)
 			);
 	}
 
-	set<Literal const*, Less<Literal*>> cases;
+	set<u256> cases;
 	for (auto const& _case: _switch.cases)
 	{
 		if (_case.value)
 		{
 			int const initialStackHeight = m_stackHeight;
+			bool isCaseValueValid = true;
 			// We cannot use "expectExpression" here because *_case.value is not a
 			// Statement and would be converted to a Statement otherwise.
 			if (!(*this)(*_case.value))
+			{
+				isCaseValueValid = false;
 				success = false;
+			}
 			expectDeposit(1, initialStackHeight, _case.value->location);
 			m_stackHeight--;
 
+			// If the case value is not valid, we should not insert it into cases.
+			yulAssert(isCaseValueValid || m_errorReporter.hasErrors(), "Invalid case value.");
 			/// Note: the parser ensures there is only one default case
-			if (!cases.insert(_case.value.get()).second)
+			if (isCaseValueValid && !cases.insert(valueOfLiteral(*_case.value)).second)
 			{
 				m_errorReporter.declarationError(
 					_case.location,
@@ -472,7 +480,7 @@ bool AsmAnalyzer::operator()(ForLoop const& _for)
 {
 	solAssert(_for.condition, "");
 
-	Scope* originalScope = m_currentScope;
+	Scope* outerScope = m_currentScope;
 
 	bool success = true;
 	if (!(*this)(_for.pre))
@@ -485,16 +493,35 @@ bool AsmAnalyzer::operator()(ForLoop const& _for)
 	if (!expectExpression(*_for.condition))
 		success = false;
 	m_stackHeight--;
+
+	// backup outer for-loop & create new state
+	auto outerForLoop = m_currentForLoop;
+	m_currentForLoop = &_for;
+
 	if (!(*this)(_for.body))
 		success = false;
+
 	if (!(*this)(_for.post))
 		success = false;
 
 	m_stackHeight -= scope(&_for.pre).numberOfVariables();
 	m_info.stackHeightInfo[&_for] = m_stackHeight;
-	m_currentScope = originalScope;
+	m_currentScope = outerScope;
+	m_currentForLoop = outerForLoop;
 
 	return success;
+}
+
+bool AsmAnalyzer::operator()(Break const& _break)
+{
+	m_info.stackHeightInfo[&_break] = m_stackHeight;
+	return true;
+}
+
+bool AsmAnalyzer::operator()(Continue const& _continue)
+{
+	m_info.stackHeightInfo[&_continue] = m_stackHeight;
+	return true;
 }
 
 bool AsmAnalyzer::operator()(Block const& _block)
@@ -632,7 +659,7 @@ void AsmAnalyzer::expectValidType(string const& type, SourceLocation const& _loc
 		);
 }
 
-void AsmAnalyzer::warnOnInstructions(solidity::Instruction _instr, SourceLocation const& _location)
+void AsmAnalyzer::warnOnInstructions(dev::eth::Instruction _instr, SourceLocation const& _location)
 {
 	// We assume that returndatacopy, returndatasize and staticcall are either all available
 	// or all not available.
@@ -656,33 +683,37 @@ void AsmAnalyzer::warnOnInstructions(solidity::Instruction _instr, SourceLocatio
 	};
 
 	if ((
-		_instr == solidity::Instruction::RETURNDATACOPY ||
-		_instr == solidity::Instruction::RETURNDATASIZE
+		_instr == dev::eth::Instruction::RETURNDATACOPY ||
+		_instr == dev::eth::Instruction::RETURNDATASIZE
 	) && !m_evmVersion.supportsReturndata())
 	{
 		errorForVM("only available for Byzantium-compatible");
 	}
-	else if (_instr == solidity::Instruction::STATICCALL && !m_evmVersion.hasStaticCall())
+	else if (_instr == dev::eth::Instruction::STATICCALL && !m_evmVersion.hasStaticCall())
 	{
 		errorForVM("only available for Byzantium-compatible");
 	}
 	else if ((
-		_instr == solidity::Instruction::SHL ||
-		_instr == solidity::Instruction::SHR ||
-		_instr == solidity::Instruction::SAR
+		_instr == dev::eth::Instruction::SHL ||
+		_instr == dev::eth::Instruction::SHR ||
+		_instr == dev::eth::Instruction::SAR
 	) && !m_evmVersion.hasBitwiseShifting())
 	{
 		errorForVM("only available for Constantinople-compatible");
 	}
-	else if (_instr == solidity::Instruction::CREATE2 && !m_evmVersion.hasCreate2())
+	else if (_instr == dev::eth::Instruction::CREATE2 && !m_evmVersion.hasCreate2())
 	{
 		errorForVM("only available for Constantinople-compatible");
 	}
-	else if (_instr == solidity::Instruction::EXTCODEHASH && !m_evmVersion.hasExtCodeHash())
+	else if (_instr == dev::eth::Instruction::EXTCODEHASH && !m_evmVersion.hasExtCodeHash())
 	{
 		errorForVM("only available for Constantinople-compatible");
 	}
-	else if (_instr == solidity::Instruction::JUMP || _instr == solidity::Instruction::JUMPI || _instr == solidity::Instruction::JUMPDEST)
+	else if (
+		_instr == dev::eth::Instruction::JUMP ||
+		_instr == dev::eth::Instruction::JUMPI ||
+		_instr == dev::eth::Instruction::JUMPDEST
+	)
 	{
 		if (m_dialect->flavour == AsmFlavour::Loose)
 			m_errorReporter.error(

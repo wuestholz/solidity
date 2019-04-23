@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <liblangutil/EVMVersion.h>
+
 #include <test/Common.h>
 
 namespace dev
@@ -28,11 +30,13 @@ namespace test
 
 struct IsolTestOptions: CommonOptions
 {
-	bool noColor = false;
 	bool showHelp = false;
+	bool noColor = false;
+	std::string testFilter = std::string{};
 
 	IsolTestOptions(std::string* _editor);
 	bool parse(int _argc, char const* const* _argv) override;
+	void validate() const override;
 };
 }
 }

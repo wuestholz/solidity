@@ -31,7 +31,6 @@
 using namespace std;
 using namespace dev;
 using namespace yul;
-using namespace dev::solidity;
 
 void RedundantAssignEliminator::operator()(Identifier const& _identifier)
 {
@@ -61,68 +60,67 @@ void RedundantAssignEliminator::operator()(If const& _if)
 {
 	visit(*_if.condition);
 
-	RedundantAssignEliminator branch{*this};
-	branch(_if.body);
+	TrackedAssignments skipBranch{m_assignments};
+	(*this)(_if.body);
 
-	join(branch);
+	merge(m_assignments, move(skipBranch));
 }
 
 void RedundantAssignEliminator::operator()(Switch const& _switch)
 {
 	visit(*_switch.expression);
 
+	TrackedAssignments const preState{m_assignments};
+
 	bool hasDefault = false;
-	vector<RedundantAssignEliminator> branches;
+	vector<TrackedAssignments> branches;
 	for (auto const& c: _switch.cases)
 	{
 		if (!c.value)
 			hasDefault = true;
-		branches.emplace_back(*this);
-		branches.back()(c.body);
+		(*this)(c.body);
+		branches.emplace_back(move(m_assignments));
+		m_assignments = preState;
 	}
 
 	if (hasDefault)
 	{
-		*this = std::move(branches.back());
+		m_assignments = move(branches.back());
 		branches.pop_back();
 	}
 	for (auto& branch: branches)
-		join(branch);
+		merge(m_assignments, move(branch));
 }
 
 void RedundantAssignEliminator::operator()(FunctionDefinition const& _functionDefinition)
 {
-	std::set<YulString> declaredVariables;
-	std::map<YulString, std::map<Assignment const*, State>> assignments;
-	swap(m_declaredVariables, declaredVariables);
-	swap(m_assignments, assignments);
+	std::set<YulString> outerDeclaredVariables;
+	TrackedAssignments outerAssignments;
+	ForLoopInfo forLoopInfo;
+	swap(m_declaredVariables, outerDeclaredVariables);
+	swap(m_assignments, outerAssignments);
+	swap(m_forLoopInfo, forLoopInfo);
 
 	(*this)(_functionDefinition.body);
 
 	for (auto const& param: _functionDefinition.parameters)
-	{
-		changeUndecidedTo(param.name, State::Unused);
-		finalize(param.name);
-	}
+		finalize(param.name, State::Unused);
 	for (auto const& retParam: _functionDefinition.returnVariables)
-	{
-		changeUndecidedTo(retParam.name, State::Used);
-		finalize(retParam.name);
-	}
+		finalize(retParam.name, State::Used);
 
-	swap(m_declaredVariables, declaredVariables);
-	swap(m_assignments, assignments);
+	swap(m_declaredVariables, outerDeclaredVariables);
+	swap(m_assignments, outerAssignments);
+	swap(m_forLoopInfo, forLoopInfo);
 }
 
 void RedundantAssignEliminator::operator()(ForLoop const& _forLoop)
 {
-	// This will set all variables that are declared in this
-	// block to "unused" when it is destroyed.
-	BlockScope scope(*this);
+	ForLoopInfo outerForLoopInfo;
+	swap(outerForLoopInfo, m_forLoopInfo);
 
-	// We need to visit the statements directly because of the
-	// scoping rules.
-	walkVector(_forLoop.pre.statements);
+	// If the pre block was not empty,
+	// we would have to deal with more complicated scoping rules.
+	assertThrow(_forLoop.pre.statements.empty(), OptimizerException, "");
 
 	// We just run the loop twice to account for the
 	// back edge.
@@ -130,32 +128,58 @@ void RedundantAssignEliminator::operator()(ForLoop const& _forLoop)
 
 	visit(*_forLoop.condition);
 
-	RedundantAssignEliminator zeroRuns{*this};
+	TrackedAssignments zeroRuns{m_assignments};
 
 	(*this)(_forLoop.body);
+	merge(m_assignments, move(m_forLoopInfo.pendingContinueStmts));
+	m_forLoopInfo.pendingContinueStmts = {};
 	(*this)(_forLoop.post);
 
 	visit(*_forLoop.condition);
 
-	RedundantAssignEliminator oneRun{*this};
+	TrackedAssignments oneRun{m_assignments};
 
 	(*this)(_forLoop.body);
+
+	merge(m_assignments, move(m_forLoopInfo.pendingContinueStmts));
+	m_forLoopInfo.pendingContinueStmts.clear();
 	(*this)(_forLoop.post);
 
 	visit(*_forLoop.condition);
 
 	// Order does not matter because "max" is commutative and associative.
-	join(oneRun);
-	join(zeroRuns);
+	merge(m_assignments, move(oneRun));
+	merge(m_assignments, move(zeroRuns));
+	merge(m_assignments, move(m_forLoopInfo.pendingBreakStmts));
+	m_forLoopInfo.pendingBreakStmts.clear();
+
+	// Restore potential outer for-loop states.
+	swap(m_forLoopInfo, outerForLoopInfo);
+}
+
+void RedundantAssignEliminator::operator()(Break const&)
+{
+	m_forLoopInfo.pendingBreakStmts.emplace_back(move(m_assignments));
+	m_assignments.clear();
+}
+
+void RedundantAssignEliminator::operator()(Continue const&)
+{
+	m_forLoopInfo.pendingContinueStmts.emplace_back(move(m_assignments));
+	m_assignments.clear();
 }
 
 void RedundantAssignEliminator::operator()(Block const& _block)
 {
-	// This will set all variables that are declared in this
-	// block to "unused" when it is destroyed.
-	BlockScope scope(*this);
+	set<YulString> outerDeclaredVariables;
+	swap(m_declaredVariables, outerDeclaredVariables);
 
 	ASTWalker::operator()(_block);
+
+	for (auto const& var: m_declaredVariables)
+		finalize(var, State::Unused);
+
+	swap(m_declaredVariables, outerDeclaredVariables);
 }
 
 void RedundantAssignEliminator::run(Dialect const& _dialect, Block& _ast)
@@ -163,7 +187,7 @@ void RedundantAssignEliminator::run(Dialect const& _dialect, Block& _ast)
 	RedundantAssignEliminator rae{_dialect};
 	rae(_ast);
 
-	AssignmentRemover remover{rae.m_assignmentsToRemove};
+	AssignmentRemover remover{rae.m_pendingRemovals};
 	remover(_ast);
 }
 
@@ -194,37 +218,56 @@ void joinMap(std::map<K, V>& _a, std::map<K, V>&& _b, F _conflictSolver)
 	}
 }
 
-void RedundantAssignEliminator::join(RedundantAssignEliminator& _other)
+void RedundantAssignEliminator::merge(TrackedAssignments& _target, TrackedAssignments&& _other)
 {
-	m_assignmentsToRemove.insert(begin(_other.m_assignmentsToRemove), end(_other.m_assignmentsToRemove));
-
-	joinMap(m_assignments, std::move(_other.m_assignments), [](
+	joinMap(_target, move(_other), [](
 		map<Assignment const*, State>& _assignmentHere,
 		map<Assignment const*, State>&& _assignmentThere
 	)
 	{
-		return joinMap(_assignmentHere, std::move(_assignmentThere), State::join);
+		return joinMap(_assignmentHere, move(_assignmentThere), State::join);
 	});
+}
+
+void RedundantAssignEliminator::merge(TrackedAssignments& _target, vector<TrackedAssignments>&& _source)
+{
+	for (TrackedAssignments& ts: _source)
+		merge(_target, move(ts));
+	_source.clear();
 }
 
 void RedundantAssignEliminator::changeUndecidedTo(YulString _variable, RedundantAssignEliminator::State _newState)
 {
 	for (auto& assignment: m_assignments[_variable])
-		if (assignment.second == State{State::Undecided})
+		if (assignment.second == State::Undecided)
 			assignment.second = _newState;
 }
 
-void RedundantAssignEliminator::finalize(YulString _variable)
+void RedundantAssignEliminator::finalize(YulString _variable, RedundantAssignEliminator::State _finalState)
 {
-	for (auto& assignment: m_assignments[_variable])
+	finalize(m_assignments, _variable, _finalState);
+	for (auto& assignments: m_forLoopInfo.pendingBreakStmts)
+		finalize(assignments, _variable, _finalState);
+	for (auto& assignments: m_forLoopInfo.pendingContinueStmts)
+		finalize(assignments, _variable, _finalState);
+}
+
+void RedundantAssignEliminator::finalize(
+	TrackedAssignments& _assignments,
+	YulString _variable,
+	RedundantAssignEliminator::State _finalState
+)
+{
+	for (auto const& assignment: _assignments[_variable])
 	{
-		assertThrow(assignment.second != State::Undecided, OptimizerException, "");
-		if (assignment.second == State{State::Unused} && MovableChecker{*m_dialect, *assignment.first->value}.movable())
+		State const state = assignment.second == State::Undecided ? _finalState : assignment.second;
+
+		if (state == State::Unused && MovableChecker{*m_dialect, *assignment.first->value}.movable())
 			// TODO the only point where we actually need this
 			// to be a set is for the for loop
-			m_assignmentsToRemove.insert(assignment.first);
+			m_pendingRemovals.insert(assignment.first);
 	}
-	m_assignments.erase(_variable);
+	_assignments.erase(_variable);
 }
 
 void AssignmentRemover::operator()(Block& _block)

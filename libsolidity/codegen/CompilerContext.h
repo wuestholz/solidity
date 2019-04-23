@@ -203,7 +203,7 @@ public:
 
 	/// Append elements to the current instruction list and adjust @a m_stackOffset.
 	CompilerContext& operator<<(eth::AssemblyItem const& _item) { m_asm->append(_item); return *this; }
-	CompilerContext& operator<<(Instruction _instruction) { m_asm->append(_instruction); return *this; }
+	CompilerContext& operator<<(dev::eth::Instruction _instruction) { m_asm->append(_instruction); return *this; }
 	CompilerContext& operator<<(u256 const& _value) { m_asm->append(_value); return *this; }
 	CompilerContext& operator<<(bytes const& _data) { m_asm->append(_data); return *this; }
 
@@ -217,7 +217,7 @@ public:
 		std::vector<std::string> const& _localVariables = std::vector<std::string>(),
 		std::set<std::string> const& _externallyUsedFunctions = std::set<std::string>(),
 		bool _system = false,
-		bool _optimise = false
+		OptimiserSettings const& _optimiserSettings = OptimiserSettings::none()
 	);
 
 	/// Appends arbitrary data to the end of the bytecode.

@@ -310,6 +310,40 @@ BOOST_AUTO_TEST_CASE(call_arguments_bool)
 	);
 }
 
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string)
+{
+	char const* source = R"(
+		// f(bytes): hex"4200ef" -> hex"ab0023"
+	)";
+	auto const calls = parse(source);
+	BOOST_REQUIRE_EQUAL(calls.size(), 1);
+	testFunctionCall(
+		calls.at(0),
+		Mode::SingleLine,
+		"f(bytes)",
+		false,
+		fromHex("4200ef"),
+		fromHex("ab0023")
+	);
+}
+
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string_lowercase)
+{
+	char const* source = R"(
+		// f(bytes): hex"4200ef" -> hex"23ef00"
+	)";
+	auto const calls = parse(source);
+	BOOST_REQUIRE_EQUAL(calls.size(), 1);
+	testFunctionCall(
+		calls.at(0),
+		Mode::SingleLine,
+		"f(bytes)",
+		false,
+		fromHex("4200EF"),
+		fromHex("23EF00")
+	);
+}
+
 BOOST_AUTO_TEST_CASE(call_arguments_tuple)
 {
 	char const* source = R"(
@@ -474,6 +508,23 @@ BOOST_AUTO_TEST_CASE(call_signature_array)
 	testFunctionCall(calls.at(2), Mode::SingleLine, "f(uint256[3][][],uint8[9])", false);
 }
 
+BOOST_AUTO_TEST_CASE(call_signature_struct_array)
+{
+	char const* source = R"(
+		// f((uint256)[]) ->
+		// f((uint256)[3]) ->
+		// f((uint256, uint8)[3]) ->
+		// f((uint256)[3][][], (uint8, bool)[9]) ->
+	)";
+	auto const calls = parse(source);
+	BOOST_REQUIRE_EQUAL(calls.size(), 4);
+	testFunctionCall(calls.at(0), Mode::SingleLine, "f((uint256)[])", false);
+	testFunctionCall(calls.at(1), Mode::SingleLine, "f((uint256)[3])", false);
+	testFunctionCall(calls.at(2), Mode::SingleLine, "f((uint256,uint8)[3])", false);
+	testFunctionCall(calls.at(3), Mode::SingleLine, "f((uint256)[3][][],(uint8,bool)[9])", false);
+
+}
+
 BOOST_AUTO_TEST_CASE(call_signature_valid)
 {
 	char const* source = R"(
@@ -545,6 +596,22 @@ BOOST_AUTO_TEST_CASE(call_builtin_right_decimal)
 		fmt::encodeArgs(1, fromHex("0x20")),
 		fmt::encodeArgs(-2, true)
 	);
+}
+
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string_left_align)
+{
+	char const* source = R"(
+		// f(bytes): left(hex"4200ef") ->
+	)";
+	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
+}
+
+BOOST_AUTO_TEST_CASE(call_arguments_hex_string_right_align)
+{
+	char const* source = R"(
+		// f(bytes): right(hex"4200ef") ->
+	)";
+	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
 }
 
 BOOST_AUTO_TEST_CASE(call_newline_invalid)
@@ -704,6 +771,14 @@ BOOST_AUTO_TEST_CASE(call_arrow_missing)
 {
 	char const* source = R"(
 		// h256()
+	)";
+	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
+}
+
+BOOST_AUTO_TEST_CASE(call_unexpected_character)
+{
+	char const* source = R"(
+		// f() -> ??
 	)";
 	BOOST_REQUIRE_THROW(parse(source), langutil::Error);
 }

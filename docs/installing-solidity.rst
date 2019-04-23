@@ -126,6 +126,8 @@ currently not supported.
     brew tap ethereum/ethereum
     brew install solidity
 
+To install the most recent 0.4.x version of Solidity you can also use ``brew install solidity@4``.
+
 If you need a specific version of Solidity you can install a
 Homebrew formula directly from Github.
 
@@ -140,7 +142,7 @@ Install it using ``brew``:
 .. code-block:: bash
 
     brew unlink solidity
-    # Install 0.4.8
+    # eg. Install 0.4.8
     brew install https://raw.githubusercontent.com/ethereum/homebrew-ethereum/77cce03da9f289e5a3ffe579840d3c5dc0a62717/solidity.rb
 
 Gentoo Linux also provides a solidity package that can be installed using ``emerge``:
@@ -168,7 +170,7 @@ The following are dependencies for all builds of Solidity:
 +-----------------------------------+-------------------------------------------------------+
 | `Git`_                            | Command-line tool for retrieving source code.         |
 +-----------------------------------+-------------------------------------------------------+
-| `z3`_ (version 5.6+, Optional)    | For use with SMT checker.                             |
+| `z3`_ (version 4.6+, Optional)    | For use with SMT checker.                             |
 +-----------------------------------+-------------------------------------------------------+
 | `cvc4`_ (Optional)                | For use with SMT checker.                             |
 +-----------------------------------+-------------------------------------------------------+

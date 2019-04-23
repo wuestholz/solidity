@@ -295,6 +295,74 @@ BOOST_AUTO_TEST_CASE(if_statement)
 	BOOST_CHECK(successParse("{ function f() -> x:bool {} if f() { let b:bool := f() } }"));
 }
 
+BOOST_AUTO_TEST_CASE(for_statement)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	BOOST_CHECK(successParse("{ for {let i := 0} iszero(eq(i, 10)) {i := add(i, 1)} {} }", dialect));
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_break)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	BOOST_CHECK(successParse("{ for {let i := 0} iszero(eq(i, 10)) {i := add(i, 1)} {break} }", dialect));
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_break_init)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	CHECK_ERROR_DIALECT(
+		"{ for {let i := 0 break} iszero(eq(i, 10)) {i := add(i, 1)} {} }",
+		SyntaxError,
+		"Keyword break outside for-loop body is not allowed.",
+		dialect);
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_break_post)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	CHECK_ERROR_DIALECT(
+		"{ for {let i := 0} iszero(eq(i, 10)) {i := add(i, 1) break} {} }",
+		SyntaxError,
+		"Keyword break outside for-loop body is not allowed.",
+		dialect);
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_nested_break)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	CHECK_ERROR_DIALECT(
+		"{ for {let i := 0} iszero(eq(i, 10)) {} { function f() { break } } }",
+		SyntaxError,
+		"Keyword break outside for-loop body is not allowed.",
+		dialect);
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_continue)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	BOOST_CHECK(successParse("{ for {let i := 0} iszero(eq(i, 10)) {i := add(i, 1)} {continue} }", dialect));
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_continue_fail_init)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	CHECK_ERROR_DIALECT(
+		"{ for {let i := 0 continue} iszero(eq(i, 10)) {i := add(i, 1)} {} }",
+		SyntaxError,
+		"Keyword continue outside for-loop body is not allowed.",
+		dialect);
+}
+
+BOOST_AUTO_TEST_CASE(for_statement_continue_fail_post)
+{
+	auto dialect = EVMDialect::strictAssemblyForEVMObjects(EVMVersion::constantinople());
+	CHECK_ERROR_DIALECT(
+		"{ for {let i := 0} iszero(eq(i, 10)) {i := add(i, 1) continue} {} }",
+		SyntaxError,
+		"Keyword continue outside for-loop body is not allowed.",
+		dialect);
+}
+
 BOOST_AUTO_TEST_CASE(if_statement_invalid)
 {
 	CHECK_ERROR("{ if let x:u256 {} }", ParserError, "Literal or identifier expected.");
@@ -314,6 +382,24 @@ BOOST_AUTO_TEST_CASE(switch_duplicate_case)
 {
 	CHECK_ERROR("{ switch 0:u256 case 0:u256 {} case 0x0:u256 {} }", DeclarationError, "Duplicate case defined.");
 	BOOST_CHECK(successParse("{ switch 0:u256 case 42:u256 {} case 0x42:u256 {} }"));
+}
+
+BOOST_AUTO_TEST_CASE(switch_duplicate_case_different_literal)
+{
+	CHECK_ERROR("{ switch 0:u256 case 0:u256 {} case \"\":u256 {} }", DeclarationError, "Duplicate case defined.");
+	BOOST_CHECK(successParse("{ switch 1:u256 case \"1\":u256 {} case \"2\":u256 {} }"));
+}
+
+BOOST_AUTO_TEST_CASE(switch_case_string_literal_too_long)
+{
+	BOOST_CHECK(successParse("{let x:u256 switch x case \"01234567890123456789012345678901\":u256 {}}"));
+	CHECK_ERROR("{let x:u256 switch x case \"012345678901234567890123456789012\":u256 {}}", TypeError, "String literal too long (33 > 32)");
+}
+
+BOOST_AUTO_TEST_CASE(function_shadowing_outside_vars)
+{
+	CHECK_ERROR("{ let x:u256 function f() -> x:u256 {} }", DeclarationError, "already taken in this scope");
+	BOOST_CHECK(successParse("{ { let x:u256 } function f() -> x:u256 {} }"));
 }
 
 BOOST_AUTO_TEST_CASE(builtins_parser)

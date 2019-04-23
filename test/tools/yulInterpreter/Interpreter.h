@@ -35,8 +35,27 @@ namespace yul
 namespace test
 {
 
-class InterpreterTerminated: dev::Exception
+class InterpreterTerminatedGeneric: public dev::Exception
 {
+};
+
+class ExplicitlyTerminated: public InterpreterTerminatedGeneric
+{
+};
+
+class StepLimitReached: public InterpreterTerminatedGeneric
+{
+};
+
+class TraceLimitReached: public InterpreterTerminatedGeneric
+{
+};
+
+enum class LoopState
+{
+	Default,
+	Continue,
+	Break,
 };
 
 struct InterpreterState
@@ -65,6 +84,12 @@ struct InterpreterState
 	std::vector<std::string> trace;
 	/// This is actually an input parameter that more or less limits the runtime.
 	size_t maxTraceSize = 0;
+	/// Memory size limit. Anything beyond this will still work, but it has
+	/// deterministic yet not necessarily consistent behaviour.
+	size_t maxMemSize = 0x200;
+	size_t maxSteps = 0;
+	size_t numSteps = 0;
+	LoopState loopState = LoopState::Default;
 };
 
 /**
@@ -90,6 +115,8 @@ public:
 	void operator()(Switch const& _switch) override;
 	void operator()(FunctionDefinition const&) override;
 	void operator()(ForLoop const&) override;
+	void operator()(Break const&) override;
+	void operator()(Continue const&) override;
 	void operator()(Block const& _block) override;
 
 	std::vector<std::string> const& trace() const { return m_state.trace; }

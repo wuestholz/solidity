@@ -36,18 +36,24 @@ using namespace boost::unit_test;
 namespace fs = boost::filesystem;
 
 
-SemanticTest::SemanticTest(string const& _filename, string const& _ipcPath):
-	SolidityExecutionFramework(_ipcPath)
+SemanticTest::SemanticTest(string const& _filename, string const& _ipcPath, langutil::EVMVersion _evmVersion):
+	SolidityExecutionFramework(_ipcPath, _evmVersion)
 {
 	ifstream file(_filename);
 	soltestAssert(file, "Cannot open test contract: \"" + _filename + "\".");
 	file.exceptions(ios::badbit);
 
-	m_source = parseSource(file);
+	m_source = parseSourceAndSettings(file);
+	if (m_settings.count("compileViaYul"))
+	{
+		m_validatedSettings["compileViaYul"] = m_settings["compileViaYul"];
+		m_compileViaYul = true;
+		m_settings.erase("compileViaYul");
+	}
 	parseExpectations(file);
 }
 
-bool SemanticTest::run(ostream& _stream, string const& _linePrefix, bool const _formatted)
+bool SemanticTest::run(ostream& _stream, string const& _linePrefix, bool _formatted)
 {
 	soltestAssert(deploy("", 0, bytes()), "Failed to deploy contract.");
 
@@ -87,7 +93,7 @@ bool SemanticTest::run(ostream& _stream, string const& _linePrefix, bool const _
 	return true;
 }
 
-void SemanticTest::printSource(ostream& _stream, string const& _linePrefix, bool const) const
+void SemanticTest::printSource(ostream& _stream, string const& _linePrefix, bool) const
 {
 	stringstream stream(m_source);
 	string line;
@@ -105,7 +111,7 @@ void SemanticTest::parseExpectations(istream& _stream)
 {
 	TestFileParser parser{_stream};
 	auto functionCalls = parser.parseFunctionCalls();
-	move(functionCalls.begin(), functionCalls.end(), back_inserter(m_tests));
+	std::move(functionCalls.begin(), functionCalls.end(), back_inserter(m_tests));
 }
 
 bool SemanticTest::deploy(string const& _contractName, u256 const& _value, bytes const& _arguments)

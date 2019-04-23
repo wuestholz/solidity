@@ -21,19 +21,20 @@
 
 #pragma once
 
-#include <vector>
-#include <functional>
-
-#include <boost/multiprecision/detail/min_max.hpp>
 
 #include <libevmasm/Instruction.h>
 #include <libevmasm/SimplificationRule.h>
 
 #include <libdevcore/CommonData.h>
 
+#include <boost/multiprecision/detail/min_max.hpp>
+
+#include <vector>
+#include <functional>
+
 namespace dev
 {
-namespace solidity
+namespace eth
 {
 
 template <class S> S divWorkaround(S const& _a, S const& _b)
@@ -146,12 +147,14 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart2(
 		{{Instruction::SHR, {0, X}}, [=]{ return X; }, false},
 		{{Instruction::SHL, {X, 0}}, [=]{ return u256(0); }, true},
 		{{Instruction::SHR, {X, 0}}, [=]{ return u256(0); }, true},
-		{{Instruction::LT, {X, 0}}, [=]{ return u256(0); }, true},
 		{{Instruction::GT, {X, 0}}, [=]() -> Pattern { return {Instruction::ISZERO, {{Instruction::ISZERO, {X}}}}; }, false},
+		{{Instruction::LT, {0, X}}, [=]() -> Pattern { return {Instruction::ISZERO, {{Instruction::ISZERO, {X}}}}; }, false},
 		{{Instruction::GT, {X, ~u256(0)}}, [=]{ return u256(0); }, true},
+		{{Instruction::LT, {~u256(0), X}}, [=]{ return u256(0); }, true},
 		{{Instruction::GT, {0, X}}, [=]{ return u256(0); }, true},
+		{{Instruction::LT, {X, 0}}, [=]{ return u256(0); }, true},
 		{{Instruction::AND, {{Instruction::BYTE, {X, Y}}, {u256(0xff)}}}, [=]() -> Pattern { return {Instruction::BYTE, {X, Y}}; }, false},
-		{{Instruction::BYTE, {X, 31}}, [=]() -> Pattern { return {Instruction::AND, {X, u256(0xff)}}; }, false}
+		{{Instruction::BYTE, {31, X}}, [=]() -> Pattern { return {Instruction::AND, {X, u256(0xff)}}; }, false}
 	};
 }
 
@@ -213,7 +216,7 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart4(
 
 template <class Pattern>
 std::vector<SimplificationRule<Pattern>> simplificationRuleListPart5(
-	Pattern,
+	Pattern A,
 	Pattern,
 	Pattern,
 	Pattern X,
@@ -232,6 +235,22 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart5(
 			false
 		});
 	}
+
+	// Replace SHL >=256, X with 0
+	rules.push_back({
+		{Instruction::SHL, {A, X}},
+		[=]() -> Pattern { return u256(0); },
+		true,
+		[=]() { return A.d() >= 256; }
+	});
+
+	// Replace SHR >=256, X with 0
+	rules.push_back({
+		{Instruction::SHR, {A, X}},
+		[=]() -> Pattern { return u256(0); },
+		true,
+		[=]() { return A.d() >= 256; }
+	});
 
 	for (auto const& op: std::vector<Instruction>{
 		Instruction::ADDRESS,
@@ -349,15 +368,51 @@ std::vector<SimplificationRule<Pattern>> simplificationRuleListPart7(
 	rules.push_back({
 		// SHL(B, SHL(A, X)) -> SHL(min(A+B, 256), X)
 		{Instruction::SHL, {{B}, {Instruction::SHL, {{A}, {X}}}}},
-		[=]() -> Pattern { return {Instruction::SHL, {std::min(A.d() + B.d(), u256(256)), X}}; },
+		[=]() -> Pattern {
+			bigint sum = bigint(A.d()) + B.d();
+			if (sum >= 256)
+				return {Instruction::AND, {X, u256(0)}};
+			else
+				return {Instruction::SHL, {u256(sum), X}};
+		},
 		false
 	});
 
 	rules.push_back({
 		// SHR(B, SHR(A, X)) -> SHR(min(A+B, 256), X)
 		{Instruction::SHR, {{B}, {Instruction::SHR, {{A}, {X}}}}},
-		[=]() -> Pattern { return {Instruction::SHR, {std::min(A.d() + B.d(), u256(256)), X}}; },
+		[=]() -> Pattern {
+			bigint sum = bigint(A.d()) + B.d();
+			if (sum >= 256)
+				return {Instruction::AND, {X, u256(0)}};
+			else
+				return {Instruction::SHR, {u256(sum), X}};
+		},
 		false
+	});
+
+
+	std::function<bool()> feasibilityFunction = [=]() {
+		if (B.d() > 256)
+			return false;
+		unsigned bAsUint = static_cast<unsigned>(B.d());
+		return (A.d() & (u256(-1) >> bAsUint)) == (u256(-1) >> bAsUint);
+	};
+
+	rules.push_back({
+		// AND(A, SHR(B, X)) -> A & ((2^256-1) >> B) == ((2^256-1) >> B)
+		{Instruction::AND, {A, {Instruction::SHR, {B, X}}}},
+		[=]() -> Pattern { return {Instruction::SHR, {B, X}}; },
+		false,
+		feasibilityFunction
+	});
+
+	rules.push_back({
+		// AND(SHR(B, X), A) -> ((2^256-1) >> B) & A == ((2^256-1) >> B)
+		{Instruction::AND, {{Instruction::SHR, {B, X}}, A}},
+		[=]() -> Pattern { return {Instruction::SHR, {B, X}}; },
+		false,
+		feasibilityFunction
 	});
 
 	return rules;

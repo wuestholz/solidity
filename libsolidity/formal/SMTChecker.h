@@ -18,8 +18,10 @@
 #pragma once
 
 
+#include <libsolidity/formal/EncodingContext.h>
 #include <libsolidity/formal/SolverInterface.h>
 #include <libsolidity/formal/SymbolicVariables.h>
+#include <libsolidity/formal/VariableUsage.h>
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/interface/ReadFile.h>
@@ -41,8 +43,6 @@ namespace dev
 namespace solidity
 {
 
-class VariableUsage;
-
 class SMTChecker: private ASTConstVisitor
 {
 public:
@@ -55,6 +55,10 @@ public:
 	/// the constructor.
 	std::vector<std::string> unhandledQueries() { return m_interface->unhandledQueries(); }
 
+	/// @return the FunctionDefinition of a called function if possible and should inline,
+	/// otherwise nullptr.
+	static FunctionDefinition const* inlinedFunctionCallToDefinition(FunctionCall const& _funCall);
+
 private:
 	// TODO: Check that we do not have concurrent reads and writes to a variable,
 	// because the order of expression evaluation is undefined
@@ -63,15 +67,19 @@ private:
 	bool visit(ContractDefinition const& _node) override;
 	void endVisit(ContractDefinition const& _node) override;
 	void endVisit(VariableDeclaration const& _node) override;
+	bool visit(ModifierDefinition const& _node) override;
 	bool visit(FunctionDefinition const& _node) override;
 	void endVisit(FunctionDefinition const& _node) override;
+	bool visit(PlaceholderStatement const& _node) override;
 	bool visit(IfStatement const& _node) override;
 	bool visit(WhileStatement const& _node) override;
 	bool visit(ForStatement const& _node) override;
 	void endVisit(VariableDeclarationStatement const& _node) override;
 	void endVisit(Assignment const& _node) override;
 	void endVisit(TupleExpression const& _node) override;
+	bool visit(UnaryOperation const& _node) override;
 	void endVisit(UnaryOperation const& _node) override;
+	bool visit(BinaryOperation const& _node) override;
 	void endVisit(BinaryOperation const& _node) override;
 	void endVisit(FunctionCall const& _node) override;
 	void endVisit(Identifier const& _node) override;
@@ -79,8 +87,22 @@ private:
 	void endVisit(Return const& _node) override;
 	bool visit(MemberAccess const& _node) override;
 	void endVisit(IndexAccess const& _node) override;
+	bool visit(InlineAssembly const& _node) override;
 
+	/// Do not visit subtree if node is a RationalNumber.
+	/// Symbolic _expr is the rational literal.
+	bool shortcutRationalNumber(Expression const& _expr);
 	void arithmeticOperation(BinaryOperation const& _op);
+	/// @returns _op(_left, _right).
+	/// Used by the function above, compound assignments and
+	/// unary increment/decrement.
+	smt::Expression arithmeticOperation(
+		Token _op,
+		smt::Expression const& _left,
+		smt::Expression const& _right,
+		TypePointer const& _commonType,
+		langutil::SourceLocation const& _location
+	);
 	void compareOperation(BinaryOperation const& _op);
 	void booleanOperation(BinaryOperation const& _op);
 
@@ -95,6 +117,10 @@ private:
 	void abstractFunctionCall(FunctionCall const& _funCall);
 	void visitFunctionIdentifier(Identifier const& _identifier);
 
+	/// Encodes a modifier or function body according to the modifier
+	/// visit depth.
+	void visitFunctionOrModifier();
+
 	void defineGlobalVariable(std::string const& _name, Expression const& _expr, bool _increaseIndex = false);
 	void defineGlobalFunction(std::string const& _name, Expression const& _expr);
 	/// Handles the side effects of assignment
@@ -102,7 +128,7 @@ private:
 	/// while aliasing is not supported.
 	void arrayAssignment();
 	/// Handles assignment to SMT array index.
-	void arrayIndexAssignment(Assignment const& _assignment);
+	void arrayIndexAssignment(Expression const& _expr, smt::Expression const& _rightHandSide);
 
 	/// Division expression in the given type. Requires special treatment because
 	/// of rounding for signed division.
@@ -117,8 +143,8 @@ private:
 	/// Visits the branch given by the statement, pushes and pops the current path conditions.
 	/// @param _condition if present, asserts that this condition is true within the branch.
 	/// @returns the variable indices after visiting the branch.
-	VariableIndices visitBranch(Statement const& _statement, smt::Expression const* _condition = nullptr);
-	VariableIndices visitBranch(Statement const& _statement, smt::Expression _condition);
+	VariableIndices visitBranch(ASTNode const* _statement, smt::Expression const* _condition = nullptr);
+	VariableIndices visitBranch(ASTNode const* _statement, smt::Expression _condition);
 
 	/// Check that a condition can be satisfied.
 	void checkCondition(
@@ -126,7 +152,7 @@ private:
 		langutil::SourceLocation const& _location,
 		std::string const& _description,
 		std::string const& _additionalValueName = "",
-		smt::Expression* _additionalValue = nullptr
+		smt::Expression const* _additionalValue = nullptr
 	);
 	/// Checks that a boolean condition is not constant. Do not warn if the expression
 	/// is a literal constant.
@@ -143,15 +169,17 @@ private:
 		smt::Expression value;
 		smt::Expression path;
 		langutil::SourceLocation const& location;
+		std::vector<ASTNode const*> callStack;
 
-		OverflowTarget(Type _type, TypePointer _intType, smt::Expression _value, smt::Expression _path, langutil::SourceLocation const& _location):
+		OverflowTarget(Type _type, TypePointer _intType, smt::Expression _value, smt::Expression _path, langutil::SourceLocation const& _location, std::vector<ASTNode const*> _callStack):
 			type(_type),
 			intType(_intType),
 			value(_value),
 			path(_path),
-			location(_location)
+			location(_location),
+			callStack(move(_callStack))
 		{
-			solAssert(dynamic_cast<IntegerType const*>(intType.get()), "");
+			solAssert(dynamic_cast<IntegerType const*>(intType), "");
 		}
 	};
 
@@ -169,11 +197,11 @@ private:
 	smt::CheckResult checkSatisfiable();
 
 	void initializeLocalVariables(FunctionDefinition const& _function);
-	void initializeFunctionCallParameters(FunctionDefinition const& _function, std::vector<smt::Expression> const& _callArgs);
+	void initializeFunctionCallParameters(CallableDeclaration const& _function, std::vector<smt::Expression> const& _callArgs);
 	void resetVariable(VariableDeclaration const& _variable);
 	void resetStateVariables();
 	void resetStorageReferences();
-	void resetVariables(std::vector<VariableDeclaration const*> _variables);
+	void resetVariables(std::set<VariableDeclaration const*> const& _variables);
 	void resetVariables(std::function<bool(VariableDeclaration const&)> const& _filter);
 	/// @returns the type without storage pointer information if it has it.
 	TypePointer typeWithoutPointer(TypePointer const& _type);
@@ -181,7 +209,7 @@ private:
 	/// Given two different branches and the touched variables,
 	/// merge the touched variables into after-branch ite variables
 	/// using the branch condition as guard.
-	void mergeVariables(std::vector<VariableDeclaration const*> const& _variables, smt::Expression const& _condition, VariableIndices const& _indicesEndTrue, VariableIndices const& _indicesEndFalse);
+	void mergeVariables(std::set<VariableDeclaration const*> const& _variables, smt::Expression const& _condition, VariableIndices const& _indicesEndTrue, VariableIndices const& _indicesEndFalse);
 	/// Tries to create an uninitialized variable and returns true on success.
 	/// This fails if the type is not supported.
 	bool createVariable(VariableDeclaration const& _varDecl);
@@ -224,6 +252,12 @@ private:
 	void popPathCondition();
 	/// Returns the conjunction of all path conditions or True if empty
 	smt::Expression currentPathConditions();
+	/// Returns the current callstack. Used for models.
+	langutil::SecondarySourceLocation currentCallStack();
+	/// Copies and pops the last called node.
+	ASTNode const* popCallStack();
+	/// Adds @param _node to the callstack.
+	void pushCallStack(ASTNode const* _node);
 	/// Conjoin the current path conditions with the given parameter and add to the solver
 	void addPathConjoinedExpression(smt::Expression const& _e);
 	/// Add to the solver: the given expression implied by the current path conditions
@@ -237,10 +271,14 @@ private:
 	/// Resets the variable indices.
 	void resetVariableIndices(VariableIndices const& _indices);
 
+	/// @returns variables that are touched in _node's subtree.
+	std::set<VariableDeclaration const*> touchedVariables(ASTNode const& _node);
+
 	std::shared_ptr<smt::SolverInterface> m_interface;
-	std::shared_ptr<VariableUsage> m_variableUsage;
+	VariableUsage m_variableUsage;
 	bool m_loopExecutionHappened = false;
 	bool m_arrayAssignmentHappened = false;
+	bool m_externalFunctionCallHappened = false;
 	// True if the "No SMT solver available" warning was already created.
 	bool m_noSolverWarning = false;
 	/// An Expression may have multiple smt::Expression due to
@@ -264,6 +302,8 @@ private:
 
 	/// Stores the current path of function calls.
 	std::vector<FunctionDefinition const*> m_functionPath;
+	/// Stores the current call/invocation path.
+	std::vector<ASTNode const*> m_callStack;
 	/// Returns true if the current function was not visited by
 	/// a function call.
 	bool isRootFunction();
@@ -271,6 +311,15 @@ private:
 	bool visitedFunction(FunctionDefinition const* _funDef);
 
 	std::vector<OverflowTarget> m_overflowTargets;
+
+	/// Depth of visit to modifiers.
+	/// When m_modifierDepth == #modifiers the function can be visited
+	/// when placeholder is visited.
+	/// Needs to be a stack because of function calls.
+	std::vector<int> m_modifierDepthStack;
+
+	/// Stores the context of the encoding.
+	smt::EncodingContext m_context;
 };
 
 }

@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 
 #include <functional>
+#include <list>
 #include <memory>
 
 namespace langutil
@@ -93,6 +94,8 @@ public:
 	bool operator()(If const& _if);
 	bool operator()(Switch const& _switch);
 	bool operator()(ForLoop const& _forLoop);
+	bool operator()(Break const&);
+	bool operator()(Continue const&);
 	bool operator()(Block const& _block);
 
 private:
@@ -106,7 +109,7 @@ private:
 
 	Scope& scope(Block const* _block);
 	void expectValidType(std::string const& type, langutil::SourceLocation const& _location);
-	void warnOnInstructions(dev::solidity::Instruction _instr, langutil::SourceLocation const& _location);
+	void warnOnInstructions(dev::eth::Instruction _instr, langutil::SourceLocation const& _location);
 
 	/// Depending on @a m_flavour and @a m_errorTypeForLoose, throws an internal compiler
 	/// exception (if the flavour is not Loose), reports an error/warning
@@ -124,6 +127,7 @@ private:
 	langutil::EVMVersion m_evmVersion;
 	std::shared_ptr<Dialect> m_dialect;
 	boost::optional<langutil::Error::Type> m_errorTypeForLoose;
+	ForLoop const* m_currentForLoop = nullptr;
 };
 
 }

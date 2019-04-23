@@ -22,12 +22,12 @@
 
 #include <libsolidity/parsing/Parser.h>
 
-#include <libsolidity/analysis/SemVerHandler.h>
 #include <libsolidity/interface/Version.h>
 #include <libyul/AsmParser.h>
 #include <libyul/backends/evm/EVMDialect.h>
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Scanner.h>
+#include <liblangutil/SemVerHandler.h>
 #include <liblangutil/SourceLocation.h>
 #include <cctype>
 #include <vector>
@@ -64,6 +64,8 @@ public:
 			markEndPosition();
 		return make_shared<NodeType>(m_location, std::forward<Args>(_args)...);
 	}
+
+	SourceLocation const& location() const noexcept { return m_location; }
 
 private:
 	Parser const& m_parser;
@@ -126,14 +128,15 @@ ASTPointer<Expression> Parser::parseExpression(shared_ptr<Scanner> const& _scann
 	}
 }
 
-void Parser::parsePragmaVersion(vector<Token> const& tokens, vector<string> const& literals)
+void Parser::parsePragmaVersion(SourceLocation const& _location, vector<Token> const& _tokens, vector<string> const& _literals)
 {
-	SemVerMatchExpressionParser parser(tokens, literals);
+	SemVerMatchExpressionParser parser(_tokens, _literals);
 	auto matchExpression = parser.parse();
 	static SemVerVersion const currentVersion{string(VersionString)};
 	// FIXME: only match for major version incompatibility
 	if (!matchExpression.matches(currentVersion))
-		fatalParserError(
+		m_errorReporter.fatalParserError(
+			_location,
 			"Source file requires different compiler version (current compiler is " +
 			string(VersionString) + " - note that nightly builds are considered to be "
 			"strictly less than the released version"
@@ -172,6 +175,7 @@ ASTPointer<PragmaDirective> Parser::parsePragmaDirective()
 	if (literals.size() >= 2 && literals[0] == "solidity")
 	{
 		parsePragmaVersion(
+			nodeFactory.location(),
 			vector<Token>(tokens.begin() + 1, tokens.end()),
 			vector<string>(literals.begin() + 1, literals.end())
 		);
@@ -1050,7 +1054,8 @@ ASTPointer<Statement> Parser::parseStatement()
 ASTPointer<InlineAssembly> Parser::parseInlineAssembly(ASTPointer<ASTString> const& _docString)
 {
 	RecursionGuard recursionGuard(*this);
-	ASTNodeFactory nodeFactory(*this);
+	SourceLocation location{position(), -1, source()};
+
 	expectToken(Token::Assembly);
 	if (m_scanner->currentToken() == Token::StringLiteral)
 	{
@@ -1064,8 +1069,9 @@ ASTPointer<InlineAssembly> Parser::parseInlineAssembly(ASTPointer<ASTString> con
 	shared_ptr<yul::Block> block = asmParser.parse(m_scanner, true);
 	if (block == nullptr)
 		BOOST_THROW_EXCEPTION(FatalError());
-	nodeFactory.markEndPosition();
-	return nodeFactory.createNode<InlineAssembly>(_docString, block);
+
+	location.end = block->location.end;
+	return make_shared<InlineAssembly>(location, _docString, block);
 }
 
 ASTPointer<IfStatement> Parser::parseIfStatement(ASTPointer<ASTString> const& _docString)

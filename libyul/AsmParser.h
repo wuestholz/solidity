@@ -39,7 +39,7 @@ class Parser: public langutil::ParserBase
 {
 public:
 	explicit Parser(langutil::ErrorReporter& _errorReporter, std::shared_ptr<Dialect> _dialect):
-		ParserBase(_errorReporter), m_dialect(std::move(_dialect)) {}
+		ParserBase(_errorReporter), m_dialect(std::move(_dialect)), m_insideForLoopBody{false} {}
 
 	/// Parses an inline assembly block starting with `{` and ending with `}`.
 	/// @param _reuseScanner if true, do check for end of input after the `}`.
@@ -71,8 +71,8 @@ protected:
 	ForLoop parseForLoop();
 	/// Parses a functional expression that has to push exactly one stack element
 	Expression parseExpression();
-	static std::map<std::string, dev::solidity::Instruction> const& instructions();
-	static std::map<dev::solidity::Instruction, std::string> const& instructionNames();
+	static std::map<std::string, dev::eth::Instruction> const& instructions();
+	static std::map<dev::eth::Instruction, std::string> const& instructionNames();
 	/// Parses an elementary operation, i.e. a literal, identifier or instruction.
 	/// This will parse instructions even in strict mode as part of the full parser
 	/// for FunctionalInstruction.
@@ -87,6 +87,7 @@ protected:
 
 private:
 	std::shared_ptr<Dialect> m_dialect;
+	bool m_insideForLoopBody;
 };
 
 }
