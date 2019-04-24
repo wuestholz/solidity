@@ -29,7 +29,7 @@ pushd .
 git clone https://github.com/dddejan/boogie.git
 cd boogie
 wget https://nuget.org/nuget.exe
-travis_retry mono ./nuget.exe restore Source/Boogie.sln
+mono ./nuget.exe restore Source/Boogie.sln
 xbuild Source/Boogie.sln
 popd
 
