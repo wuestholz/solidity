@@ -700,6 +700,16 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			addSideEffect(bg::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
 			addSideEffect(bg::Stmt::call(funcName, args, {returnVar->getName()}));
 
+			// Assume invariants after external call
+			if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+			{
+
+				for (auto invar : m_context.currentContractInvars()) {
+					for (auto tcc : invar.tccs) { addSideEffect(bg::Stmt::assume(tcc)); }
+					addSideEffect(bg::Stmt::assume(invar.expr));
+				}
+			}
+
 			// The call function is special as it indicates failure in a return value and in this case
 			// we must undo reducing our balance
 			if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
@@ -735,16 +745,6 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		m_currentExpr = nullptr;
 		addSideEffect(bg::Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())));
 		addSideEffect(bg::Stmt::call(funcName, args));
-	}
-
-	// Assume invariants after external call
-	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
-	{
-
-		for (auto invar : m_context.currentContractInvars()) {
-			for (auto tcc : invar.tccs) { addSideEffect(bg::Stmt::assume(tcc)); }
-			addSideEffect(bg::Stmt::assume(invar.expr));
-		}
 	}
 
 	return false;
