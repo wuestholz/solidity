@@ -4,11 +4,18 @@
 # Shell script for installing solc-verify testing dependencies
 #
 
+# Mono repositories
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+echo "deb https://download.mono-project.com/repo/ubuntu stable-"`lsb_release -cs`" main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+sudo apt-get update
+	
+# Mono for boogie, python3 for solc-verify
 sudo apt-get install -y \
 	mono-complete \
 	python3 \
 	python3-pip
 
+# PSUtil for timeout kill 
 sudo pip3 install psutil
 
 # CVC4 1.7
@@ -24,13 +31,14 @@ cd yices*
 sudo ./install-yices
 popd
 
-# Boogie
+# Boogie with Yices2 support
 pushd .
 git clone https://github.com/dddejan/boogie.git
 cd boogie
+mozroots --import --sync
 wget https://nuget.org/nuget.exe
 mono ./nuget.exe restore Source/Boogie.sln
-xbuild Source/Boogie.sln
+msbuild Source/Boogie.sln
 popd
 
 # Truffle (use nvm, latest node)
