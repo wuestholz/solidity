@@ -2,6 +2,8 @@ pragma solidity >=0.5.0;
 
 contract FunctionCall {
     uint x;
+    uint y;
+    uint a;
 
     function set(uint x1) private {
         x = x1;
@@ -47,4 +49,19 @@ contract FunctionCall {
         uint y = h(f() + f());
         assert(y == 7);
     }
+
+    function add(uint x, uint y) private pure returns (uint sum) {
+        sum = x + y;
+    }
+
+    function() external payable {
+      a = 0;
+      x = 0;
+      y = 0;
+      uint sum = add(a ++ /* 0 */, (++ x) + a /** 2 */);
+      assert(a == 1);
+      assert(x == 1);
+      assert(sum == 2);
+    }
+
 }
