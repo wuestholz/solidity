@@ -123,7 +123,7 @@ Grammar::
         'break' | 'continue'
     FunctionCall =
         Identifier '(' ( Expression ( ',' Expression )* )? ')'
-    Identifier = [a-zA-Z_$] [a-zA-Z_$0-9]*
+    Identifier = [a-zA-Z_$] [a-zA-Z_$0-9.]*
     IdentifierList = Identifier ( ',' Identifier)*
     TypeName = Identifier | BuiltinTypeName
     BuiltinTypeName = 'bool' | [us] ( '8' | '32' | '64' | '128' | '256' )
@@ -167,6 +167,7 @@ The ``continue`` and ``break`` statements can only be used inside loop bodies
 and have to be in the same function as the loop (or both have to be at the
 top level).
 The condition part of the for-loop has to evaluate to exactly one value.
+Functions cannot be defined inside for loop init blocks.
 
 Literals cannot be larger than the their type. The largest type defined is 256-bit wide.
 

@@ -38,6 +38,10 @@ using namespace yul;
 shared_ptr<Block> Parser::parse(std::shared_ptr<Scanner> const& _scanner, bool _reuseScanner)
 {
 	m_recursionDepth = 0;
+
+	_scanner->supportPeriodInIdentifier(true);
+	ScopeGuard resetScanner([&]{ _scanner->supportPeriodInIdentifier(false); });
+
 	try
 	{
 		m_scanner = _scanner;
@@ -50,7 +54,29 @@ shared_ptr<Block> Parser::parse(std::shared_ptr<Scanner> const& _scanner, bool _
 	{
 		solAssert(!m_errorReporter.errors().empty(), "Fatal error detected, but no error is reported.");
 	}
+
 	return nullptr;
+}
+
+std::map<string, dev::eth::Instruction> const& Parser::instructions()
+{
+	// Allowed instructions, lowercase names.
+	static map<string, dev::eth::Instruction> s_instructions;
+	if (s_instructions.empty())
+	{
+		for (auto const& instruction: dev::eth::c_instructions)
+		{
+			if (
+				instruction.second == dev::eth::Instruction::JUMPDEST ||
+				dev::eth::isPushInstruction(instruction.second)
+			)
+				continue;
+			string name = instruction.first;
+			transform(name.begin(), name.end(), name.begin(), [](unsigned char _c) { return tolower(_c); });
+			s_instructions[name] = instruction.second;
+		}
+	}
+	return s_instructions;
 }
 
 Block Parser::parseBlock()
@@ -105,31 +131,19 @@ Statement Parser::parseStatement()
 	case Token::For:
 		return parseForLoop();
 	case Token::Break:
-		if (m_insideForLoopBody)
-		{
-			auto stmt = Statement{ createWithLocation<Break>() };
-			m_scanner->next();
-			return stmt;
-		}
-		else
-		{
-			m_errorReporter.syntaxError(location(), "Keyword break outside for-loop body is not allowed.");
-			m_scanner->next();
-			return {};
-		}
+	{
+		Statement stmt{createWithLocation<Break>()};
+		checkBreakContinuePosition("break");
+		m_scanner->next();
+		return stmt;
+	}
 	case Token::Continue:
-		if (m_insideForLoopBody)
-		{
-			auto stmt = Statement{ createWithLocation<Continue>() };
-			m_scanner->next();
-			return stmt;
-		}
-		else
-		{
-			m_errorReporter.syntaxError(location(), "Keyword continue outside for-loop body is not allowed.");
-			m_scanner->next();
-			return {};
-		}
+	{
+		Statement stmt{createWithLocation<Continue>()};
+		checkBreakContinuePosition("continue");
+		m_scanner->next();
+		return stmt;
+	}
 	case Token::Assign:
 	{
 		if (m_dialect->flavour != AsmFlavour::Loose)
@@ -269,20 +283,24 @@ Case Parser::parseCase()
 
 ForLoop Parser::parseForLoop()
 {
-	bool outerForLoopBody = m_insideForLoopBody;
-	m_insideForLoopBody = false;
-
 	RecursionGuard recursionGuard(*this);
+
+	ForLoopComponent outerForLoopComponent = m_currentForLoopComponent;
+
 	ForLoop forLoop = createWithLocation<ForLoop>();
 	expectToken(Token::For);
+	m_currentForLoopComponent = ForLoopComponent::ForLoopPre;
 	forLoop.pre = parseBlock();
+	m_currentForLoopComponent = ForLoopComponent::None;
 	forLoop.condition = make_unique<Expression>(parseExpression());
+	m_currentForLoopComponent = ForLoopComponent::ForLoopPost;
 	forLoop.post = parseBlock();
-
-	m_insideForLoopBody = true;
+	m_currentForLoopComponent = ForLoopComponent::ForLoopBody;
 	forLoop.body = parseBlock();
-	m_insideForLoopBody = outerForLoopBody;
 	forLoop.location.end = forLoop.body.location.end;
+
+	m_currentForLoopComponent = outerForLoopComponent;
+
 	return forLoop;
 }
 
@@ -338,27 +356,6 @@ Expression Parser::parseExpression()
 		solAssert(operation.type() == typeid(Literal), "");
 		return boost::get<Literal>(operation);
 	}
-}
-
-std::map<string, dev::eth::Instruction> const& Parser::instructions()
-{
-	// Allowed instructions, lowercase names.
-	static map<string, dev::eth::Instruction> s_instructions;
-	if (s_instructions.empty())
-	{
-		for (auto const& instruction: dev::eth::c_instructions)
-		{
-			if (
-				instruction.second == dev::eth::Instruction::JUMPDEST ||
-				dev::eth::isPushInstruction(instruction.second)
-			)
-				continue;
-			string name = instruction.first;
-			transform(name.begin(), name.end(), name.begin(), [](unsigned char _c) { return tolower(_c); });
-			s_instructions[name] = instruction.second;
-		}
-	}
-	return s_instructions;
 }
 
 std::map<dev::eth::Instruction, string> const& Parser::instructionNames()
@@ -487,9 +484,16 @@ VariableDeclaration Parser::parseVariableDeclaration()
 FunctionDefinition Parser::parseFunctionDefinition()
 {
 	RecursionGuard recursionGuard(*this);
-	auto outerForLoopBody = m_insideForLoopBody;
-	m_insideForLoopBody = false;
-	ScopeGuard restoreInsideForLoopBody{[&]() { m_insideForLoopBody = outerForLoopBody; }};
+
+	if (m_currentForLoopComponent == ForLoopComponent::ForLoopPre)
+		m_errorReporter.syntaxError(
+			location(),
+			"Functions cannot be defined inside a for-loop init block."
+		);
+
+	ForLoopComponent outerForLoopComponent = m_currentForLoopComponent;
+	m_currentForLoopComponent = ForLoopComponent::None;
+
 	FunctionDefinition funDef = createWithLocation<FunctionDefinition>();
 	expectToken(Token::Function);
 	funDef.name = expectAsmIdentifier();
@@ -516,6 +520,8 @@ FunctionDefinition Parser::parseFunctionDefinition()
 	}
 	funDef.body = parseBlock();
 	funDef.location.end = funDef.body.location.end;
+
+	m_currentForLoopComponent = outerForLoopComponent;
 	return funDef;
 }
 
@@ -640,6 +646,24 @@ YulString Parser::expectAsmIdentifier()
 		fatalParserError("Cannot use instruction names for identifier names.");
 	expectToken(Token::Identifier);
 	return name;
+}
+
+void Parser::checkBreakContinuePosition(string const& _which)
+{
+	switch (m_currentForLoopComponent)
+	{
+	case ForLoopComponent::None:
+		m_errorReporter.syntaxError(location(), "Keyword \"" + _which + "\" needs to be inside a for-loop body.");
+		break;
+	case ForLoopComponent::ForLoopPre:
+		m_errorReporter.syntaxError(location(), "Keyword \"" + _which + "\" in for-loop init block is not allowed.");
+		break;
+	case ForLoopComponent::ForLoopPost:
+		m_errorReporter.syntaxError(location(), "Keyword \"" + _which + "\" in for-loop post block is not allowed.");
+		break;
+	case ForLoopComponent::ForLoopBody:
+		break;
+	}
 }
 
 bool Parser::isValidNumberLiteral(string const& _literal)

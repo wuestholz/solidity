@@ -84,6 +84,10 @@ explanatory purposes.
             yulDetails: {}
           }
         },
+        metadata: {
+          // Reflects the setting used in the input json, defaults to false
+          useLiteralContent: true
+        }
         // Required for Solidity: File and name of the contract or library this
         // metadata is created for.
         compilationTarget: {
@@ -92,9 +96,7 @@ explanatory purposes.
         // Required for Solidity: Addresses for libraries used
         libraries: {
           "MyLib": "0x123123..."
-        },
-        // Reflects the setting used in the input json, defaults to false
-        "useLiteralContent": false
+        }
       },
       // Required: Generated information about the contract.
       output:
@@ -178,3 +180,7 @@ bytecode is compared to the data of the creation transaction or ``CREATE`` opcod
 This automatically verifies the metadata since its hash is part of the bytecode.
 Excess data corresponds to the constructor input data, which should be decoded
 according to the interface and presented to the user.
+
+In the repository [source-verify](https://github.com/ethereum/source-verify)
+([npm package](https://www.npmjs.com/package/source-verify)) you can see
+example code that shows how to use this feature.

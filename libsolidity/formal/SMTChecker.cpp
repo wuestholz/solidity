@@ -112,6 +112,7 @@ bool SMTChecker::visit(FunctionDefinition const& _function)
 	if (isRootFunction())
 	{
 		m_interface->reset();
+		m_context.reset();
 		m_pathConditions.clear();
 		m_callStack.clear();
 		m_expressions.clear();
@@ -340,15 +341,15 @@ void SMTChecker::endVisit(VariableDeclarationStatement const& _varDecl)
 
 void SMTChecker::endVisit(Assignment const& _assignment)
 {
-	static map<Token, Token> const compoundToArithmetic{
-		{Token::AssignAdd, Token::Add},
-		{Token::AssignSub, Token::Sub},
-		{Token::AssignMul, Token::Mul},
-		{Token::AssignDiv, Token::Div},
-		{Token::AssignMod, Token::Mod}
+	static set<Token> const compoundOps{
+		Token::AssignAdd,
+		Token::AssignSub,
+		Token::AssignMul,
+		Token::AssignDiv,
+		Token::AssignMod
 	};
 	Token op = _assignment.assignmentOperator();
-	if (op != Token::Assign && !compoundToArithmetic.count(op))
+	if (op != Token::Assign && !compoundOps.count(op))
 		m_errorReporter.warning(
 			_assignment.location(),
 			"Assertion checker does not yet implement this assignment operator."
@@ -358,48 +359,19 @@ void SMTChecker::endVisit(Assignment const& _assignment)
 			_assignment.location(),
 			"Assertion checker does not yet implement type " + _assignment.annotation().type->toString()
 		);
-	else if (
-		dynamic_cast<Identifier const*>(&_assignment.leftHandSide()) ||
-		dynamic_cast<IndexAccess const*>(&_assignment.leftHandSide())
-	)
-	{
-		boost::optional<smt::Expression> leftHandSide;
-		VariableDeclaration const* decl = nullptr;
-		auto identifier = dynamic_cast<Identifier const*>(&_assignment.leftHandSide());
-		if (identifier)
-		{
-			decl = dynamic_cast<VariableDeclaration const*>(identifier->annotation().referencedDeclaration);
-			solAssert(decl, "");
-			solAssert(knownVariable(*decl), "");
-			leftHandSide = currentValue(*decl);
-		}
-		else
-			leftHandSide = expr(_assignment.leftHandSide());
-
-		solAssert(leftHandSide, "");
-		smt::Expression rightHandSide =
-			compoundToArithmetic.count(op) ?
-				arithmeticOperation(
-					compoundToArithmetic.at(op),
-					*leftHandSide,
-					expr(_assignment.rightHandSide()),
-					_assignment.annotation().type,
-					_assignment.location()
-				) :
-				expr(_assignment.rightHandSide())
-		;
-		defineExpr(_assignment, rightHandSide);
-
-		if (identifier)
-			assignment(*decl, _assignment, _assignment.location());
-		else
-			arrayIndexAssignment(_assignment.leftHandSide(), expr(_assignment));
-	}
 	else
-		m_errorReporter.warning(
-			_assignment.location(),
-			"Assertion checker does not yet implement such assignments."
+	{
+		auto rightHandSide = compoundOps.count(op) ?
+			compoundAssignment(_assignment) :
+			expr(_assignment.rightHandSide());
+		defineExpr(_assignment, rightHandSide);
+		assignment(
+			_assignment.leftHandSide(),
+			expr(_assignment),
+			_assignment.annotation().type,
+			_assignment.location()
 		);
+	}
 }
 
 void SMTChecker::endVisit(TupleExpression const& _tuple)
@@ -494,9 +466,8 @@ void SMTChecker::endVisit(UnaryOperation const& _op)
 		solAssert(_op.subExpression().annotation().lValueRequested, "");
 		if (auto identifier = dynamic_cast<Identifier const*>(&_op.subExpression()))
 		{
-			auto decl = dynamic_cast<VariableDeclaration const*>(identifier->annotation().referencedDeclaration);
+			auto decl = identifierToVariable(*identifier);
 			solAssert(decl, "");
-			solAssert(knownVariable(*decl), "");
 			auto innerValue = currentValue(*decl);
 			auto newValue = _op.getOperator() == Token::Inc ? innerValue + 1 : innerValue - 1;
 			defineExpr(_op, _op.isPrefixOperation() ? newValue : innerValue);
@@ -609,6 +580,12 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 		popCallStack();
 		break;
 	case FunctionType::Kind::External:
+	case FunctionType::Kind::DelegateCall:
+	case FunctionType::Kind::BareCall:
+	case FunctionType::Kind::BareCallCode:
+	case FunctionType::Kind::BareDelegateCall:
+	case FunctionType::Kind::BareStaticCall:
+	case FunctionType::Kind::Creation:
 		m_externalFunctionCallHappened = true;
 		resetStateVariables();
 		resetStorageReferences();
@@ -622,6 +599,22 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 	case FunctionType::Kind::MulMod:
 		abstractFunctionCall(_funCall);
 		break;
+	case FunctionType::Kind::Send:
+	case FunctionType::Kind::Transfer:
+	{
+		auto const& memberAccess = dynamic_cast<MemberAccess const&>(_funCall.expression());
+		auto const& address = memberAccess.expression();
+		auto const& value = args.at(0);
+		solAssert(value, "");
+
+		smt::Expression thisBalance = m_context.balance();
+		setSymbolicUnknownValue(thisBalance, TypeProvider::uint256(), *m_interface);
+		checkCondition(thisBalance < expr(*value), _funCall.location(), "Insufficient funds", "address(this).balance", &thisBalance);
+
+		m_context.transfer(m_context.thisAddress(), expr(address), expr(*value));
+		createExpr(_funCall);
+		break;
+	}
 	default:
 		m_errorReporter.warning(
 			_funCall.location(),
@@ -731,7 +724,7 @@ void SMTChecker::endVisit(Identifier const& _identifier)
 		visitFunctionIdentifier(_identifier);
 	else if (isSupportedType(_identifier.annotation().type->category()))
 	{
-		if (VariableDeclaration const* decl = dynamic_cast<VariableDeclaration const*>(_identifier.annotation().referencedDeclaration))
+		if (auto decl = identifierToVariable(_identifier))
 			defineExpr(_identifier, currentValue(*decl));
 		else if (_identifier.name() == "now")
 			defineGlobalVariable(_identifier.name(), _identifier);
@@ -874,6 +867,17 @@ bool SMTChecker::visit(MemberAccess const& _memberAccess)
 		}
 		return false;
 	}
+	else if (exprType->category() == Type::Category::Address)
+	{
+		_memberAccess.expression().accept(*this);
+		if (_memberAccess.memberName() == "balance")
+		{
+			defineExpr(_memberAccess, m_context.balance(expr(_memberAccess.expression())));
+			setSymbolicUnknownValue(*m_expressions[&_memberAccess], *m_interface);
+			m_uninterpretedTerms.insert(&_memberAccess);
+			return false;
+		}
+	}
 	else
 		m_errorReporter.warning(
 			_memberAccess.location(),
@@ -889,9 +893,9 @@ void SMTChecker::endVisit(IndexAccess const& _indexAccess)
 	shared_ptr<SymbolicVariable> array;
 	if (auto const& id = dynamic_cast<Identifier const*>(&_indexAccess.baseExpression()))
 	{
-		auto const& varDecl = dynamic_cast<VariableDeclaration const&>(*id->annotation().referencedDeclaration);
-		solAssert(knownVariable(varDecl), "");
-		array = m_variables[&varDecl];
+		auto varDecl = identifierToVariable(*id);
+		solAssert(varDecl, "");
+		array = m_variables[varDecl];
 	}
 	else if (auto const& innerAccess = dynamic_cast<IndexAccess const*>(&_indexAccess.baseExpression()))
 	{
@@ -930,15 +934,15 @@ void SMTChecker::arrayIndexAssignment(Expression const& _expr, smt::Expression c
 	auto const& indexAccess = dynamic_cast<IndexAccess const&>(_expr);
 	if (auto const& id = dynamic_cast<Identifier const*>(&indexAccess.baseExpression()))
 	{
-		auto const& varDecl = dynamic_cast<VariableDeclaration const&>(*id->annotation().referencedDeclaration);
-		solAssert(knownVariable(varDecl), "");
+		auto varDecl = identifierToVariable(*id);
+		solAssert(varDecl, "");
 
-		if (varDecl.hasReferenceOrMappingType())
+		if (varDecl->hasReferenceOrMappingType())
 			resetVariables([&](VariableDeclaration const& _var) {
-				if (_var == varDecl)
+				if (_var == *varDecl)
 					return false;
 				TypePointer prefix = _var.type();
-				TypePointer originalType = typeWithoutPointer(varDecl.type());
+				TypePointer originalType = typeWithoutPointer(varDecl->type());
 				while (
 					prefix->category() == Type::Category::Mapping ||
 					prefix->category() == Type::Category::Array
@@ -963,15 +967,15 @@ void SMTChecker::arrayIndexAssignment(Expression const& _expr, smt::Expression c
 			});
 
 		smt::Expression store = smt::Expression::store(
-			m_variables[&varDecl]->currentValue(),
+			m_variables[varDecl]->currentValue(),
 			expr(*indexAccess.indexExpression()),
 			_rightHandSide
 		);
-		m_interface->addAssertion(newValue(varDecl) == store);
+		m_interface->addAssertion(newValue(*varDecl) == store);
 		// Update the SMT select value after the assignment,
 		// necessary for sound models.
 		defineExpr(indexAccess, smt::Expression::select(
-			m_variables[&varDecl]->currentValue(),
+			m_variables[varDecl]->currentValue(),
 			expr(*indexAccess.indexExpression())
 		));
 	}
@@ -1201,6 +1205,50 @@ smt::Expression SMTChecker::division(smt::Expression _left, smt::Expression _rig
 		));
 	else
 		return _left / _right;
+}
+
+void SMTChecker::assignment(
+	Expression const& _left,
+	smt::Expression const& _right,
+	TypePointer const& _type,
+	langutil::SourceLocation const& _location
+)
+{
+	if (!isSupportedType(_type->category()))
+		m_errorReporter.warning(
+			_location,
+			"Assertion checker does not yet implement type " + _type->toString()
+		);
+	else if (auto varDecl = identifierToVariable(_left))
+		assignment(*varDecl, _right, _location);
+	else if (dynamic_cast<IndexAccess const*>(&_left))
+		arrayIndexAssignment(_left, _right);
+	else
+		m_errorReporter.warning(
+			_location,
+			"Assertion checker does not yet implement such assignments."
+		);
+}
+
+smt::Expression SMTChecker::compoundAssignment(Assignment const& _assignment)
+{
+	static map<Token, Token> const compoundToArithmetic{
+		{Token::AssignAdd, Token::Add},
+		{Token::AssignSub, Token::Sub},
+		{Token::AssignMul, Token::Mul},
+		{Token::AssignDiv, Token::Div},
+		{Token::AssignMod, Token::Mod}
+	};
+	Token op = _assignment.assignmentOperator();
+	solAssert(compoundToArithmetic.count(op), "");
+	auto decl = identifierToVariable(_assignment.leftHandSide());
+	return arithmeticOperation(
+		compoundToArithmetic.at(op),
+		decl ? currentValue(*decl) : expr(_assignment.leftHandSide()),
+		expr(_assignment.rightHandSide()),
+		_assignment.annotation().type,
+		_assignment.location()
+	);
 }
 
 void SMTChecker::assignment(VariableDeclaration const& _variable, Expression const& _value, SourceLocation const& _location)
@@ -1776,4 +1824,17 @@ set<VariableDeclaration const*> SMTChecker::touchedVariables(ASTNode const& _nod
 {
 	solAssert(!m_functionPath.empty(), "");
 	return m_variableUsage.touchedVariables(_node, m_functionPath);
+}
+
+VariableDeclaration const* SMTChecker::identifierToVariable(Expression const& _expr)
+{
+	if (auto identifier = dynamic_cast<Identifier const*>(&_expr))
+	{
+		if (auto decl = dynamic_cast<VariableDeclaration const*>(identifier->annotation().referencedDeclaration))
+		{
+			solAssert(knownVariable(*decl), "");
+			return decl;
+		}
+	}
+	return nullptr;
 }

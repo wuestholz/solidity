@@ -2,17 +2,37 @@
 
 from argparse import ArgumentParser
 import sys
-import shutil
 import os
 import subprocess
 import re
 import glob
+import threading
+import time
 
 DESCRIPTION = """Regressor is a tool to run regression tests in a CI env."""
 
+class PrintDotsThread(object):
+    """Prints a dot every "interval" (default is 300) seconds"""
+
+    def __init__(self, interval=300):
+        self.interval = interval
+
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True
+        thread.start()
+
+    def run(self):
+        """ Runs until the main Python thread exits. """
+        ## Print a newline at the very beginning.
+        print("")
+        while True:
+            # Print dot
+            print(".")
+            time.sleep(self.interval)
 
 class regressor():
     _re_sanitizer_log = re.compile(r"""ERROR: (?P<sanitizer>\w+).*""")
+    _error_blacklist = ["AddressSanitizer", "libFuzzer"]
 
     def __init__(self, description, args):
         self._description = description
@@ -48,9 +68,13 @@ class regressor():
         return True
 
     def process_log(self, logfile):
-        list = re.findall(self._re_sanitizer_log, open(logfile, 'r').read())
+        ## Log may contain non ASCII characters, so we simply stringify them
+        ## since they don't matter for regular expression matching
+        rawtext = str(open(logfile, 'rb').read())
+        list = re.findall(self._re_sanitizer_log, rawtext)
         numSuppressedLeaks = list.count("LeakSanitizer")
-        return "AddressSanitizer" not in list, numSuppressedLeaks
+        rv = any(word in list for word in self._error_blacklist)
+        return not rv, numSuppressedLeaks
 
     def run(self):
         for fuzzer in glob.iglob("{}/*_ossfuzz".format(self._fuzzer_path)):
@@ -58,7 +82,7 @@ class regressor():
             logfile = os.path.join(self._logpath, "{}.log".format(basename))
             corpus_dir = "/tmp/solidity-fuzzing-corpus/{0}_seed_corpus" \
                 .format(basename)
-            cmd = "find {0} -type f | xargs {1}".format(corpus_dir, fuzzer)
+            cmd = "find {0} -type f | xargs -P2 {1}".format(corpus_dir, fuzzer)
             if not self.run_cmd(cmd, logfile=logfile):
                 ret, numLeaks = self.process_log(logfile)
                 if not ret:
@@ -78,5 +102,6 @@ class regressor():
 
 
 if __name__ == '__main__':
+    dotprinter = PrintDotsThread()
     tool = regressor(DESCRIPTION, sys.argv[1:])
     tool.run()
