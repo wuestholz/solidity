@@ -5,18 +5,24 @@
 
 #include <sstream>
 #include <string>
-#include <list>
 #include <memory>
+#include <vector>
 
 #include "libdevcore/Common.h"
 
-namespace boogie {
+namespace boogie
+{
 
 using bigint = boost::multiprecision::int1024_t;
 
-typedef std::pair<std::string, std::string> Binding;
+struct Binding
+{
+	std::string id;
+	std::string type;
+};
 
-class Expr {
+class Expr
+{
 public:
 
   /** Reference to expressions */
@@ -24,8 +30,8 @@ public:
 
   virtual ~Expr() {}
   virtual void print(std::ostream& os) const = 0;
-  static Ref exists(std::list<Binding> const&, Ref e);
-  static Ref forall(std::list<Binding> const&, Ref e);
+  static Ref exists(std::vector<Binding> const&, Ref e);
+  static Ref forall(std::vector<Binding> const&, Ref e);
   static Ref and_(Ref l, Ref r);
   static Ref or_(Ref l, Ref r);
   static Ref cond(Ref c, Ref t, Ref e);
@@ -44,7 +50,7 @@ public:
   static Ref fn(std::string f, Ref x);
   static Ref fn(std::string f, Ref x, Ref y);
   static Ref fn(std::string f, Ref x, Ref y, Ref z);
-  static Ref fn(std::string f, std::list<Ref> const& args);
+  static Ref fn(std::string f, std::vector<Ref> const& args);
   static Ref id(std::string x);
   static Ref impl(Ref l, Ref r);
   static Ref iff(Ref l, Ref r);
@@ -62,18 +68,22 @@ public:
   static Ref neg(Ref e);
   static Ref sel(Ref b, Ref i);
   static Ref sel(std::string b, std::string i);
-  static Ref sel(Ref a, std::list<Ref> const& i);
+  static Ref sel(Ref a, std::vector<Ref> const& i);
   static Ref upd(Ref b, Ref i, Ref v);
-  static Ref upd(Ref a, std::list<Ref> const& i, Ref v);
+  static Ref upd(Ref a, std::vector<Ref> const& i, Ref v);
   static Ref if_then_else(Ref c, Ref t, Ref e);
   static Ref old(Ref expr);
+  static Ref tuple(std::vector<Ref> const& e);
 };
 
-class BinExpr : public Expr {
+class BinExpr : public Expr
+{
 public:
-  enum Binary { Iff, Imp, Or, And, Eq, Neq, Lt, Gt, Lte, Gte, Sub, Conc,
-                Plus, Minus, Times, Div, IntDiv, Mod, Exp
-              };
+  enum Binary
+  {
+	  Iff, Imp, Or, And, Eq, Neq, Lt, Gt, Lte, Gte, Sub,
+	  Conc, Plus, Minus, Times, Div, IntDiv, Mod, Exp
+  };
 private:
   const Binary op;
   Expr::Ref lhs;
@@ -95,9 +105,9 @@ public:
 
 class FunExpr : public Expr {
   std::string fun;
-  std::list<Ref> args;
+  std::vector<Ref> args;
 public:
-  FunExpr(std::string f, std::list<Ref> const& xs) : fun(f), args(xs) {}
+  FunExpr(std::string f, std::vector<Ref> const& xs) : fun(f), args(xs) {}
   void print(std::ostream& os) const override;
 };
 
@@ -169,33 +179,33 @@ public:
   enum Quantifier { Exists, Forall };
 private:
   Quantifier quant;
-  std::list<Binding> vars;
+  std::vector<Binding> vars;
   Ref expr;
 public:
-  QuantExpr(Quantifier q, std::list<Binding> const& vs, Ref e) : quant(q), vars(vs), expr(e) {}
+  QuantExpr(Quantifier q, std::vector<Binding> const& vs, Ref e) : quant(q), vars(vs), expr(e) {}
   void print(std::ostream& os) const override;
 };
 
 class SelExpr : public Expr {
   Ref base;
-  std::list<Ref> idxs;
+  std::vector<Ref> idxs;
 public:
-  SelExpr(Ref a, std::list<Ref> const& i) : base(a), idxs(i) {}
-  SelExpr(Ref a, Ref i) : base(a), idxs(std::list<Ref>(1, i)) {}
+  SelExpr(Ref a, std::vector<Ref> const& i) : base(a), idxs(i) {}
+  SelExpr(Ref a, Ref i) : base(a), idxs(std::vector<Ref>(1, i)) {}
   Ref getBase() const { return base; }
-  std::list<Ref> const& getIdxs() const { return idxs; }
+  std::vector<Ref> const& getIdxs() const { return idxs; }
   void print(std::ostream& os) const override;
 };
 
 class UpdExpr : public Expr {
   Ref base;
-  std::list<Ref> idxs;
+  std::vector<Ref> idxs;
   Ref val;
 public:
-  UpdExpr(Ref a, std::list<Ref> const& i, Expr::Ref v)
+  UpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
     : base(a), idxs(i), val(v) {}
   UpdExpr(Ref a, Ref i, Ref v)
-    : base(a), idxs(std::list<Ref>(1, i)), val(v) {}
+    : base(a), idxs(std::vector<Ref>(1, i)), val(v) {}
   Ref getBase() const { return base; }
   void print(std::ostream& os) const override;
 };
@@ -225,16 +235,23 @@ public:
   void print(std::ostream& os) const override;
 };
 
+class TupleExpr : public Expr {
+	std::vector<Ref> es;
+public:
+	TupleExpr(std::vector<Ref> const& elements): es(elements) {}
+	std::vector<Ref> const& elements() const { return es; }
+	void print(std::ostream& os) const override;
+};
+
 class Attr {
 protected:
   std::string name;
-  std::list<Expr::Ref> vals;
+  std::vector<Expr::Ref> vals;
 public:
 
   using Ref = std::shared_ptr<Attr const>;
 
-  Attr(std::string n, std::initializer_list<Expr::Ref> vs) : name(n), vals(vs) {}
-  Attr(std::string n, std::list<Expr::Ref> const& vs) : name(n), vals(vs) {}
+  Attr(std::string n, std::vector<Expr::Ref> const& vs) : name(n), vals(vs) {}
   void print(std::ostream& os) const;
   std::string getName() const { return name; }
 
@@ -243,8 +260,7 @@ public:
   static Ref attr(std::string s, int v);
   static Ref attr(std::string s, std::string v, int i);
   static Ref attr(std::string s, std::string v, int i, int j);
-  static Ref attr(std::string s, std::initializer_list<Expr::Ref> vs);
-  static Ref attr(std::string s, std::list<Expr::Ref> const& vs);
+  static Ref attr(std::string s, std::vector<Expr::Ref> const& vs);
 };
 
 class Block;
@@ -271,21 +287,21 @@ public:
 
  public:
   virtual ~Stmt() {}
-  static Ref annot(std::list<Attr::Ref> const& attrs);
+  static Ref annot(std::vector<Attr::Ref> const& attrs);
   static Ref annot(Attr::Ref a);
   static Ref assert_(Expr::Ref e,
-    std::list<Attr::Ref> const& attrs = std::list<Attr::Ref>());
+    std::vector<Attr::Ref> const& attrs = {});
   static Ref assign(Expr::Ref e, Expr::Ref f);
-  static Ref assign(std::list<Expr::Ref> const& lhs, std::list<Expr::Ref> const& rhs);
+  static Ref assign(std::vector<Expr::Ref> const& lhs, std::vector<Expr::Ref> const& rhs);
   static Ref assume(Expr::Ref e);
   static Ref assume(Expr::Ref e, Attr::Ref attr);
   static Ref call(
     std::string p,
-    std::list<Expr::Ref> const& args = std::list<Expr::Ref>(),
-    std::list<std::string> const& rets = std::list<std::string>(),
-    std::list<Attr::Ref> const& attrs = std::list<Attr::Ref>());
+    std::vector<Expr::Ref> const& args = {},
+    std::vector<std::string> const& rets = {},
+    std::vector<Attr::Ref> const& attrs = {});
   static Ref comment(std::string c);
-  static Ref goto_(std::list<std::string> const& ts);
+  static Ref goto_(std::vector<std::string> const& ts);
   static Ref havoc(std::string x);
   static Ref return_();
   static Ref return_(Expr::Ref e);
@@ -295,7 +311,7 @@ public:
   static Ref while_(
 		  Expr::Ref cond,
 		  BlockConstRef body,
-		  std::list<SpecificationRef> const& invars = std::list<SpecificationRef>());
+		  std::vector<SpecificationRef> const& invars = {});
   static Ref break_();
   static Ref label(std::string name);
   virtual void print(std::ostream& os) const = 0;
@@ -303,19 +319,19 @@ public:
 
 class AssertStmt : public Stmt {
   Expr::Ref expr;
-  std::list<Attr::Ref> attrs;
+  std::vector<Attr::Ref> attrs;
 public:
-  AssertStmt(Expr::Ref e, std::list<Attr::Ref> const& ax)
+  AssertStmt(Expr::Ref e, std::vector<Attr::Ref> const& ax)
     : Stmt(ASSERT), expr(e), attrs(ax) {}
   void print(std::ostream& os) const override;
   static bool classof(Ref S) { return S->getKind() == ASSERT; }
 };
 
 class AssignStmt : public Stmt {
-  std::list<Expr::Ref> lhs;
-  std::list<Expr::Ref> rhs;
+  std::vector<Expr::Ref> lhs;
+  std::vector<Expr::Ref> rhs;
 public:
-  AssignStmt(std::list<Expr::Ref> const& lhs, std::list<Expr::Ref> const& rhs)
+  AssignStmt(std::vector<Expr::Ref> const& lhs, std::vector<Expr::Ref> const& rhs)
     : Stmt(ASSIGN), lhs(lhs), rhs(rhs) {}
   void print(std::ostream& os) const override;
   static bool classof(Ref S) { return S->getKind() == ASSIGN; }
@@ -323,7 +339,7 @@ public:
 
 class AssumeStmt : public Stmt {
   Expr::Ref expr;
-  std::list<Attr::Ref> attrs;
+  std::vector<Attr::Ref> attrs;
 public:
   AssumeStmt(Expr::Ref e) : Stmt(ASSUME), expr(e) {}
   void add(Attr::Ref a) {
@@ -342,14 +358,14 @@ public:
 
 class CallStmt : public Stmt {
   std::string proc;
-  std::list<Attr::Ref> attrs;
-  std::list<Expr::Ref> params;
-  std::list<std::string> returns;
+  std::vector<Attr::Ref> attrs;
+  std::vector<Expr::Ref> params;
+  std::vector<std::string> returns;
 public:
   CallStmt(std::string p,
-    std::list<Attr::Ref> const& attrs,
-    std::list<Expr::Ref> const& args,
-    std::list<std::string> const& rets)
+    std::vector<Attr::Ref> const& attrs,
+    std::vector<Expr::Ref> const& args,
+    std::vector<std::string> const& rets)
     : Stmt(CALL), proc(p), attrs(attrs), params(args), returns(rets) {}
 
   void print(std::ostream& os) const override;
@@ -365,17 +381,17 @@ public:
 };
 
 class GotoStmt : public Stmt {
-  std::list<std::string> targets;
+  std::vector<std::string> targets;
 public:
-  GotoStmt(std::list<std::string> const& ts) : Stmt(GOTO), targets(ts) {}
+  GotoStmt(std::vector<std::string> const& ts) : Stmt(GOTO), targets(ts) {}
   void print(std::ostream& os) const override;
   static bool classof(Ref S) { return S->getKind() == GOTO; }
 };
 
 class HavocStmt : public Stmt {
-  std::list<std::string> vars;
+  std::vector<std::string> vars;
 public:
-  HavocStmt(std::list<std::string> const& vs) : Stmt(HAVOC), vars(vs) {}
+  HavocStmt(std::vector<std::string> const& vs) : Stmt(HAVOC), vars(vs) {}
   void print(std::ostream& os) const override;
   static bool classof(Ref S) { return S->getKind() == HAVOC; }
 };
@@ -410,9 +426,9 @@ public:
 class WhileStmt : public Stmt {
   Expr::Ref cond;
   BlockConstRef body;
-  std::list<SpecificationRef> invars;
+  std::vector<SpecificationRef> invars;
 public:
-  WhileStmt(Expr::Ref cond, BlockConstRef body, std::list<SpecificationRef> const& invars)
+  WhileStmt(Expr::Ref cond, BlockConstRef body, std::vector<SpecificationRef> const& invars)
     : Stmt(WHILE), cond(cond), body(body), invars(invars) {}
   void print(std::ostream& os) const override;
   static bool classof(Ref S) { return S->getKind() == WHILE; }
@@ -452,8 +468,8 @@ private:
 protected:
   unsigned id;
   std::string name;
-  std::list<Attr::Ref> attrs;
-  Decl(Kind k, std::string n, std::list<Attr::Ref> const& ax)
+  std::vector<Attr::Ref> attrs;
+  Decl(Kind k, std::string n, std::vector<Attr::Ref> const& ax)
     : kind(k), id(uniqueId++), name(n), attrs(ax) { }
 public:
 
@@ -465,26 +481,26 @@ public:
   unsigned getId() const { return id; }
   std::string getName() const { return name; }
   void addAttr(Attr::Ref a) { attrs.push_back(a); }
-  void addAttrs(std::list<Attr::Ref> const& ax) { for (auto a : ax) addAttr(a); }
+  void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a : ax) addAttr(a); }
 
   static Ref typee(std::string name, std::string type = "",
-    std::list<Attr::Ref> const& attrs = std::list<Attr::Ref>());
+    std::vector<Attr::Ref> const& attrs = {});
   static Ref axiom(Expr::Ref e, std::string name = "");
   static FuncDeclRef function(
     std::string name,
-    std::list<Binding> const& args,
+    std::vector<Binding> const& args,
     std::string type,
     Expr::Ref e = nullptr,
-    std::list<Attr::Ref> const& attrs = std::list<Attr::Ref>());
+    std::vector<Attr::Ref> const& attrs = {});
   static Ref constant(std::string name, std::string type);
   static Ref constant(std::string name, std::string type, bool unique);
-  static Ref constant(std::string name, std::string type, std::list<Attr::Ref> const& ax, bool unique);
+  static Ref constant(std::string name, std::string type, std::vector<Attr::Ref> const& ax, bool unique);
   static Ref variable(std::string name, std::string type);
   static ProcDeclRef procedure(std::string name,
-    std::list<Binding> const& params = std::list<Binding>(),
-    std::list<Binding> const& rets = std::list<Binding>(),
-    std::list<Ref> const& decls = std::list<Ref>(),
-    std::list<BlockRef> const& blocks = std::list<BlockRef>());
+    std::vector<Binding> const& params = {},
+    std::vector<Binding> const& rets = {},
+    std::vector<Ref> const& decls = {},
+    std::vector<BlockRef> const& blocks = {});
   static Ref code(std::string name, std::string s);
   static FuncDeclRef code(ProcDeclRef P);
   static Ref comment(std::string name, std::string str);
@@ -493,7 +509,7 @@ public:
 class TypeDecl : public Decl {
   std::string alias;
 public:
-  TypeDecl(std::string n, std::string t, std::list<Attr::Ref> const& ax)
+  TypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax)
     : Decl(TYPE, n, ax), alias(t) {}
   void print(std::ostream& os) const override;
   static bool classof(Decl::ConstRef D) { return D->getKind() == TYPE; }
@@ -512,18 +528,18 @@ class ConstDecl : public Decl {
   std::string type;
   bool unique;
 public:
-  ConstDecl(std::string n, std::string t, std::list<Attr::Ref> const& ax, bool u)
+  ConstDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, bool u)
     : Decl(CONSTANT, n, ax), type(t), unique(u) {}
   void print(std::ostream& os) const override;
   static bool classof(Decl::ConstRef D) { return D->getKind() == CONSTANT; }
 };
 
 class FuncDecl : public Decl {
-  std::list<Binding> params;
+  std::vector<Binding> params;
   std::string type;
   Expr::Ref body;
 public:
-  FuncDecl(std::string n, std::list<Attr::Ref> const& ax, std::list<Binding> const& ps,
+  FuncDecl(std::string n, std::vector<Attr::Ref> const& ax, std::vector<Binding> const& ps,
     std::string t, Expr::Ref b)
     : Decl(FUNCTION, n, ax), params(ps), type(t), body(b) {}
   void print(std::ostream& os) const override;
@@ -540,7 +556,7 @@ public:
 
 class Block {
   std::string name;
-  typedef std::list<Stmt::Ref> StatementList;
+  typedef std::vector<Stmt::Ref> StatementList;
   StatementList stmts;
 public:
 
@@ -548,22 +564,26 @@ public:
   using ConstRef = std::shared_ptr<Block const>;
 
   static
-  Ref block(std::string n = "", std::list<Stmt::Ref> const& stmts = std::list<Stmt::Ref>()) {
+  Ref block(std::string n = "", std::vector<Stmt::Ref> const& stmts = {}) {
     return std::make_shared<Block>(n,stmts);
   }
 
-  Block(std::string n, std::list<Stmt::Ref> const& stmts) : name(n), stmts(stmts) {}
+  Block(std::string n, std::vector<Stmt::Ref> const& stmts) : name(n), stmts(stmts) {}
   void print(std::ostream& os) const;
   typedef StatementList::iterator iterator;
   iterator begin() { return stmts.begin(); }
   iterator end() { return stmts.end(); }
   StatementList &getStatements() { return stmts; }
-  void insert(Stmt::Ref s) {
-    stmts.insert(stmts.begin(), s);
-  }
+
   void addStmt(Stmt::Ref s) {
     stmts.push_back(s);
   }
+
+  void addStmts(std::vector<Stmt::Ref> const& stmts) {
+    for (auto s : stmts)
+    	addStmt(s);
+  }
+
   std::string getName() {
     return name;
   }
@@ -571,9 +591,9 @@ public:
 
 class CodeContainer {
 protected:
-  typedef std::list<Decl::Ref> DeclarationList;
-  typedef std::list<Block::Ref> BlockList;
-  typedef std::list<std::string> ModifiesList;
+  typedef std::vector<Decl::Ref> DeclarationList;
+  typedef std::vector<Block::Ref> BlockList;
+  typedef std::vector<std::string> ModifiesList;
   DeclarationList decls;
   BlockList blocks;
   ModifiesList mods;
@@ -593,10 +613,6 @@ public:
   mod_iterator mod_begin() { return mods.begin(); }
   mod_iterator mod_end() { return mods.end(); }
   ModifiesList& getModifies() { return mods; }
-
-  void insert(Stmt::Ref s) {
-    blocks.front()->insert(s);
-  }
 };
 
 class CodeExpr : public Expr, public CodeContainer {
@@ -607,23 +623,23 @@ public:
 
 class Specification {
   Expr::Ref expr;
-  std::list<Attr::Ref> attrs;
+  std::vector<Attr::Ref> attrs;
 public:
 
   using Ref = std::shared_ptr<Specification const>;
 
-  Specification(Expr::Ref e, std::list<Attr::Ref> const& ax)
+  Specification(Expr::Ref e, std::vector<Attr::Ref> const& ax)
     : expr(e), attrs(ax) {}
 
   void print(std::ostream& os, std::string kind) const;
-  static Ref spec(Expr::Ref e, std::list<Attr::Ref> const& ax);
+  static Ref spec(Expr::Ref e, std::vector<Attr::Ref> const& ax);
   static Ref spec(Expr::Ref e);
 };
 
 class ProcDecl : public Decl, public CodeContainer {
   typedef Binding Parameter;
-  typedef std::list<Parameter> ParameterList;
-  typedef std::list<Specification::Ref> SpecificationList;
+  typedef std::vector<Parameter> ParameterList;
+  typedef std::vector<Specification::Ref> SpecificationList;
 
   ParameterList params;
   ParameterList rets;
@@ -672,11 +688,8 @@ public:
 };
 
 class Program {
-  // TODO While I would prefer that a program is just a set or sequence of
-  // declarations, putting the Prelude in a CodeDeclaration does not work,
-  // and I do not yet understand why; see below. --mje
   std::string prelude;
-  typedef std::list<Decl::Ref> DeclarationList;
+  typedef std::vector<Decl::Ref> DeclarationList;
   DeclarationList decls;
 public:
   Program() {}

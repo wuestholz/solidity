@@ -106,16 +106,27 @@ public:
 	 * Create attributes for original source location and message
 	 */
 	static
-	std::list<boogie::Attr::Ref> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
+	std::vector<boogie::Attr::Ref> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
 
-	/** Pair of expressions: first = result, second = correctness condition */
-	typedef std::pair<boogie::Expr::Ref, boogie::Expr::Ref> expr_pair;
+	/** An expression with the associated correctness condition. */
+	struct ExprWithCC {
+		boogie::Expr::Ref expr;
+		boogie::Expr::Ref cc;
+	};
 
+	/**
+	 * Convert an arithmetic operation (including ops like +=) to an expression (with CC).
+	 * The associatedNode is only used for error reporting.
+	 */
 	static
-	expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, unsigned bits, bool isSigned);
+	ExprWithCC encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, unsigned bits, bool isSigned);
 
+	/**
+	 * Convert an arithmetic operation to an expression (with CC).
+	 * The associatedNode is only used for error reporting.
+	 */
 	static
-	expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref subExpr, unsigned bits, bool isSigned);
+	ExprWithCC encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref subExpr, unsigned bits, bool isSigned);
 
 	/**
 	 * Check if a type can be represented with bitvectors

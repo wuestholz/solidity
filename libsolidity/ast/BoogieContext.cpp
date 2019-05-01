@@ -4,6 +4,8 @@
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/TypeProvider.h>
 
+#include <liblangutil/ErrorReporter.h>
+
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;

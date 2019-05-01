@@ -23,14 +23,14 @@ private:
 	unsigned long m_currentModifier; // Index of the current modifier being processed
 
 	// Collect local variable declarations (Boogie requires them at the beginning of the function).
-	std::list<boogie::Decl::Ref> m_localDecls;
+	std::vector<boogie::Decl::Ref> m_localDecls;
 
 	// Collect initializers for state variables to be added to the beginning of the constructor
 	// If there is no constructor, but there are initializers, we create one
-	std::list<boogie::Stmt::Ref> m_stateVarInitializers;
+	std::vector<boogie::Stmt::Ref> m_stateVarInitializers;
 
 	// Collect variables to be initialized to default values
-	std::list<VariableDeclaration const*> m_stateVarsToInitialize;
+	std::vector<VariableDeclaration const*> m_stateVarsToInitialize;
 
 	// Current block(s) where statements are appended, stack is needed due to nested blocks
 	std::stack<boogie::Block::Ref> m_currentBlocks;
@@ -73,7 +73,7 @@ private:
 	/**
 	 * Helper method to produce statement assigning a default value for a declared variable.
 	 */
-	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::list<boogie::Stmt::Ref>& output);
+	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::vector<boogie::Stmt::Ref>& output);
 
 	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,
@@ -84,7 +84,8 @@ private:
 	/**
 	 * Parse expressions from documentation for a given doctag
 	 */
-	std::list<BoogieContext::DocTagExpr> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot, ASTNode const* _scope, std::string _tag);
+	void getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
+			ASTNode const* _scope, std::string _tag, std::vector<BoogieContext::DocTagExpr>& out);
 
 
 	/**

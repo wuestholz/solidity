@@ -54,6 +54,9 @@ private:
 	// Helper method to add a side effect (statement)
 	void addSideEffect(boogie::Stmt::Ref stmt);
 
+	// Helper method to add a side effects (statement)
+	void addSideEffects(std::vector<boogie::Stmt::Ref> const& stmts) { for (auto stmt : stmts) addSideEffect(stmt); }
+
 public:
 
 	/**

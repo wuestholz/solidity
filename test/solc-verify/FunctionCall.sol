@@ -40,18 +40,18 @@ contract FunctionCall {
         return h1 + 5;
     }
 
-    function sequentialCall() public {
-        uint y = f() + g();
-        assert(y == 3);
+    function sequentialCall() pure public {
+        uint y1 = f() + g();
+        assert(y1 == 3);
     }
 
-    function compositeCall() public {
-        uint y = h(f() + f());
-        assert(y == 7);
+    function compositeCall() pure public {
+        uint y1 = h(f() + f());
+        assert(y1 == 7);
     }
 
-    function add(uint x, uint y) private pure returns (uint sum) {
-        sum = x + y;
+    function add(uint x1, uint y1) private pure returns (uint sum) {
+        sum = x1 + y1;
     }
 
     function() external payable {

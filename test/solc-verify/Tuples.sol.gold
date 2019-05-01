@@ -1,0 +1,5 @@
+Verifying Tuples::testSideffect: OK
+Verifying Tuples::testCasts: OK
+Verifying Tuples::: OK
+Verifying Tuples::[implicit_constructor]: OK
+No errors found.
