@@ -2,6 +2,21 @@ pragma solidity >=0.5.0;
 
 contract Tuples {
 
+    function testPartial() public pure {
+      int x = 2;
+      int y = 3;
+
+      (x,) = (1, 1);
+      assert(x == 1 && y == 3);
+      (,y) = (x, x+1);
+      assert(x == 1 && y == 2);
+      (y,) = minMax(x, y);
+      assert(x == 1 && y == 1);
+      (int min,) = minMax(1, 100);
+      (,int max) = minMax(1, 100);
+      assert(min == 1 && max == 100);
+    }
+
     function testSideffect() public pure {
       int a = 0;
       int x = 0;
@@ -46,6 +61,7 @@ contract Tuples {
       assert(min == 10 && max == 20);
       testSideffect();
       testCasts();
+      testPartial();
     }
     
 }

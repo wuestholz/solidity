@@ -129,6 +129,7 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 {
+
 	// Parameters: this, msg.sender, msg.value
 	vector<Binding> callParams {
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
@@ -139,8 +140,18 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
+	// Get the type of the call function
+	auto callType = TypeProvider::address()->memberType("call");
+	auto callFunctionType = dynamic_cast<FunctionType const*>(callType);
+
+	solAssert(callFunctionType, "");
+	solAssert(callFunctionType->returnParameterTypes().size() == 2, "");
+
 	// Return value
-	vector<Binding> callReturns{ {"__result", "bool"} };
+	vector<Binding> callReturns{
+		{"__result", mapType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
+		{"__calldata", mapType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
+	};
 
 	// Body
 	// Successful transfer
@@ -292,7 +303,7 @@ string ASTBoogieUtils::boogieBVType(unsigned n) {
 	return "bv" + to_string(n);
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context)
+string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
 {
 	Type::Category tpCategory = tp->category();
 
@@ -308,7 +319,7 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 		if (!tpRational->isFractional()) {
 			return BOOGIE_INT_CONST_TYPE;
 		} else {
-			context.reportError(&_associatedNode, "Fractional numbers are not supported");
+			context.reportError(_associatedNode, "Fractional numbers are not supported");
 		}
 		break;
 	}
@@ -337,11 +348,11 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const& _associatedNode, B
 		return context.intType(fbType->numBytes() * 8);
 	}
 	case Type::Category::Tuple:
-		context.reportError(&_associatedNode, "Tuples are not supported");
+		context.reportError(_associatedNode, "Tuples are not supported");
 		break;
 	default: {
 		std::string tpStr = tp->toString();
-		context.reportError(&_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
 	}
 
@@ -657,7 +668,7 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 	{
 		auto tupleType = dynamic_cast<TupleType const*>(type);
 		for (auto e : tupleType->components())
-			if (!isBitPreciseType(e))
+			if (e && !isBitPreciseType(e))
 				return false;
 		return true;
 	}
@@ -700,7 +711,8 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 			auto expr_i = exprTuple->elements()[i];
 			auto exprType_i = exprTypleType->components()[i];
 			auto targetType_i = targetTupleType->components()[i];
-			auto result_i = checkImplicitBvConversion(expr_i, exprType_i, targetType_i, context);
+			auto result_i = targetType_i ?
+					checkImplicitBvConversion(expr_i, exprType_i, targetType_i, context) : nullptr;
 			elements.push_back(result_i);
 		}
 

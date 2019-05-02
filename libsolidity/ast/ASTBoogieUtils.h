@@ -94,7 +94,7 @@ public:
 	 * Map a Solidity type to a Boogie type
 	 */
 	static
-	std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
+	std::string mapType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context);
 
 	/**
 	 * Return Boogie's BV type of given size.

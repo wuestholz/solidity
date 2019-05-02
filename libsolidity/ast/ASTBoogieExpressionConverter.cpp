@@ -177,7 +177,10 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 		auto const& lhsElements = lhsTuple->elements();
 		auto const& rhsElements = rhsTuple->elements();
 		for (unsigned i = 0; i < lhsElements.size(); ++ i)
-			createAssignment(originalLhs, lhsElements[i], rhsElements[i]);
+		{
+			if (lhsElements[i])
+				createAssignment(originalLhs, lhsElements[i], rhsElements[i]);
+		}
 		return;
 	}
 
@@ -246,8 +249,13 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 	vector<Expr::Ref> elements;
 	for (auto element : _node.components())
 	{
-		element->accept(*this);
-		elements.push_back(m_currentExpr);
+		if (element != nullptr)
+		{
+			element->accept(*this);
+			elements.push_back(m_currentExpr);
+		}
+		else
+			elements.push_back(nullptr);
 	}
 
 	// Make the expression
@@ -299,7 +307,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							m_context.isBvEncoding() ? Expr::lit(bg::bigint(1), bits) : Expr::lit(bg::bigint(1)),
 							bits, isSigned);
 			bg::Decl::Ref tempVar = bg::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, _node, m_context));
+					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, &_node, m_context));
 			m_newDecls.push_back(tempVar);
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
@@ -438,8 +446,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				return false;
 			}
 		}
-		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, _node, m_context);
-		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, *arg, m_context);
+		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, &_node, m_context);
+		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, arg.get(), m_context);
 		// Nothing to do when the two types are mapped to same type in Boogie,
 		// e.g., conversion from uint256 to int256 if both are mapped to int
 		if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
@@ -709,7 +717,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		for (size_t i = 0; i < returnTypes.size(); ++ i)
 		{
 			auto varName = funcName + "#" + to_string(i) + "#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::mapType(returnTypes[i], _node, m_context);
+			auto varType = ASTBoogieUtils::mapType(returnTypes[i], &_node, m_context);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
 			returnVarNames.push_back(varName);
@@ -719,7 +727,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else
 	{
 		auto varName = funcName + "#" + to_string(_node.id());
-		auto varType = ASTBoogieUtils::mapType(returnType, _node, m_context);
+		auto varType = ASTBoogieUtils::mapType(returnType, &_node, m_context);
 		auto varDecl = bg::Decl::variable(varName, varType);
 		m_newDecls.push_back(varDecl);
 		returnVarNames.push_back(varName);
@@ -786,7 +794,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
 							Expr::id(ASTBoogieUtils::BOOGIE_THIS),
 							addResult.expr)));
-			addSideEffect(Stmt::ifelse(Expr::not_(m_currentExpr), revert));
+
+			// Final statement for balance update in case of failure. Return value of call
+			// is alwyas a tuple (ok, data).
+			auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
+			solAssert(okDataTuple, "");
+			addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));
 		}
 	}
 
