@@ -78,8 +78,10 @@ void SMTChecker::analyze(SourceUnit const& _source, shared_ptr<Scanner> const& _
 
 bool SMTChecker::visit(ContractDefinition const& _contract)
 {
-	for (auto _var : _contract.stateVariables())
-		createVariable(*_var);
+	for (auto const& contract: _contract.annotation().linearizedBaseContracts)
+		for (auto var : contract->stateVariables())
+			if (*contract == _contract || var->isVisibleInDerivedContracts())
+				createVariable(*var);
 	return true;
 }
 
@@ -101,13 +103,18 @@ bool SMTChecker::visit(ModifierDefinition const&)
 
 bool SMTChecker::visit(FunctionDefinition const& _function)
 {
+	m_functionPath.push_back(&_function);
+	m_modifierDepthStack.push_back(-1);
+
 	if (_function.isConstructor())
+	{
 		m_errorReporter.warning(
 			_function.location(),
 			"Assertion checker does not yet support constructors."
 		);
-	m_functionPath.push_back(&_function);
-	m_modifierDepthStack.push_back(-1);
+		return false;
+	}
+
 	// Not visited by a function call
 	if (isRootFunction())
 	{
@@ -361,13 +368,29 @@ void SMTChecker::endVisit(Assignment const& _assignment)
 		);
 	else
 	{
-		auto rightHandSide = compoundOps.count(op) ?
-			compoundAssignment(_assignment) :
-			expr(_assignment.rightHandSide());
-		defineExpr(_assignment, rightHandSide);
+		vector<smt::Expression> rightArguments;
+		if (_assignment.rightHandSide().annotation().type->category() == Type::Category::Tuple)
+		{
+			auto const& symbTuple = dynamic_pointer_cast<SymbolicTupleVariable>(m_expressions[&_assignment.rightHandSide()]);
+			solAssert(symbTuple, "");
+			for (auto const& component: symbTuple->components())
+			{
+				/// Right hand side tuple component cannot be empty.
+				solAssert(component, "");
+				rightArguments.push_back(component->currentValue());
+			}
+		}
+		else
+		{
+			auto rightHandSide = compoundOps.count(op) ?
+				compoundAssignment(_assignment) :
+				expr(_assignment.rightHandSide());
+			defineExpr(_assignment, rightHandSide);
+			rightArguments.push_back(expr(_assignment));
+		}
 		assignment(
 			_assignment.leftHandSide(),
-			expr(_assignment),
+			rightArguments,
 			_assignment.annotation().type,
 			_assignment.location()
 		);
@@ -376,17 +399,41 @@ void SMTChecker::endVisit(Assignment const& _assignment)
 
 void SMTChecker::endVisit(TupleExpression const& _tuple)
 {
-	if (
-		_tuple.isInlineArray() ||
-		_tuple.components().size() != 1 ||
-		!isSupportedType(_tuple.components()[0]->annotation().type->category())
-	)
+	if (_tuple.isInlineArray())
 		m_errorReporter.warning(
 			_tuple.location(),
-			"Assertion checker does not yet implement tuples and inline arrays."
+			"Assertion checker does not yet implement inline arrays."
 		);
+	else if (_tuple.annotation().type->category() == Type::Category::Tuple)
+	{
+		createExpr(_tuple);
+		vector<shared_ptr<SymbolicVariable>> components;
+		for (auto const& component: _tuple.components())
+			if (component)
+			{
+				if (auto varDecl = identifierToVariable(*component))
+					components.push_back(m_variables[varDecl]);
+				else
+				{
+					solAssert(knownExpr(*component), "");
+					components.push_back(m_expressions[component.get()]);
+				}
+			}
+			else
+				components.push_back(nullptr);
+		solAssert(components.size() == _tuple.components().size(), "");
+		auto const& symbTuple = dynamic_pointer_cast<SymbolicTupleVariable>(m_expressions[&_tuple]);
+		solAssert(symbTuple, "");
+		symbTuple->setComponents(move(components));
+	}
 	else
-		defineExpr(_tuple, expr(*_tuple.components()[0]));
+	{
+		/// Parenthesized expressions are also TupleExpression regardless their type.
+		auto const& components = _tuple.components();
+		solAssert(components.size() == 1, "");
+		if (isSupportedType(components.front()->annotation().type->category()))
+			defineExpr(_tuple, expr(*components.front()));
+	}
 }
 
 void SMTChecker::addOverflowTarget(
@@ -1043,29 +1090,39 @@ bool SMTChecker::shortcutRationalNumber(Expression const& _expr)
 
 void SMTChecker::arithmeticOperation(BinaryOperation const& _op)
 {
-	switch (_op.getOperator())
+	auto type = _op.annotation().commonType;
+	solAssert(type, "");
+	if (type->category() == Type::Category::Integer)
 	{
-	case Token::Add:
-	case Token::Sub:
-	case Token::Mul:
-	case Token::Div:
-	case Token::Mod:
-	{
-		defineExpr(_op, arithmeticOperation(
-			_op.getOperator(),
-			expr(_op.leftExpression()),
-			expr(_op.rightExpression()),
-			_op.annotation().commonType,
-			_op.location()
-		));
-		break;
+		switch (_op.getOperator())
+		{
+		case Token::Add:
+		case Token::Sub:
+		case Token::Mul:
+		case Token::Div:
+		case Token::Mod:
+		{
+			defineExpr(_op, arithmeticOperation(
+				_op.getOperator(),
+				expr(_op.leftExpression()),
+				expr(_op.rightExpression()),
+				_op.annotation().commonType,
+				_op.location()
+			));
+			break;
+		}
+		default:
+			m_errorReporter.warning(
+				_op.location(),
+				"Assertion checker does not yet implement this operator."
+			);
+		}
 	}
-	default:
+	else
 		m_errorReporter.warning(
 			_op.location(),
-			"Assertion checker does not yet implement this operator."
+			"Assertion checker does not yet implement this operator for type " + type->richIdentifier() + "."
 		);
-	}
 }
 
 smt::Expression SMTChecker::arithmeticOperation(
@@ -1209,7 +1266,7 @@ smt::Expression SMTChecker::division(smt::Expression _left, smt::Expression _rig
 
 void SMTChecker::assignment(
 	Expression const& _left,
-	smt::Expression const& _right,
+	vector<smt::Expression> const& _right,
 	TypePointer const& _type,
 	langutil::SourceLocation const& _location
 )
@@ -1220,9 +1277,23 @@ void SMTChecker::assignment(
 			"Assertion checker does not yet implement type " + _type->toString()
 		);
 	else if (auto varDecl = identifierToVariable(_left))
-		assignment(*varDecl, _right, _location);
+	{
+		solAssert(_right.size() == 1, "");
+		assignment(*varDecl, _right.front(), _location);
+	}
 	else if (dynamic_cast<IndexAccess const*>(&_left))
-		arrayIndexAssignment(_left, _right);
+	{
+		solAssert(_right.size() == 1, "");
+		arrayIndexAssignment(_left, _right.front());
+	}
+	else if (auto tuple = dynamic_cast<TupleExpression const*>(&_left))
+	{
+		auto const& components = tuple->components();
+		solAssert(_right.size() == components.size(), "");
+		for (unsigned i = 0; i < _right.size(); ++i)
+			if (auto component = components.at(i))
+				assignment(*component, {_right.at(i)}, component->annotation().type, component->location());
+	}
 	else
 		m_errorReporter.warning(
 			_location,
