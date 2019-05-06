@@ -44,9 +44,9 @@ public:
 	};
 
 	/**
-	 * Global context with additional magic variables. Note that this context has AST nodes
-	 * for the magic variables with different IDs. But we never use the IDs so it should be OK.
-	 *  */
+	 * Global context with magic variables for verification-specific functions such as sum. We
+	 * use this in the name resolver, so all other stuff is already in the scope of the resolver.
+	 */
 	class BoogieGlobalContext : public GlobalContext
 	{
 	public:
