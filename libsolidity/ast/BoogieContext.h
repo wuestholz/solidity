@@ -4,6 +4,7 @@
 #include <liblangutil/EVMVersion.h>
 #include <liblangutil/Scanner.h>
 #include <libsolidity/ast/AST.h>
+#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/DeclarationContainer.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <set>
@@ -19,6 +20,7 @@ namespace solidity
  */
 class BoogieContext {
 public:
+
 	/**
 	 * Encoding for arithmetic types and operations.
 	 */
@@ -41,6 +43,16 @@ public:
 			expr(expr), exprStr(exprStr), tccs(tccs), ocs(ocs) {}
 	};
 
+	/**
+	 * Global context with additional magic variables. Note that this context has AST nodes
+	 * for the magic variables with different IDs. But we never use the IDs so it should be OK.
+	 *  */
+	class BoogieGlobalContext : public GlobalContext
+	{
+	public:
+		BoogieGlobalContext();
+	};
+
 private:
 
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
@@ -52,8 +64,7 @@ private:
 
 	// Some members required to parse invariants. (Invariants can be found
 	// in comments, so they are not parsed when the contract is parsed.)
-	std::vector<Declaration const*> m_globalDecls;
-	std::vector<MagicVariableDeclaration*> m_verifierSum;
+	BoogieGlobalContext m_globalContext;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	langutil::EVMVersion m_evmVersion;
 
@@ -74,11 +85,8 @@ public:
 	BoogieContext(Encoding encoding,
 			bool overflow,
 			langutil::ErrorReporter* errorReporter,
-			std::vector<Declaration const*> globalDecls,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
 			langutil::EVMVersion evmVersion);
-
-	~BoogieContext();
 
 	boogie::Program& program() { return m_program; }
 	Encoding encoding() const { return m_encoding; }
@@ -86,7 +94,7 @@ public:
 	bool overflow() const { return m_overflow; }
 	langutil::ErrorReporter*& errorReporter() { return m_errorReporter; }
 	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
-	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
+	GlobalContext* globalContext() { return &m_globalContext; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }

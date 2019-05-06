@@ -1206,7 +1206,7 @@ void CommandLineInterface::handleBoogie()
 		}
 	}
 
-	BoogieContext context(encoding, overflow, &errorReporter, m_compiler->getGlobalContext()->declarations(), m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(encoding, overflow, &errorReporter, m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
 	SourceReferenceFormatter formatter(serr(false));

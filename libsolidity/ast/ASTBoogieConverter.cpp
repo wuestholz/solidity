@@ -273,11 +273,11 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 					string exprStr = docTag.second.content.substr(_tag.length() + 1);
 					CharStream exprStream(exprStr, "DocString");
 					ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
-						.parseExpression(shared_ptr<Scanner>(new Scanner(exprStream)));
+						.parseExpression(std::make_shared<Scanner>(exprStream));
 
 					// Resolve references, using the given scope
-					m_context.scopes()[&*expr] = m_context.scopes()[_scope];
-					NameAndTypeResolver resolver(m_context.globalDecls(), m_context.scopes(), *m_context.errorReporter());
+					m_context.scopes()[expr.get()] = m_context.scopes()[_scope];
+					NameAndTypeResolver resolver(*m_context.globalContext(), m_context.scopes(), *m_context.errorReporter());
 					if (resolver.resolveNamesAndTypes(*expr))
 					{
 						// Do type checking

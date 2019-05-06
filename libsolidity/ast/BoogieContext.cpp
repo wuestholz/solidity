@@ -15,44 +15,39 @@ namespace dev
 {
 namespace solidity
 {
-BoogieContext::BoogieContext(Encoding encoding, bool overflow, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion) :
-					m_program(),
-					m_encoding(encoding),
-					m_overflow(overflow),
-					m_errorReporter(errorReporter),
-					m_currentScanner(nullptr),
-					m_globalDecls(globalDecls),
 
-					m_scopes(scopes),
-				  	m_evmVersion(evmVersion),
-				  	m_currentContractInvars(),
-				  	m_currentSumDecls(),
-				  	m_builtinFunctions(),
-				  	m_transferIncluded(false),
-				  	m_callIncluded(false),
-				  	m_sendIncluded(false)
+BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 {
+	// Remove all variables, so we can just add our own
+	m_magicVariables.clear();
+
 	// Add magic variables for the sum function for all sizes of int and uint
-	for (string sign : {"", "u"})
+	for (string sign : { "", "u" })
 	{
 		for (int i = 8; i <= 256; i += 8)
 		{
 			string resultType = sign + "int" + to_string(i);
-			auto funType = TypeProvider::function(strings{}, strings{resultType}, FunctionType::Kind::Internal, true, StateMutability::Pure);
-			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
-			m_verifierSum.push_back(sum);
-			m_globalDecls.push_back(sum);
+			auto funType = TypeProvider::function(strings { }, strings { resultType },
+			        FunctionType::Kind::Internal, true, StateMutability::Pure);
+			auto sum = new MagicVariableDeclaration(
+			        ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
+			m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(sum));
 		}
 	}
-
 }
 
-BoogieContext::~BoogieContext()
+BoogieContext::BoogieContext(Encoding encoding,
+		bool overflow,
+		ErrorReporter* errorReporter,
+		std::map<ASTNode const*,
+		std::shared_ptr<DeclarationContainer>> scopes,
+		EVMVersion evmVersion)
+:
+		m_program(), m_encoding(encoding), m_overflow(overflow), m_errorReporter(errorReporter),
+		m_currentScanner(nullptr), m_scopes(scopes), m_evmVersion(evmVersion),
+		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
+		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
-	for (auto it = m_verifierSum.begin(); it != m_verifierSum.end(); ++ it) {
-		delete *it;
-	}
 }
 
 void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl) {
