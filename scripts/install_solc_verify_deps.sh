@@ -43,5 +43,5 @@ popd
 
 # Truffle (use nvm, latest node)
 source ~/.nvm/nvm.sh
-nvm install node 
+nvm install 11.14.0 
 npm install -g truffle
