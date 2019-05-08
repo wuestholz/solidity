@@ -1,6 +1,6 @@
 # solc-verify
 
-This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
+This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
 
 ## Build and Install
 
@@ -33,7 +33,6 @@ cd solc-verify-tools
 ```
 git clone https://github.com/Z3Prover/z3.git
 cd z3/
-git reset z3-4.8.4 --hard
 python scripts/mk_make.py
 cd build
 make
@@ -45,7 +44,6 @@ cd ../..
 ```
 git clone https://github.com/CVC4/CVC4.git
 cd CVC4
-git reset b396d78 --hard
 ./contrib/get-antlr-3.4
 ./contrib/get-abc
 ./contrib/get-glpk-cut-log
@@ -61,7 +59,6 @@ cd ../..
 ```
 git clone https://github.com/SRI-CSL/yices2.git
 cd yices2
-git reset Yices-2.6.1 --hard
 autoconf
 ./configure
 make
@@ -86,7 +83,7 @@ cd ..
 ```
 git clone https://github.com/SRI-CSL/solidity.git
 cd solidity
-git checkout boogie
+git checkout boogie-devel
 ./scripts/install_deps.sh
 mkdir build
 cd build
@@ -118,7 +115,7 @@ solc-verify.py SimpleBank.sol --solver cvc4 --timeout 60
 
 ## Examples
 
-Some examples are located under the `test/compilationTests/boogie/examples` folder of the repository.
+Some examples are located under the `test/solc-verify/examples` folder of the repository.
 
 ### Specifictaion Annotations
 
