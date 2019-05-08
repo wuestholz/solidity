@@ -1,7 +1,7 @@
-pragma solidity ^0.4.23;
+pragma solidity >=0.5.0;
 
 /**
- * @notice invariant __verifier_sum_uint256(balances) == this.balance
+ * @notice invariant __verifier_sum_uint256(balances) == address(this).balance
  */
 contract SimpleBank {
     mapping(address=>uint) balances;
@@ -12,9 +12,9 @@ contract SimpleBank {
 
     function withdraw(uint256 amount) public {
         require(balances[msg.sender] > amount);
-        if (!msg.sender.call.value(amount)("")) { // Reentrancy attack
-            revert();
-        }
+        bool ok;
+        (ok, ) = msg.sender.call.value(amount)(""); // Reentrancy attack
+        if (!ok) revert();
         balances[msg.sender] -= amount;
     }
 }
