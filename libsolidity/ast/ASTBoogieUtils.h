@@ -90,6 +90,9 @@ public:
 	static
 	std::string mapDeclName(Declaration const& decl);
 
+	static
+	std::string getConstructorName(ContractDefinition const* contract);
+
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */

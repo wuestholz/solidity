@@ -221,7 +221,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	}
 	m_stateVarsToInitialize.clear();
 
-	string funcName = ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id());
+	string funcName = ASTBoogieUtils::getConstructorName(&_node);
 
 	// Input parameters
 	std::vector<boogie::Binding> params {
@@ -660,7 +660,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Get the name of the function
 	string funcName = _node.isConstructor() ?
-			ASTBoogieUtils::BOOGIE_CONSTRUCTOR + "#" + toString(_node.id()) : // TODO: we should use the ID of the contract (the default constructor can only use that)
+			ASTBoogieUtils::getConstructorName(m_currentContract) :
 			ASTBoogieUtils::mapDeclName(_node);
 
 	// Create the procedure

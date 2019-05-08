@@ -726,12 +726,15 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 	else
 	{
-		auto varName = funcName + "#" + to_string(_node.id());
-		auto varType = ASTBoogieUtils::mapType(returnType, &_node, m_context);
-		auto varDecl = bg::Decl::variable(varName, varType);
-		m_newDecls.push_back(varDecl);
-		returnVarNames.push_back(varName);
-		returnVars.push_back(Expr::id(varName));
+		// New expressions already create the fresh variable
+		if (!dynamic_cast<NewExpression const*>(&_node.expression())) {
+			auto varName = funcName + "#" + to_string(_node.id());
+			auto varType = ASTBoogieUtils::mapType(returnType, &_node, m_context);
+			auto varDecl = bg::Decl::variable(varName, varType);
+			m_newDecls.push_back(varDecl);
+			returnVarNames.push_back(varName);
+			returnVars.push_back(Expr::id(varName));
+		}
 	}
 
 	if (m_isGetter)
@@ -750,11 +753,19 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 		// Result is the none, single variable, or a tuple of variables
 		if (returnVars.size() == 0)
-			m_currentExpr = nullptr;
+		{
+			// For new expressions there is no return value, but the address should be used
+			if (dynamic_cast<NewExpression const*>(&_node.expression())) m_currentExpr = m_currentAddress;
+			else m_currentExpr = nullptr;
+		}
 		else if (returnVars.size() == 1)
+		{
 			m_currentExpr = returnVars[0];
+		}
 		else
+		{
 			m_currentExpr = Expr::tuple(returnVars);
+		}
 
 		// Assume invariants after external call
 		if (funcName == ASTBoogieUtils::BOOGIE_CALL)
@@ -808,7 +819,21 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 {
-	m_context.reportError(&_node, "New expression is not supported");
+
+	if (auto userDefType = dynamic_cast<UserDefinedTypeName const*>(&_node.typeName()))
+	{
+		if (auto contract = dynamic_cast<ContractDefinition const*>(userDefType->annotation().referencedDeclaration))
+		{
+			// TODO: Make sure that it is a fresh address
+			m_currentExpr = Expr::id(ASTBoogieUtils::getConstructorName(contract));
+			auto varDecl = bg::Decl::variable("new#" + toString(_node.id()), ASTBoogieUtils::BOOGIE_ADDRESS_TYPE);
+			m_newDecls.push_back(varDecl);
+			m_currentAddress = bg::Expr::id(varDecl->getName());
+			return false;
+		}
+	}
+
+	m_context.reportError(&_node, "Unsupported new expression");
 	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 	return false;
 }

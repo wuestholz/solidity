@@ -299,6 +299,11 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
+std::string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
+{
+	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
+}
+
 string ASTBoogieUtils::boogieBVType(unsigned n) {
 	return "bv" + to_string(n);
 }
