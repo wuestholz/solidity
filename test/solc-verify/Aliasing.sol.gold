@@ -1,0 +1,6 @@
+Verifying A::reset: OK
+Verifying A::get: OK
+Verifying A::[implicit_constructor]: OK
+Verifying Aliasing::f: OK
+Verifying Aliasing::[implicit_constructor]: OK
+No errors found.
