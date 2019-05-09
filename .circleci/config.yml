@@ -157,6 +157,38 @@ jobs:
           paths:
             - "*"
 
+  build_x86_linux_solcverify:
+    docker:
+      - image: buildpack-deps:bionic
+    environment:
+      TERM: xterm
+      COVERAGE: "ON"
+      CMAKE_OPTIONS: -DBOOGIE_BIN=$HOME/boogie/Binaries
+      DEBIAN_FRONTEND: noninteractive 
+    steps:
+      - checkout
+      - run:
+          name: Install build dependencies
+          command: |
+            apt-get -qq update
+            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libcvc4-dev libjsoncpp-dev=1.7.4-\*
+            apt-get -qy install mono-complete
+            pushd .
+            git clone https://github.com/dddejan/boogie.git
+            cd boogie
+            mozroots --import --sync
+            wget https://nuget.org/nuget.exe
+            mono ./nuget.exe restore Source/Boogie.sln
+            xbuild Source/Boogie.sln
+            popd
+      - run: *setup_prerelease_commit_hash
+      - run: *run_build
+      - store_artifacts: *solc_artifact
+      - persist_to_workspace:
+          root: build
+          paths:
+            - "*"
+
   build_x86_linux_cxx17:
     docker:
       - image: buildpack-deps:disco
@@ -482,6 +514,7 @@ workflows:
           requires:
             - build_emscripten
       - build_x86_linux: *build_on_tags
+      - build_x86_linux_solcverify: *build_on_tags
       - build_x86_linux_cxx17: *build_on_tags
       - build_x86_clang7_asan: *build_on_tags
       - build_x86_mac: *build_on_tags
