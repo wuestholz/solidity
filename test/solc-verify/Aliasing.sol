@@ -10,16 +10,25 @@ contract A {
     function get() public view returns (int r) { return x; }
 }
 
-contract Aliasing {
+contract Aliasing is A {
+    
     A a1;
     A a2;
 
-    function f() public {
+    constructor() public {
+        a1 = new A();
+        a2 = new A();
+    }
+
+    function() external payable {
         require(a1 != a2);
         a1.reset();
         assert(a1.get() == 0); // Should hold
         a2.reset();
         assert(a2.get() == 0); // Should hold
+        reset();
+        assert(get() == 0); // Should hold
         assert(a1.get() == 0); // Should hold
+        assert(a2.get() == 0); // Should hold
     }
 }
