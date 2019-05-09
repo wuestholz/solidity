@@ -12,6 +12,7 @@ defaults:
   - run_build: &run_build
       name: Build
       command: |
+        echo $CMAKE_OPTIONS
         mkdir -p build
         cd build
         [ -n "$COVERAGE" -a "$CIRCLE_BRANCH" != release -a -z "$CIRCLE_TAG" ] && CMAKE_OPTIONS="$CMAKE_OPTIONS -DCOVERAGE=ON"
@@ -163,7 +164,6 @@ jobs:
     environment:
       TERM: xterm
       COVERAGE: "ON"
-      CMAKE_OPTIONS: -DBOOGIE_BIN=$HOME/boogie/Binaries
       DEBIAN_FRONTEND: noninteractive 
     steps:
       - checkout
@@ -183,6 +183,7 @@ jobs:
             mono ./nuget.exe restore Source/Boogie.sln
             xbuild Source/Boogie.sln
             popd
+            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV 
       - run: *setup_prerelease_commit_hash
       - run: *run_build
       - store_artifacts: *solc_artifact
