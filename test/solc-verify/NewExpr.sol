@@ -16,7 +16,7 @@ contract A {
     function setX(int _x) public { require(_x >= 0); x = _x; }
 }
 
-contract B {
+contract NewExpr {
     function single() public {
         A a = new A();
         a.incr();
@@ -31,5 +31,10 @@ contract B {
         A a2 = new A();
         assert(a2.getX() == 0); // Should hold
         assert(a1.getX() == 1); // Should hold
+    }
+
+    function() external payable {
+        single();
+        multiple();
     }
 }
