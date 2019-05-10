@@ -83,7 +83,7 @@ function solcverify_check()
     filename="${1}"
     solcverify_args="${2}"
     out_expected="${3}"
-   
+
     # Test id
     test_string="$filename"
     [[ !  -z  $solcverify_args  ]] && test_string="$test_string [ $solcverify_args ]"
@@ -91,7 +91,7 @@ function solcverify_check()
     # Run it
     (time "$SOLCVERIFY" "${filename}" ${solcverify_args} >& $OUT_PATH) >& $TIME_PATH
     elapsed=$(cat $TIME_PATH)
-    
+
     # Check output
     out_diff=$(diff -w $out_expected $OUT_PATH)
     if [ $? -ne 0 ]
@@ -111,11 +111,11 @@ for filename in $SOLCVERIFY_TESTS/*.sol; do
         flags=$(<"$filename.flags")
     fi
     # Run the test
-	solcverify_check "$filename" "$flags" "$filename.gold" 
+	solcverify_check "$filename" "$flags" "$filename.gold"
 done
 
 # Remove temps
-rm -f $OUT_PATH $TIME_PATH 
+rm -f $OUT_PATH $TIME_PATH
 
 # Print the details of the failed tests
 if [ $FAIL -eq 0 ]

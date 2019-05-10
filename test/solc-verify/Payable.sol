@@ -11,7 +11,7 @@ contract PayableFunctions {
 }
 
 contract Payable {
-    
+
     PayableFunctions p;
 
     function() external payable {
