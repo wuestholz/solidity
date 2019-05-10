@@ -582,7 +582,6 @@ workflows:
       - build_x86_linux_solcverify: *build_on_tags
       - build_x86_linux_cxx17: *build_on_tags
       - build_x86_clang7_asan: *build_on_tags
-      - build_x86_mac: *build_on_tags
       - test_x86_linux_solcverify_boogie:
           <<: *build_on_tags
           requires:
@@ -599,10 +598,6 @@ workflows:
           <<: *build_on_tags
           requires:
             - build_x86_clang7_asan
-      - test_x86_mac:
-          <<: *build_on_tags
-          requires:
-            - build_x86_mac
       - docs: *build_on_tags
       - build_x86_archlinux: *build_on_tags
       - test_x86_archlinux:
