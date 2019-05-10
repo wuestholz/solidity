@@ -94,8 +94,19 @@ string IRGenerationContext::newYulVariable()
 string IRGenerationContext::variable(Expression const& _expression)
 {
 	unsigned size = _expression.annotation().type->sizeOnStack();
-	solUnimplementedAssert(size == 1, "");
-	return "expr_" + to_string(_expression.id());
+	string var = "expr_" + to_string(_expression.id());
+	if (size == 1)
+		return var;
+	else
+		return YulUtilFunctions::suffixedVariableNameList(move(var) + "_", 1, 1 + size);
+}
+
+string IRGenerationContext::variablePart(Expression const& _expression, size_t _part)
+{
+	size_t numVars = _expression.annotation().type->sizeOnStack();
+	solAssert(numVars > 1, "");
+	solAssert(1 <= _part && _part <= numVars, "");
+	return "expr_" + to_string(_expression.id()) + "_" + to_string(_part);
 }
 
 string IRGenerationContext::internalDispatch(size_t _in, size_t _out)

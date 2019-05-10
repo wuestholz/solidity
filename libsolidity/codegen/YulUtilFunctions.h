@@ -26,6 +26,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace dev
 {
@@ -34,6 +35,7 @@ namespace solidity
 
 class Type;
 class ArrayType;
+class MappingType;
 
 /**
  * Component that can generate various useful Yul functions.
@@ -61,6 +63,10 @@ public:
 	/// or memory to memory.
 	/// Pads with zeros and might write more than exactly length.
 	std::string copyToMemoryFunction(bool _fromCalldata);
+
+	// @returns the name of a function that has the equivalent logic of an
+	// `assert` or `require` call.
+	std::string requireOrAssertFunction(bool _assert, Type const* _messageType = nullptr);
 
 	/// @returns the name of a function that takes a (cleaned) value of the given value type and
 	/// left-aligns it, usually for use in non-padded encoding.
@@ -92,6 +98,11 @@ public:
 	/// @returns the name of a function that advances an array data pointer to the next element.
 	/// Only works for memory arrays, calldata arrays and storage arrays that store one item per slot.
 	std::string nextArrayElementFunction(ArrayType const& _type);
+
+	/// @returns the name of a function that performs index access for mappings.
+	/// @param _mappingType the type of the mapping
+	/// @param _keyType the type of the value provided
+	std::string mappingIndexAccessFunction(MappingType const& _mappingType, Type const& _keyType);
 
 	/// @returns a function that reads a value type from storage.
 	/// Performs bit mask/sign extend cleanup and appropriate left / right shift, but not validation.
@@ -148,6 +159,12 @@ public:
 	/// This is used for data decoded from external sources.
 	std::string validatorFunction(Type const& _type, bool _revertOnFailure = false);
 
+	std::string packedHashFunction(std::vector<Type const*> const& _givenTypes, std::vector<Type const*> const& _targetTypes);
+
+	/// @returns the name of a function that reverts and uses returndata (if available)
+	/// as reason string.
+	std::string forwardingRevertFunction();
+
 	/// @returns a string containing a comma-separated list of variable names consisting of @a _baseName suffixed
 	/// with increasing integers in the range [@a _startSuffix, @a _endSuffix), if @a _startSuffix < @a _endSuffix,
 	/// and with decreasing integers in the range [@a _endSuffix, @a _startSuffix), if @a _endSuffix < @a _startSuffix.
@@ -155,6 +172,11 @@ public:
 	static std::string suffixedVariableNameList(std::string const& _baseName, size_t _startSuffix, size_t _endSuffix);
 
 private:
+
+	/// Special case of conversionFunction - handles everything that does not
+	/// use exactly one variable to hold the value.
+	std::string conversionFunctionSpecial(Type const& _from, Type const& _to);
+
 	langutil::EVMVersion m_evmVersion;
 	std::shared_ptr<MultiUseYulFunctionCollector> m_functionCollector;
 };

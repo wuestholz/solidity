@@ -9,5 +9,3 @@ contract C
 	}
 }
 // ----
-// Warning: (76-101): Assertion checker does not yet support such variable declarations.
-// Warning: (105-119): Assertion violation happens here

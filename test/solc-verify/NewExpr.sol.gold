@@ -1,8 +1,0 @@
-Verifying A::[constructor]: OK
-Verifying A::incr: OK
-Verifying A::getX: OK
-Verifying A::setX: OK
-Verifying B::single: OK
-Verifying B::multiple: OK
-Verifying B::[implicit_constructor]: OK
-No errors found.

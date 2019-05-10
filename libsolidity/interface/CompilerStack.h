@@ -25,6 +25,7 @@
 
 #include <libsolidity/interface/ReadFile.h>
 #include <libsolidity/interface/OptimiserSettings.h>
+#include <libsolidity/interface/Version.h>
 
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/EVMVersion.h>
@@ -261,11 +262,9 @@ public:
 	/// @returns a JSON representing the estimated gas usage for contract creation, internal and external functions
 	Json::Value gasEstimates(std::string const& _contractName) const;
 
-	std::shared_ptr<GlobalContext> getGlobalContext() const { return m_globalContext; }
-
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> getScopes() const { return m_scopes; }
-
-
+	/// Overwrites the release/prerelease flag. Should only be used for testing.
+	void overwriteReleaseFlag(bool release) { m_release = release; }
 
 private:
 	/// The state per source unit. Filled gradually during parsing.
@@ -339,7 +338,7 @@ private:
 	std::string createMetadata(Contract const& _contract) const;
 
 	/// @returns the metadata CBOR for the given serialised metadata JSON.
-	static bytes createCBORMetadata(std::string const& _metadata, bool _experimentalMode);
+	bytes createCBORMetadata(std::string const& _metadata, bool _experimentalMode);
 
 	/// @returns the computer source mapping string.
 	std::string computeSourceMapping(eth::AssemblyItems const& _items) const;
@@ -388,6 +387,7 @@ private:
 	langutil::ErrorReporter m_errorReporter;
 	bool m_metadataLiteralSources = false;
 	State m_stackState = Empty;
+	bool m_release = VersionIsRelease;
 };
 
 }

@@ -42,7 +42,7 @@ struct Object;
  */
 struct WasmDialect: public Dialect
 {
-	WasmDialect(AsmFlavour _flavour);
+	WasmDialect();
 
 	BuiltinFunction const* builtin(YulString _name) const override;
 

@@ -38,6 +38,12 @@ add_library(yul
 	backends/evm/EVMObjectCompiler.h
 	backends/evm/NoOutputAssembly.h
 	backends/evm/NoOutputAssembly.cpp
+	backends/wasm/EWasmCodeTransform.cpp
+	backends/wasm/EWasmCodeTransform.h
+	backends/wasm/EWasmObjectCompiler.cpp
+	backends/wasm/EWasmObjectCompiler.h
+	backends/wasm/EWasmToText.cpp
+	backends/wasm/EWasmToText.h
 	backends/wasm/WasmDialect.cpp
 	backends/wasm/WasmDialect.h
 	backends/wasm/WordSizeTransform.cpp
