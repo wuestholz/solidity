@@ -27,7 +27,7 @@ public:
 	static const std::string SOLIDITY_CALL;
 	static const std::string BOOGIE_CALL;
 
-	// Constract related identifiers
+	// Contract related identifiers
 	static const std::string SOLIDITY_SUPER;
 	static const std::string SOLIDITY_THIS;
 

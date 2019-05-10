@@ -807,7 +807,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							addResult.expr)));
 
 			// Final statement for balance update in case of failure. Return value of call
-			// is alwyas a tuple (ok, data).
+			// is always a tuple (ok, data).
 			auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
 			solAssert(okDataTuple, "");
 			addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));

@@ -736,9 +736,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	// Add other pre/postconditions
-	std::vector<BoogieContext::DocTagExpr> pres;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND, pres);
-	for (auto pre : pres)
+	std::vector<BoogieContext::DocTagExpr> preconds;
+	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND, preconds);
+	for (auto pre : preconds)
 	{
 		procDecl->getRequires().push_back(boogie::Specification::spec(pre.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
@@ -747,9 +747,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		for (auto oc : pre.ocs) { procDecl->getRequires().push_back(boogie::Specification::spec(oc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of precondition '" + pre.exprStr + "' when entering function.", *m_context.currentScanner()))); }
 	}
-	std::vector<BoogieContext::DocTagExpr> posts;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND, posts);
-	for (auto post : posts)
+	std::vector<BoogieContext::DocTagExpr> postconds;
+	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND, postconds);
+	for (auto post : postconds)
 	{
 		procDecl->getEnsures().push_back(boogie::Specification::spec(post.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));

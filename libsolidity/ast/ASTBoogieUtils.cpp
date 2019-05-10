@@ -787,7 +787,7 @@ Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer 
 			// Check if explicit conversion is really needed:
 			// - converting to smaller size
 			// - converting from signed to unsigned
-			// - converting from unsinged to same size signed
+			// - converting from unsigned to same size signed
 			if (targetBits < exprBits || (exprSigned && !targetSigned) || (targetBits == exprBits && !exprSigned && targetSigned))
 			{
 				// Nothing to do for same size, since Boogie bitvectors do not have signs
