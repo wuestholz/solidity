@@ -10,7 +10,7 @@ contract Initializers {
         assert(c == 0);
         b = b0;
     }
-    
+
     int a = 5;
 }
 

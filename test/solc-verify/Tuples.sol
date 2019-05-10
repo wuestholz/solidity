@@ -21,7 +21,7 @@ contract Tuples {
       int a = 0;
       int x = 0;
       int y = 0;
-      
+
       (x, y) = (++ a /* 1 */, (++ x) + a /** 2 */);
       // Not correct:
       // x = ++ a;
@@ -63,5 +63,5 @@ contract Tuples {
       testCasts();
       testPartial();
     }
-    
+
 }

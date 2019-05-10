@@ -11,7 +11,7 @@ contract A {
 }
 
 contract Aliasing is A {
-    
+
     A a1;
     A a2;
 

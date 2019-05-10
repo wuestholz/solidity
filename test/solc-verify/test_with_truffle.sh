@@ -43,7 +43,7 @@ pushd .
 mkdir truffle
 cd truffle
 truffle init
-popd 
+popd
 cp truffle-config.js truffle
 
 # Copy the contracts to the truffle
@@ -54,7 +54,7 @@ cp $CONTRACTS_WITH_MAIN truffle/contracts/
 DEPLOY=truffle/migrations/2_deploy_contracts.js
 (
 for c in $CONTRACTS_WITH_MAIN
-do 
+do
   c_basename=`basename $c`
   c_name=${c_basename%.*}
   echo "var $c_name = artifacts.require('./$c_basename');"
@@ -62,7 +62,7 @@ done
 echo
 echo "module.exports = function(deployer) {"
 for c in $CONTRACTS_WITH_MAIN
-do 
+do
   c_basename=`basename $c`
   c_name=${c_basename%.*}
   echo "  deployer.deploy($c_name);"
@@ -74,7 +74,7 @@ echo "};"
 TEST=truffle/test/All.js
 (
 for c in $CONTRACTS_WITH_MAIN
-do 
+do
   c_basename=`basename $c`
   c_name=${c_basename%.*}
   echo "var $c_name = artifacts.require('$c_name');"
@@ -83,11 +83,11 @@ echo
 echo "contract('All', function(accounts) {"
 echo "  var contract"
 echo "  var user = accounts[0]"
-echo 
+echo
 for c in $CONTRACTS_WITH_MAIN
-do 
+do
   c_basename=`basename $c`
-  c_name=${c_basename%.*}   
+  c_name=${c_basename%.*}
   echo "  it('$c_name', function() {"
   echo "    return $c_name.deployed().then(function(instance) {"
   echo "      contract = instance"

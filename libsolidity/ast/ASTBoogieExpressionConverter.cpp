@@ -706,11 +706,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	auto returnType = _node.annotation().type;
 	auto returnTupleType = dynamic_cast<TupleType const*>(returnType);
-	
+
 	// Create fresh variables to store the result of the function call
 	std::vector<std::string> returnVarNames;
 	std::vector<Expr::Ref> returnVars;
-	if (returnTupleType) 
+	if (returnTupleType)
 	{
 		auto const& returnTypes = returnTupleType->components();
 		solAssert(returnTypes.size() != 1, "");
@@ -743,7 +743,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		m_currentExpr = returnVars[0];
 		addSideEffect(Stmt::assign(returnVars[0], Expr::sel(Expr::id(funcName), m_currentAddress)));
 	}
-	else 
+	else
 	{
 		// Assign call to the fresh variable
 		addSideEffects({

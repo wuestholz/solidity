@@ -52,18 +52,18 @@ contract SpecificationLoopInvar {
     }
 }
 
-/** 
- * @notice invariant x <= y 
- * @notice invariant x >= y 
+/**
+ * @notice invariant x <= y
+ * @notice invariant x >= y
  */
 contract ContractInvarOnLoop {
     int x;
     int y;
 
     function increase(int amount) public {
-        /** 
-         * @notice invariant x <= y 
-         * @notice invariant x >= y 
+        /**
+         * @notice invariant x <= y
+         * @notice invariant x >= y
          */
         for (int i = 0; i < amount; i++) {
             x++;

@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 contract ErrorHandling {
-    
+
     // Assertion should hold
     function abs_sound(int param) pure public returns (int) {
         int result = param;

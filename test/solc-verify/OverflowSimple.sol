@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
  * @notice invariant x == y
  */
 contract OverflowSimple {
- 
+
     uint8 x;
     uint8 y;
 

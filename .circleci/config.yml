@@ -181,7 +181,7 @@ jobs:
     environment:
       TERM: xterm
       COVERAGE: "ON"
-      DEBIAN_FRONTEND: noninteractive 
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - checkout
       - run:
@@ -202,7 +202,7 @@ jobs:
             xbuild Source/Boogie.sln
             popd
             # Set CMAKE options, TODO: try to do it in the environment variable
-            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV 
+            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV
       - run: *setup_prerelease_commit_hash
       - run: *run_build
       - store_artifacts: *solc_artifact

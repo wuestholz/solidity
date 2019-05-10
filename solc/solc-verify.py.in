@@ -26,7 +26,7 @@ def findSolver(solver):
         solverPath = os.path.join(path, solverExe)
         if os.path.isfile(solverPath) and os.access(solverPath, os.X_OK):
             return solverPath
-    
+
 def main(tmpDir):
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -46,12 +46,12 @@ def main(tmpDir):
     args = parser.parse_args()
 
     solFile = args.file
-    
+
     # BPL file if requested, otherwise a temporary
     if args.output: outDir = args.output
     else: outDir = tmpDir
     bplFile = outDir + '/' + os.path.basename(solFile) + '.bpl'
-    
+
     # First convert .sol to .bpl
     solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, outDir, args.boogie_arith)
     convertCommand = args.solc + ' ' + solcArgs
@@ -77,8 +77,8 @@ def main(tmpDir):
     boogieArgs = '/nologo /doModSetAnalysis /errorTrace:0 /useArrayTheory /trace'
     if args.smt_log:
         boogieArgs += ' /proverLog:%s' % args.smt_log
-    
-    # Solver path 
+
+    # Solver path
     if args.solver_bin is not None:
         solverPath = args.solver_bin
     else:
@@ -88,8 +88,8 @@ def main(tmpDir):
         return
     if args.verbose:
        print('Using %s at %s' % (args.solver, solverPath))
-    
-    # Setup solver-specific arguments      
+
+    # Setup solver-specific arguments
     if args.solver == 'z3':
         boogieArgs += ' /z3exe:%s' % solverPath
     if args.solver == 'yices2':
@@ -121,7 +121,7 @@ def main(tmpDir):
     verifierOutputStr = verifierOutput.decode('utf-8')
     if re.search('Boogie program verifier finished with', verifierOutputStr) == None:
         print('Error while running verifier, details:')
-        print(verifierOutputStr)        
+        print(verifierOutputStr)
         return
     elif args.verbose:
         print('----- Verifier output -----')

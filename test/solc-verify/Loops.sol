@@ -19,7 +19,7 @@ contract Loops {
 
     function forLoopFunc(uint param) private pure returns (uint) {
         uint result = param;
-        
+
         /**
          * @notice invariant result == param + i
          */

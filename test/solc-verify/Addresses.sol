@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 contract Addresses {
-    
+
     function thisBalance(uint amount) public view returns (bool) {
         // 'this.balance' is deprecated but some older contracts use it
         return address(this).balance > amount;
@@ -27,7 +27,7 @@ contract Addresses {
             assert(oldThisBalance - amount == address(this).balance);
             assert(oldSenderBalance + amount == msg.sender.balance);
         }
-        
+
     }
 
     function testTransferError(uint amount) public {
@@ -70,7 +70,7 @@ contract Addresses {
 
         bool success = false;
         if (address(this).balance >= amount) success = msg.sender.send(amount);
-        
+
         // We can state stronger assertions because sender is different than receiver
         if (success) {
             assert(oldThisBalance - amount == address(this).balance);
