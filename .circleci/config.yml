@@ -383,6 +383,26 @@ jobs:
           name: Test solc-verify with Boogie
           command: ./test/solc-verify/test_with_boogie.sh
 
+  test_x86_linux_solcverify_truffle:
+    docker:
+      - image: buildpack-deps:bionic
+    environment:
+      TERM: xterm
+    steps:
+      - checkout
+      - attach_workspace:
+          at: build
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get -qq update
+            apt-get -qy install libcvc4-dev nodejs nodejs-dev node-gyp libssl1.0-dev
+            apt-get -qy install npm
+            npm install -g truffle
+      - run:
+          name: Test solc-verify with Truffle
+          command: ./test/solc-verify/test_with_truffle.sh
+
   test_x86_clang7_asan:
     docker:
       - image: buildpack-deps:cosmic
@@ -554,6 +574,10 @@ workflows:
       #- build_x86_clang7_asan: *build_on_tags
       #- build_x86_mac: *build_on_tags
       - test_x86_linux_solcverify_boogie:
+          <<: *build_on_tags
+          requires:
+            - build_x86_linux_solcverify
+      - test_x86_linux_solcverify_truffle:
           <<: *build_on_tags
           requires:
             - build_x86_linux_solcverify
