@@ -104,6 +104,60 @@ string YulUtilFunctions::copyToMemoryFunction(bool _fromCalldata)
 	});
 }
 
+string YulUtilFunctions::requireOrAssertFunction(bool _assert, Type const* _messageType)
+{
+	string functionName =
+		string(_assert ? "assert_helper" : "require_helper") +
+		(_messageType ? ("_" + _messageType->identifier()) : "");
+
+	solAssert(!_assert || !_messageType, "Asserts can't have messages!");
+
+	return m_functionCollector->createFunction(functionName, [&]() {
+		if (!_messageType)
+			return Whiskers(R"(
+				function <functionName>(condition) {
+					if iszero(condition) { <invalidOrRevert> }
+				}
+			)")
+			("invalidOrRevert", _assert ? "invalid()" : "revert(0, 0)")
+			("functionName", functionName)
+			.render();
+
+
+		solUnimplemented("require() with two parameters is not yet implemented.");
+		// TODO The code below is completely untested as we don't support StringLiterals yet
+		int const hashHeaderSize = 4;
+		int const byteSize = 8;
+		u256 const errorHash =
+			u256(FixedHash<hashHeaderSize>::Arith(
+				FixedHash<hashHeaderSize>(dev::keccak256("Error(string)"))
+			)) << (256 - hashHeaderSize * byteSize);
+
+		string const encodeFunc = ABIFunctions(m_evmVersion, m_functionCollector)
+			.tupleEncoder(
+				{_messageType},
+				{TypeProvider::stringMemory()}
+			);
+
+		return Whiskers(R"(
+			function <functionName>(condition, message) {
+				if iszero(condition) {
+					let fmp := mload(<freeMemPointer>)
+					mstore(fmp, <errorHash>)
+					let end := <abiEncodeFunc>(add(fmp, <hashHeaderSize>), message)
+					revert(fmp, sub(end, fmp))
+				}
+			}
+		)")
+		("functionName", functionName)
+		("freeMemPointer", to_string(CompilerUtils::freeMemoryPointer))
+		("errorHash", errorHash.str())
+		("abiEncodeFunc", encodeFunc)
+		("hashHeaderSize", to_string(hashHeaderSize))
+		.render();
+	});
+}
+
 string YulUtilFunctions::leftAlignFunction(Type const& _type)
 {
 	string functionName = string("leftAlign_") + _type.identifier();
@@ -485,6 +539,48 @@ string YulUtilFunctions::nextArrayElementFunction(ArrayType const& _type)
 	});
 }
 
+string YulUtilFunctions::mappingIndexAccessFunction(MappingType const& _mappingType, Type const& _keyType)
+{
+	solAssert(_keyType.sizeOnStack() <= 1, "");
+
+	string functionName = "mapping_index_access_" + _mappingType.identifier() + "_of_" + _keyType.identifier();
+	return m_functionCollector->createFunction(functionName, [&]() {
+		if (_mappingType.keyType()->isDynamicallySized())
+			return Whiskers(R"(
+				function <functionName>(slot <comma> <key>) -> dataSlot {
+					dataSlot := <hash>(slot <comma> <key>)
+				}
+			)")
+			("functionName", functionName)
+			("key", _keyType.sizeOnStack() > 0 ? "key" : "")
+			("comma", _keyType.sizeOnStack() > 0 ? "," : "")
+			("hash", packedHashFunction(
+				{&_keyType, TypeProvider::uint256()},
+				{_mappingType.keyType(), TypeProvider::uint256()}
+			))
+			.render();
+		else
+		{
+			solAssert(CompilerUtils::freeMemoryPointer >= 0x40, "");
+			solAssert(!_mappingType.keyType()->isDynamicallyEncoded(), "");
+			solAssert(_mappingType.keyType()->calldataEncodedSize(false) <= 0x20, "");
+			Whiskers templ(R"(
+				function <functionName>(slot <key>) -> dataSlot {
+					mstore(0, <convertedKey>)
+					mstore(0x20, slot)
+					dataSlot := keccak256(0, 0x40)
+				}
+			)");
+			templ("functionName", functionName);
+			templ("key", _keyType.sizeOnStack() == 1 ? ", key" : "");
+			if (_keyType.sizeOnStack() == 0)
+				templ("convertedKey", conversionFunction(_keyType, *_mappingType.keyType()) + "()");
+			else
+				templ("convertedKey", conversionFunction(_keyType, *_mappingType.keyType()) + "(key)");
+			return templ.render();
+		}
+	});
+}
 
 string YulUtilFunctions::readFromStorage(Type const& _type, size_t _offset, bool _splitFunctionTypes)
 {
@@ -606,6 +702,9 @@ string YulUtilFunctions::allocationFunction()
 
 string YulUtilFunctions::conversionFunction(Type const& _from, Type const& _to)
 {
+	if (_from.sizeOnStack() != 1 || _to.sizeOnStack() != 1)
+		return conversionFunctionSpecial(_from, _to);
+
 	string functionName =
 		"convert_" +
 		_from.identifier() +
@@ -906,6 +1005,62 @@ string YulUtilFunctions::validatorFunction(Type const& _type, bool _revertOnFail
 	});
 }
 
+string YulUtilFunctions::packedHashFunction(
+	vector<Type const*> const& _givenTypes,
+	vector<Type const*> const& _targetTypes
+)
+{
+	string functionName = string("packed_hashed_");
+	for (auto const& t: _givenTypes)
+		functionName += t->identifier() + "_";
+	functionName += "_to_";
+	for (auto const& t: _targetTypes)
+		functionName += t->identifier() + "_";
+	size_t sizeOnStack = 0;
+	for (Type const* t: _givenTypes)
+		sizeOnStack += t->sizeOnStack();
+	return m_functionCollector->createFunction(functionName, [&]() {
+		Whiskers templ(R"(
+			function <functionName>(<variables>) -> hash {
+				let pos := mload(<freeMemoryPointer>)
+				let end := <packedEncode>(pos <comma> <variables>)
+				hash := keccak256(pos, sub(end, pos))
+			}
+		)");
+		templ("functionName", functionName);
+		templ("variables", suffixedVariableNameList("var_", 1, 1 + sizeOnStack));
+		templ("comma", sizeOnStack > 0 ? "," : "");
+		templ("freeMemoryPointer", to_string(CompilerUtils::freeMemoryPointer));
+		templ("packedEncode", ABIFunctions(m_evmVersion, m_functionCollector).tupleEncoderPacked(_givenTypes, _targetTypes));
+		return templ.render();
+	});
+}
+
+string YulUtilFunctions::forwardingRevertFunction()
+{
+	bool forward = m_evmVersion.supportsReturndata();
+	string functionName = "revert_forward_" + to_string(forward);
+	return m_functionCollector->createFunction(functionName, [&]() {
+		if (forward)
+			return Whiskers(R"(
+				function <functionName>() {
+					returndatacopy(0, 0, returndatasize())
+					revert(0, returndatasize())
+				}
+			)")
+			("functionName", functionName)
+			.render();
+		else
+			return Whiskers(R"(
+				function <functionName>() {
+					revert(0, 0)
+				}
+			)")
+			("functionName", functionName)
+			.render();
+	});
+}
+
 string YulUtilFunctions::suffixedVariableNameList(string const& _baseName, size_t _startSuffix, size_t _endSuffix)
 {
 	string result;
@@ -922,4 +1077,70 @@ string YulUtilFunctions::suffixedVariableNameList(string const& _baseName, size_
 			result = _baseName + to_string(_endSuffix++) + ", " + result;
 	}
 	return result;
+}
+
+string YulUtilFunctions::conversionFunctionSpecial(Type const& _from, Type const& _to)
+{
+	string functionName =
+		"convert_" +
+		_from.identifier() +
+		"_to_" +
+		_to.identifier();
+	return m_functionCollector->createFunction(functionName, [&]() {
+		solUnimplementedAssert(
+			_from.category() == Type::Category::StringLiteral,
+			"Type conversion " + _from.toString() + " -> " + _to.toString() + " not yet implemented."
+		);
+		string const& data = dynamic_cast<StringLiteralType const&>(_from).value();
+		if (_to.category() == Type::Category::FixedBytes)
+		{
+			unsigned const numBytes = dynamic_cast<FixedBytesType const&>(_to).numBytes();
+			solAssert(data.size() <= 32, "");
+			Whiskers templ(R"(
+				function <functionName>() -> converted {
+					converted := <data>
+				}
+			)");
+			templ("functionName", functionName);
+			templ("data", formatNumber(
+				h256::Arith(h256(data, h256::AlignLeft)) &
+				(~(u256(-1) >> (8 * numBytes)))
+			));
+			return templ.render();
+		}
+		else if (_to.category() == Type::Category::Array)
+		{
+			auto const& arrayType = dynamic_cast<ArrayType const&>(_to);
+			solAssert(arrayType.isByteArray(), "");
+			size_t words = (data.size() + 31) / 32;
+			size_t storageSize = 32 + words * 32;
+
+			Whiskers templ(R"(
+				function <functionName>() -> converted {
+					converted := <allocate>(<storageSize>)
+					mstore(converted, <size>)
+					<#word>
+						mstore(add(converted, <offset>), <wordValue>)
+					</word>
+				}
+			)");
+			templ("functionName", functionName);
+			templ("allocate", allocationFunction());
+			templ("storageSize", to_string(storageSize));
+			templ("size", to_string(data.size()));
+			vector<map<string, string>> wordParams(words);
+			for (size_t i = 0; i < words; ++i)
+			{
+				wordParams[i]["offset"] = to_string(32 + i * 32);
+				wordParams[i]["wordValue"] = "0x" + h256(data.substr(32 * i, 32), h256::AlignLeft).hex();
+			}
+			templ("word", wordParams);
+			return templ.render();
+		}
+		else
+			solAssert(
+				false,
+				"Invalid conversion from string literal to " + _to.toString() + " requested."
+			);
+	});
 }

@@ -34,7 +34,7 @@ using namespace langutil;
 using namespace dev::solidity;
 
 SMTChecker::SMTChecker(ErrorReporter& _errorReporter, map<h256, string> const& _smtlib2Responses):
-	m_interface(make_shared<smt::SMTPortfolio>(_smtlib2Responses)),
+	m_interface(make_unique<smt::SMTPortfolio>(_smtlib2Responses)),
 	m_errorReporterReference(_errorReporter),
 	m_errorReporter(m_smtErrors),
 	m_context(*m_interface)
@@ -79,7 +79,7 @@ void SMTChecker::analyze(SourceUnit const& _source, shared_ptr<Scanner> const& _
 bool SMTChecker::visit(ContractDefinition const& _contract)
 {
 	for (auto const& contract: _contract.annotation().linearizedBaseContracts)
-		for (auto var : contract->stateVariables())
+		for (auto var: contract->stateVariables())
 			if (*contract == _contract || var->isVisibleInDerivedContracts())
 				createVariable(*var);
 	return true;
@@ -103,25 +103,14 @@ bool SMTChecker::visit(ModifierDefinition const&)
 
 bool SMTChecker::visit(FunctionDefinition const& _function)
 {
-	m_functionPath.push_back(&_function);
-	m_modifierDepthStack.push_back(-1);
-
-	if (_function.isConstructor())
-	{
-		m_errorReporter.warning(
-			_function.location(),
-			"Assertion checker does not yet support constructors."
-		);
-		return false;
-	}
-
 	// Not visited by a function call
-	if (isRootFunction())
+	if (m_callStack.empty())
 	{
 		m_interface->reset();
 		m_context.reset();
 		m_pathConditions.clear();
 		m_callStack.clear();
+		pushCallStack({&_function, nullptr});
 		m_expressions.clear();
 		m_globalContext.clear();
 		m_uninterpretedTerms.clear();
@@ -132,20 +121,31 @@ bool SMTChecker::visit(FunctionDefinition const& _function)
 		m_arrayAssignmentHappened = false;
 		m_externalFunctionCallHappened = false;
 	}
-	_function.parameterList().accept(*this);
-	if (_function.returnParameterList())
-		_function.returnParameterList()->accept(*this);
-	visitFunctionOrModifier();
+	m_modifierDepthStack.push_back(-1);
+	if (_function.isConstructor())
+	{
+		m_errorReporter.warning(
+			_function.location(),
+			"Assertion checker does not yet support constructors."
+		);
+	}
+	else
+	{
+		_function.parameterList().accept(*this);
+		if (_function.returnParameterList())
+			_function.returnParameterList()->accept(*this);
+		visitFunctionOrModifier();
+	}
 	return false;
 }
 
 void SMTChecker::visitFunctionOrModifier()
 {
-	solAssert(!m_functionPath.empty(), "");
+	solAssert(!m_callStack.empty(), "");
 	solAssert(!m_modifierDepthStack.empty(), "");
 
 	++m_modifierDepthStack.back();
-	FunctionDefinition const& function = *m_functionPath.back();
+	FunctionDefinition const& function = dynamic_cast<FunctionDefinition const&>(*m_callStack.back().first);
 
 	if (m_modifierDepthStack.back() == int(function.modifiers().size()))
 	{
@@ -166,7 +166,7 @@ void SMTChecker::visitFunctionOrModifier()
 			for (auto arg: *modifierInvocation->arguments())
 				modifierArgsExpr.push_back(expr(*arg));
 		initializeFunctionCallParameters(modifierDef, modifierArgsExpr);
-		pushCallStack(modifierInvocation.get());
+		pushCallStack({&modifierDef, modifierInvocation.get()});
 		modifierDef.body().accept(*this);
 		popCallStack();
 	}
@@ -176,8 +176,8 @@ void SMTChecker::visitFunctionOrModifier()
 
 bool SMTChecker::visit(PlaceholderStatement const&)
 {
-	solAssert(!m_functionPath.empty(), "");
-	ASTNode const* lastCall = popCallStack();
+	solAssert(!m_callStack.empty(), "");
+	auto lastCall = popCallStack();
 	visitFunctionOrModifier();
 	pushCallStack(lastCall);
 	return true;
@@ -185,20 +185,19 @@ bool SMTChecker::visit(PlaceholderStatement const&)
 
 void SMTChecker::endVisit(FunctionDefinition const&)
 {
+	m_callStack.pop_back();
+	solAssert(m_modifierDepthStack.back() == -1, "");
+	m_modifierDepthStack.pop_back();
 	// If _function was visited from a function call we don't remove
 	// the local variables just yet, since we might need them for
 	// future calls.
 	// Otherwise we remove any local variables from the context and
 	// keep the state variables.
-	if (isRootFunction())
+	if (m_callStack.empty())
 	{
 		checkUnderOverflow();
-		removeLocalVariables();
 		solAssert(m_callStack.empty(), "");
 	}
-	m_functionPath.pop_back();
-	solAssert(m_modifierDepthStack.back() == -1, "");
-	m_modifierDepthStack.pop_back();
 }
 
 bool SMTChecker::visit(InlineAssembly const& _inlineAsm)
@@ -330,20 +329,35 @@ bool SMTChecker::visit(ForStatement const& _node)
 void SMTChecker::endVisit(VariableDeclarationStatement const& _varDecl)
 {
 	if (_varDecl.declarations().size() != 1)
-		m_errorReporter.warning(
-			_varDecl.location(),
-			"Assertion checker does not yet support such variable declarations."
-		);
-	else if (knownVariable(*_varDecl.declarations()[0]))
+	{
+		if (auto init = _varDecl.initialValue())
+		{
+			auto symbTuple = dynamic_pointer_cast<SymbolicTupleVariable>(m_expressions[init]);
+			/// symbTuple == nullptr if it is the return of a non-inlined function call.
+			if (symbTuple)
+			{
+				auto const& components = symbTuple->components();
+				auto const& declarations = _varDecl.declarations();
+				for (unsigned i = 0; i < declarations.size(); ++i)
+				{
+					solAssert(components.at(i), "");
+					if (declarations.at(i) && knownVariable(*declarations.at(i)))
+						assignment(*declarations.at(i), components.at(i)->currentValue(), declarations.at(i)->location());
+				}
+			}
+		}
+	}
+	else if (knownVariable(*_varDecl.declarations().front()))
 	{
 		if (_varDecl.initialValue())
-			assignment(*_varDecl.declarations()[0], *_varDecl.initialValue(), _varDecl.location());
+			assignment(*_varDecl.declarations().front(), *_varDecl.initialValue(), _varDecl.location());
 	}
 	else
 		m_errorReporter.warning(
 			_varDecl.location(),
 			"Assertion checker does not yet implement such variable declarations."
 		);
+
 }
 
 void SMTChecker::endVisit(Assignment const& _assignment)
@@ -362,16 +376,21 @@ void SMTChecker::endVisit(Assignment const& _assignment)
 			"Assertion checker does not yet implement this assignment operator."
 		);
 	else if (!isSupportedType(_assignment.annotation().type->category()))
+	{
 		m_errorReporter.warning(
 			_assignment.location(),
 			"Assertion checker does not yet implement type " + _assignment.annotation().type->toString()
 		);
+		// Give it a new index anyway to keep the SSA scheme sound.
+		if (auto varDecl = identifierToVariable(_assignment.leftHandSide()))
+			newValue(*varDecl);
+	}
 	else
 	{
 		vector<smt::Expression> rightArguments;
 		if (_assignment.rightHandSide().annotation().type->category() == Type::Category::Tuple)
 		{
-			auto const& symbTuple = dynamic_pointer_cast<SymbolicTupleVariable>(m_expressions[&_assignment.rightHandSide()]);
+			auto symbTuple = dynamic_pointer_cast<SymbolicTupleVariable>(m_expressions[&_assignment.rightHandSide()]);
 			solAssert(symbTuple, "");
 			for (auto const& component: symbTuple->components())
 			{
@@ -546,6 +565,30 @@ void SMTChecker::endVisit(UnaryOperation const& _op)
 			);
 		break;
 	}
+	case Token::Delete:
+	{
+		auto const& subExpr = _op.subExpression();
+		if (auto decl = identifierToVariable(subExpr))
+		{
+			newValue(*decl);
+			setZeroValue(*decl);
+		}
+		else
+		{
+			solAssert(knownExpr(subExpr), "");
+			auto const& symbVar = m_expressions[&subExpr];
+			symbVar->increaseIndex();
+			setZeroValue(*symbVar);
+			if (dynamic_cast<IndexAccess const*>(&_op.subExpression()))
+				arrayIndexAssignment(_op.subExpression(), symbVar->currentValue());
+			else
+				m_errorReporter.warning(
+					_op.location(),
+					"Assertion checker does not yet implement \"delete\" for this expression."
+				);
+		}
+		break;
+	}
 	default:
 		m_errorReporter.warning(
 			_op.location(),
@@ -622,10 +665,6 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 		visitGasLeft(_funCall);
 		break;
 	case FunctionType::Kind::Internal:
-		pushCallStack(&_funCall);
-		inlineFunctionCall(_funCall);
-		popCallStack();
-		break;
 	case FunctionType::Kind::External:
 	case FunctionType::Kind::DelegateCall:
 	case FunctionType::Kind::BareCall:
@@ -633,9 +672,7 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 	case FunctionType::Kind::BareDelegateCall:
 	case FunctionType::Kind::BareStaticCall:
 	case FunctionType::Kind::Creation:
-		m_externalFunctionCallHappened = true;
-		resetStateVariables();
-		resetStorageReferences();
+		internalOrExternalFunctionCall(_funCall);
 		break;
 	case FunctionType::Kind::KECCAK256:
 	case FunctionType::Kind::ECRecover:
@@ -651,7 +688,7 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 	{
 		auto const& memberAccess = dynamic_cast<MemberAccess const&>(_funCall.expression());
 		auto const& address = memberAccess.expression();
-		auto const& value = args.at(0);
+		auto const& value = args.front();
 		solAssert(value, "");
 
 		smt::Expression thisBalance = m_context.balance();
@@ -712,10 +749,8 @@ void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
 			_funCall.location(),
 			"Assertion checker does not yet implement this type of function call."
 		);
-		return;
 	}
-
-	if (visitedFunction(funDef))
+	else if (visitedFunction(funDef))
 		m_errorReporter.warning(
 			_funCall.location(),
 			"Assertion checker does not support recursive function calls.",
@@ -739,7 +774,12 @@ void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
 			funArgs.push_back(expr(*arg));
 		initializeFunctionCallParameters(*funDef, funArgs);
 
+		// The reason why we need to pushCallStack here instead of visit(FunctionDefinition)
+		// is that there we don't have `_funCall`.
+		pushCallStack({funDef, &_funCall});
 		funDef->accept(*this);
+		// The callstack entry is popped only in endVisit(FunctionDefinition) instead of here
+		// as well to avoid code duplication (not all entries are from inlined function calls).
 
 		createExpr(_funCall);
 		auto const& returnParams = funDef->returnParameters();
@@ -757,6 +797,25 @@ void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
 		}
 		else if (returnParams.size() == 1)
 			defineExpr(_funCall, currentValue(*returnParams.front()));
+	}
+}
+
+void SMTChecker::internalOrExternalFunctionCall(FunctionCall const& _funCall)
+{
+	auto funDef = inlinedFunctionCallToDefinition(_funCall);
+	auto const& funType = dynamic_cast<FunctionType const&>(*_funCall.expression().annotation().type);
+	if (funDef)
+		inlineFunctionCall(_funCall);
+	else if (funType.kind() == FunctionType::Kind::Internal)
+		m_errorReporter.warning(
+			_funCall.location(),
+			"Assertion checker does not yet implement this type of function call."
+		);
+	else
+	{
+		m_externalFunctionCallHappened = true;
+		resetStateVariables();
+		resetStorageReferences();
 	}
 }
 
@@ -802,7 +861,7 @@ void SMTChecker::visitTypeConversion(FunctionCall const& _funCall)
 {
 	solAssert(_funCall.annotation().kind == FunctionCallKind::TypeConversion, "");
 	solAssert(_funCall.arguments().size() == 1, "");
-	auto argument = _funCall.arguments().at(0);
+	auto argument = _funCall.arguments().front();
 	unsigned argSize = argument->annotation().type->storageBytes();
 	unsigned castSize = _funCall.annotation().type->storageBytes();
 	if (argSize == castSize)
@@ -876,7 +935,7 @@ void SMTChecker::endVisit(Return const& _return)
 {
 	if (_return.expression() && knownExpr(*_return.expression()))
 	{
-		auto returnParams = m_functionPath.back()->returnParameters();
+		auto returnParams = m_callStack.back().first->returnParameters();
 		if (returnParams.size() > 1)
 		{
 			auto tuple = dynamic_cast<TupleExpression const*>(_return.expression());
@@ -1379,7 +1438,7 @@ void SMTChecker::checkCondition(
 
 	vector<smt::Expression> expressionsToEvaluate;
 	vector<string> expressionNames;
-	if (m_functionPath.size())
+	if (m_callStack.size())
 	{
 		solAssert(m_scanner, "");
 		if (_additionalValue)
@@ -1447,7 +1506,7 @@ void SMTChecker::checkCondition(
 	{
 		std::ostringstream message;
 		message << _description << " happens here";
-		if (m_functionPath.size())
+		if (m_callStack.size())
 		{
 			std::ostringstream modelMessage;
 			modelMessage << "  for:\n";
@@ -1672,7 +1731,11 @@ TypePointer SMTChecker::typeWithoutPointer(TypePointer const& _type)
 
 void SMTChecker::mergeVariables(set<VariableDeclaration const*> const& _variables, smt::Expression const& _condition, VariableIndices const& _indicesEndTrue, VariableIndices const& _indicesEndFalse)
 {
-	for (auto const* decl: _variables)
+	auto cmp = [] (VariableDeclaration const* var1, VariableDeclaration const* var2) {
+		return var1->id() < var2->id();
+	};
+	set<VariableDeclaration const*, decltype(cmp)> sortedVars(begin(_variables), end(_variables), cmp);
+	for (auto const* decl: sortedVars)
 	{
 		solAssert(_indicesEndTrue.count(decl) && _indicesEndFalse.count(decl), "");
 		int trueIndex = _indicesEndTrue.at(decl);
@@ -1816,25 +1879,27 @@ smt::Expression SMTChecker::currentPathConditions()
 SecondarySourceLocation SMTChecker::currentCallStack()
 {
 	SecondarySourceLocation callStackLocation;
-	if (m_callStack.empty())
-		return callStackLocation;
+	solAssert(!m_callStack.empty(), "");
 	callStackLocation.append("Callstack: ", SourceLocation());
 	for (auto const& call: m_callStack | boost::adaptors::reversed)
-		callStackLocation.append("", call->location());
+		if (call.second)
+			callStackLocation.append("", call.second->location());
+	// The first function in the tx has no FunctionCall.
+	solAssert(m_callStack.front().second == nullptr, "");
 	return callStackLocation;
 }
 
-ASTNode const* SMTChecker::popCallStack()
+pair<CallableDeclaration const*, ASTNode const*> SMTChecker::popCallStack()
 {
 	solAssert(!m_callStack.empty(), "");
-	ASTNode const* lastCalled = m_callStack.back();
+	auto lastCalled = m_callStack.back();
 	m_callStack.pop_back();
 	return lastCalled;
 }
 
-void SMTChecker::pushCallStack(ASTNode const* _node)
+void SMTChecker::pushCallStack(CallStackEntry _entry)
 {
-	m_callStack.push_back(_node);
+	m_callStack.push_back(_entry);
 }
 
 void SMTChecker::addPathConjoinedExpression(smt::Expression const& _e)
@@ -1849,12 +1914,15 @@ void SMTChecker::addPathImpliedExpression(smt::Expression const& _e)
 
 bool SMTChecker::isRootFunction()
 {
-	return m_functionPath.size() == 1;
+	return m_callStack.size() == 1;
 }
 
 bool SMTChecker::visitedFunction(FunctionDefinition const* _funDef)
 {
-	return contains(m_functionPath, _funDef);
+	for (auto const& call: m_callStack)
+		if (call.first == _funDef)
+			return true;
+	return false;
 }
 
 SMTChecker::VariableIndices SMTChecker::copyVariableIndices()
@@ -1877,7 +1945,21 @@ FunctionDefinition const* SMTChecker::inlinedFunctionCallToDefinition(FunctionCa
 		return nullptr;
 
 	FunctionType const& funType = dynamic_cast<FunctionType const&>(*_funCall.expression().annotation().type);
-	if (funType.kind() != FunctionType::Kind::Internal)
+	if (funType.kind() == FunctionType::Kind::External)
+	{
+		auto memberAccess = dynamic_cast<MemberAccess const*>(&_funCall.expression());
+		auto identifier = memberAccess ?
+			dynamic_cast<Identifier const*>(&memberAccess->expression()) :
+			nullptr;
+		if (!(
+			identifier &&
+			identifier->name() == "this" &&
+			identifier->annotation().referencedDeclaration &&
+			dynamic_cast<MagicVariableDeclaration const*>(identifier->annotation().referencedDeclaration)
+		))
+			return nullptr;
+	}
+	else if (funType.kind() != FunctionType::Kind::Internal)
 		return nullptr;
 
 	FunctionDefinition const* funDef = nullptr;
@@ -1902,8 +1984,11 @@ FunctionDefinition const* SMTChecker::inlinedFunctionCallToDefinition(FunctionCa
 
 set<VariableDeclaration const*> SMTChecker::touchedVariables(ASTNode const& _node)
 {
-	solAssert(!m_functionPath.empty(), "");
-	return m_variableUsage.touchedVariables(_node, m_functionPath);
+	solAssert(!m_callStack.empty(), "");
+	vector<CallableDeclaration const*> callStack;
+	for (auto const& call: m_callStack)
+		callStack.push_back(call.first);
+	return m_variableUsage.touchedVariables(_node, callStack);
 }
 
 VariableDeclaration const* SMTChecker::identifierToVariable(Expression const& _expr)

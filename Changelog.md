@@ -6,13 +6,18 @@ Language Features:
 
 Compiler Features:
  * SMTChecker: Support inherited state variables.
- * SMTChecker: Support tuple assignments and function calls with multiple return values.
+ * SMTChecker: Support tuples and function calls with multiple return values.
+ * SMTChecker: Support ``delete``.
+ * SMTChecker: Inline external function calls to ``this``.
+ * Assembler: Encode the compiler version in the deployed bytecode.
 
 
 Bugfixes:
  * SMTChecker: Fix bad cast in base constructor modifier.
  * SMTChecker: Fix internal error when visiting state variable inherited from base class.
  * SMTChecker: Fix internal error in fixed point operations.
+ * SMTChecker: Fix internal error in assignment to unsupported type.
+ * SMTChecker: Fix internal error in branching when inlining function calls that modify local variables.
 
 
 
