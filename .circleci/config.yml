@@ -12,7 +12,6 @@ defaults:
   - run_build: &run_build
       name: Build
       command: |
-        echo $CMAKE_OPTIONS
         mkdir -p build
         cd build
         [ -n "$COVERAGE" -a "$CIRCLE_BRANCH" != release -a -z "$CIRCLE_TAG" ] && CMAKE_OPTIONS="$CMAKE_OPTIONS -DCOVERAGE=ON"
@@ -173,8 +172,9 @@ jobs:
             apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
             echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
-            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libcvc4-dev libjsoncpp-dev=1.7.4-\*
+            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libcvc4-dev cvc4 libjsoncpp-dev=1.7.4-\*
             apt-get -qy install mono-complete
+            # Set-up Boogie (TODO: use dotnet tool)
             pushd .
             git clone https://github.com/dddejan/boogie.git
             cd boogie
@@ -183,6 +183,7 @@ jobs:
             mono ./nuget.exe restore Source/Boogie.sln
             xbuild Source/Boogie.sln
             popd
+            # Set CMAKE options, TODO: try to do it in the environment variable
             echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV 
       - run: *setup_prerelease_commit_hash
       - run: *run_build
@@ -351,6 +352,44 @@ jobs:
           path: test_results/
           destination: test_results/
 
+  test_x86_linux_solcverify:
+    docker:
+      - image: buildpack-deps:bionic
+    environment:
+      TERM: xterm
+    steps:
+      - checkout
+      - attach_workspace:
+          at: build
+      - run:
+          name: Install dependencies
+          command: |
+            apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+            echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
+            apt-get -qq update
+            apt-get -qy install cvc4 python3 python3-pip
+            pip3 install psutil
+            apt-get -qy install mono-complete
+            # Set-up Boogie (TODO: use dotnet tool, TODO: do only once for build/test)
+            pushd .
+            git clone https://github.com/dddejan/boogie.git
+            cd boogie
+            mozroots --import --sync
+            wget https://nuget.org/nuget.exe
+            mono ./nuget.exe restore Source/Boogie.sln
+            xbuild Source/Boogie.sln
+            popd
+      - run: mkdir -p test_results
+      - run:
+          name: Test solc-verify
+          command: |
+            ./test/solc-verify/tests.sh
+      - store_test_results:
+          path: test_results/
+      - store_artifacts:
+          path: test_results/
+          destination: test_results/
+
   test_x86_clang7_asan:
     docker:
       - image: buildpack-deps:cosmic
@@ -500,46 +539,50 @@ workflows:
   version: 2
   build_all:
     jobs:
-      - test_check_spelling: *build_on_tags
-      - test_check_style: *build_on_tags
-      - test_buglist: *build_on_tags
-      - build_emscripten: *build_on_tags
-      - test_emscripten_solcjs:
-          <<: *build_on_tags
-          requires:
-            - build_emscripten
-      - test_emscripten_external_zeppelin:
-          <<: *build_on_tags
-          requires:
-            - build_emscripten
-      - test_emscripten_external_gnosis:
-          <<: *build_on_tags
-          requires:
-            - build_emscripten
-      - build_x86_linux: *build_on_tags
+      #- test_check_spelling: *build_on_tags
+      #- test_check_style: *build_on_tags
+      #- test_buglist: *build_on_tags
+      #- build_emscripten: *build_on_tags
+      #- test_emscripten_solcjs:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_emscripten
+      #- test_emscripten_external_zeppelin:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_emscripten
+      #- test_emscripten_external_gnosis:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_emscripten
+      #- build_x86_linux: *build_on_tags
       - build_x86_linux_solcverify: *build_on_tags
-      - build_x86_linux_cxx17: *build_on_tags
-      - build_x86_clang7_asan: *build_on_tags
-      - build_x86_mac: *build_on_tags
-      - test_x86_linux:
+      #- build_x86_linux_cxx17: *build_on_tags
+      #- build_x86_clang7_asan: *build_on_tags
+      #- build_x86_mac: *build_on_tags
+      - test_x86_linux_solcverify:
           <<: *build_on_tags
           requires:
-            - build_x86_linux
-      - test_x86_clang7_asan:
-          <<: *build_on_tags
-          requires:
-            - build_x86_clang7_asan
-      - test_x86_mac:
-          <<: *build_on_tags
-          requires:
-            - build_x86_mac
-      - docs: *build_on_tags
-      - build_x86_archlinux: *build_on_tags
-      - test_x86_archlinux:
-          <<: *build_on_tags
-          requires:
-            - build_x86_archlinux
-      - build_x86_linux_ossfuzz: *build_on_tags
+            - build_x86_linux_solcverify
+      #- test_x86_linux:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_x86_linux
+      #- test_x86_clang7_asan:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_x86_clang7_asan
+      #- test_x86_mac:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_x86_mac
+      #- docs: *build_on_tags
+      #- build_x86_archlinux: *build_on_tags
+      #- test_x86_archlinux:
+      #    <<: *build_on_tags
+      #    requires:
+      #      - build_x86_archlinux
+      #- build_x86_linux_ossfuzz: *build_on_tags
 
   test_nightly:
     triggers:
