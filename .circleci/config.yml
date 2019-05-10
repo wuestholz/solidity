@@ -352,7 +352,7 @@ jobs:
           path: test_results/
           destination: test_results/
 
-  test_x86_linux_solcverify:
+  test_x86_linux_solcverify_boogie:
     docker:
       - image: buildpack-deps:bionic
     environment:
@@ -379,16 +379,9 @@ jobs:
             mono ./nuget.exe restore Source/Boogie.sln
             xbuild Source/Boogie.sln
             popd
-      - run: mkdir -p test_results
       - run:
-          name: Test solc-verify
-          command: |
-            ./test/solc-verify/tests.sh
-      - store_test_results:
-          path: test_results/
-      - store_artifacts:
-          path: test_results/
-          destination: test_results/
+          name: Test solc-verify with Boogie
+          command: ./test/solc-verify/test_with_boogie.sh
 
   test_x86_clang7_asan:
     docker:
@@ -560,7 +553,7 @@ workflows:
       #- build_x86_linux_cxx17: *build_on_tags
       #- build_x86_clang7_asan: *build_on_tags
       #- build_x86_mac: *build_on_tags
-      - test_x86_linux_solcverify:
+      - test_x86_linux_solcverify_boogie:
           <<: *build_on_tags
           requires:
             - build_x86_linux_solcverify

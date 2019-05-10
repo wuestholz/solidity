@@ -114,19 +114,6 @@ for filename in $SOLCVERIFY_TESTS/*.sol; do
 	solcverify_check "$filename" "$flags" "$filename.gold" 
 done
 
-# Run truffle tests
-TRUFFLE_SCRIPT=$SOLCVERIFY_TESTS/test_with_truffle.sh
-(time $TRUFFLE_SCRIPT >& $OUT_PATH) >& $TIME_PATH
-if [ $? -ne 0 ]
-then
-    elapsed=$(cat $TIME_PATH)
-    log=`cat $OUT_PATH`
-    reportError "$TRUFFLE_SCRIPT" "$elapsed" "$log"
-else
-    elapsed=$(cat $TIME_PATH)   
-    reportSuccess "$TRUFFLE_SCRIPT" "$elapsed"
-fi
-
 # Remove temps
 rm -f $OUT_PATH $TIME_PATH 
 
