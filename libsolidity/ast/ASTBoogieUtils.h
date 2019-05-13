@@ -93,6 +93,9 @@ public:
 	static
 	std::string getConstructorName(ContractDefinition const* contract);
 
+	static
+	std::string getStructAddressType(StructDefinition const* structDef);
+
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */

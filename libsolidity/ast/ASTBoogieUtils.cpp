@@ -304,6 +304,11 @@ std::string ASTBoogieUtils::getConstructorName(ContractDefinition const* contrac
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
 }
 
+std::string ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef)
+{
+	return BOOGIE_ADDRESS_TYPE + "_" + structDef->name() + "#" + toString(structDef->id());
+}
+
 string ASTBoogieUtils::boogieBVType(unsigned n) {
 	return "bv" + to_string(n);
 }
@@ -355,6 +360,11 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 	case Type::Category::Tuple:
 		context.reportError(_associatedNode, "Tuples are not supported");
 		break;
+	case Type::Category::Struct:
+	{
+		auto structTp = dynamic_cast<StructType const*>(tp);
+		return getStructAddressType(&structTp->structDefinition());
+	}
 	default: {
 		std::string tpStr = tp->toString();
 		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
