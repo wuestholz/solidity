@@ -411,60 +411,12 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 	return false;
 }
-
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
-	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
-
 	// Check for conversions
 	if (_node.annotation().kind == FunctionCallKind::TypeConversion)
 	{
-		solAssert(_node.arguments().size() == 1, "Type conversion should have exactly one argument");
-		auto arg = _node.arguments()[0];
-		// Converting to address
-		if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
-		{
-			if (expr->typeName().token() == Token::Address)
-			{
-				arg->accept(*this);
-				if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
-				{
-					if (lit->getVal() == 0)
-						m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
-					else
-						m_context.reportError(&_node, "Unsupported conversion to address");
-				}
-				return false;
-			}
-		}
-		// Converting to other kind of contract
-		if (auto expr = dynamic_cast<Identifier const*>(&_node.expression()))
-		{
-			if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
-			{
-				arg->accept(*this);
-				return false;
-			}
-		}
-		string targetType = ASTBoogieUtils::mapType(_node.annotation().type, &_node, m_context);
-		string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, arg.get(), m_context);
-		// Nothing to do when the two types are mapped to same type in Boogie,
-		// e.g., conversion from uint256 to int256 if both are mapped to int
-		if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
-		{
-			arg->accept(*this);
-			return false;
-		}
-
-		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
-		{
-			arg->accept(*this);
-			m_currentExpr = ASTBoogieUtils::checkExplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
-			return false;
-		}
-
-		m_context.reportError(&_node, "Unsupported type conversion");
-		m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+		functionCallConversion(_node);
 		return false;
 	}
 	// Function calls in Boogie are statements and cannot be part of
@@ -498,6 +450,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			m_currentMsgValue = m_currentExpr;
 			if (m_context.isBvEncoding())
 			{
+				TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 				m_currentMsgValue = ASTBoogieUtils::checkImplicitBvConversion(m_currentMsgValue,
 						arg->annotation().type, tp_uint256, m_context);
 			}
@@ -530,7 +483,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// 'm_currentExpr' should be an identifier, giving the name of the function
 	string funcName;
 	if (auto varExpr = dynamic_pointer_cast<bg::VarExpr const>(m_currentExpr))
+	{
 		funcName = varExpr->name();
+	}
 	else
 	{
 		m_context.reportError(&_node, "Only identifiers are supported as function calls");
@@ -538,19 +493,22 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	if (m_isGetter && _node.arguments().size() > 0)
+	{
 		m_context.reportError(&_node, "Getter arguments are not supported");
+	}
 
 	// Process arguments recursively
-	vector<Expr::Ref> args;
+	vector<Expr::Ref> allArgs;
+	vector<Expr::Ref> regularArgs;
 	// First, pass extra arguments
-	if (m_isLibraryCall) { args.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
-	else { args.push_back(m_currentAddress); } // this
-	args.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
+	if (m_isLibraryCall) { allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
+	else { allArgs.push_back(m_currentAddress); } // this
+	allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	Expr::Ref defaultMsgValue = (m_context.isBvEncoding() ?
 			Expr::lit(bg::bigint(0), 256) : Expr::lit(bg::bigint(0)));
 	Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
-	args.push_back(msgValue); // msg.value
-	if (m_isLibraryCall && !m_isLibraryCallStatic) { args.push_back(m_currentAddress); } // Non-static library calls require extra argument
+	allArgs.push_back(msgValue); // msg.value
+	if (m_isLibraryCall && !m_isLibraryCallStatic) { allArgs.push_back(m_currentAddress); } // Non-static library calls require extra argument
 
 	for (unsigned i = 0; i < _node.arguments().size(); ++i)
 	{
@@ -579,10 +537,14 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Do not add argument for call
 		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
 		{
-			args.push_back(m_currentExpr);
+			allArgs.push_back(m_currentExpr);
+			regularArgs.push_back(m_currentExpr);
 			// Array length
 			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)
-				args.push_back(getArrayLength(m_currentExpr, *arg));
+			{
+				allArgs.push_back(getArrayLength(m_currentExpr, *arg));
+				regularArgs.push_back(getArrayLength(m_currentExpr, *arg));
+			}
 		}
 	}
 
@@ -597,9 +559,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_sourceLocation(_node.location()));
 
 		// Parameter of assert is the first (and only) normal argument
-		vector<Expr::Ref>::iterator it = args.begin();
-		std::advance(it, args.size() - _node.arguments().size());
-		addSideEffect(Stmt::assert_(*it, ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
+		addSideEffect(Stmt::assert_(regularArgs[0], ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
 		return false;
 	}
 
@@ -612,9 +572,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 							errinfo_sourceLocation(_node.location()));
 
 		// Parameter of assume is the first normal argument (second is optional message omitted in Boogie)
-		vector<Expr::Ref>::iterator it = args.begin();
-		std::advance(it, args.size() - _node.arguments().size());
-		addSideEffect(Stmt::assume(*it));
+		addSideEffect(Stmt::assume(regularArgs[0]));
 		return false;
 	}
 
@@ -666,60 +624,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression())) {
 		if (auto structDef = dynamic_cast<StructDefinition const *>(exprId->annotation().referencedDeclaration))
 		{
-			// Address of the new struct
-			auto varName = "new_struct#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::getStructAddressType(structDef);
-			auto varDecl = bg::Decl::variable(varName, varType);
-			m_newDecls.push_back(varDecl);
-
-			int shiftArgs = args.size() - _node.arguments().size();
-
-			// Initialize each member
-			for (size_t i = 0; i < structDef->members().size(); ++i)
-			{
-				auto member = bg::Expr::id(ASTBoogieUtils::mapDeclName(*structDef->members()[i]));
-				auto init = bg::Expr::upd(
-						member,
-						bg::Expr::id(varDecl->getName()),
-						args[i + shiftArgs]
-				);
-				m_newStatements.push_back(bg::Stmt::assign(member, init));
-			}
-			// Return the address
-			m_currentExpr = bg::Expr::id(varDecl->getName());
+			functionCallNewStruct(_node, structDef, regularArgs);
 			return false;
 		}
 	}
 
 	// If msg.value was set, we should reduce our own balance (and the called function will increase its own)
-	if (msgValue != defaultMsgValue)
-	{
-		// assert(balance[this] >= msg.value)
-		auto selExpr = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-		auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
-		addSideEffect(Stmt::comment("Implicit assumption that we have enough ether"));
-		addSideEffect(Stmt::assume(geqResult.expr));
-		// balance[this] -= msg.value
-		Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-		if (m_context.encoding() == BoogieContext::Encoding::MOD)
-		{
-			addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
-			addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
-		}
-		auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
-												this_balance, msgValue, 256, false);
-		if (m_context.overflow())
-		{
-			addSideEffect(Stmt::comment("Implicit assumption that balances cannot overflow"));
-			addSideEffect(Stmt::assume(subResult.cc));
-		}
-		addSideEffect(Stmt::assign(
-				Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-				Expr::upd(
-						Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-						Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-						subResult.expr)));
-	}
+	if (msgValue != defaultMsgValue) functionCallReduceBalance(msgValue);
 
 	// External calls require the invariants to hold
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
@@ -777,7 +688,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Assign call to the fresh variable
 		addSideEffects({
 		  Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())),
-		  Stmt::call(funcName, args, returnVarNames)
+		  Stmt::call(funcName, allArgs, returnVarNames)
 		});
 
 		// Result is the none, single variable, or a tuple of variables
@@ -809,41 +720,133 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// we must undo reducing our balance
 		if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
 		{
-			bg::Block::Ref revert = bg::Block::block();
-			// balance[this] += msg.value
-			Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
-			if (m_context.encoding() == BoogieContext::Encoding::MOD)
-			{
-				revert->addStmts({
-					Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
-					Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256))
-				});
-			}
-			auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
-														this_balance, msgValue, 256, false);
-			if (m_context.overflow())
-			{
-				revert->addStmts({
-					Stmt::comment("Implicit assumption that balances cannot overflow"),
-					Stmt::assume(addResult.cc)
-				});
-			}
-			revert->addStmt(Stmt::assign(
-					Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-					Expr::upd(
-							Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-							Expr::id(ASTBoogieUtils::BOOGIE_THIS),
-							addResult.expr)));
-
-			// Final statement for balance update in case of failure. Return value of call
-			// is always a tuple (ok, data).
-			auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
-			solAssert(okDataTuple, "");
-			addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));
+			functionCallRevertBalance(msgValue);
 		}
 	}
 
 	return false;
+}
+
+void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _node)
+{
+	solAssert(_node.arguments().size() == 1, "Type conversion should have exactly one argument");
+	auto arg = _node.arguments()[0];
+	// Converting to address
+	if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
+	{
+		if (expr->typeName().token() == Token::Address)
+		{
+			arg->accept(*this);
+			if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
+			{
+				if (lit->getVal() == 0)
+					m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
+				else
+					m_context.reportError(&_node, "Unsupported conversion to address");
+			}
+			return;
+		}
+	}
+	// Converting to other kind of contract
+	if (auto expr = dynamic_cast<Identifier const*>(&_node.expression()))
+	{
+		if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
+		{
+			arg->accept(*this);
+			return;
+		}
+	}
+	string targetType = ASTBoogieUtils::mapType(_node.annotation().type, &_node, m_context);
+	string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, arg.get(), m_context);
+	// Nothing to do when the two types are mapped to same type in Boogie,
+	// e.g., conversion from uint256 to int256 if both are mapped to int
+	if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
+	{
+		arg->accept(*this);
+		return;
+	}
+
+	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
+	{
+		arg->accept(*this);
+		m_currentExpr = ASTBoogieUtils::checkExplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
+		return;
+	}
+
+	m_context.reportError(&_node, "Unsupported type conversion");
+	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+}
+
+void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _node,
+        const StructDefinition* structDef, const vector<Expr::Ref>& args) {
+	// Address of the new struct
+	// TODO: make sure that it is a new address
+	auto varName = "new_struct#" + to_string(_node.id());
+	auto varType = ASTBoogieUtils::getStructAddressType(structDef);
+	auto varDecl = bg::Decl::variable(varName, varType);
+	m_newDecls.push_back(varDecl);
+	// Initialize each member
+	for (size_t i = 0; i < structDef->members().size(); ++i) {
+		auto member = bg::Expr::id(ASTBoogieUtils::mapDeclName(*structDef->members()[i]));
+		auto init = bg::Expr::upd(member, bg::Expr::id(varDecl->getName()), args[i]);
+		m_newStatements.push_back(bg::Stmt::assign(member, init));
+	}
+	// Return the address
+	m_currentExpr = bg::Expr::id(varDecl->getName());
+}
+
+void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue) {
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+	// assert(balance[this] >= msg.value)
+	auto selExpr = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
+	auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr,
+	        langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
+	addSideEffect(Stmt::comment("Implicit assumption that we have enough ether"));
+	addSideEffect(Stmt::assume(geqResult.expr));
+	// balance[this] -= msg.value
+	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
+	        ASTBoogieUtils::BOOGIE_THIS);
+	if (m_context.encoding() == BoogieContext::Encoding::MOD) {
+		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
+		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
+	}
+	auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
+	        this_balance, msgValue, 256, false);
+	if (m_context.overflow()) {
+		addSideEffect(Stmt::comment("Implicit assumption that balances cannot overflow"));
+		addSideEffect(Stmt::assume(subResult.cc));
+	}
+	addSideEffect(
+	        Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+	                Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), subResult.expr)));
+}
+
+void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue) {
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+	bg::Block::Ref revert = bg::Block::block();
+	// balance[this] += msg.value
+	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
+	        ASTBoogieUtils::BOOGIE_THIS);
+	if (m_context.encoding() == BoogieContext::Encoding::MOD) {
+		revert->addStmts( { Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
+		        Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)) });
+	}
+	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
+	        this_balance, msgValue, 256, false);
+	if (m_context.overflow()) {
+		revert->addStmts( { Stmt::comment("Implicit assumption that balances cannot overflow"),
+		        Stmt::assume(addResult.cc) });
+	}
+	revert->addStmt(
+	        Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+	                Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), addResult.expr)));
+	// Final statement for balance update in case of failure. Return value of call
+	// is always a tuple (ok, data).
+	auto okDataTuple = dynamic_pointer_cast<const TupleExpr>(m_currentExpr);
+	solAssert(okDataTuple, "");
+	addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));
 }
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
