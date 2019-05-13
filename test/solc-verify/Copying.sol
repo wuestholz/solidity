@@ -1,5 +1,17 @@
 pragma solidity >=0.5.0;
 
+
+/*
+                          RHS
+
+                Storage   Memory   Local st
+               ----------------------------
+      Storage | Deep      Deep     Deep
+              |
+LHS    Memory | Deep      Ref      Deep
+              |
+     Local st | Ref       Error    Ref
+*/
 contract Copying {
     struct S {
         int x;
