@@ -662,6 +662,35 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
+	// Struct initialization
+	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression())) {
+		if (auto structDef = dynamic_cast<StructDefinition const *>(exprId->annotation().referencedDeclaration))
+		{
+			// Address of the new struct
+			auto varName = "new_struct#" + to_string(_node.id());
+			auto varType = ASTBoogieUtils::getStructAddressType(structDef);
+			auto varDecl = bg::Decl::variable(varName, varType);
+			m_newDecls.push_back(varDecl);
+
+			int shiftArgs = args.size() - _node.arguments().size();
+
+			// Initialize each member
+			for (size_t i = 0; i < structDef->members().size(); ++i)
+			{
+				auto member = bg::Expr::id(ASTBoogieUtils::mapDeclName(*structDef->members()[i]));
+				auto init = bg::Expr::upd(
+						member,
+						bg::Expr::id(varDecl->getName()),
+						args[i + shiftArgs]
+				);
+				m_newStatements.push_back(bg::Stmt::assign(member, init));
+			}
+			// Return the address
+			m_currentExpr = bg::Expr::id(varDecl->getName());
+			return false;
+		}
+	}
+
 	// If msg.value was set, we should reduce our own balance (and the called function will increase its own)
 	if (msgValue != defaultMsgValue)
 	{
