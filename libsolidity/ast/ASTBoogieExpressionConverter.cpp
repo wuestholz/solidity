@@ -960,6 +960,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 	}
 
+	// Member access on structures: create selector expression
+	if (typeCategory == Type::Category::Struct) {
+		m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
+	}
+
 	return false;
 }
 
