@@ -18,7 +18,7 @@ contract StructsNestedAccess {
 
     mapping(address=>S) ss;
 
-    function () external {
+    function() external payable {
         ss[msg.sender].x = 1;
         ss[msg.sender].y = true;
         ss[msg.sender].t.z = 2;

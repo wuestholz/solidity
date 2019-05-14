@@ -11,7 +11,7 @@ contract StructsMem {
         int z;
     }
 
-    function () external {
+    function() external payable {
         T memory tm = T(2);
         S memory sm = S(1, true, tm);
         assert(sm.t.z == 2);
