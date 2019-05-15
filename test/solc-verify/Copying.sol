@@ -17,6 +17,10 @@ contract Copying {
         int x;
     }
 
+    struct T {
+        S s;
+    }
+
     S s1;
     S s2;
 
@@ -119,6 +123,15 @@ contract Copying {
         assert(sm.x == 1);
     }
 
+    function nestedMemToMem() public {
+        T memory t1 = T(S(1));
+        T memory t2 = t1;
+
+        t2.s.x = 2;
+
+        assert(t1.s.x == 2);
+    }
+
     function() external payable {
         storToStor();
         storToMem();
@@ -129,6 +142,7 @@ contract Copying {
         locToLoc();
         locToStor();
         locToMem();
+        nestedMemToMem();
     }
 
 }

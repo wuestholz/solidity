@@ -60,8 +60,8 @@ const string ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
 const string ASTBoogieUtils::ERR_EXPR = "__ERROR";
 
-const string ASTBoogieUtils::BOOGIE_STOR = "STOR_LOC";
-const string ASTBoogieUtils::BOOGIE_MEM = "MEM_LOC";
+const string ASTBoogieUtils::BOOGIE_STOR = "stor";
+const string ASTBoogieUtils::BOOGIE_MEM = "mem";
 
 ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
@@ -329,7 +329,7 @@ string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 
 string ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, DataLocation loc)
 {
-	return BOOGIE_ADDRESS_TYPE + dataLocToStr(loc) + structDef->name() + "#" + toString(structDef->id());
+	return BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) + "_" + structDef->name() + "#" + toString(structDef->id());
 }
 
 string ASTBoogieUtils::boogieBVType(unsigned n) {

@@ -787,7 +787,7 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _no
 	m_newDecls.push_back(varDecl);
 	// Initialize each member
 	for (size_t i = 0; i < structDef->members().size(); ++i) {
-		auto member = bg::Expr::id(ASTBoogieUtils::mapDeclName(*structDef->members()[i]));
+		auto member = bg::Expr::id(ASTBoogieUtils::mapStructMemberName(*structDef->members()[i], DataLocation::Memory));
 		auto init = bg::Expr::upd(member, bg::Expr::id(varDecl->getName()), args[i]);
 		m_newStatements.push_back(bg::Stmt::assign(member, init));
 	}
@@ -994,6 +994,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 
 	// Member access on structures: create selector expression
 	if (typeCategory == Type::Category::Struct) {
+		auto structType = dynamic_cast<StructType const*>(&*type);
+		m_currentExpr = Expr::id(ASTBoogieUtils::mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
 		m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
 	}
 

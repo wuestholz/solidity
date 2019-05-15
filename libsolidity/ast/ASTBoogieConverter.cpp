@@ -469,6 +469,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
 	rememberScope(_node);
 
+	// First define memory/storage address types for the struct type
 	addGlobalComment("");
 	addGlobalComment("------- Struct: " + _node.name() + "-------");
 	string structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
@@ -476,15 +477,34 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structStorageType));
 	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structMemType));
 
+	// Create mappings for each member (both memory and storage)
 	for (auto member : _node.members())
 	{
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
+		auto memberType = member->type();
+		string memberTypeForMem, memberTypeForStor;
+		// Nested structures need separate types for the memory/storage member
+		if (member->type()->category() == Type::Category::Struct)
+		{
+			auto structTp = dynamic_cast<StructType const*>(memberType);
+			memberTypeForMem = ASTBoogieUtils::getStructAddressType(&structTp->structDefinition(), DataLocation::Memory);
+			memberTypeForStor = ASTBoogieUtils::getStructAddressType(&structTp->structDefinition(), DataLocation::Storage);
+		}
+		else // Other types are the same for both memory/storage
+		{
+			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::mapType(member->type(), &*member, m_context);
+		}
+		// TODO: arrays?
+
+		// Storage member
 		auto varDeclStor = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage),
-				"[" + structStorageType + "]" + ASTBoogieUtils::mapType(member->type(), &*member, m_context));
+				"[" + structStorageType + "]" + memberTypeForStor);
 		varDeclStor->addAttrs(attrs);
 		m_context.program().getDeclarations().push_back(varDeclStor);
+
+		// Memory member
 		auto varDeclMem = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Memory),
-				"[" + structMemType + "]" + ASTBoogieUtils::mapType(member->type(), &*member, m_context));
+				"[" + structMemType + "]" + memberTypeForMem);
 		varDeclMem->addAttrs(attrs);
 		m_context.program().getDeclarations().push_back(varDeclMem);
 	}
