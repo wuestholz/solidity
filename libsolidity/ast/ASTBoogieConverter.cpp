@@ -471,15 +471,22 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 
 	addGlobalComment("");
 	addGlobalComment("------- Struct: " + _node.name() + "-------");
-	string structType = ASTBoogieUtils::getStructAddressType(&_node);
-	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structType));
+	string structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
+	string structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
+	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structStorageType));
+	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structMemType));
 
 	for (auto member : _node.members())
 	{
-		auto varDecl = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*member),
-				"[" + structType + "]" + ASTBoogieUtils::mapType(member->type(), &*member, m_context));
-		varDecl->addAttrs(ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner()));
-		m_context.program().getDeclarations().push_back(varDecl);
+		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
+		auto varDeclStor = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage),
+				"[" + structStorageType + "]" + ASTBoogieUtils::mapType(member->type(), &*member, m_context));
+		varDeclStor->addAttrs(attrs);
+		m_context.program().getDeclarations().push_back(varDeclStor);
+		auto varDeclMem = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Memory),
+				"[" + structMemType + "]" + ASTBoogieUtils::mapType(member->type(), &*member, m_context));
+		varDeclMem->addAttrs(attrs);
+		m_context.program().getDeclarations().push_back(varDeclMem);
 	}
 
 	return false;

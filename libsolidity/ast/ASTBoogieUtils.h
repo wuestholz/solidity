@@ -66,6 +66,9 @@ public:
 	// Return this expression as an identifier when something cannot be evaluated
 	static const std::string ERR_EXPR;
 
+	static const std::string BOOGIE_STOR;
+	static const std::string BOOGIE_MEM;
+
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */
@@ -84,6 +87,9 @@ public:
 	static
 	boogie::ProcDeclRef createSendProc(BoogieContext& context);
 
+	static
+	std::string dataLocToStr(DataLocation loc);
+
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */
@@ -91,10 +97,13 @@ public:
 	std::string mapDeclName(Declaration const& decl);
 
 	static
+	std::string mapStructMemberName(Declaration const& decl, DataLocation loc);
+
+	static
 	std::string getConstructorName(ContractDefinition const* contract);
 
 	static
-	std::string getStructAddressType(StructDefinition const* structDef);
+	std::string getStructAddressType(StructDefinition const* structDef, DataLocation loc);
 
 	/**
 	 * Map a Solidity type to a Boogie type

@@ -782,7 +782,7 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _no
 	// Address of the new struct
 	// TODO: make sure that it is a new address
 	auto varName = "new_struct#" + to_string(_node.id());
-	auto varType = ASTBoogieUtils::getStructAddressType(structDef);
+	auto varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
 	auto varDecl = bg::Decl::variable(varName, varType);
 	m_newDecls.push_back(varDecl);
 	// Initialize each member
