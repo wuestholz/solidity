@@ -28,7 +28,7 @@ contract ArrayLayout {
     assert(m_a[0].x == m_a[1].x);
     
     m_a[0].x = 2;
-    // We change copies, so differenct
+    // We change copies, so different
     assert(m_a[0].x != m_a[1].x);
 
     S storage a0 = m_a[0];
@@ -38,7 +38,7 @@ contract ArrayLayout {
     assert(m_a[0].x == 2);
     assert(m_a[1].x == 3);
 
-    a = m_a; // Creates a new array and assignes m_a to it
+    a = m_a; // Creates a new array and assigns m_a to it
     assert(a[0].x == 2);
     assert(a[1].x == 3);
 
