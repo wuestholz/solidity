@@ -36,10 +36,12 @@ SOLCVERIFY="$REPO_ROOT/build/solc/solc-verify.py"
 RED=
 GREEN=
 BLACK=
+YELLOW=
 if test -t 1 ; then
   RED=$(tput setaf 1)
   GREEN=$(tput setaf 2)
   BLACK=$(tput sgr0)
+  YELLOW=$(tput setaf 3)
 fi
 
 # Time format
@@ -48,6 +50,7 @@ TIMEFORMAT="%U"
 ## Keep track of failed tests
 FAIL=0
 PASS=0
+UNKN=0
 FAILED_TESTS=()
 
 ## Success/fail printout
@@ -65,12 +68,20 @@ function reportError() {
 function reportSuccess() {
     test_name=$1
     elapsed=$2
-    message=$3
     echo -n "$test_name "
     echo -n $GREEN
     echo PASS [$elapsed s]
     echo -n $BLACK
     PASS=$((PASS+1))
+}
+function reportUnknown() {
+    test_name=$1
+    elapsed=$2
+    echo -n "$test_name "
+    echo -n $YELLOW
+    echo UNSPECIFIED [$elapsed s]
+    echo -n $BLACK
+    UNKN=$((UNKN+1))
 }
 
 # Temp files
@@ -93,12 +104,17 @@ function solcverify_check()
     elapsed=$(cat $TIME_PATH)
 
     # Check output
-    out_diff=$(diff -w $out_expected $OUT_PATH)
-    if [ $? -ne 0 ]
+    if [[ -s $out_expected ]]
     then
-        reportError "$test_string" "$elapsed" "$out_diff"
+        out_diff=$(diff -w $out_expected $OUT_PATH)
+        if [ $? -ne 0 ]
+        then
+            reportError "$test_string" "$elapsed" "$out_diff"
+        else
+            reportSuccess "$test_string" "$elapsed"
+        fi
     else
-        reportSuccess "$test_string" "$elapsed"
+        reportUnknown "$test_string" "$elapsed"
     fi
 }
 
@@ -125,4 +141,3 @@ else
 	for i in "${!FAILED_TESTS[@]}"; do echo "$((i+1)). ${FAILED_TESTS[$i]}"; done
     exit 1
 fi
-
