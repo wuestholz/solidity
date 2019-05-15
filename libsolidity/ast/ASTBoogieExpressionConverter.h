@@ -42,6 +42,9 @@ private:
 	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
 
+	// Helper method for deep copying between structures
+	void deepCopyStruct(StructDefinition const* structDef, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+
 	// Helper method to transform a select to an update
 	boogie::Expr::Ref selectToUpdate(std::shared_ptr<boogie::SelExpr const> sel, boogie::Expr::Ref value);
 

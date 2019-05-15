@@ -87,6 +87,9 @@ public:
 	static
 	boogie::ProcDeclRef createSendProc(BoogieContext& context);
 
+	/**
+	 * Data locations as strings
+	 */
 	static
 	std::string dataLocToStr(DataLocation loc);
 
@@ -96,12 +99,19 @@ public:
 	static
 	std::string mapDeclName(Declaration const& decl);
 
+	/**
+	 * Map a structure member with a given data location
+	 * to a name in Boogie
+	 */
 	static
 	std::string mapStructMemberName(Declaration const& decl, DataLocation loc);
 
 	static
 	std::string getConstructorName(ContractDefinition const* contract);
 
+	/**
+	 * Get address type for a struct with a given data location
+	 */
 	static
 	std::string getStructAddressType(StructDefinition const* structDef, DataLocation loc);
 

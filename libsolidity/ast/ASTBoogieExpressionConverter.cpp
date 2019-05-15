@@ -137,6 +137,58 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	Expr::Ref rhsExpr = m_currentExpr;
 
+	// Structs
+	if (lhsType->category() == Type::Category::Struct)
+	{
+		solAssert(rhsType->category() == Type::Category::Struct, "LHS is struct but RHS is not");
+		auto lhsStructType = dynamic_cast<StructType const*>(lhsType);
+		auto rhsStructType = dynamic_cast<StructType const*>(rhsType);
+		// LHS is memory
+		if (lhsStructType->location() == DataLocation::Memory)
+		{
+			// RHS is memory --> reference copy
+			if (rhsStructType->location() == DataLocation::Memory)
+			{
+				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
+				m_currentExpr = lhsExpr;
+				return false;
+			}
+			else
+			{
+				m_context.reportError(&_node, "Unsupported assignment to memory struct");
+				m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+				return false;
+			}
+		}
+		// LHS is storage
+		else if(lhsStructType->location() == DataLocation::Storage)
+		{
+			if (rhsStructType->location() == DataLocation::Storage)
+			{
+				// LHS is local storage --> reference copy
+				if (lhsStructType->isPointer())
+				{
+					createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
+					m_currentExpr = lhsExpr;
+					return false;
+				}
+				// LHS is storage --> deep copy
+				else
+				{
+					deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr);
+					m_currentExpr = lhsExpr;
+					return false;
+				}
+			}
+			else
+			{
+				m_context.reportError(&_node, "Unsupported assignment to storage struct");
+				m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+				return false;
+			}
+		}
+	}
+
 	// Bit-precise mode
 	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(lhsType))
 		// Check for implicit conversion
@@ -233,6 +285,34 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	}
 
 	m_context.reportError(&originalLhs, "Unsupported assignment (LHS must be identifier/indexer)");
+}
+
+void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* structDef, Expr::Ref lhsBase, Expr::Ref rhsBase)
+{
+	addSideEffect(Stmt::comment("Deep copy struct " + structDef->name()));
+	// Loop through each member
+	for (auto member : structDef->members())
+	{
+		// Get the mapping for the member
+		// TODO: currently assumes storage as only storage to storage deep copy is supported
+		Expr::Ref memberMapping = Expr::id(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage));
+		// Select the lhs and rhs from the mapping
+		auto lhsSel = dynamic_pointer_cast<SelExpr const>(Expr::sel(memberMapping, lhsBase));
+		auto rhsSel = Expr::sel(memberMapping, rhsBase);
+
+		// For nested structs do recursion
+		if (member->annotation().type->category() == Type::Category::Struct)
+		{
+			auto memberStructType = dynamic_cast<StructType const*>(member->annotation().type);
+			deepCopyStruct(&memberStructType->structDefinition(), lhsSel, rhsSel);
+		}
+		// For other types make the copy by updating the LHS with RHS
+		else
+		{
+			auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhsSel));
+			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+		}
+	}
 }
 
 Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(std::shared_ptr<bg::SelExpr const> sel, Expr::Ref value)
