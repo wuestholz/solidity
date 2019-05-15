@@ -1003,6 +1003,12 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
 	rememberScope(_node);
 
+	if (_node.isDoWhile())
+	{
+		m_context.reportError(&_node, "Do-while loops are not supported");
+		return false;
+	}
+
 	// Get condition recursively
 	boogie::Expr::Ref cond = convertExpression(_node.condition());
 
