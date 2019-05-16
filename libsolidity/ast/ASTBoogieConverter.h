@@ -124,11 +124,6 @@ public:
 	 */
 	void convert(ASTNode const& _node) { _node.accept(*this); }
 
-	/**
-	 * Print the actual Boogie program to an output stream
-	 */
-	void print(std::ostream& _stream) { m_context.program().print(_stream); }
-
 	bool visit(SourceUnit const& _node) override;
 	bool visit(PragmaDirective const& _node) override;
 	bool visit(ImportDirective const& _node) override;

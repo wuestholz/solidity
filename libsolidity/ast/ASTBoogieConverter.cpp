@@ -39,20 +39,7 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 			boogie::Expr::or_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), boogie::Expr::not_(oc))));
 	}
 	for (auto s : result.newStatements) { m_currentBlocks.top()->addStmt(s); }
-	for (auto c : result.newConstants)
-	{
-		bool alreadyDefined = false;
-		for (auto d : m_context.program().getDeclarations())
-		{
-			if (d->getName() == c->getName())
-			{
-				// TODO: check that other fields are equal
-				alreadyDefined = true;
-				break;
-			}
-		}
-		if (!alreadyDefined) m_context.addDecl(c);
-	}
+	for (auto c : result.newConstants) { m_context.addConstant(c); }
 
 	return result.expr;
 }

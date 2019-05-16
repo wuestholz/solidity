@@ -119,6 +119,25 @@ void BoogieContext::addDecl(boogie::Decl::Ref decl)
 	m_program.getDeclarations().push_back(decl);
 }
 
+void BoogieContext::addConstant(boogie::Decl::Ref decl)
+{
+	bool alreadyDefined = false;
+	for (auto d : m_constants)
+	{
+		if (d->getName() == decl->getName())
+		{
+			// TODO: check that other fields are equal
+			alreadyDefined = true;
+			break;
+		}
+	}
+	if (!alreadyDefined)
+	{
+		addDecl(decl);
+		m_constants.push_back(decl);
+	}
+}
+
 string BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
