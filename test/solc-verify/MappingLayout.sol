@@ -10,6 +10,7 @@ contract Layout {
     mapping(address=>T) ts;
 
     function() external payable {
+        require(msg.sender != address(this));
         ts[msg.sender] = T(1);
         ts[address(this)] = ts[msg.sender];
 
