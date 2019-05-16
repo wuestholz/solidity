@@ -333,8 +333,9 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 		auto lhsSel = dynamic_pointer_cast<SelExpr const>(Expr::sel(lhsMemberMapping, lhsBase));
 		auto rhsSel = Expr::sel(rhsMemberMapping, rhsBase);
 
+		auto memberTypeCat = member->annotation().type->category();
 		// For nested structs do recursion
-		if (member->annotation().type->category() == Type::Category::Struct)
+		if (memberTypeCat == Type::Category::Struct)
 		{
 			auto memberStructType = dynamic_cast<StructType const*>(member->annotation().type);
 			// Deep copy into memory creates new
@@ -348,6 +349,11 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 			}
 			// Do the deep copy
 			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
+		}
+		// Unsupported stuff
+		else if (memberTypeCat == Type::Category::Array || memberTypeCat == Type::Category::Mapping)
+		{
+			m_context.reportError(&_node, "Deep copy assignment between struct with arrays/mappings are not supported");
 		}
 		// For other types make the copy by updating the LHS with RHS
 		else
