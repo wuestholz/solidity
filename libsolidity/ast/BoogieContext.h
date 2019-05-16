@@ -108,6 +108,7 @@ public:
 	void reportWarning(ASTNode const* associatedNode, std::string message);
 
 	void addGlobalComment(std::string str);
+	void addDecl(boogie::Decl::Ref decl);
 
 	/** Returns the integer type corresponding to the encoding */
 	std::string intType(unsigned size) const;

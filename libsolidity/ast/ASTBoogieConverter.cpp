@@ -51,7 +51,7 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 				break;
 			}
 		}
-		if (!alreadyDefined) m_context.program().getDeclarations().push_back(c);
+		if (!alreadyDefined) m_context.addDecl(c);
 	}
 
 	return result.expr;
@@ -233,7 +233,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	}
 	auto attrs = ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[implicit_constructor]", *m_context.currentScanner());
 	procDecl->addAttrs(attrs);
-	m_context.program().getDeclarations().push_back(procDecl);
+	m_context.addDecl(procDecl);
 }
 
 void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
@@ -320,25 +320,12 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 				m_context(context),
+				m_currentContract(nullptr),
+				m_currentFunc(nullptr),
+				m_currentModifier(0),
 				m_currentRet(nullptr),
 				m_nextReturnLabelId(0)
 {
-	// Initialize global declarations
-	m_context.addGlobalComment("Global declarations and definitions related to the address type");
-	// address type
-	m_context.program().getDeclarations().push_back(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
-	m_context.program().getDeclarations().push_back(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
-	// address.balance
-	m_context.program().getDeclarations().push_back(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.isBvEncoding() ? "bv256" : "int")));
-	// Uninterpreted type for strings
-	m_context.program().getDeclarations().push_back(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
-	// now
-	m_context.program().getDeclarations().push_back(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_context.isBvEncoding() ? "bv256" : "int"));
-	// overflow
-	if (m_context.overflow()) {
-		m_context.program().getDeclarations().push_back(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, "bool"));
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +382,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	for (auto sumDecl : m_context.currentSumDecls())
 	{
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
-		m_context.program().getDeclarations().push_back(
+		m_context.addDecl(
 					boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
 					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
 					ASTBoogieUtils::mapType(sumDecl.second, sumDecl.first, m_context)));
@@ -465,8 +452,8 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
 	string structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
 	string structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
-	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structStorageType));
-	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structMemType));
+	m_context.addDecl(boogie::Decl::typee(structStorageType));
+	m_context.addDecl(boogie::Decl::typee(structMemType));
 
 	// Create mappings for each member (both memory and storage)
 	for (auto member : _node.members())
@@ -491,13 +478,13 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		auto varDeclStor = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage),
 				"[" + structStorageType + "]" + memberTypeForStor);
 		varDeclStor->addAttrs(attrs);
-		m_context.program().getDeclarations().push_back(varDeclStor);
+		m_context.addDecl(varDeclStor);
 
 		// Memory member
 		auto varDeclMem = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Memory),
 				"[" + structMemType + "]" + memberTypeForMem);
 		varDeclMem->addAttrs(attrs);
-		m_context.program().getDeclarations().push_back(varDeclMem);
+		m_context.addDecl(varDeclMem);
 	}
 
 	return false;
@@ -794,7 +781,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
 	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
-	m_context.program().getDeclarations().push_back(procDecl);
+	m_context.addDecl(procDecl);
 	return false;
 }
 
@@ -836,12 +823,12 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	auto varDecl = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), &_node, m_context));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
-	m_context.program().getDeclarations().push_back(varDecl);
+	m_context.addDecl(varDecl);
 
 	// Arrays require an extra variable for their length
 	if (_node.type()->category() == Type::Category::Array)
 	{
-		m_context.program().getDeclarations().push_back(
+		m_context.addDecl(
 				boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
 				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.isBvEncoding() ? "bv256" : "int")));
 	}
