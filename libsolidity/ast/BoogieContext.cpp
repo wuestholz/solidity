@@ -28,7 +28,7 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 		{
 			string resultType = sign + "int" + to_string(i);
 			auto funType = TypeProvider::function(strings { }, strings { resultType },
-			        FunctionType::Kind::Internal, true, StateMutability::Pure);
+					FunctionType::Kind::Internal, true, StateMutability::Pure);
 			auto sum = new MagicVariableDeclaration(
 			        ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
 			m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(sum));
@@ -62,12 +62,12 @@ BoogieContext::BoogieContext(Encoding encoding,
 	// now
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_encoding == BV ? "bv256" : "int"));
 	// overflow
-	if (m_overflow) {
+	if (m_overflow)
 		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, "bool"));
-	}
 }
 
-void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl) {
+void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl)
+{
 	m_builtinFunctions[fnDecl->getName()] = fnDecl;
 	m_program.getDeclarations().push_back(fnDecl);
 }
@@ -177,7 +177,8 @@ boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned expr
 	std::string fnName = fnNameSS.str();
 
 	// Get it if already there
-	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end()) {
+	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end())
+	{
 		// Not there construct SMT
 		std::stringstream fnSmtSS;
 		fnSmtSS << "(_ extract " << high << " " << low << "0)";
@@ -211,7 +212,8 @@ boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned expr
 	std::string fnName = fnNameSS.str();
 
 	// Get it if already there
-	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end()) {
+	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end())
+	{
 		// Not there construct SMT
 		std::stringstream fnSmtSS;
 		fnSmtSS << "(_ zero_extend " << resultSize - exprSize << ")";
@@ -244,7 +246,8 @@ boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned expr
 	std::string fnName = fnNameSS.str();
 
 	// Get it if already there
-	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end()) {
+	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end())
+	{
 		// Not there construct SMT
 		std::stringstream fnSmtSS;
 		fnSmtSS << "(_ sign_extend " << resultSize - exprSize << ")";
@@ -383,7 +386,8 @@ boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boo
 	std::string fnName = fnNameSS.str();
 
 	// Get it if already there
-	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end()) {
+	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end())
+	{
 		// Not there construct SMT
 		std::stringstream fnSmtSS;
 		fnSmtSS << "bv" << name;
@@ -417,7 +421,8 @@ boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boog
 	std::string fnName = fnNameSS.str();
 
 	// Get it if already there
-	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end()) {
+	if (m_builtinFunctions.find(fnName) == m_builtinFunctions.end())
+	{
 		// Not there construct SMT
 		std::stringstream fnSmtSS;
 		fnSmtSS << "bv" << name;

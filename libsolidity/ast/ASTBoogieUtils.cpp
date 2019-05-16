@@ -332,7 +332,8 @@ string ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, D
 	return BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) + "_" + structDef->name() + "#" + toString(structDef->id());
 }
 
-string ASTBoogieUtils::boogieBVType(unsigned n) {
+string ASTBoogieUtils::boogieBVType(unsigned n)
+{
 	return "bv" + to_string(n);
 }
 
@@ -340,42 +341,46 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 {
 	Type::Category tpCategory = tp->category();
 
-	switch (tpCategory) {
+	switch (tpCategory)
+	{
 	case Type::Category::Address:
 		return BOOGIE_ADDRESS_TYPE;
 	case Type::Category::StringLiteral:
 		return BOOGIE_STRING_TYPE;
 	case Type::Category::Bool:
 		return BOOGIE_BOOL_TYPE;
-	case Type::Category::RationalNumber: {
+	case Type::Category::RationalNumber:
+	{
 		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
-		if (!tpRational->isFractional()) {
+		if (!tpRational->isFractional())
 			return BOOGIE_INT_CONST_TYPE;
-		} else {
+		else
 			context.reportError(_associatedNode, "Fractional numbers are not supported");
-		}
 		break;
 	}
-	case Type::Category::Integer: {
+	case Type::Category::Integer:
+	{
 		auto tpInteger = dynamic_cast<IntegerType const*>(tp);
 		return context.intType(tpInteger->numBits());
 	}
 	case Type::Category::Contract:
 		return BOOGIE_ADDRESS_TYPE;
-	case Type::Category::Array: {
+	case Type::Category::Array:
+	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
-		if (arrType->isString()) {
+		if (arrType->isString())
 			return BOOGIE_STRING_TYPE;
-		} else {
+		else
 			return "[" + context.intType(256) + "]" + mapType(arrType->baseType(), _associatedNode, context);
-		}
 	}
-	case Type::Category::Mapping: {
+	case Type::Category::Mapping:
+	{
 		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
 		return "[" + mapType(mappingType->keyType(), _associatedNode, context) + "]"
 				+ mapType(mappingType->valueType(), _associatedNode, context);
 	}
-	case Type::Category::FixedBytes: {
+	case Type::Category::FixedBytes:
+	{
 		// up to 32 bytes (use integer and slice it up)
 		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
 		return context.intType(fbType->numBytes() * 8);
@@ -388,7 +393,8 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 		auto structTp = dynamic_cast<StructType const*>(tp);
 		return getStructAddressType(&structTp->structDefinition(), structTp->location());
 	}
-	default: {
+	default:
+	{
 		std::string tpStr = tp->toString();
 		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
@@ -442,16 +448,11 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 
 		case Token::Exp:
 			if (auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs))
-			{
 				if (auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs))
-				{
 					result = Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
-				}
-			}
 			context.reportError(associatedNode, "Exponentiation is not supported in 'int' encoding");
-			if (result == nullptr) {
+			if (result == nullptr)
 				result = Expr::id(ERR_EXPR);
-			}
 			break;
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + TokenTraits::toString(op));
@@ -459,161 +460,162 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 		}
 		break;
 	case BoogieContext::Encoding::BV:
+	{
+		string name;
+		string retType;
+
+		switch (op)
 		{
-			string name;
-			string retType;
+		case Token::Add:
+		case Token::AssignAdd:
+			result = context.bvAdd(bits, lhs, rhs); break;
+		case Token::Sub:
+		case Token::AssignSub:
+			result = context.bvSub(bits, lhs, rhs); break;
+		case Token::Mul:
+		case Token::AssignMul:
+			result = context.bvMul(bits, lhs, rhs); break;
+		case Token::Div:
+		case Token::AssignDiv:
+			if (isSigned)
+				result = context.bvSDiv(bits, lhs, rhs);
+			else
+				result = context.bvUDiv(bits, lhs, rhs);
+			break;
 
-			switch (op) {
-			case Token::Add:
-			case Token::AssignAdd:
-				result = context.bvAdd(bits, lhs, rhs); break;
-			case Token::Sub:
-			case Token::AssignSub:
-				result = context.bvSub(bits, lhs, rhs); break;
-			case Token::Mul:
-			case Token::AssignMul:
-				result = context.bvMul(bits, lhs, rhs); break;
-			case Token::Div:
-			case Token::AssignDiv:
-				if (isSigned) { result = context.bvSDiv(bits, lhs, rhs); }
-				else { result = context.bvUDiv(bits, lhs, rhs); }
-				break;
+		case Token::BitAnd:
+		case Token::AssignBitAnd:
+			result = context.bvAnd(bits, lhs, rhs); break;
+		case Token::BitOr:
+		case Token::AssignBitOr:
+			result = context.bvOr(bits, lhs, rhs); break;
+		case Token::BitXor:
+		case Token::AssignBitXor:
+			result = context.bvXor(bits, lhs, rhs); break;
+		case Token::SAR:
+		case Token::AssignSar:
+			if (isSigned)
+				result = context.bvAShr(bits, lhs, rhs);
+			else
+				result = context.bvLShr(bits, lhs, rhs);
+			break;
+		case Token::SHL:
+		case Token::AssignShl:
+			result = context.bvShl(bits, lhs, rhs); break;
 
-			case Token::BitAnd:
-			case Token::AssignBitAnd:
-				result = context.bvAnd(bits, lhs, rhs); break;
-			case Token::BitOr:
-			case Token::AssignBitOr:
-				result = context.bvOr(bits, lhs, rhs); break;
-			case Token::BitXor:
-			case Token::AssignBitXor:
-				result = context.bvXor(bits, lhs, rhs); break;
-			case Token::SAR:
-			case Token::AssignSar:
-				if (isSigned) { result = context.bvAShr(bits, lhs, rhs); }
-				else { result = context.bvLShr(bits, lhs, rhs); }
-				break;
-			case Token::SHL:
-			case Token::AssignShl:
-				result = context.bvShl(bits, lhs, rhs); break;
-
-			case Token::LessThan:
-				if (isSigned) { result = context.bvSlt(bits, lhs, rhs); }
-				else { result = context.bvUlt(bits, lhs, rhs); }
-				break;
-			case Token::GreaterThan:
-				if (isSigned) { result = context.bvSgt(bits, lhs, rhs); }
-				else { result = context.bvUgt(bits, lhs, rhs); }
-				break;
-			case Token::LessThanOrEqual:
-				if (isSigned) { result = context.bvSle(bits, lhs, rhs); }
-				else { result = context.bvUle(bits, lhs, rhs); }
-				break;
-			case Token::GreaterThanOrEqual:
-				if (isSigned) { result = context.bvSge(bits, lhs, rhs); }
-				else { result = context.bvUge(bits, lhs, rhs); }
-				break;
-			default:
-				context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
-				result = Expr::id(ERR_EXPR);
-			}
+		case Token::LessThan:
+			if (isSigned)
+				result = context.bvSlt(bits, lhs, rhs);
+			else
+				result = context.bvUlt(bits, lhs, rhs);
+			break;
+		case Token::GreaterThan:
+			if (isSigned)
+				result = context.bvSgt(bits, lhs, rhs);
+			else
+				result = context.bvUgt(bits, lhs, rhs);
+			break;
+		case Token::LessThanOrEqual:
+			if (isSigned)
+				result = context.bvSle(bits, lhs, rhs);
+			else
+				result = context.bvUle(bits, lhs, rhs);
+			break;
+		case Token::GreaterThanOrEqual:
+			if (isSigned)
+				result = context.bvSge(bits, lhs, rhs);
+			else
+				result = context.bvUge(bits, lhs, rhs);
+			break;
+		default:
+			context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
+			result = Expr::id(ERR_EXPR);
 		}
 		break;
+	}
 	case BoogieContext::Encoding::MOD:
+	{
+		auto modulo = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
+		auto largestSigned = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
+		auto smallestSigned = Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
+		switch(op)
 		{
-			auto modulo = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
-			auto largestSigned = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
-			auto smallestSigned = Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
-			switch(op)
+		case Token::Add:
+		case Token::AssignAdd:
+		{
+			auto sum = Expr::plus(lhs, rhs);
+			if (isSigned)
+				result = Expr::cond(Expr::gt(sum, largestSigned),
+					Expr::minus(sum, modulo),
+					Expr::cond(Expr::lt(sum, smallestSigned), Expr::plus(sum, modulo), sum));
+			else
+				result = Expr::cond(Expr::gte(sum, modulo), Expr::minus(sum, modulo), sum);
+			ecc = Expr::eq(sum, result);
+			break;
+		}
+		case Token::Sub:
+		case Token::AssignSub:
+		{
+			auto diff = Expr::minus(lhs, rhs);
+			if (isSigned)
+				result = Expr::cond(Expr::gt(diff, largestSigned),
+					Expr::minus(diff, modulo),
+					Expr::cond(Expr::lt(diff, smallestSigned), Expr::plus(diff, modulo), diff));
+			else
+				result = Expr::cond(Expr::gte(lhs, rhs), diff, Expr::plus(diff, modulo));
+			ecc = Expr::eq(diff, result);
+			break;
+		}
+		case Token::Mul:
+		case Token::AssignMul:
+		{
+			auto prod = Expr::times(lhs, rhs);
+			if (isSigned)
 			{
-			case Token::Add:
-			case Token::AssignAdd:
-			{
-				auto sum = Expr::plus(lhs, rhs);
-				if (isSigned)
-				{
-					result = Expr::cond(Expr::gt(sum, largestSigned),
-						Expr::minus(sum, modulo),
-						Expr::cond(Expr::lt(sum, smallestSigned), Expr::plus(sum, modulo), sum));
-				}
-				else
-				{
-					result = Expr::cond(Expr::gte(sum, modulo), Expr::minus(sum, modulo), sum);
-				}
-				ecc = Expr::eq(sum, result);
-				break;
+				auto lhs1 = Expr::cond(Expr::gte(lhs, Expr::lit((long)0)), lhs, Expr::plus(modulo, lhs));
+				auto rhs1 = Expr::cond(Expr::gte(rhs, Expr::lit((long)0)), rhs, Expr::plus(modulo, rhs));
+				auto prod = Expr::mod(Expr::times(lhs1, rhs1), modulo);
+				result = Expr::cond(Expr::gt(prod, largestSigned), Expr::minus(prod, modulo), prod);
 			}
-			case Token::Sub:
-			case Token::AssignSub:
+			else
 			{
-				auto diff = Expr::minus(lhs, rhs);
-				if (isSigned)
-				{
-					result = Expr::cond(Expr::gt(diff, largestSigned),
-						Expr::minus(diff, modulo),
-						Expr::cond(Expr::lt(diff, smallestSigned), Expr::plus(diff, modulo), diff));
-				}
-				else
-				{
-					result = Expr::cond(Expr::gte(lhs, rhs), diff, Expr::plus(diff, modulo));
-				}
-				ecc = Expr::eq(diff, result);
-				break;
+				result = Expr::cond(Expr::gte(prod, modulo), Expr::mod(prod, modulo), prod);
 			}
-			case Token::Mul:
-			case Token::AssignMul:
-			{
-				auto prod = Expr::times(lhs, rhs);
-				if (isSigned)
-				{
-					auto lhs1 = Expr::cond(Expr::gte(lhs, Expr::lit((long)0)), lhs, Expr::plus(modulo, lhs));
-					auto rhs1 = Expr::cond(Expr::gte(rhs, Expr::lit((long)0)), rhs, Expr::plus(modulo, rhs));
-					auto prod = Expr::mod(Expr::times(lhs1, rhs1), modulo);
-					result = Expr::cond(Expr::gt(prod, largestSigned), Expr::minus(prod, modulo), prod);
-				}
-				else
-				{
-					result = Expr::cond(Expr::gte(prod, modulo), Expr::mod(prod, modulo), prod);
-				}
-				ecc = Expr::eq(prod, result);
-				break;
-			}
-			case Token::Div:
-			case Token::AssignDiv:
-			{
-				auto div = Expr::intdiv(lhs, rhs);
-				if (isSigned)
-				{
-					result = Expr::cond(Expr::gt(div, largestSigned),
-						Expr::minus(div, modulo),
-						Expr::cond(Expr::lt(div, smallestSigned), Expr::plus(div, modulo), div));
-				}
-				else
-				{
-					result = div;
-				}
-				ecc = Expr::eq(div, result);
-				break;
-			}
+			ecc = Expr::eq(prod, result);
+			break;
+		}
+		case Token::Div:
+		case Token::AssignDiv:
+		{
+			auto div = Expr::intdiv(lhs, rhs);
+			if (isSigned)
+				result = Expr::cond(Expr::gt(div, largestSigned),
+					Expr::minus(div, modulo),
+					Expr::cond(Expr::lt(div, smallestSigned), Expr::plus(div, modulo), div));
+			else
+				result = div;
+			ecc = Expr::eq(div, result);
+			break;
+		}
 
-			case Token::LessThan:
-				result = Expr::lt(lhs, rhs);
-				break;
-			case Token::GreaterThan:
-				result = Expr::gt(lhs, rhs);
-				break;
-			case Token::LessThanOrEqual:
-				result = Expr::lte(lhs, rhs);
-				break;
-			case Token::GreaterThanOrEqual:
-				result = Expr::gte(lhs, rhs);
-				break;
-			default:
-				context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + TokenTraits::toString(op));
-				result = Expr::id(ERR_EXPR);
-			}
+		case Token::LessThan:
+			result = Expr::lt(lhs, rhs);
+			break;
+		case Token::GreaterThan:
+			result = Expr::gt(lhs, rhs);
+			break;
+		case Token::LessThanOrEqual:
+			result = Expr::lte(lhs, rhs);
+			break;
+		case Token::GreaterThanOrEqual:
+			result = Expr::gte(lhs, rhs);
+			break;
+		default:
+			context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + TokenTraits::toString(op));
+			result = Expr::id(ERR_EXPR);
 		}
 		break;
+	}
 	default:
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
 	}
@@ -698,7 +700,8 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 
 bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 {
-	switch (type->category()) {
+	switch (type->category())
+	{
 	case Type::Category::Integer:
 	case Type::Category::FixedBytes:
 		return true;
@@ -775,7 +778,8 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 			bool exprSigned = isSigned(exprType);
 
 			// Nothing to do if size and signedness is the same
-			if (targetBits == exprBits && targetSigned == exprSigned) { return expr; }
+			if (targetBits == exprBits && targetSigned == exprSigned)
+				return expr;
 			// Conversion to smaller type should have already been detected by the compiler
 			if (targetBits < exprBits)
 			{
@@ -801,7 +805,8 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
 	// Do nothing if any of the types is unknown
-	if (!targetType || !exprType) { return expr; }
+	if (!targetType || !exprType)
+		return expr;
 
 	if (isBitPreciseType(targetType))
 	{
