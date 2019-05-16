@@ -48,6 +48,23 @@ BoogieContext::BoogieContext(Encoding encoding,
 		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
+
+	// Initialize global declarations
+	addGlobalComment("Global declarations and definitions related to the address type");
+	// address type
+	addDecl(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+	// address.balance
+	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
+			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_encoding == BV ? "bv256" : "int")));
+	// Uninterpreted type for strings
+	addDecl(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	// now
+	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_encoding == BV ? "bv256" : "int"));
+	// overflow
+	if (m_overflow) {
+		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, "bool"));
+	}
 }
 
 void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl) {
@@ -76,7 +93,7 @@ void BoogieContext::includeSendFunction()
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(*this));
 }
 
-void BoogieContext::reportError(ASTNode const* associatedNode, std::string message)
+void BoogieContext::reportError(ASTNode const* associatedNode, string message)
 {
 	if (associatedNode)
 		m_errorReporter->error(Error::Type::ParserError, associatedNode->location(), message);
@@ -84,7 +101,7 @@ void BoogieContext::reportError(ASTNode const* associatedNode, std::string messa
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Error at unknown node: " + message));
 }
 
-void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string message)
+void BoogieContext::reportWarning(ASTNode const* associatedNode, string message)
 {
 	if (associatedNode)
 		m_errorReporter->warning(associatedNode->location(), message);
@@ -92,7 +109,36 @@ void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string mes
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Warning at unknown node: " + message));
 }
 
-std::string BoogieContext::intType(unsigned size) const
+void BoogieContext::addGlobalComment(string str)
+{
+	addDecl(boogie::Decl::comment("", str));
+}
+
+void BoogieContext::addDecl(boogie::Decl::Ref decl)
+{
+	m_program.getDeclarations().push_back(decl);
+}
+
+void BoogieContext::addConstant(boogie::Decl::Ref decl)
+{
+	bool alreadyDefined = false;
+	for (auto d : m_constants)
+	{
+		if (d->getName() == decl->getName())
+		{
+			// TODO: check that other fields are equal
+			alreadyDefined = true;
+			break;
+		}
+	}
+	if (!alreadyDefined)
+	{
+		addDecl(decl);
+		m_constants.push_back(decl);
+	}
+}
+
+string BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
 		return ASTBoogieUtils::boogieBVType(size);

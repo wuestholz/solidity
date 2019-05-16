@@ -8,13 +8,17 @@ pragma solidity >=0.5.0;
                ----------------------------
       Storage | Deep      Deep     Deep
               |
-LHS    Memory | Deep      Ref      Deep
+LHS    Memory | Deep+new  Ref      Deep+new
               |
      Local st | Ref       Error    Ref
 */
 contract Copying {
     struct S {
         int x;
+    }
+
+    struct T {
+        S s;
     }
 
     S s1;
@@ -32,13 +36,16 @@ contract Copying {
 
     function storToMem() public {
         S memory sm = S(3);
+        S memory sm2 = sm;
         s1.x = 1;
-        sm = s1; // Deep copy
+        sm = s1; // Deep copy, but also a new copy, i.e., now independent from sm2
         assert(s1.x == 1);
         assert(sm.x == 1);
+        assert(sm2.x == 3);
         s1.x = 2;
         assert(s1.x == 2);
         assert(sm.x == 1);
+        assert(sm2.x == 3);
     }
 
     function storToLoc() public {
@@ -119,6 +126,15 @@ contract Copying {
         assert(sm.x == 1);
     }
 
+    function nestedMemToMem() public pure {
+        T memory t1 = T(S(1));
+        T memory t2 = t1; // Nested structures are also reference copied
+
+        t2.s.x = 2;
+
+        assert(t1.s.x == 2);
+    }
+
     function() external payable {
         storToStor();
         storToMem();
@@ -129,6 +145,7 @@ contract Copying {
         locToLoc();
         locToStor();
         locToMem();
+        nestedMemToMem();
     }
 
 }

@@ -56,6 +56,7 @@ public:
 private:
 
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
+	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
 
 	Encoding m_encoding;
 	bool m_overflow;
@@ -88,7 +89,6 @@ public:
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
 			langutil::EVMVersion evmVersion);
 
-	boogie::Program& program() { return m_program; }
 	Encoding encoding() const { return m_encoding; }
 	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
 	bool overflow() const { return m_overflow; }
@@ -100,12 +100,21 @@ public:
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
+	/**
+	 * Print the actual Boogie program to an output stream
+	 */
+	void print(std::ostream& _stream) { m_program.print(_stream); }
+
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
 
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
+
+	void addGlobalComment(std::string str);
+	void addDecl(boogie::Decl::Ref decl);
+	void addConstant(boogie::Decl::Ref decl);
 
 	/** Returns the integer type corresponding to the encoding */
 	std::string intType(unsigned size) const;

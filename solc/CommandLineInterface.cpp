@@ -1251,7 +1251,7 @@ void CommandLineInterface::handleBoogie()
 	if (m_args.count(g_argOutputDir))
 	{
 		stringstream data;
-		boogieConverter.print(data);
+		context.print(data);
 		// TODO: when multiple files are given, output file will have the name
 		// of the first file
 		boost::filesystem::path path(m_sourceCodes.begin()->first);
@@ -1259,7 +1259,7 @@ void CommandLineInterface::handleBoogie()
 	}
 	else
 	{
-		boogieConverter.print(sout());
+		context.print(sout());
 	}
 }
 

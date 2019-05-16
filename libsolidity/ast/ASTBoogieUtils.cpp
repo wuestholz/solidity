@@ -60,6 +60,9 @@ const string ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
 const string ASTBoogieUtils::ERR_EXPR = "__ERROR";
 
+const string ASTBoogieUtils::BOOGIE_STOR = "stor";
+const string ASTBoogieUtils::BOOGIE_MEM = "mem";
+
 ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
@@ -283,6 +286,21 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	return sendProc;
 }
 
+string ASTBoogieUtils::dataLocToStr(DataLocation loc)
+{
+	switch(loc)
+	{
+	case DataLocation::Storage: return BOOGIE_STOR;
+	case DataLocation::Memory: return BOOGIE_MEM;
+	case DataLocation::CallData:
+		solAssert(false, "CallData storage location is not supported.");
+		break;
+	default:
+		solAssert(false, "Unknown storage location.");
+	}
+	return "";
+}
+
 string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
@@ -299,9 +317,19 @@ string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 	return decl.name() + "#" + to_string(decl.id());
 }
 
-std::string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
+string ASTBoogieUtils::mapStructMemberName(Declaration const& decl, DataLocation loc)
+{
+	return mapDeclName(decl) + "_" + dataLocToStr(loc);
+}
+
+string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 {
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
+}
+
+string ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, DataLocation loc)
+{
+	return BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) + "_" + structDef->name() + "#" + toString(structDef->id());
 }
 
 string ASTBoogieUtils::boogieBVType(unsigned n) {
@@ -355,6 +383,11 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 	case Type::Category::Tuple:
 		context.reportError(_associatedNode, "Tuples are not supported");
 		break;
+	case Type::Category::Struct:
+	{
+		auto structTp = dynamic_cast<StructType const*>(tp);
+		return getStructAddressType(&structTp->structDefinition(), structTp->location());
+	}
 	default: {
 		std::string tpStr = tp->toString();
 		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
