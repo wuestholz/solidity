@@ -85,11 +85,11 @@ public:
 		Conc, Plus, Minus, Times, Div, IntDiv, Mod, Exp
 	};
 private:
-	const Binary op;
+	Binary const op;
 	Expr::Ref lhs;
 	Expr::Ref rhs;
 public:
-	BinExpr(const Binary op, Expr::Ref l, Expr::Ref r) : op(op), lhs(l), rhs(r) {}
+	BinExpr(Binary const op, Expr::Ref l, Expr::Ref r) : op(op), lhs(l), rhs(r) {}
 	void print(std::ostream& os) const override;
 };
 
@@ -279,7 +279,7 @@ public:
 	using Ref = std::shared_ptr<Stmt const>;
 
 private:
-	const Kind kind;
+	Kind const kind;
 protected:
 	Stmt(Kind k) : kind(k) {}
 public:
@@ -460,7 +460,7 @@ public:
 		CONSTANT, VARIABLE, PROCEDURE, FUNCTION, TYPE, AXIOM, CODE, COMMENT
 	};
 private:
-	const Kind kind;
+	Kind const kind;
 public:
 	Kind getKind() const { return kind; }
 private:
@@ -703,7 +703,7 @@ public:
 	void appendPrelude(std::string s) { prelude += s; }
 };
 
-std::ostream& operator<<(std::ostream& os, const Expr& e);
+std::ostream& operator<<(std::ostream& os, Expr const& e);
 std::ostream& operator<<(std::ostream& os, Expr::Ref e);
 
 std::ostream& operator<<(std::ostream& os, Decl& e);

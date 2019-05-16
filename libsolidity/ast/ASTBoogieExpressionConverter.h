@@ -66,8 +66,8 @@ private:
 
 	// Helper methods for the different scenarios for function calls
 	void functionCallConversion(FunctionCall const& _node);
-	boogie::Decl::Ref newStruct(const StructDefinition* structDef, std::string id);
-	void functionCallNewStruct(const FunctionCall& _node, const StructDefinition* structDef, const std::vector<boogie::Expr::Ref>& args);
+	boogie::Decl::Ref newStruct(StructDefinition const* structDef, std::string id);
+	void functionCallNewStruct(FunctionCall const& _node, StructDefinition const* structDef, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 

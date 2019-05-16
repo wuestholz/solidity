@@ -43,11 +43,11 @@ private:
 	std::string m_currentReturnLabel;
 	int m_nextReturnLabelId;
 
-	static const std::string DOCTAG_CONTRACT_INVAR;
-	static const std::string DOCTAG_LOOP_INVAR;
-	static const std::string DOCTAG_CONTRACT_INVARS_INCLUDE;
-	static const std::string DOCTAG_PRECOND;
-	static const std::string DOCTAG_POSTCOND;
+	static std::string const DOCTAG_CONTRACT_INVAR;
+	static std::string const DOCTAG_LOOP_INVAR;
+	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;
+	static std::string const DOCTAG_PRECOND;
+	static std::string const DOCTAG_POSTCOND;
 
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,

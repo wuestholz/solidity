@@ -20,11 +20,11 @@ namespace dev
 namespace solidity
 {
 
-const string ASTBoogieConverter::DOCTAG_CONTRACT_INVAR = "invariant";
-const string ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
-const string ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
-const string ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
-const string ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
+string const ASTBoogieConverter::DOCTAG_CONTRACT_INVAR = "invariant";
+string const ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
+string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
+string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
+string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {

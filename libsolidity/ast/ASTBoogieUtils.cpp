@@ -21,47 +21,47 @@ namespace dev
 {
 namespace solidity
 {
-const string ASTBoogieUtils::BOOGIE_ADDRESS_TYPE = "address_t";
-const string ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
-const string ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
-const string ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
-const string ASTBoogieUtils::BOOGIE_TRANSFER = "__transfer";
-const string ASTBoogieUtils::SOLIDITY_SEND = "send";
-const string ASTBoogieUtils::BOOGIE_SEND = "__send";
-const string ASTBoogieUtils::SOLIDITY_CALL = "call";
-const string ASTBoogieUtils::BOOGIE_CALL = "__call";
-const string ASTBoogieUtils::SOLIDITY_SUPER = "super";
+string const ASTBoogieUtils::BOOGIE_ADDRESS_TYPE = "address_t";
+string const ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
+string const ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
+string const ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
+string const ASTBoogieUtils::BOOGIE_TRANSFER = "__transfer";
+string const ASTBoogieUtils::SOLIDITY_SEND = "send";
+string const ASTBoogieUtils::BOOGIE_SEND = "__send";
+string const ASTBoogieUtils::SOLIDITY_CALL = "call";
+string const ASTBoogieUtils::BOOGIE_CALL = "__call";
+string const ASTBoogieUtils::SOLIDITY_SUPER = "super";
 
-const string ASTBoogieUtils::SOLIDITY_SENDER = "sender";
-const string ASTBoogieUtils::SOLIDITY_VALUE = "value";
-const string ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
-const string ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
+string const ASTBoogieUtils::SOLIDITY_SENDER = "sender";
+string const ASTBoogieUtils::SOLIDITY_VALUE = "value";
+string const ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
+string const ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 
-const string ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
-const string ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
-const string ASTBoogieUtils::SOLIDITY_REVERT = "revert";
+string const ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
+string const ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
+string const ASTBoogieUtils::SOLIDITY_REVERT = "revert";
 
-const string ASTBoogieUtils::SOLIDITY_THIS = "this";
-const string ASTBoogieUtils::BOOGIE_THIS = "__this";
-const string ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
-const string ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
-const string ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
-const string ASTBoogieUtils::BOOGIE_LENGTH = "#length";
-const string ASTBoogieUtils::BOOGIE_SUM = "#sum";
-const string ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
-const string ASTBoogieUtils::BOOGIE_BOOL_TYPE = "bool";
-const string ASTBoogieUtils::BOOGIE_INT_TYPE = "int";
-const string ASTBoogieUtils::BOOGIE_INT_CONST_TYPE = "int_const";
-const string ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
-const string ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
-const string ASTBoogieUtils::SOLIDITY_NOW = "now";
-const string ASTBoogieUtils::BOOGIE_NOW = "__now";
-const string ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
+string const ASTBoogieUtils::SOLIDITY_THIS = "this";
+string const ASTBoogieUtils::BOOGIE_THIS = "__this";
+string const ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
+string const ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
+string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
+string const ASTBoogieUtils::BOOGIE_LENGTH = "#length";
+string const ASTBoogieUtils::BOOGIE_SUM = "#sum";
+string const ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
+string const ASTBoogieUtils::BOOGIE_BOOL_TYPE = "bool";
+string const ASTBoogieUtils::BOOGIE_INT_TYPE = "int";
+string const ASTBoogieUtils::BOOGIE_INT_CONST_TYPE = "int_const";
+string const ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
+string const ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
+string const ASTBoogieUtils::SOLIDITY_NOW = "now";
+string const ASTBoogieUtils::BOOGIE_NOW = "__now";
+string const ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
-const string ASTBoogieUtils::ERR_EXPR = "__ERROR";
+string const ASTBoogieUtils::ERR_EXPR = "__ERROR";
 
-const string ASTBoogieUtils::BOOGIE_STOR = "stor";
-const string ASTBoogieUtils::BOOGIE_MEM = "mem";
+string const ASTBoogieUtils::BOOGIE_STOR = "stor";
+string const ASTBoogieUtils::BOOGIE_MEM = "mem";
 
 ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {

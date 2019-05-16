@@ -442,7 +442,7 @@ Decl::Ref Decl::comment(std::string name, std::string str)
 	return std::make_shared<CommentDecl>(name, str);
 }
 
-std::ostream& operator<<(std::ostream& os, const Expr& e)
+std::ostream& operator<<(std::ostream& os, Expr const& e)
 {
 	e.print(os);
 	return os;
@@ -496,7 +496,7 @@ std::ostream& operator<<(std::ostream& os, Decl::ConstRef d)
 	return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Program* p)
+std::ostream& operator<<(std::ostream& os, Program const* p)
 {
 	if (p == 0)
 		os << "<null> Program!\n";
@@ -504,13 +504,13 @@ std::ostream& operator<<(std::ostream& os, const Program* p)
 		p->print(os);
 	return os;
 }
-std::ostream& operator<<(std::ostream& os, const Program& p)
+std::ostream& operator<<(std::ostream& os, Program const& p)
 {
 	p.print(os);
 	return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Binding& p)
+std::ostream& operator<<(std::ostream& os, Binding const& p)
 {
 	os << p.id << ": " << p.type;
 	return os;
@@ -538,7 +538,7 @@ void print_seq(std::ostream& os, std::vector<T> const& ts)
 }
 
 template<class T, class C>
-void print_set(std::ostream& os, const std::set<T,C>& ts, std::string init, std::string sep, std::string term)
+void print_set(std::ostream& os, std::set<T,C> const& ts, std::string init, std::string sep, std::string term)
 {
 	os << init;
 	for (typename std::set<T,C>::const_iterator i = ts.begin(); i != ts.end(); ++i)
@@ -547,13 +547,13 @@ void print_set(std::ostream& os, const std::set<T,C>& ts, std::string init, std:
 }
 
 template<class T, class C>
-void print_set(std::ostream& os, const std::set<T,C>& ts, std::string sep)
+void print_set(std::ostream& os, std::set<T,C> const& ts, std::string sep)
 {
 	print_set<T,C>(os, ts, "", sep, "");
 }
 
 template<class T, class C>
-void print_set(std::ostream& os, const std::set<T,C>& ts)
+void print_set(std::ostream& os, std::set<T,C> const& ts)
 {
 	print_set<T,C>(os, ts, "", "", "");
 }

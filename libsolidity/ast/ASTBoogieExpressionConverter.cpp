@@ -77,7 +77,7 @@ ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& contex
 		m_isLibraryCall(false),
 		m_isLibraryCallStatic(false) {}
 
-ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(const Expression& _node)
+ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(Expression const& _node)
 {
 	m_currentExpr = nullptr;
 	m_currentAddress = nullptr;
@@ -566,7 +566,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Check for the special case of calling the 'value' function
 	// For example x.f.value(y)(z) should be treated as x.f(z), while setting
 	// 'm_currentMsgValue' to 'y'.
-	if (auto exprMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
 	{
 		if (exprMa->memberName() == "value")
 		{
@@ -594,7 +594,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Ignore gas setting, e.g., x.f.gas(y)(z) is just x.f(z)
-	if (auto exprMa = dynamic_cast<const MemberAccess*>(&_node.expression()))
+	if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
 	{
 		if (exprMa->memberName() == "gas")
 		{
@@ -654,7 +654,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (m_context.isBvEncoding())
 		{
 			// Try to get the definition
-			const FunctionDefinition* calledFunc = nullptr;
+			FunctionDefinition const* calledFunc = nullptr;
 			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 			{
 				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
@@ -921,7 +921,7 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
-Decl::Ref ASTBoogieExpressionConverter::newStruct(const StructDefinition* structDef, string id)
+Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* structDef, string id)
 {
 	// Address of the new struct
 	// TODO: make sure that it is a new address
@@ -933,8 +933,8 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(const StructDefinition* struct
 }
 
 
-void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _node,
-        const StructDefinition* structDef, const vector<Expr::Ref>& args)
+void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _node,
+        StructDefinition const* structDef, vector<Expr::Ref> const& args)
 {
 	auto varDecl = newStruct(structDef, toString(_node.id()));
 	// Initialize each member
@@ -1003,7 +1003,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), addResult.expr)));
 	// Final statement for balance update in case of failure. Return value of call
 	// is always a tuple (ok, data).
-	auto okDataTuple = dynamic_pointer_cast<const TupleExpr>(m_currentExpr);
+	auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
 	solAssert(okDataTuple, "");
 	addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));
 }
@@ -1134,10 +1134,10 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	}
 	m_currentExpr = Expr::id(ASTBoogieUtils::mapDeclName(*_node.annotation().referencedDeclaration));
 	// Check for getter
-	m_isGetter =  dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration);
+	m_isGetter =  dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration);
 	// Check for library call
 	m_isLibraryCall = false;
-	if (auto fDef = dynamic_cast<const FunctionDefinition*>(_node.annotation().referencedDeclaration))
+	if (auto fDef = dynamic_cast<FunctionDefinition const*>(_node.annotation().referencedDeclaration))
 	{
 		m_isLibraryCall = fDef->inContractKind() == ContractDefinition::ContractKind::Library;
 		if (m_isLibraryCall)
@@ -1237,7 +1237,7 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 	// Check if a state variable is referenced
 	bool referencesStateVar = false;
-	if (auto varDecl = dynamic_cast<const VariableDeclaration*>(_node.annotation().referencedDeclaration))
+	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration))
 	{
 		referencesStateVar = varDecl->isStateVariable();
 	}

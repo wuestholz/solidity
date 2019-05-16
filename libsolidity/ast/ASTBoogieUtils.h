@@ -18,56 +18,56 @@ class ASTBoogieUtils
 public:
 
 	// Identifiers related to the 'address' type
-	static const std::string SOLIDITY_BALANCE;
-	static const std::string BOOGIE_BALANCE;
-	static const std::string SOLIDITY_TRANSFER;
-	static const std::string BOOGIE_TRANSFER;
-	static const std::string SOLIDITY_SEND;
-	static const std::string BOOGIE_SEND;
-	static const std::string SOLIDITY_CALL;
-	static const std::string BOOGIE_CALL;
+	static std::string const SOLIDITY_BALANCE;
+	static std::string const BOOGIE_BALANCE;
+	static std::string const SOLIDITY_TRANSFER;
+	static std::string const BOOGIE_TRANSFER;
+	static std::string const SOLIDITY_SEND;
+	static std::string const BOOGIE_SEND;
+	static std::string const SOLIDITY_CALL;
+	static std::string const BOOGIE_CALL;
 
 	// Contract related identifiers
-	static const std::string SOLIDITY_SUPER;
-	static const std::string SOLIDITY_THIS;
+	static std::string const SOLIDITY_SUPER;
+	static std::string const SOLIDITY_THIS;
 
 	// Identifiers related to 'msg'
-	static const std::string SOLIDITY_SENDER;
-	static const std::string SOLIDITY_VALUE;
-	static const std::string BOOGIE_MSG_SENDER;
-	static const std::string BOOGIE_MSG_VALUE;
+	static std::string const SOLIDITY_SENDER;
+	static std::string const SOLIDITY_VALUE;
+	static std::string const BOOGIE_MSG_SENDER;
+	static std::string const BOOGIE_MSG_VALUE;
 
 	// Error handling
-	static const std::string SOLIDITY_ASSERT;
-	static const std::string SOLIDITY_REQUIRE;
-	static const std::string SOLIDITY_REVERT;
+	static std::string const SOLIDITY_ASSERT;
+	static std::string const SOLIDITY_REQUIRE;
+	static std::string const SOLIDITY_REVERT;
 	// no constant required for 'throw' because it is a separate statement
 
 	// Boogie types
-	static const std::string BOOGIE_ADDRESS_TYPE;
-	static const std::string BOOGIE_STRING_TYPE;
-	static const std::string BOOGIE_BOOL_TYPE;
-	static const std::string BOOGIE_INT_TYPE;
-	static const std::string BOOGIE_INT_CONST_TYPE;
-	static const std::string ERR_TYPE;
+	static std::string const BOOGIE_ADDRESS_TYPE;
+	static std::string const BOOGIE_STRING_TYPE;
+	static std::string const BOOGIE_BOOL_TYPE;
+	static std::string const BOOGIE_INT_TYPE;
+	static std::string const BOOGIE_INT_CONST_TYPE;
+	static std::string const ERR_TYPE;
 
 	// Other identifiers
-	static const std::string BOOGIE_THIS;
-	static const std::string VERIFIER_MAIN;
-	static const std::string VERIFIER_SUM;
-	static const std::string BOOGIE_CONSTRUCTOR;
-	static const std::string BOOGIE_LENGTH;
-	static const std::string BOOGIE_SUM;
-	static const std::string BOOGIE_ZERO_ADDRESS;
-	static const std::string SOLIDITY_NOW;
-	static const std::string BOOGIE_NOW;
-	static const std::string VERIFIER_OVERFLOW;
+	static std::string const BOOGIE_THIS;
+	static std::string const VERIFIER_MAIN;
+	static std::string const VERIFIER_SUM;
+	static std::string const BOOGIE_CONSTRUCTOR;
+	static std::string const BOOGIE_LENGTH;
+	static std::string const BOOGIE_SUM;
+	static std::string const BOOGIE_ZERO_ADDRESS;
+	static std::string const SOLIDITY_NOW;
+	static std::string const BOOGIE_NOW;
+	static std::string const VERIFIER_OVERFLOW;
 
 	// Return this expression as an identifier when something cannot be evaluated
-	static const std::string ERR_EXPR;
+	static std::string const ERR_EXPR;
 
-	static const std::string BOOGIE_STOR;
-	static const std::string BOOGIE_MEM;
+	static std::string const BOOGIE_STOR;
+	static std::string const BOOGIE_MEM;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()
