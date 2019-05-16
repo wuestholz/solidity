@@ -107,6 +107,8 @@ public:
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
 
+	void addGlobalComment(std::string str);
+
 	/** Returns the integer type corresponding to the encoding */
 	std::string intType(unsigned size) const;
 

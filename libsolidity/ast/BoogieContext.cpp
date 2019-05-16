@@ -76,7 +76,7 @@ void BoogieContext::includeSendFunction()
 	m_program.getDeclarations().push_back(ASTBoogieUtils::createSendProc(*this));
 }
 
-void BoogieContext::reportError(ASTNode const* associatedNode, std::string message)
+void BoogieContext::reportError(ASTNode const* associatedNode, string message)
 {
 	if (associatedNode)
 		m_errorReporter->error(Error::Type::ParserError, associatedNode->location(), message);
@@ -84,7 +84,7 @@ void BoogieContext::reportError(ASTNode const* associatedNode, std::string messa
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Error at unknown node: " + message));
 }
 
-void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string message)
+void BoogieContext::reportWarning(ASTNode const* associatedNode, string message)
 {
 	if (associatedNode)
 		m_errorReporter->warning(associatedNode->location(), message);
@@ -92,7 +92,12 @@ void BoogieContext::reportWarning(ASTNode const* associatedNode, std::string mes
 		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Warning at unknown node: " + message));
 }
 
-std::string BoogieContext::intType(unsigned size) const
+void BoogieContext::addGlobalComment(string str)
+{
+	m_program.getDeclarations().push_back(boogie::Decl::comment("", str));
+}
+
+string BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
 		return ASTBoogieUtils::boogieBVType(size);

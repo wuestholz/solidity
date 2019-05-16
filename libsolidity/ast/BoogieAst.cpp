@@ -868,7 +868,12 @@ void CodeDecl::print(std::ostream& os) const {
 }
 
 void CommentDecl::print(std::ostream& os) const {
-  os << "// " << str;
+  os << "// ";
+  for (char c : str) {
+    os << c;
+    if (c == '\n')
+      os << "// ";
+  }
 }
 
 void Block::print(std::ostream& os) const {

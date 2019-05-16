@@ -26,7 +26,7 @@ private:
 	std::vector<boogie::Decl::Ref> m_localDecls;
 
 	// Collect initializers for state variables to be added to the beginning of the constructor
-	// If there is no constructor, but there are initializers, we create one
+	// If there is no constructor, we create one
 	std::vector<boogie::Stmt::Ref> m_stateVarInitializers;
 
 	// Collect variables to be initialized to default values
@@ -48,11 +48,6 @@ private:
 	static const std::string DOCTAG_CONTRACT_INVARS_INCLUDE;
 	static const std::string DOCTAG_PRECOND;
 	static const std::string DOCTAG_POSTCOND;
-
-	/**
-	 * Add a top-level comment
-	 */
-	void addGlobalComment(std::string str);
 
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,

@@ -26,11 +26,6 @@ const string ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
 const string ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
 const string ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
 
-void ASTBoogieConverter::addGlobalComment(string str)
-{
-	m_context.program().getDeclarations().push_back(boogie::Decl::comment("", str));
-}
-
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
@@ -191,8 +186,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 
 void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _node)
 {
-	addGlobalComment("");
-	addGlobalComment("Default constructor");
+	m_context.addGlobalComment("\nDefault constructor");
 
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
@@ -330,7 +324,7 @@ ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 				m_nextReturnLabelId(0)
 {
 	// Initialize global declarations
-	addGlobalComment("Global declarations and definitions related to the address type");
+	m_context.addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	m_context.program().getDeclarations().push_back(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
 	m_context.program().getDeclarations().push_back(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
@@ -356,8 +350,7 @@ bool ASTBoogieConverter::visit(SourceUnit const& _node)
 	rememberScope(_node);
 
 	// Boogie programs are flat, source units do not appear explicitly
-	addGlobalComment("");
-	addGlobalComment("------- Source: " + _node.annotation().path + " -------");
+	m_context.addGlobalComment("\n------- Source: " + _node.annotation().path + " -------");
 	return true; // Simply apply visitor recursively
 }
 
@@ -366,7 +359,7 @@ bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 	rememberScope(_node);
 
 	// Pragmas are only included as comments
-	addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
+	m_context.addGlobalComment("Pragma: " + boost::algorithm::join(_node.literals(), ""));
 	return false;
 }
 
@@ -384,8 +377,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	m_currentContract = &_node;
 	// Boogie programs are flat, contracts do not appear explicitly
-	addGlobalComment("");
-	addGlobalComment("------- Contract: " + _node.name() + " -------");
+	m_context.addGlobalComment("\n------- Contract: " + _node.name() + " -------");
 
 	// Process contract invariants
 	m_context.currentContractInvars().clear();
@@ -395,14 +387,14 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR, invars);
 	for (auto invar : invars)
 	{
-		addGlobalComment("Contract invariant: " + invar.exprStr);
+		m_context.addGlobalComment("Contract invariant: " + invar.exprStr);
 		m_context.currentContractInvars().push_back(invar);
 	}
 
 	// Add new shadow variables for sum
 	for (auto sumDecl : m_context.currentSumDecls())
 	{
-		addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
+		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.program().getDeclarations().push_back(
 					boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
 					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
@@ -446,7 +438,7 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 
 	// TODO: calling constructor of superclass?
 	// Boogie programs are flat, inheritance does not appear explicitly
-	addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
+	m_context.addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
 	if (_node.arguments() && _node.arguments()->size() > 0)
 	{
 		m_context.reportError(&_node, "Arguments for base constructor in inheritance list is not supported");
@@ -461,7 +453,7 @@ bool ASTBoogieConverter::visit(UsingForDirective const& _node)
 	// Nothing to do with using for directives, calls to functions are resolved in the AST
 	string libraryName = _node.libraryName().annotation().type->toString();
 	string typeName = _node.typeName() ? _node.typeName()->annotation().type->toString() : "*";
-	addGlobalComment("Using " + libraryName + " for " + typeName);
+	m_context.addGlobalComment("Using " + libraryName + " for " + typeName);
 	return false;
 }
 
@@ -470,8 +462,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 	rememberScope(_node);
 
 	// First define memory/storage address types for the struct type
-	addGlobalComment("");
-	addGlobalComment("------- Struct: " + _node.name() + "-------");
+	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
 	string structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
 	string structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
 	m_context.program().getDeclarations().push_back(boogie::Decl::typee(structStorageType));
@@ -801,9 +792,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
-	addGlobalComment("");
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
-	addGlobalComment("Function: " + _node.name() + funcType);
+	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
 	m_context.program().getDeclarations().push_back(procDecl);
 	return false;
 }
@@ -841,8 +831,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		m_stateVarsToInitialize.push_back(&_node);
 	}
 
-	addGlobalComment("");
-	addGlobalComment("State variable: " + _node.name() + " : " + _node.type()->toString());
+	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	auto varDecl = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), &_node, m_context));
