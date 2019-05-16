@@ -267,6 +267,7 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 	// LHS is storage
 	else if(lhsStructType->location() == DataLocation::Storage)
 	{
+		// RHS is storage
 		if (rhsStructType->location() == DataLocation::Storage)
 		{
 			// LHS is local storage --> reference copy
@@ -279,10 +280,19 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 			// LHS is storage --> deep copy
 			else
 			{
-				deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr);
+				deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr,
+						lhsStructType->location(), rhsStructType->location());
 				m_currentExpr = lhsExpr;
 				return;
 			}
+		}
+		// RHS is memory --> deep copy
+		else if (rhsStructType->location() == DataLocation::Memory)
+		{
+			deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr,
+					lhsStructType->location(), rhsStructType->location());
+			m_currentExpr = lhsExpr;
+			return;
 		}
 		else
 		{
@@ -296,24 +306,24 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
-void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* structDef, Expr::Ref lhsBase, Expr::Ref rhsBase)
+void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* structDef, Expr::Ref lhsBase, Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc)
 {
 	addSideEffect(Stmt::comment("Deep copy struct " + structDef->name()));
 	// Loop through each member
 	for (auto member : structDef->members())
 	{
 		// Get the mapping for the member
-		// TODO: currently assumes storage as only storage to storage deep copy is supported
-		Expr::Ref memberMapping = Expr::id(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage));
+		Expr::Ref lhsMemberMapping = Expr::id(ASTBoogieUtils::mapStructMemberName(*member, lhsLoc));
+		Expr::Ref rhsMemberMapping = Expr::id(ASTBoogieUtils::mapStructMemberName(*member, rhsLoc));
 		// Select the lhs and rhs from the mapping
-		auto lhsSel = dynamic_pointer_cast<SelExpr const>(Expr::sel(memberMapping, lhsBase));
-		auto rhsSel = Expr::sel(memberMapping, rhsBase);
+		auto lhsSel = dynamic_pointer_cast<SelExpr const>(Expr::sel(lhsMemberMapping, lhsBase));
+		auto rhsSel = Expr::sel(rhsMemberMapping, rhsBase);
 
 		// For nested structs do recursion
 		if (member->annotation().type->category() == Type::Category::Struct)
 		{
 			auto memberStructType = dynamic_cast<StructType const*>(member->annotation().type);
-			deepCopyStruct(&memberStructType->structDefinition(), lhsSel, rhsSel);
+			deepCopyStruct(&memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
 		}
 		// For other types make the copy by updating the LHS with RHS
 		else
