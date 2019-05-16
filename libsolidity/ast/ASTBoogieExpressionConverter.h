@@ -94,7 +94,7 @@ public:
 				std::list<boogie::Expr::Ref> const& tccs,
 				std::list<boogie::Expr::Ref> const& ocs)
 			:expr(expr), newStatements(newStatements), newDecls(newDecls),
-			 newConstants(newConstants), tccs(tccs), ocs(ocs) {}
+				newConstants(newConstants), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**

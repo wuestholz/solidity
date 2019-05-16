@@ -285,7 +285,7 @@ protected:
 public:
 	Kind getKind() const { return kind; }
 
- public:
+public:
 	virtual ~Stmt() {}
 	static Ref annot(std::vector<Attr::Ref> const& attrs);
 	static Ref annot(Attr::Ref a);
@@ -573,7 +573,7 @@ public:
 	typedef StatementList::iterator iterator;
 	iterator begin() { return stmts.begin(); }
 	iterator end() { return stmts.end(); }
-	StatementList &getStatements() { return stmts; }
+	StatementList& getStatements() { return stmts; }
 
 	void addStmt(Stmt::Ref s) {
 		stmts.push_back(s);
@@ -652,20 +652,20 @@ public:
 	typedef ParameterList::iterator param_iterator;
 	param_iterator param_begin() { return params.begin(); }
 	param_iterator param_end() { return params.end(); }
-	ParameterList &getParameters() { return params; }
+	ParameterList& getParameters() { return params; }
 
 	param_iterator returns_begin() { return rets.begin(); }
 	param_iterator returns_end() { return rets.end(); }
-	ParameterList &getReturns() { return rets; }
+	ParameterList& getReturns() { return rets; }
 
 	typedef SpecificationList::iterator spec_iterator;
 	spec_iterator requires_begin() { return requires.begin(); }
 	spec_iterator requires_end() { return requires.end(); }
-	SpecificationList &getRequires() { return requires; }
+	SpecificationList& getRequires() { return requires; }
 
 	spec_iterator ensures_begin() { return ensures.begin(); }
 	spec_iterator ensures_end() { return ensures.end(); }
-	SpecificationList &getEnsures() { return ensures; }
+	SpecificationList& getEnsures() { return ensures; }
 
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == PROCEDURE; }

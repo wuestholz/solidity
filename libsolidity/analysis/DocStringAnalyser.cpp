@@ -50,7 +50,7 @@ bool DocStringAnalyser::visit(ContractDefinition const& _contract)
 
 bool DocStringAnalyser::visit(ForStatement const& _loop)
 {
-	static const set<string> validTags = set<string>{"notice"};
+	static set<string> const validTags = set<string>{"notice"};
 	parseDocStrings(_loop, _loop.annotation(), validTags, "loops");
 
 	return true;
@@ -58,7 +58,7 @@ bool DocStringAnalyser::visit(ForStatement const& _loop)
 
 bool DocStringAnalyser::visit(WhileStatement const& _loop)
 {
-	static const set<string> validTags = set<string>{"notice"};
+	static set<string> const validTags = set<string>{"notice"};
 	parseDocStrings(_loop, _loop.annotation(), validTags, "loops");
 
 	return true;

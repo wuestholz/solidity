@@ -414,7 +414,7 @@ std::vector<Attr::Ref> ASTBoogieUtils::createAttrs(SourceLocation const& loc, st
 }
 
 ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op,
-		 Expr::Ref lhs, Expr::Ref rhs, unsigned bits, bool isSigned)
+		Expr::Ref lhs, Expr::Ref rhs, unsigned bits, bool isSigned)
 {
 	Expr::Ref result = nullptr;
 	Expr::Ref ecc = nullptr;

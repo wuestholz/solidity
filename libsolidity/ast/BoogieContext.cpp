@@ -29,8 +29,7 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 			string resultType = sign + "int" + to_string(i);
 			auto funType = TypeProvider::function(strings { }, strings { resultType },
 					FunctionType::Kind::Internal, true, StateMutability::Pure);
-			auto sum = new MagicVariableDeclaration(
-			        ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
+			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
 			m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(sum));
 		}
 	}

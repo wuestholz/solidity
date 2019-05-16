@@ -829,8 +829,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// Assign call to the fresh variable
 		addSideEffects({
-		  Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())),
-		  Stmt::call(funcName, allArgs, returnVarNames)
+			Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())),
+			Stmt::call(funcName, allArgs, returnVarNames)
 		});
 
 		// Result is the none, single variable, or a tuple of variables
@@ -934,7 +934,7 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* struct
 
 
 void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _node,
-        StructDefinition const* structDef, vector<Expr::Ref> const& args)
+		StructDefinition const* structDef, vector<Expr::Ref> const& args)
 {
 	auto varDecl = newStruct(structDef, toString(_node.id()));
 	// Initialize each member
@@ -954,28 +954,28 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 	// assert(balance[this] >= msg.value)
 	auto selExpr = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 	auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr,
-	        langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
+			langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
 	addSideEffect(Stmt::comment("Implicit assumption that we have enough ether"));
 	addSideEffect(Stmt::assume(geqResult.expr));
 	// balance[this] -= msg.value
 	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
-	        ASTBoogieUtils::BOOGIE_THIS);
+			ASTBoogieUtils::BOOGIE_THIS);
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
 		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 	}
 	auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
-	        this_balance, msgValue, 256, false);
+			this_balance, msgValue, 256, false);
 	if (m_context.overflow())
 	{
 		addSideEffect(Stmt::comment("Implicit assumption that balances cannot overflow"));
 		addSideEffect(Stmt::assume(subResult.cc));
 	}
 	addSideEffect(
-	        Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-	                Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), subResult.expr)));
+			Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+							Expr::id(ASTBoogieUtils::BOOGIE_THIS), subResult.expr)));
 }
 
 void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
@@ -983,24 +983,23 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	bg::Block::Ref revert = bg::Block::block();
 	// balance[this] += msg.value
-	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
-	        ASTBoogieUtils::BOOGIE_THIS);
+	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		revert->addStmts( { Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
-		        Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)) });
+			Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)) });
 	}
 	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
-	        this_balance, msgValue, 256, false);
+			this_balance, msgValue, 256, false);
 	if (m_context.overflow())
 	{
 		revert->addStmts( { Stmt::comment("Implicit assumption that balances cannot overflow"),
-		        Stmt::assume(addResult.cc) });
+			Stmt::assume(addResult.cc) });
 	}
 	revert->addStmt(
-	        Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-	                Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
-	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), addResult.expr)));
+			Stmt::assign(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+					Expr::upd(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE),
+							Expr::id(ASTBoogieUtils::BOOGIE_THIS), addResult.expr)));
 	// Final statement for balance update in case of failure. Return value of call
 	// is always a tuple (ok, data).
 	auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
