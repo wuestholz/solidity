@@ -257,6 +257,19 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 			m_currentExpr = lhsExpr;
 			return;
 		}
+		// RHS is storage --> create new, deep copy
+		else if (rhsStructType->location() == DataLocation::Storage)
+		{
+			// Create new
+			auto varDecl = newStruct(&lhsStructType->structDefinition(), toString(_node.id()));
+			addSideEffect(Stmt::assign(lhsExpr, Expr::id(varDecl->getName())));
+
+			// Make deep copy
+			deepCopyStruct(_node, &lhsStructType->structDefinition(), lhsExpr, rhsExpr,
+					lhsStructType->location(), rhsStructType->location());
+			m_currentExpr = lhsExpr;
+			return;
+		}
 		else
 		{
 			m_context.reportError(&_node, "Unsupported assignment to memory struct");
@@ -280,7 +293,7 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 			// LHS is storage --> deep copy
 			else
 			{
-				deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr,
+				deepCopyStruct(_node, &lhsStructType->structDefinition(), lhsExpr, rhsExpr,
 						lhsStructType->location(), rhsStructType->location());
 				m_currentExpr = lhsExpr;
 				return;
@@ -289,7 +302,7 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 		// RHS is memory --> deep copy
 		else if (rhsStructType->location() == DataLocation::Memory)
 		{
-			deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr,
+			deepCopyStruct(_node, &lhsStructType->structDefinition(), lhsExpr, rhsExpr,
 					lhsStructType->location(), rhsStructType->location());
 			m_currentExpr = lhsExpr;
 			return;
@@ -306,7 +319,8 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
-void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* structDef, Expr::Ref lhsBase, Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc)
+void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
+		Expr::Ref lhsBase, Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc)
 {
 	addSideEffect(Stmt::comment("Deep copy struct " + structDef->name()));
 	// Loop through each member
@@ -323,7 +337,17 @@ void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* struct
 		if (member->annotation().type->category() == Type::Category::Struct)
 		{
 			auto memberStructType = dynamic_cast<StructType const*>(member->annotation().type);
-			deepCopyStruct(&memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
+			// Deep copy into memory creates new
+			if (lhsLoc == DataLocation::Memory)
+			{
+				// Create new
+				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(_node.id()) + toString(member->id()));
+				// Update member to point to new
+				auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, Expr::id(varDecl->getName())));
+				addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			}
+			// Do the deep copy
+			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
 		}
 		// For other types make the copy by updating the LHS with RHS
 		else
@@ -876,14 +900,21 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
-void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _node,
-        const StructDefinition* structDef, const vector<Expr::Ref>& args) {
+Decl::Ref ASTBoogieExpressionConverter::newStruct(const StructDefinition* structDef, string id)
+{
 	// Address of the new struct
 	// TODO: make sure that it is a new address
-	auto varName = "new_struct#" + to_string(_node.id());
-	auto varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
+	string varName = "new_struct_" + structDef->name() + "#" + id;
+	string varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
 	auto varDecl = bg::Decl::variable(varName, varType);
 	m_newDecls.push_back(varDecl);
+	return varDecl;
+}
+
+
+void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _node,
+        const StructDefinition* structDef, const vector<Expr::Ref>& args) {
+	auto varDecl = newStruct(structDef, toString(_node.id()));
 	// Initialize each member
 	for (size_t i = 0; i < structDef->members().size(); ++i) {
 		auto member = bg::Expr::id(ASTBoogieUtils::mapStructMemberName(*structDef->members()[i], DataLocation::Memory));

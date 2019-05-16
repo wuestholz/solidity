@@ -8,7 +8,7 @@ pragma solidity >=0.5.0;
                ----------------------------
       Storage | Deep      Deep     Deep
               |
-LHS    Memory | Deep      Ref      Deep
+LHS    Memory | Deep+new  Ref      Deep+new
               |
      Local st | Ref       Error    Ref
 */

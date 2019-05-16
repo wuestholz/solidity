@@ -46,7 +46,8 @@ private:
 	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
 
 	// Helper method for recursive deep copy between structures
-	void deepCopyStruct(StructDefinition const* structDef, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
+	void deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
+			boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
 
 	// Helper method to transform a select to an update
 	boogie::Expr::Ref selectToUpdate(std::shared_ptr<boogie::SelExpr const> sel, boogie::Expr::Ref value);
@@ -65,6 +66,7 @@ private:
 
 	// Helper methods for the different scenarios for function calls
 	void functionCallConversion(FunctionCall const& _node);
+	boogie::Decl::Ref newStruct(const StructDefinition* structDef, std::string id);
 	void functionCallNewStruct(const FunctionCall& _node, const StructDefinition* structDef, const std::vector<boogie::Expr::Ref>& args);
 	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
