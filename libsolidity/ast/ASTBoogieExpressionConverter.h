@@ -42,6 +42,9 @@ private:
 	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
 
+	// Helper method to create struct assignment
+	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
+
 	// Helper method for deep copying between structures
 	void deepCopyStruct(StructDefinition const* structDef, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
 

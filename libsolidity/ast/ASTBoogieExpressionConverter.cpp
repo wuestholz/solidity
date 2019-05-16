@@ -141,52 +141,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	if (lhsType->category() == Type::Category::Struct)
 	{
 		solAssert(rhsType->category() == Type::Category::Struct, "LHS is struct but RHS is not");
-		auto lhsStructType = dynamic_cast<StructType const*>(lhsType);
-		auto rhsStructType = dynamic_cast<StructType const*>(rhsType);
-		// LHS is memory
-		if (lhsStructType->location() == DataLocation::Memory)
-		{
-			// RHS is memory --> reference copy
-			if (rhsStructType->location() == DataLocation::Memory)
-			{
-				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
-				m_currentExpr = lhsExpr;
-				return false;
-			}
-			else
-			{
-				m_context.reportError(&_node, "Unsupported assignment to memory struct");
-				m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
-				return false;
-			}
-		}
-		// LHS is storage
-		else if(lhsStructType->location() == DataLocation::Storage)
-		{
-			if (rhsStructType->location() == DataLocation::Storage)
-			{
-				// LHS is local storage --> reference copy
-				if (lhsStructType->isPointer())
-				{
-					createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
-					m_currentExpr = lhsExpr;
-					return false;
-				}
-				// LHS is storage --> deep copy
-				else
-				{
-					deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr);
-					m_currentExpr = lhsExpr;
-					return false;
-				}
-			}
-			else
-			{
-				m_context.reportError(&_node, "Unsupported assignment to storage struct");
-				m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
-				return false;
-			}
-		}
+		createStructAssignment(_node, lhsExpr, rhsExpr);
+		return false;
 	}
 
 	// Bit-precise mode
@@ -285,6 +241,59 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	}
 
 	m_context.reportError(&originalLhs, "Unsupported assignment (LHS must be identifier/indexer)");
+}
+
+void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _node, Expr::Ref lhsExpr, Expr::Ref rhsExpr)
+{
+	auto lhsStructType = dynamic_cast<StructType const*>(_node.leftHandSide().annotation().type);
+	auto rhsStructType = dynamic_cast<StructType const*>(_node.rightHandSide().annotation().type);
+	// LHS is memory
+	if (lhsStructType->location() == DataLocation::Memory)
+	{
+		// RHS is memory --> reference copy
+		if (rhsStructType->location() == DataLocation::Memory)
+		{
+			createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
+			m_currentExpr = lhsExpr;
+			return;
+		}
+		else
+		{
+			m_context.reportError(&_node, "Unsupported assignment to memory struct");
+			m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+			return;
+		}
+	}
+	// LHS is storage
+	else if(lhsStructType->location() == DataLocation::Storage)
+	{
+		if (rhsStructType->location() == DataLocation::Storage)
+		{
+			// LHS is local storage --> reference copy
+			if (lhsStructType->isPointer())
+			{
+				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
+				m_currentExpr = lhsExpr;
+				return;
+			}
+			// LHS is storage --> deep copy
+			else
+			{
+				deepCopyStruct(&lhsStructType->structDefinition(), lhsExpr, rhsExpr);
+				m_currentExpr = lhsExpr;
+				return;
+			}
+		}
+		else
+		{
+			m_context.reportError(&_node, "Unsupported assignment to storage struct");
+			m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+			return;
+		}
+	}
+
+	m_context.reportError(&_node, "Unsupported kind of struct as LHS");
+	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
 void ASTBoogieExpressionConverter::deepCopyStruct(StructDefinition const* structDef, Expr::Ref lhsBase, Expr::Ref rhsBase)
