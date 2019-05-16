@@ -278,7 +278,7 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 		}
 	}
 	// LHS is storage
-	else if(lhsStructType->location() == DataLocation::Storage)
+	else if (lhsStructType->location() == DataLocation::Storage)
 	{
 		// RHS is storage
 		if (rhsStructType->location() == DataLocation::Storage)
@@ -407,7 +407,8 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 	_node.subExpression().accept(*this);
 	Expr::Ref subExpr = m_currentExpr;
 
-	switch (_node.getOperator()) {
+	switch (_node.getOperator())
+	{
 	case Token::Add: m_currentExpr = subExpr; break; // Unary plus does not do anything
 	case Token::Not: m_currentExpr = Expr::not_(subExpr); break;
 
@@ -441,7 +442,8 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
 				// First do the assignment x := x + 1 (or x := x - 1)
-				if (m_context.overflow() && rhsResult.cc) { m_ocs.push_back(rhsResult.cc); }
+				if (m_context.overflow() && rhsResult.cc)
+					m_ocs.push_back(rhsResult.cc);
 				createAssignment(_node.subExpression(), lhs, rhsResult.expr);
 				// Then the assignment tmp := x
 				addSideEffect(Stmt::assign(Expr::id(tempVar->getName()), lhs));
@@ -451,7 +453,8 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 				// First do the assignment tmp := x
 				addSideEffect(Stmt::assign(Expr::id(tempVar->getName()), subExpr));
 				// Then the assignment x := x + 1 (or x := x - 1)
-				if (m_context.overflow() && rhsResult.cc) { m_ocs.push_back(rhsResult.cc); }
+				if (m_context.overflow() && rhsResult.cc)
+					m_ocs.push_back(rhsResult.cc);
 				createAssignment(_node.subExpression(), lhs, rhsResult.expr);
 			}
 			// Result is the tmp variable (if the assignment is part of an expression)
@@ -630,14 +633,17 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	vector<Expr::Ref> allArgs;
 	vector<Expr::Ref> regularArgs;
 	// First, pass extra arguments
-	if (m_isLibraryCall) { allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); } // this
-	else { allArgs.push_back(m_currentAddress); } // this
+	if (m_isLibraryCall)
+		allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // this
+	else
+		allArgs.push_back(m_currentAddress); // this
 	allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
 	Expr::Ref defaultMsgValue = (m_context.isBvEncoding() ?
 			Expr::lit(bg::bigint(0), 256) : Expr::lit(bg::bigint(0)));
 	Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
 	allArgs.push_back(msgValue); // msg.value
-	if (m_isLibraryCall && !m_isLibraryCallStatic) { allArgs.push_back(m_currentAddress); } // Non-static library calls require extra argument
+	if (m_isLibraryCall && !m_isLibraryCallStatic)
+		allArgs.push_back(m_currentAddress); // Non-static library calls require extra argument
 
 	for (unsigned i = 0; i < _node.arguments().size(); ++i)
 	{
@@ -651,11 +657,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			const FunctionDefinition* calledFunc = nullptr;
 			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 			{
-				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration)) { calledFunc = funcDef; }
+				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
+					calledFunc = funcDef;
 			}
 			if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
 			{
-				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration)) { calledFunc = funcDef; }
+				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration))
+					calledFunc = funcDef;
 			}
 			// TODO: the above does not work for complex expressions like 'x.f.value(1)()'
 
@@ -750,7 +758,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	// Struct initialization
-	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression())) {
+	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+	{
 		if (auto structDef = dynamic_cast<StructDefinition const *>(exprId->annotation().referencedDeclaration))
 		{
 			functionCallNewStruct(_node, structDef, regularArgs);
@@ -766,8 +775,11 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
-			for (auto tcc : invar.tccs) { addSideEffect(Stmt::assert_(tcc,
-										ASTBoogieUtils::createAttrs(_node.location(), "Variables for invariant '" + invar.exprStr + "' might be out of range before external call.", *m_context.currentScanner()))); }
+			for (auto tcc : invar.tccs)
+			{
+				addSideEffect(Stmt::assert_(tcc,
+						ASTBoogieUtils::createAttrs(_node.location(), "Variables for invariant '" + invar.exprStr + "' might be out of range before external call.", *m_context.currentScanner())));
+			}
 			addSideEffect(Stmt::assert_(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold before external call.", *m_context.currentScanner())));
 		}
@@ -796,7 +808,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else
 	{
 		// New expressions already create the fresh variable
-		if (!dynamic_cast<NewExpression const*>(&_node.expression())) {
+		if (!dynamic_cast<NewExpression const*>(&_node.expression()))
+		{
 			auto varName = funcName + "#" + to_string(_node.id());
 			auto varType = ASTBoogieUtils::mapType(returnType, &_node, m_context);
 			auto varDecl = bg::Decl::variable(varName, varType);
@@ -839,8 +852,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Assume invariants after external call
 		if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 		{
-			for (auto invar : m_context.currentContractInvars()) {
-				for (auto tcc : invar.tccs) { addSideEffect(Stmt::assume(tcc)); }
+			for (auto invar : m_context.currentContractInvars())
+			{
+				for (auto tcc : invar.tccs)
+					addSideEffect(Stmt::assume(tcc));
 				addSideEffect(Stmt::assume(invar.expr));
 			}
 		}
@@ -919,10 +934,12 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(const StructDefinition* struct
 
 
 void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _node,
-        const StructDefinition* structDef, const vector<Expr::Ref>& args) {
+        const StructDefinition* structDef, const vector<Expr::Ref>& args)
+{
 	auto varDecl = newStruct(structDef, toString(_node.id()));
 	// Initialize each member
-	for (size_t i = 0; i < structDef->members().size(); ++i) {
+	for (size_t i = 0; i < structDef->members().size(); ++i)
+	{
 		auto member = bg::Expr::id(ASTBoogieUtils::mapStructMemberName(*structDef->members()[i], DataLocation::Memory));
 		auto init = bg::Expr::upd(member, bg::Expr::id(varDecl->getName()), args[i]);
 		m_newStatements.push_back(bg::Stmt::assign(member, init));
@@ -931,7 +948,8 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(const FunctionCall& _no
 	m_currentExpr = bg::Expr::id(varDecl->getName());
 }
 
-void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue) {
+void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
+{
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	// assert(balance[this] >= msg.value)
 	auto selExpr = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE, ASTBoogieUtils::BOOGIE_THIS);
@@ -942,13 +960,15 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 	// balance[this] -= msg.value
 	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
 	        ASTBoogieUtils::BOOGIE_THIS);
-	if (m_context.encoding() == BoogieContext::Encoding::MOD) {
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
+	{
 		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
 		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)));
 	}
 	auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
 	        this_balance, msgValue, 256, false);
-	if (m_context.overflow()) {
+	if (m_context.overflow())
+	{
 		addSideEffect(Stmt::comment("Implicit assumption that balances cannot overflow"));
 		addSideEffect(Stmt::assume(subResult.cc));
 	}
@@ -958,19 +978,22 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 	                        Expr::id(ASTBoogieUtils::BOOGIE_THIS), subResult.expr)));
 }
 
-void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue) {
+void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
+{
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	bg::Block::Ref revert = bg::Block::block();
 	// balance[this] += msg.value
 	Expr::Ref this_balance = Expr::sel(ASTBoogieUtils::BOOGIE_BALANCE,
 	        ASTBoogieUtils::BOOGIE_THIS);
-	if (m_context.encoding() == BoogieContext::Encoding::MOD) {
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
+	{
 		revert->addStmts( { Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
 		        Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)) });
 	}
 	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 	        this_balance, msgValue, 256, false);
-	if (m_context.overflow()) {
+	if (m_context.overflow())
+	{
 		revert->addStmts( { Stmt::comment("Implicit assumption that balances cannot overflow"),
 		        Stmt::assume(addResult.cc) });
 	}
@@ -1034,7 +1057,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	bool isAddress = typeCategory == Type::Category::Address;
 	if (_node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
 	{
-		if (isAddress) {
+		if (isAddress)
+		{
 			m_currentExpr = Expr::sel(Expr::id(ASTBoogieUtils::BOOGIE_BALANCE), expr);
 			addTCC(m_currentExpr, tp_uint256);
 			return false;
@@ -1129,7 +1153,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	}
 
 	// Member access on structures: create selector expression
-	if (typeCategory == Type::Category::Struct) {
+	if (typeCategory == Type::Category::Struct)
+	{
 		auto structType = dynamic_cast<StructType const*>(&*type);
 		m_currentExpr = Expr::id(ASTBoogieUtils::mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
 		m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
@@ -1218,9 +1243,11 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	}
 
 	// State variables must be referenced by accessing the map
-	if (referencesStateVar) { m_currentExpr = Expr::sel(declName, ASTBoogieUtils::BOOGIE_THIS); }
+	if (referencesStateVar)
+		m_currentExpr = Expr::sel(declName, ASTBoogieUtils::BOOGIE_THIS);
 	// Other identifiers can be referenced by their name
-	else { m_currentExpr = Expr::id(declName); }
+	else
+		m_currentExpr = Expr::id(declName);
 
 	addTCC(m_currentExpr, _node.annotation().referencedDeclaration->type());
 
@@ -1238,12 +1265,16 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	TypePointer type = _node.annotation().type;
 	Type::Category typeCategory = type->category();
 
-	switch (typeCategory) {
-	case Type::Category::RationalNumber: {
+	switch (typeCategory)
+	{
+	case Type::Category::RationalNumber:
+	{
 		auto rationalType = dynamic_cast<RationalNumberType const*>(type);
-		if (rationalType != nullptr) {
+		if (rationalType != nullptr)
+		{
 			// For now, just the integers
-			if (!rationalType->isFractional()) {
+			if (!rationalType->isFractional())
+			{
 				m_currentExpr = Expr::lit(bg::bigint(_node.value()));
 				return false;
 			}
@@ -1253,19 +1284,22 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	case Type::Category::Bool:
 		m_currentExpr = Expr::lit(_node.value() == "true");
 		return false;
-	case Type::Category::Address: {
+	case Type::Category::Address:
+	{
 		string name = "address_" + _node.value();
 		m_newConstants.push_back(bg::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 		m_currentExpr = Expr::id(name);
 		return false;
 	}
-	case Type::Category::StringLiteral: {
+	case Type::Category::StringLiteral:
+	{
 		string name = "literal_string#" + to_string(_node.id());
 		m_newConstants.push_back(bg::Decl::constant(name, ASTBoogieUtils::BOOGIE_STRING_TYPE, true));
 		m_currentExpr = Expr::id(name);
 		return false;
 	}
-	default: {
+	default:
+	{
 		// Report unsupported
 		string tpStr = type->toString();
 		m_context.reportError(&_node, "Unsupported literal for type " + tpStr.substr(0, tpStr.find(' ')));
