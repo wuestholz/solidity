@@ -57,6 +57,7 @@ CMakeLists.txt.user
 /.vs
 /.cproject
 /.project
+.settings/language.settings.xml
 
 # place to put local temporary files
 tmp
