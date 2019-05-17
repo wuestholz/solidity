@@ -121,12 +121,6 @@ public:
 	boogie::TypeDeclRef mappingType(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType);
 
 	/**
-	 * Return Boogie's BV type of given size.
-	 */
-	static
-	boogie::TypeDeclRef boogieBVType(unsigned n);
-
-	/**
 	 * Create attributes for original source location and message
 	 */
 	static

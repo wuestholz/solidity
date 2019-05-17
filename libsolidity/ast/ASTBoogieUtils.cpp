@@ -329,11 +329,6 @@ TypeDeclRef ASTBoogieUtils::getStructAddressType(StructDefinition const* structD
 			"_" + structDef->name() + "#" + toString(structDef->id()));
 }
 
-TypeDeclRef ASTBoogieUtils::boogieBVType(unsigned n)
-{
-	return Decl::typee("bv" + to_string(n));
-}
-
 TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
 {
 	Type::Category tpCategory = tp->category();

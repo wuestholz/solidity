@@ -155,7 +155,7 @@ boogie::TypeDeclRef BoogieContext::stringType() const
 boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
-		return ASTBoogieUtils::boogieBVType(size);
+		return boogie::Decl::typee("bv" + toString(size));
 	else
 		return boogie::Decl::typee("int");
 }
@@ -199,8 +199,8 @@ boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned expr
 
 		// Appropriate types
 		unsigned resultSize = high - low + 1;
-		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = intType(resultSize);
+		boogie::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
@@ -233,8 +233,8 @@ boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ zero_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = intType(resultSize);
+		boogie::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
@@ -267,8 +267,8 @@ boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ sign_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = intType(resultSize);
+		boogie::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
@@ -408,8 +408,8 @@ boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boo
 
 		// Appropriate types
 		if (resultType == nullptr)
-			resultType = ASTBoogieUtils::boogieBVType(bits);
-		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(bits);
+			resultType = intType(bits);
+		boogie::TypeDeclRef exprType = intType(bits);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
@@ -442,7 +442,7 @@ boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boog
 		fnSmtSS << "bv" << name;
 
 		// Appropriate types
-		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(bits);
+		boogie::TypeDeclRef exprType = intType(bits);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
