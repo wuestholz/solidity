@@ -51,24 +51,71 @@ void MovableChecker::operator()(Identifier const& _identifier)
 
 void MovableChecker::operator()(FunctionalInstruction const& _instr)
 {
+	ASTWalker::operator()(_instr);
+
 	if (!eth::SemanticInformation::movable(_instr.instruction))
 		m_movable = false;
-	else
-		ASTWalker::operator()(_instr);
+	if (!eth::SemanticInformation::sideEffectFree(_instr.instruction))
+		m_sideEffectFree = false;
 }
 
 void MovableChecker::operator()(FunctionCall const& _functionCall)
 {
+	ASTWalker::operator()(_functionCall);
+
 	if (BuiltinFunction const* f = m_dialect.builtin(_functionCall.functionName.name))
-		if (f->movable)
-		{
-			ASTWalker::operator()(_functionCall);
-			return;
-		}
-	m_movable = false;
+	{
+		if (!f->movable)
+			m_movable = false;
+		if (!f->sideEffectFree)
+			m_sideEffectFree = false;
+	}
+	else
+	{
+		m_movable = false;
+		m_sideEffectFree = false;
+	}
 }
 
 void MovableChecker::visit(Statement const&)
 {
 	assertThrow(false, OptimizerException, "Movability for statement requested.");
+}
+
+pair<TerminationFinder::ControlFlow, size_t> TerminationFinder::firstUnconditionalControlFlowChange(
+	vector<Statement> const& _statements
+)
+{
+	for (size_t i = 0; i < _statements.size(); ++i)
+	{
+		ControlFlow controlFlow = controlFlowKind(_statements[i]);
+		if (controlFlow != ControlFlow::FlowOut)
+			return {controlFlow, i};
+	}
+	return {ControlFlow::FlowOut, size_t(-1)};
+}
+
+TerminationFinder::ControlFlow TerminationFinder::controlFlowKind(Statement const& _statement)
+{
+	if (
+		_statement.type() == typeid(ExpressionStatement) &&
+		isTerminatingBuiltin(boost::get<ExpressionStatement>(_statement))
+	)
+		return ControlFlow::Terminate;
+	else if (_statement.type() == typeid(Break))
+		return ControlFlow::Break;
+	else if (_statement.type() == typeid(Continue))
+		return ControlFlow::Continue;
+	else
+		return ControlFlow::FlowOut;
+}
+
+bool TerminationFinder::isTerminatingBuiltin(ExpressionStatement const& _exprStmnt)
+{
+	if (_exprStmnt.expression.type() != typeid(FunctionalInstruction))
+		return false;
+
+	return eth::SemanticInformation::terminatesControlFlow(
+		boost::get<FunctionalInstruction>(_exprStmnt.expression).instruction
+	);
 }

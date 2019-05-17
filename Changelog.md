@@ -5,11 +5,16 @@ Language Features:
 
 
 Compiler Features:
+ * Code Generator: Fix handling of structs of dynamic size as constructor parameters.
+ * Optimizer: Add rule to simplify SHL/SHR combinations.
  * SMTChecker: Support inherited state variables.
  * SMTChecker: Support tuples and function calls with multiple return values.
  * SMTChecker: Support ``delete``.
  * SMTChecker: Inline external function calls to ``this``.
+ * Metadata: Add IPFS hashes of source files.
  * Assembler: Encode the compiler version in the deployed bytecode.
+ * Yul Optimizer: Simplify single-run ``for`` loops to ``if`` statements.
+ * Optimizer: Add rules for multiplication and division by left-shifted one.
 
 
 Bugfixes:

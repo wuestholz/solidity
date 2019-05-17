@@ -49,6 +49,8 @@ struct BuiltinFunction
 	/// This means the function cannot depend on storage or memory, cannot have any side-effects,
 	/// but it can depend on state that is constant across an EVM-call.
 	bool movable = false;
+	/// If true, a call to this function can be omitted without changing semantics.
+	bool sideEffectFree = false;
 	/// If true, can only accept literals as arguments and they cannot be moved to variables.
 	bool literalArguments = false;
 };
@@ -62,10 +64,10 @@ struct Dialect: boost::noncopyable
 	Dialect(AsmFlavour _flavour): flavour(_flavour) {}
 	virtual ~Dialect() = default;
 
-	static std::shared_ptr<Dialect> yul()
+	static Dialect const& yul()
 	{
-		// Will have to add builtins later.
-		return std::make_shared<Dialect>(AsmFlavour::Yul);
+		static Dialect yulDialect(AsmFlavour::Yul);
+		return yulDialect;
 	}
 };
 

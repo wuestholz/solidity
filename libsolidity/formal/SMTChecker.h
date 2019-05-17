@@ -55,9 +55,11 @@ public:
 	/// the constructor.
 	std::vector<std::string> unhandledQueries() { return m_interface->unhandledQueries(); }
 
-	/// @return the FunctionDefinition of a called function if possible and should inline,
+	/// @returns the FunctionDefinition of a called function if possible and should inline,
 	/// otherwise nullptr.
 	static FunctionDefinition const* inlinedFunctionCallToDefinition(FunctionCall const& _funCall);
+	/// @returns the leftmost identifier in a multi-d IndexAccess.
+	static Expression const* leftmostBase(IndexAccess const& _indexAccess);
 
 private:
 	// TODO: Check that we do not have concurrent reads and writes to a variable,
@@ -214,11 +216,8 @@ private:
 
 	void initializeLocalVariables(FunctionDefinition const& _function);
 	void initializeFunctionCallParameters(CallableDeclaration const& _function, std::vector<smt::Expression> const& _callArgs);
-	void resetVariable(VariableDeclaration const& _variable);
 	void resetStateVariables();
 	void resetStorageReferences();
-	void resetVariables(std::set<VariableDeclaration const*> const& _variables);
-	void resetVariables(std::function<bool(VariableDeclaration const&)> const& _filter);
 	/// @returns the type without storage pointer information if it has it.
 	TypePointer typeWithoutPointer(TypePointer const& _type);
 
@@ -227,35 +226,18 @@ private:
 	/// using the branch condition as guard.
 	void mergeVariables(std::set<VariableDeclaration const*> const& _variables, smt::Expression const& _condition, VariableIndices const& _indicesEndTrue, VariableIndices const& _indicesEndFalse);
 	/// Tries to create an uninitialized variable and returns true on success.
-	/// This fails if the type is not supported.
 	bool createVariable(VariableDeclaration const& _varDecl);
 
-	/// @returns true if _delc is a variable that is known at the current point, i.e.
-	/// has a valid index
-	bool knownVariable(VariableDeclaration const& _decl);
 	/// @returns an expression denoting the value of the variable declared in @a _decl
 	/// at the current point.
 	smt::Expression currentValue(VariableDeclaration const& _decl);
 	/// @returns an expression denoting the value of the variable declared in @a _decl
 	/// at the given index. Does not ensure that this index exists.
 	smt::Expression valueAtIndex(VariableDeclaration const& _decl, int _index);
-	/// Allocates a new index for the declaration, updates the current
-	/// index to this value and returns the expression.
-	smt::Expression newValue(VariableDeclaration const& _decl);
-
-	/// Sets the value of the declaration to zero.
-	void setZeroValue(VariableDeclaration const& _decl);
-	void setZeroValue(SymbolicVariable& _variable);
-	/// Resets the variable to an unknown value (in its range).
-	void setUnknownValue(VariableDeclaration const& decl);
-	void setUnknownValue(SymbolicVariable& _variable);
-
 	/// Returns the expression corresponding to the AST node. Throws if the expression does not exist.
 	smt::Expression expr(Expression const& _e);
 	/// Creates the expression (value can be arbitrary)
 	void createExpr(Expression const& _e);
-	/// Checks if expression was created
-	bool knownExpr(Expression const& _e) const;
 	/// Creates the expression and sets its value.
 	void defineExpr(Expression const& _e, smt::Expression _value);
 
@@ -279,9 +261,6 @@ private:
 	/// Add to the solver: the given expression implied by the current path conditions
 	void addPathImpliedExpression(smt::Expression const& _e);
 
-	/// Removes local variables from the context.
-	void removeLocalVariables();
-
 	/// Copy the SSA indices of m_variables.
 	VariableIndices copyVariableIndices();
 	/// Resets the variable indices.
@@ -294,17 +273,14 @@ private:
 	VariableDeclaration const* identifierToVariable(Expression const& _expr);
 
 	std::unique_ptr<smt::SolverInterface> m_interface;
-	VariableUsage m_variableUsage;
+	smt::VariableUsage m_variableUsage;
 	bool m_loopExecutionHappened = false;
 	bool m_arrayAssignmentHappened = false;
 	bool m_externalFunctionCallHappened = false;
 	// True if the "No SMT solver available" warning was already created.
 	bool m_noSolverWarning = false;
-	/// An Expression may have multiple smt::Expression due to
-	/// repeated calls to the same function.
-	std::unordered_map<Expression const*, std::shared_ptr<SymbolicVariable>> m_expressions;
-	std::unordered_map<VariableDeclaration const*, std::shared_ptr<SymbolicVariable>> m_variables;
-	std::unordered_map<std::string, std::shared_ptr<SymbolicVariable>> m_globalContext;
+
+	std::unordered_map<std::string, std::shared_ptr<smt::SymbolicVariable>> m_globalContext;
 
 	/// Stores the instances of an Uninterpreted Function applied to arguments.
 	/// These may be direct application of UFs or Array index access.
