@@ -18,7 +18,7 @@ using bigint = boost::multiprecision::int1024_t;
 struct Binding
 {
 	std::string id;
-	std::string type;
+	std::string type; // TODO: replace with TypeDeclRef
 };
 
 class Expr
@@ -453,6 +453,8 @@ class ProcDecl;
 using ProcDeclRef = std::shared_ptr<ProcDecl>;
 class FuncDecl;
 using FuncDeclRef = std::shared_ptr<FuncDecl>;
+class TypeDecl;
+using TypeDeclRef = std::shared_ptr<TypeDecl>;
 
 class Decl {
 public:
@@ -483,7 +485,7 @@ public:
 	void addAttr(Attr::Ref a) { attrs.push_back(a); }
 	void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a : ax) addAttr(a); }
 
-	static Ref typee(std::string name, std::string type = "",
+	static TypeDeclRef typee(std::string name, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
 	static Ref axiom(Expr::Ref e, std::string name = "");
 	static FuncDeclRef function(
@@ -496,6 +498,7 @@ public:
 	static Ref constant(std::string name, std::string type, bool unique);
 	static Ref constant(std::string name, std::string type, std::vector<Attr::Ref> const& ax, bool unique);
 	static Ref variable(std::string name, std::string type);
+	static Ref variable(std::string name, TypeDeclRef type);
 	static ProcDeclRef procedure(std::string name,
 		std::vector<Binding> const& params = {},
 		std::vector<Binding> const& rets = {},

@@ -137,12 +137,12 @@ void BoogieContext::addConstant(boogie::Decl::Ref decl)
 	}
 }
 
-string BoogieContext::intType(unsigned size) const
+boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
 		return ASTBoogieUtils::boogieBVType(size);
 	else
-		return ASTBoogieUtils::BOOGIE_INT_TYPE;
+		return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_INT_TYPE);
 }
 
 boogie::Expr::Ref BoogieContext::intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low)
@@ -184,14 +184,14 @@ boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned expr
 
 		// Appropriate types
 		unsigned resultSize = high - low + 1;
-		std::string resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		std::string exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
+		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
-				resultType,         // Type
+				{ {"", exprType->getName()} }, // Arguments
+				resultType->getName(),         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
@@ -218,14 +218,14 @@ boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ zero_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		std::string resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		std::string exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
+		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
-				resultType,         // Type
+				{ {"", exprType->getName()} }, // Arguments
+				resultType->getName(),         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
@@ -252,14 +252,14 @@ boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ sign_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		std::string resultType = ASTBoogieUtils::boogieBVType(resultSize);
-		std::string exprType = ASTBoogieUtils::boogieBVType(exprSize);
+		boogie::TypeDeclRef resultType = ASTBoogieUtils::boogieBVType(resultSize);
+		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(exprSize);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
-				resultType,         // Type
+				{ {"", exprType->getName()} }, // Arguments
+				resultType->getName(),         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
@@ -393,13 +393,13 @@ boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boo
 
 		// Appropriate types
 		if (resultType == "")
-			resultType = ASTBoogieUtils::boogieBVType(bits);
-		std::string exprType = ASTBoogieUtils::boogieBVType(bits);
+			resultType = ASTBoogieUtils::boogieBVType(bits)->getName();
+		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(bits);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { "", exprType }, { "", exprType } }, // Arguments
+				{ { "", exprType->getName() }, { "", exprType->getName() } }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
@@ -427,13 +427,13 @@ boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boog
 		fnSmtSS << "bv" << name;
 
 		// Appropriate types
-		std::string exprType = ASTBoogieUtils::boogieBVType(bits);
+		boogie::TypeDeclRef exprType = ASTBoogieUtils::boogieBVType(bits);
 
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),       // Name
-				{ { "", exprType } }, // Arguments
-				exprType,             // Type
+				{ { "", exprType->getName() } }, // Arguments
+				exprType->getName(),  // Type
 				nullptr,              // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);

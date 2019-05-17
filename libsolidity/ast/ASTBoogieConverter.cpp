@@ -394,8 +394,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.addDecl(
 					boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
-					"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" +
-					ASTBoogieUtils::mapType(sumDecl.second, sumDecl.first, m_context)));
+					ASTBoogieUtils::mappingType(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
+					ASTBoogieUtils::toBoogieType(sumDecl.second, sumDecl.first, m_context))));
 	}
 
 	// Process state variables first (to get initializer expressions)
@@ -467,17 +467,17 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 
 	// First define memory/storage address types for the struct type
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
-	string structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
-	string structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
-	m_context.addDecl(boogie::Decl::typee(structStorageType));
-	m_context.addDecl(boogie::Decl::typee(structMemType));
+	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
+	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
+	m_context.addDecl(structStorageType);
+	m_context.addDecl(structMemType);
 
 	// Create mappings for each member (both memory and storage)
 	for (auto member : _node.members())
 	{
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
 		auto memberType = member->type();
-		string memberTypeForMem, memberTypeForStor;
+		boogie::TypeDeclRef memberTypeForMem, memberTypeForStor;
 		// Nested structures need separate types for the memory/storage member
 		if (member->type()->category() == Type::Category::Struct)
 		{
@@ -487,19 +487,19 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		}
 		else // Other types are the same for both memory/storage
 		{
-			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::mapType(member->type(), &*member, m_context);
+			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::toBoogieType(member->type(), &*member, m_context);
 		}
 		// TODO: arrays?
 
 		// Storage member
 		auto varDeclStor = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Storage),
-				"[" + structStorageType + "]" + memberTypeForStor);
+				ASTBoogieUtils::mappingType(structStorageType, memberTypeForStor));
 		varDeclStor->addAttrs(attrs);
 		m_context.addDecl(varDeclStor);
 
 		// Memory member
 		auto varDeclMem = boogie::Decl::variable(ASTBoogieUtils::mapStructMemberName(*member, DataLocation::Memory),
-				"[" + structMemType + "]" + memberTypeForMem);
+				ASTBoogieUtils::mappingType(structMemType, memberTypeForMem));
 		varDeclMem->addAttrs(attrs);
 		m_context.addDecl(varDeclMem);
 	}
@@ -551,7 +551,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add original parameters of the function
 	for (auto par : _node.parameters())
 	{
-		params.push_back({ASTBoogieUtils::mapDeclName(*par), ASTBoogieUtils::mapType(par->type(), par.get(), m_context)});
+		params.push_back({ASTBoogieUtils::mapDeclName(*par), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)->getName()});
 		if (par->type()->category() == Type::Category::Array) // Array length
 		{
 			params.push_back({ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.isBvEncoding() ? "bv256" : "int"});
@@ -569,9 +569,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			return false;
 		}
 		std::string id = ASTBoogieUtils::mapDeclName(*ret);
-		std::string type = ASTBoogieUtils::mapType(ret->type(), ret.get(), m_context);
+		boogie::TypeDeclRef type = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
 		retIds.push_back(boogie::Expr::id(id));
-		rets.push_back({id, type});
+		rets.push_back({id, type->getName()});
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -665,7 +665,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					auto modifierParamDecl = modifierDecl->parameters()[i];
 					boogie::Decl::Ref modifierParam = boogie::Decl::variable(
 							ASTBoogieUtils::mapDeclName(*modifierParamDecl),
-							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, modifierParamDecl.get(), m_context));
+							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, modifierParamDecl.get(), m_context));
 					m_localDecls.push_back(modifierParam);
 					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
 					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
@@ -849,7 +849,9 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	auto varDecl = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + ASTBoogieUtils::mapType(_node.type(), &_node, m_context));
+			ASTBoogieUtils::mappingType(
+					boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
+					ASTBoogieUtils::toBoogieType(_node.type(), &_node, m_context)));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.addDecl(varDecl);
 
@@ -858,7 +860,9 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	{
 		m_context.addDecl(
 				boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
-				"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_context.isBvEncoding() ? "bv256" : "int")));
+						ASTBoogieUtils::mappingType(
+								boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
+								boogie::Decl::typee(m_context.isBvEncoding() ? "bv256" : "int"))));
 	}
 	return false;
 }
@@ -981,7 +985,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 				{
 					auto paramDecls = modifierDecl->parameters()[i];
 					boogie::Decl::Ref modifierParam = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*paramDecls),
-							ASTBoogieUtils::mapType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
+							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
 					m_localDecls.push_back(modifierParam);
 					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
 					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
@@ -1280,7 +1284,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				// Boogie requires local variables to be declared at the beginning of the procedure
 				auto varDecl = boogie::Decl::variable(
 						ASTBoogieUtils::mapDeclName(*decl),
-						ASTBoogieUtils::mapType(decl->type(), decl.get(), m_context));
+						ASTBoogieUtils::toBoogieType(decl->type(), decl.get(), m_context));
 				varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
 				m_localDecls.push_back(varDecl);
 			}
@@ -1392,7 +1396,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 	boogie::Expr::Ref expr = convertExpression(_node.expression());
 	boogie::Decl::Ref tmpVar = boogie::Decl::variable("tmpVar" + to_string(_node.id()),
-			ASTBoogieUtils::mapType(_node.expression().annotation().type, &_node, m_context));
+			ASTBoogieUtils::toBoogieType(_node.expression().annotation().type, &_node, m_context));
 	m_localDecls.push_back(tmpVar);
 	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
 	m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(tmpVar->getName()), expr));

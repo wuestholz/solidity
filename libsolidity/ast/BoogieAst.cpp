@@ -357,10 +357,11 @@ Stmt::Ref Stmt::label(std::string s)
 	return std::make_shared<LabelStmt const>(s);
 }
 
-Decl::Ref Decl::typee(std::string name, std::string type, std::vector<Attr::Ref> const& attrs)
+TypeDeclRef Decl::typee(std::string name, std::string type, std::vector<Attr::Ref> const& attrs)
 {
 	return std::make_shared<TypeDecl>(name,type,attrs);
 }
+
 Decl::Ref Decl::axiom(Expr::Ref e, std::string name)
 {
 	return std::make_shared<AxiomDecl>(name, e);
@@ -390,6 +391,11 @@ Decl::Ref Decl::constant(std::string name, std::string type, std::vector<Attr::R
 Decl::Ref Decl::variable(std::string name, std::string type)
 {
 	return std::make_shared<VarDecl>(name, type);
+}
+
+Decl::Ref Decl::variable(std::string name, TypeDeclRef type)
+{
+	return std::make_shared<VarDecl>(name, type->getName());
 }
 
 ProcDeclRef Decl::procedure(std::string name,

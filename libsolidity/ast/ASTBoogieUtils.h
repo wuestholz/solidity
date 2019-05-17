@@ -113,19 +113,22 @@ public:
 	 * Get address type for a struct with a given data location
 	 */
 	static
-	std::string getStructAddressType(StructDefinition const* structDef, DataLocation loc);
+	boogie::TypeDeclRef getStructAddressType(StructDefinition const* structDef, DataLocation loc);
 
 	/**
 	 * Map a Solidity type to a Boogie type
 	 */
 	static
-	std::string mapType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context);
+	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context);
+
+	static
+	boogie::TypeDeclRef mappingType(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType);
 
 	/**
 	 * Return Boogie's BV type of given size.
 	 */
 	static
-	std::string boogieBVType(unsigned n);
+	boogie::TypeDeclRef boogieBVType(unsigned n);
 
 	/**
 	 * Create attributes for original source location and message

@@ -117,7 +117,7 @@ public:
 	void addConstant(boogie::Decl::Ref decl);
 
 	/** Returns the integer type corresponding to the encoding */
-	std::string intType(unsigned size) const;
+	boogie::TypeDeclRef intType(unsigned size) const;
 
 	/** Slice of an integer corresponding to the encoding */
 	boogie::Expr::Ref intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low);

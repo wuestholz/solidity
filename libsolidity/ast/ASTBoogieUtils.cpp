@@ -69,8 +69,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	vector<Binding> transferParams{
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.intType(256) },
-		{"amount", context.intType(256) }
+		{BOOGIE_MSG_VALUE, context.intType(256)->getName() },
+		{"amount", context.intType(256)->getName() }
 	};
 
 	// Type to pass around
@@ -137,7 +137,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	vector<Binding> callParams {
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.intType(256) }
+		{BOOGIE_MSG_VALUE, context.intType(256)->getName() }
 	};
 
 	// Type to pass around
@@ -152,8 +152,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Return value
 	vector<Binding> callReturns{
-		{"__result", mapType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
-		{"__calldata", mapType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
+		{"__result", toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)->getName()},
+		{"__calldata", toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)->getName()}
 	};
 
 	// Body
@@ -203,8 +203,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	vector<Binding> sendParams {
 		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
 		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.intType(256) },
-		{"amount", context.intType(256) }
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.intType(256)->getName() },
+		{"amount", context.intType(256)->getName() }
 	};
 
 	// Type to pass around
@@ -327,33 +327,34 @@ string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
 }
 
-string ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, DataLocation loc)
+TypeDeclRef ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, DataLocation loc)
 {
-	return BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) + "_" + structDef->name() + "#" + toString(structDef->id());
+	return Decl::typee(BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) +
+			"_" + structDef->name() + "#" + toString(structDef->id()));
 }
 
-string ASTBoogieUtils::boogieBVType(unsigned n)
+TypeDeclRef ASTBoogieUtils::boogieBVType(unsigned n)
 {
-	return "bv" + to_string(n);
+	return Decl::typee("bv" + to_string(n));
 }
 
-string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
+TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
 {
 	Type::Category tpCategory = tp->category();
 
 	switch (tpCategory)
 	{
 	case Type::Category::Address:
-		return BOOGIE_ADDRESS_TYPE;
+		return Decl::typee(BOOGIE_ADDRESS_TYPE);
 	case Type::Category::StringLiteral:
-		return BOOGIE_STRING_TYPE;
+		return Decl::typee(BOOGIE_STRING_TYPE);
 	case Type::Category::Bool:
-		return BOOGIE_BOOL_TYPE;
+		return Decl::typee(BOOGIE_BOOL_TYPE);
 	case Type::Category::RationalNumber:
 	{
 		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
 		if (!tpRational->isFractional())
-			return BOOGIE_INT_CONST_TYPE;
+			return Decl::typee(BOOGIE_INT_CONST_TYPE);
 		else
 			context.reportError(_associatedNode, "Fractional numbers are not supported");
 		break;
@@ -364,20 +365,20 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 		return context.intType(tpInteger->numBits());
 	}
 	case Type::Category::Contract:
-		return BOOGIE_ADDRESS_TYPE;
+		return Decl::typee(BOOGIE_ADDRESS_TYPE);
 	case Type::Category::Array:
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
 		if (arrType->isString())
-			return BOOGIE_STRING_TYPE;
+			return Decl::typee(BOOGIE_STRING_TYPE);
 		else
-			return "[" + context.intType(256) + "]" + mapType(arrType->baseType(), _associatedNode, context);
+			return mappingType(context.intType(256), toBoogieType(arrType->baseType(), _associatedNode, context));
 	}
 	case Type::Category::Mapping:
 	{
-		auto mappingType = dynamic_cast<MappingType const*>(&*tp);
-		return "[" + mapType(mappingType->keyType(), _associatedNode, context) + "]"
-				+ mapType(mappingType->valueType(), _associatedNode, context);
+		auto mapType = dynamic_cast<MappingType const*>(&*tp);
+		return mappingType(toBoogieType(mapType->keyType(), _associatedNode, context),
+				toBoogieType(mapType->valueType(), _associatedNode, context));
 	}
 	case Type::Category::FixedBytes:
 	{
@@ -394,13 +395,16 @@ string ASTBoogieUtils::mapType(TypePointer tp, ASTNode const* _associatedNode, B
 		return getStructAddressType(&structTp->structDefinition(), structTp->location());
 	}
 	default:
-	{
 		std::string tpStr = tp->toString();
 		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
-	}
 
-	return ERR_TYPE;
+	return Decl::typee(ERR_TYPE);
+}
+
+TypeDeclRef ASTBoogieUtils::mappingType(TypeDeclRef keyType, TypeDeclRef valueType)
+{
+	return Decl::typee("[" + keyType->getName() + "]" + valueType->getName());
 }
 
 std::vector<Attr::Ref> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)

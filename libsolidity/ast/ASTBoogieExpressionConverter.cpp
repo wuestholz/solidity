@@ -437,7 +437,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							m_context.isBvEncoding() ? Expr::lit(bg::bigint(1), bits) : Expr::lit(bg::bigint(1)),
 							bits, isSigned);
 			bg::Decl::Ref tempVar = bg::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::mapType(_node.subExpression().annotation().type, &_node, m_context));
+					ASTBoogieUtils::toBoogieType(_node.subExpression().annotation().type, &_node, m_context));
 			m_newDecls.push_back(tempVar);
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
@@ -798,7 +798,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		for (size_t i = 0; i < returnTypes.size(); ++ i)
 		{
 			auto varName = funcName + "#" + to_string(i) + "#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::mapType(returnTypes[i], &_node, m_context);
+			auto varType = ASTBoogieUtils::toBoogieType(returnTypes[i], &_node, m_context);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
 			returnVarNames.push_back(varName);
@@ -811,7 +811,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (!dynamic_cast<NewExpression const*>(&_node.expression()))
 		{
 			auto varName = funcName + "#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::mapType(returnType, &_node, m_context);
+			auto varType = ASTBoogieUtils::toBoogieType(returnType, &_node, m_context);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
 			returnVarNames.push_back(varName);
@@ -900,11 +900,12 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 			return;
 		}
 	}
-	string targetType = ASTBoogieUtils::mapType(_node.annotation().type, &_node, m_context);
-	string sourceType = ASTBoogieUtils::mapType(arg->annotation().type, arg.get(), m_context);
+	TypeDeclRef targetType = ASTBoogieUtils::toBoogieType(_node.annotation().type, &_node, m_context);
+	TypeDeclRef sourceType = ASTBoogieUtils::toBoogieType(arg->annotation().type, arg.get(), m_context);
 	// Nothing to do when the two types are mapped to same type in Boogie,
 	// e.g., conversion from uint256 to int256 if both are mapped to int
-	if (targetType == sourceType || (targetType == "int" && sourceType == "int_const"))
+	// TODO: check the type instance instead of name as soon as it is a singleton
+	if (targetType->getName() == sourceType->getName() || (targetType->getName() == "int" && sourceType->getName() == "int_const"))
 	{
 		arg->accept(*this);
 		return;
@@ -926,7 +927,7 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* struct
 	// Address of the new struct
 	// TODO: make sure that it is a new address
 	string varName = "new_struct_" + structDef->name() + "#" + id;
-	string varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
+	TypeDeclRef varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
 	auto varDecl = bg::Decl::variable(varName, varType);
 	m_newDecls.push_back(varDecl);
 	return varDecl;
