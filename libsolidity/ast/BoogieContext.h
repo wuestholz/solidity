@@ -157,7 +157,7 @@ public:
 	boogie::Expr::Ref bvNot(unsigned bits, boogie::Expr::Ref expr);
 
 	// Low lever interface
-	boogie::Expr::Ref bvBinaryOp(std::string name, unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, std::string resultType = "");
+	boogie::Expr::Ref bvBinaryOp(std::string name, unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, boogie::TypeDeclRef resultType = nullptr);
 	boogie::Expr::Ref bvUnaryOp(std::string name, unsigned bits, boogie::Expr::Ref expr);
 
 };

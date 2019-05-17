@@ -368,7 +368,7 @@ Decl::Ref Decl::axiom(Expr::Ref e, std::string name)
 }
 
 FuncDeclRef Decl::function(std::string name, std::vector<Binding> const& args,
-		std::string type, Expr::Ref e, std::vector<Attr::Ref> const& attrs)
+		TypeDeclRef type, Expr::Ref e, std::vector<Attr::Ref> const& attrs)
 {
 	return std::make_shared<FuncDecl>(name,attrs,args,type,e);
 }
@@ -431,10 +431,10 @@ FuncDeclRef Decl::code(ProcDeclRef P)
 	//decls.push_back(Decl::variable(Naming::EXN_VAR, "bool"));
 
 	for (auto R : P->getReturns())
-		decls.push_back(Decl::variable(R.id, Decl::typee(R.type)));
+		decls.push_back(Decl::variable(R.id, R.type));
 
 	return Decl::function(
-		P->getName(), P->getParameters(), "bool", std::make_shared<CodeExpr const>(decls, blocks),
+		P->getName(), P->getParameters(), Decl::typee("bool"), std::make_shared<CodeExpr const>(decls, blocks),
 		{Attr::attr("inline")}
 	);
 }
@@ -513,7 +513,7 @@ std::ostream& operator<<(std::ostream& os, Program const& p)
 
 std::ostream& operator<<(std::ostream& os, Binding const& p)
 {
-	os << p.id << ": " << p.type;
+	os << p.id << ": " << p.type->getName();
 	return os;
 }
 
@@ -891,8 +891,8 @@ void FuncDecl::print(std::ostream& os) const
 		print_seq(os, attrs, "", " ", " ");
 	os << name << "(";
 	for (auto P = params.begin(), E = params.end(); P != E; ++P)
-		os << (P == params.begin() ? "" : ", ") << (P->id != "" ? P->id + ": " : "") << P->type;
-	os << ") returns (" << type << ")";
+		os << (P == params.begin() ? "" : ", ") << (P->id != "" ? P->id + ": " : "") << P->type->getName();
+	os << ") returns (" << type->getName() << ")";
 	if (body)
 		os << " { " << body << " }";
 	else
@@ -930,14 +930,14 @@ void ProcDecl::print(std::ostream& os) const
 		print_seq(os, attrs, "", " ", " ");
 	os << name << "(";
 	for (auto P = params.begin(), E = params.end(); P != E; ++P)
-		os << (P == params.begin() ? "" : ", ") << P->id << ": " << P->type;
+		os << (P == params.begin() ? "" : ", ") << P->id << ": " << P->type->getName();
 	os << ")";
 	if (rets.size() > 0)
 	{
 		os << "\n";
 		os << "	returns (";
 		for (auto R = rets.begin(), E = rets.end(); R != E; ++R)
-			os << (R == rets.begin() ? "" : ", ") << R->id << ": " << R->type;
+			os << (R == rets.begin() ? "" : ", ") << R->id << ": " << R->type->getName();
 		os << ")";
 	}
 	if (blocks.size() == 0)

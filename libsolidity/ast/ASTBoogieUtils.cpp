@@ -67,10 +67,10 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> transferParams{
-		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.intType(256)->getName() },
-		{"amount", context.intType(256)->getName() }
+		{BOOGIE_THIS, context.addressType() },
+		{BOOGIE_MSG_SENDER, context.addressType() },
+		{BOOGIE_MSG_VALUE, context.intType(256) },
+		{"amount", context.intType(256) }
 	};
 
 	// Type to pass around
@@ -135,9 +135,9 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Parameters: this, msg.sender, msg.value
 	vector<Binding> callParams {
-		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_VALUE, context.intType(256)->getName() }
+		{BOOGIE_THIS, context.addressType()},
+		{BOOGIE_MSG_SENDER, context.addressType()},
+		{BOOGIE_MSG_VALUE, context.intType(256) }
 	};
 
 	// Type to pass around
@@ -152,8 +152,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Return value
 	vector<Binding> callReturns{
-		{"__result", toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)->getName()},
-		{"__calldata", toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)->getName()}
+		{"__result", toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
+		{"__calldata", toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
 	};
 
 	// Body
@@ -201,17 +201,17 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> sendParams {
-		{BOOGIE_THIS, BOOGIE_ADDRESS_TYPE},
-		{BOOGIE_MSG_SENDER, BOOGIE_ADDRESS_TYPE},
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.intType(256)->getName() },
-		{"amount", context.intType(256)->getName() }
+		{BOOGIE_THIS, context.addressType()},
+		{BOOGIE_MSG_SENDER, context.addressType()},
+		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.intType(256) },
+		{"amount", context.intType(256) }
 	};
 
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
-	vector<Binding> sendReturns{ {"__result", "bool"} };
+	vector<Binding> sendReturns{ {"__result", context.boolType()} };
 
 	// Body
 	// Successful transfer

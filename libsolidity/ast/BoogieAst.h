@@ -21,7 +21,7 @@ using TypeDeclRef = std::shared_ptr<TypeDecl>;
 struct Binding
 {
 	std::string id;
-	std::string type; // TODO: replace with TypeDeclRef
+	TypeDeclRef type;
 };
 
 class Expr
@@ -492,7 +492,7 @@ public:
 	static FuncDeclRef function(
 		std::string name,
 		std::vector<Binding> const& args,
-		std::string type,
+		TypeDeclRef type,
 		Expr::Ref e = nullptr,
 		std::vector<Attr::Ref> const& attrs = {});
 	static Ref constant(std::string name, TypeDeclRef type);
@@ -539,11 +539,11 @@ public:
 
 class FuncDecl : public Decl {
 	std::vector<Binding> params;
-	std::string type;
+	TypeDeclRef type;
 	Expr::Ref body;
 public:
 	FuncDecl(std::string n, std::vector<Attr::Ref> const& ax, std::vector<Binding> const& ps,
-		std::string t, Expr::Ref b)
+			TypeDeclRef t, Expr::Ref b)
 		: Decl(FUNCTION, n, ax), params(ps), type(t), body(b) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == FUNCTION; }
