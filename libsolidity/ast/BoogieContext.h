@@ -123,6 +123,8 @@ public:
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 
+	boogie::Expr::Ref intLit(long lit, int bits) const;
+
 	/** Slice of an integer corresponding to the encoding */
 	boogie::Expr::Ref intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low);
 

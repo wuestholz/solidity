@@ -53,22 +53,11 @@ boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type)
 	switch (type->category())
 	{
 	case Type::Category::Integer:
-	{
-		if (m_context.isBvEncoding())
-		{
-			unsigned bits = ASTBoogieUtils::getBits(type);
-			return boogie::Expr::lit("0", bits);
-		}
-		else
-		{
-			return boogie::Expr::lit((long) 0);
-		}
-		break;
-	}
+		// 0
+		return m_context.intLit((long)0, ASTBoogieUtils::getBits(type));
 	case Type::Category::Bool:
 		// False
 		return boogie::Expr::lit(false);
-		break;
 	default:
 		// For unhandled, just return null
 		break;

@@ -160,6 +160,14 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return boogie::Decl::typee("int");
 }
 
+boogie::Expr::Ref BoogieContext::intLit(long lit, int bits) const
+{
+	if (isBvEncoding())
+		return boogie::Expr::lit(boogie::bigint(lit), bits);
+	else
+		return boogie::Expr::lit(lit);
+}
+
 boogie::Expr::Ref BoogieContext::intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low)
 {
 	solAssert(high < size, "");

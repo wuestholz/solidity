@@ -434,7 +434,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 					ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node,
 							_node.getOperator() == Token::Inc ? Token::Add : Token::Sub,
 							lhs,
-							m_context.isBvEncoding() ? Expr::lit(bg::bigint(1), bits) : Expr::lit(bg::bigint(1)),
+							m_context.intLit(1, bits),
 							bits, isSigned);
 			bg::Decl::Ref tempVar = bg::Decl::variable("inc#" + to_string(_node.id()),
 					ASTBoogieUtils::toBoogieType(_node.subExpression().annotation().type, &_node, m_context));
@@ -638,8 +638,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	else
 		allArgs.push_back(m_currentAddress); // this
 	allArgs.push_back(Expr::id(ASTBoogieUtils::BOOGIE_THIS)); // msg.sender
-	Expr::Ref defaultMsgValue = (m_context.isBvEncoding() ?
-			Expr::lit(bg::bigint(0), 256) : Expr::lit(bg::bigint(0)));
+	Expr::Ref defaultMsgValue = m_context.intLit(0, 256);
 	Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
 	allArgs.push_back(msgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic)
