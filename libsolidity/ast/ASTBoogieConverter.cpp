@@ -394,7 +394,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.addDecl(
 					boogie::Decl::variable(ASTBoogieUtils::mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
-					ASTBoogieUtils::mappingType(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
+					ASTBoogieUtils::mappingType(m_context.addressType(),
 					ASTBoogieUtils::toBoogieType(sumDecl.second, sumDecl.first, m_context))));
 	}
 
@@ -850,7 +850,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	// State variables are represented as maps from address to their type
 	auto varDecl = boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node),
 			ASTBoogieUtils::mappingType(
-					boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
+					m_context.addressType(),
 					ASTBoogieUtils::toBoogieType(_node.type(), &_node, m_context)));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.addDecl(varDecl);
@@ -861,8 +861,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		m_context.addDecl(
 				boogie::Decl::variable(ASTBoogieUtils::mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
 						ASTBoogieUtils::mappingType(
-								boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE),
-								boogie::Decl::typee(m_context.isBvEncoding() ? "bv256" : "int"))));
+								m_context.addressType(),
+								m_context.intType(256))));
 	}
 	return false;
 }

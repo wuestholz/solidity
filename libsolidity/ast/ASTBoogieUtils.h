@@ -44,10 +44,6 @@ public:
 	// no constant required for 'throw' because it is a separate statement
 
 	// Boogie types
-	static std::string const BOOGIE_ADDRESS_TYPE;
-	static std::string const BOOGIE_STRING_TYPE;
-	static std::string const BOOGIE_BOOL_TYPE;
-	static std::string const BOOGIE_INT_TYPE;
 	static std::string const BOOGIE_INT_CONST_TYPE;
 	static std::string const ERR_TYPE;
 

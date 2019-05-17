@@ -21,7 +21,6 @@ namespace dev
 {
 namespace solidity
 {
-string const ASTBoogieUtils::BOOGIE_ADDRESS_TYPE = "address_t";
 string const ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
 string const ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
 string const ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
@@ -48,9 +47,6 @@ string const ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 string const ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 string const ASTBoogieUtils::BOOGIE_SUM = "#sum";
-string const ASTBoogieUtils::BOOGIE_STRING_TYPE = "string_t";
-string const ASTBoogieUtils::BOOGIE_BOOL_TYPE = "bool";
-string const ASTBoogieUtils::BOOGIE_INT_TYPE = "int";
 string const ASTBoogieUtils::BOOGIE_INT_CONST_TYPE = "int_const";
 string const ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 string const ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
@@ -329,7 +325,7 @@ string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 
 TypeDeclRef ASTBoogieUtils::getStructAddressType(StructDefinition const* structDef, DataLocation loc)
 {
-	return Decl::typee(BOOGIE_ADDRESS_TYPE + "_" + dataLocToStr(loc) +
+	return Decl::typee("address_struct_" + dataLocToStr(loc) +
 			"_" + structDef->name() + "#" + toString(structDef->id()));
 }
 
@@ -345,11 +341,11 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 	switch (tpCategory)
 	{
 	case Type::Category::Address:
-		return Decl::typee(BOOGIE_ADDRESS_TYPE);
+		return context.addressType();
 	case Type::Category::StringLiteral:
-		return Decl::typee(BOOGIE_STRING_TYPE);
+		return context.stringType();
 	case Type::Category::Bool:
-		return Decl::typee(BOOGIE_BOOL_TYPE);
+		return context.boolType();
 	case Type::Category::RationalNumber:
 	{
 		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
@@ -365,12 +361,12 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 		return context.intType(tpInteger->numBits());
 	}
 	case Type::Category::Contract:
-		return Decl::typee(BOOGIE_ADDRESS_TYPE);
+		return context.addressType();
 	case Type::Category::Array:
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
 		if (arrType->isString())
-			return Decl::typee(BOOGIE_STRING_TYPE);
+			return context.stringType();
 		else
 			return mappingType(context.intType(256), toBoogieType(arrType->baseType(), _associatedNode, context));
 	}

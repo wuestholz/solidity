@@ -57,7 +57,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
 			ASTBoogieUtils::mappingType(addressType(), intType(256))));
 	// Uninterpreted type for strings
-	addDecl(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
+	addDecl(stringType());
 	// now
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, intType(256)));
 	// overflow
@@ -139,7 +139,7 @@ void BoogieContext::addConstant(boogie::Decl::Ref decl)
 
 boogie::TypeDeclRef BoogieContext::addressType() const
 {
-	return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE);
+	return boogie::Decl::typee("address_t");
 }
 
 boogie::TypeDeclRef BoogieContext::boolType() const
@@ -149,7 +149,7 @@ boogie::TypeDeclRef BoogieContext::boolType() const
 
 boogie::TypeDeclRef BoogieContext::stringType() const
 {
-	return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE);
+	return boogie::Decl::typee("string_t");
 }
 
 boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
@@ -157,7 +157,7 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 	if (isBvEncoding())
 		return ASTBoogieUtils::boogieBVType(size);
 	else
-		return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_INT_TYPE);
+		return boogie::Decl::typee("int");
 }
 
 boogie::Expr::Ref BoogieContext::intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low)
