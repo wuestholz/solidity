@@ -1017,7 +1017,7 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 		{
 			// TODO: Make sure that it is a fresh address
 			m_currentExpr = Expr::id(ASTBoogieUtils::getConstructorName(contract));
-			auto varDecl = bg::Decl::variable("new#" + toString(_node.id()), ASTBoogieUtils::BOOGIE_ADDRESS_TYPE);
+			auto varDecl = bg::Decl::variable("new#" + toString(_node.id()), m_context.addressType());
 			m_newDecls.push_back(varDecl);
 			m_currentAddress = bg::Expr::id(varDecl->getName());
 			return false;

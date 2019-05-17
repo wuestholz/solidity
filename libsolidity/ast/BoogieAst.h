@@ -497,7 +497,6 @@ public:
 	static Ref constant(std::string name, std::string type);
 	static Ref constant(std::string name, std::string type, bool unique);
 	static Ref constant(std::string name, std::string type, std::vector<Attr::Ref> const& ax, bool unique);
-	static Ref variable(std::string name, std::string type);
 	static Ref variable(std::string name, TypeDeclRef type);
 	static ProcDeclRef procedure(std::string name,
 		std::vector<Binding> const& params = {},
@@ -550,9 +549,9 @@ public:
 };
 
 class VarDecl : public Decl {
-	std::string type;
+	TypeDeclRef type;
 public:
-	VarDecl(std::string n, std::string t) : Decl(VARIABLE, n, {}), type(t) {}
+	VarDecl(std::string n, TypeDeclRef t) : Decl(VARIABLE, n, {}), type(t) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == VARIABLE; }
 };

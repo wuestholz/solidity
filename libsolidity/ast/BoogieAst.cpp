@@ -388,14 +388,9 @@ Decl::Ref Decl::constant(std::string name, std::string type, std::vector<Attr::R
 	return std::make_shared<ConstDecl>(name, type, ax, unique);
 }
 
-Decl::Ref Decl::variable(std::string name, std::string type)
-{
-	return std::make_shared<VarDecl>(name, type);
-}
-
 Decl::Ref Decl::variable(std::string name, TypeDeclRef type)
 {
-	return std::make_shared<VarDecl>(name, type->getName());
+	return std::make_shared<VarDecl>(name, type);
 }
 
 ProcDeclRef Decl::procedure(std::string name,
@@ -436,7 +431,7 @@ FuncDeclRef Decl::code(ProcDeclRef P)
 	//decls.push_back(Decl::variable(Naming::EXN_VAR, "bool"));
 
 	for (auto R : P->getReturns())
-		decls.push_back(Decl::variable(R.id, R.type));
+		decls.push_back(Decl::variable(R.id, Decl::typee(R.type)));
 
 	return Decl::function(
 		P->getName(), P->getParameters(), "bool", std::make_shared<CodeExpr const>(decls, blocks),
@@ -909,7 +904,7 @@ void VarDecl::print(std::ostream& os) const
 	os << "var ";
 	if (attrs.size() > 0)
 		print_seq(os, attrs, "", " ", " ");
-	os << name << ": " << type << ";";
+	os << name << ": " << type->getName() << ";";
 }
 
 void Specification::print(std::ostream& os, std::string kind) const

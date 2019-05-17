@@ -47,22 +47,22 @@ BoogieContext::BoogieContext(Encoding encoding,
 		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
-
+;
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
-	addDecl(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE));
+	addDecl(addressType());
 	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
 	// address.balance
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
-			"[" + ASTBoogieUtils::BOOGIE_ADDRESS_TYPE + "]" + (m_encoding == BV ? "bv256" : "int")));
+			ASTBoogieUtils::mappingType(addressType(), intType(256))));
 	// Uninterpreted type for strings
 	addDecl(boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE));
 	// now
-	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, m_encoding == BV ? "bv256" : "int"));
+	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, intType(256)));
 	// overflow
 	if (m_overflow)
-		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, "bool"));
+		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
 }
 
 void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl)
@@ -135,6 +135,16 @@ void BoogieContext::addConstant(boogie::Decl::Ref decl)
 		addDecl(decl);
 		m_constants.push_back(decl);
 	}
+}
+
+boogie::TypeDeclRef BoogieContext::addressType() const
+{
+	return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_ADDRESS_TYPE);
+}
+
+boogie::TypeDeclRef BoogieContext::boolType() const
+{
+	return boogie::Decl::typee("bool");
 }
 
 boogie::TypeDeclRef BoogieContext::intType(unsigned size) const

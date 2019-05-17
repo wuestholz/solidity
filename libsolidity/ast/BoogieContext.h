@@ -116,6 +116,9 @@ public:
 	void addDecl(boogie::Decl::Ref decl);
 	void addConstant(boogie::Decl::Ref decl);
 
+	boogie::TypeDeclRef addressType() const;
+	boogie::TypeDeclRef boolType() const;
+
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 
