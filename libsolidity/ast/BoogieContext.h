@@ -118,6 +118,7 @@ public:
 
 	boogie::TypeDeclRef addressType() const;
 	boogie::TypeDeclRef boolType() const;
+	boogie::TypeDeclRef stringType() const;
 
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;

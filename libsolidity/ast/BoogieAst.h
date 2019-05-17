@@ -15,6 +15,9 @@ namespace boogie
 
 using bigint = boost::multiprecision::int1024_t;
 
+class TypeDecl;
+using TypeDeclRef = std::shared_ptr<TypeDecl>;
+
 struct Binding
 {
 	std::string id;
@@ -453,8 +456,6 @@ class ProcDecl;
 using ProcDeclRef = std::shared_ptr<ProcDecl>;
 class FuncDecl;
 using FuncDeclRef = std::shared_ptr<FuncDecl>;
-class TypeDecl;
-using TypeDeclRef = std::shared_ptr<TypeDecl>;
 
 class Decl {
 public:
@@ -494,9 +495,9 @@ public:
 		std::string type,
 		Expr::Ref e = nullptr,
 		std::vector<Attr::Ref> const& attrs = {});
-	static Ref constant(std::string name, std::string type);
-	static Ref constant(std::string name, std::string type, bool unique);
-	static Ref constant(std::string name, std::string type, std::vector<Attr::Ref> const& ax, bool unique);
+	static Ref constant(std::string name, TypeDeclRef type);
+	static Ref constant(std::string name, TypeDeclRef type, bool unique);
+	static Ref constant(std::string name, TypeDeclRef type, std::vector<Attr::Ref> const& ax, bool unique);
 	static Ref variable(std::string name, TypeDeclRef type);
 	static ProcDeclRef procedure(std::string name,
 		std::vector<Binding> const& params = {},
@@ -527,10 +528,10 @@ public:
 };
 
 class ConstDecl : public Decl {
-	std::string type;
+	TypeDeclRef type;
 	bool unique;
 public:
-	ConstDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, bool u)
+	ConstDecl(std::string n, TypeDeclRef t, std::vector<Attr::Ref> const& ax, bool u)
 		: Decl(CONSTANT, n, ax), type(t), unique(u) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == CONSTANT; }

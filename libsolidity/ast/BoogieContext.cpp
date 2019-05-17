@@ -52,7 +52,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	addDecl(addressType());
-	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, addressType(), true));
 	// address.balance
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
 			ASTBoogieUtils::mappingType(addressType(), intType(256))));
@@ -145,6 +145,11 @@ boogie::TypeDeclRef BoogieContext::addressType() const
 boogie::TypeDeclRef BoogieContext::boolType() const
 {
 	return boogie::Decl::typee("bool");
+}
+
+boogie::TypeDeclRef BoogieContext::stringType() const
+{
+	return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_STRING_TYPE);
 }
 
 boogie::TypeDeclRef BoogieContext::intType(unsigned size) const

@@ -1287,14 +1287,14 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	case Type::Category::Address:
 	{
 		string name = "address_" + _node.value();
-		m_newConstants.push_back(bg::Decl::constant(name, ASTBoogieUtils::BOOGIE_ADDRESS_TYPE, true));
+		m_newConstants.push_back(bg::Decl::constant(name, m_context.addressType(), true));
 		m_currentExpr = Expr::id(name);
 		return false;
 	}
 	case Type::Category::StringLiteral:
 	{
 		string name = "literal_string#" + to_string(_node.id());
-		m_newConstants.push_back(bg::Decl::constant(name, ASTBoogieUtils::BOOGIE_STRING_TYPE, true));
+		m_newConstants.push_back(bg::Decl::constant(name, m_context.stringType(), true));
 		m_currentExpr = Expr::id(name);
 		return false;
 	}

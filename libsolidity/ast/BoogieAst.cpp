@@ -373,17 +373,17 @@ FuncDeclRef Decl::function(std::string name, std::vector<Binding> const& args,
 	return std::make_shared<FuncDecl>(name,attrs,args,type,e);
 }
 
-Decl::Ref Decl::constant(std::string name, std::string type)
+Decl::Ref Decl::constant(std::string name, TypeDeclRef type)
 {
 	return Decl::constant(name, type, {}, false);
 }
 
-Decl::Ref Decl::constant(std::string name, std::string type, bool unique)
+Decl::Ref Decl::constant(std::string name, TypeDeclRef type, bool unique)
 {
 	return Decl::constant(name, type, {}, unique);
 }
 
-Decl::Ref Decl::constant(std::string name, std::string type, std::vector<Attr::Ref> const& ax, bool unique)
+Decl::Ref Decl::constant(std::string name, TypeDeclRef type, std::vector<Attr::Ref> const& ax, bool unique)
 {
 	return std::make_shared<ConstDecl>(name, type, ax, unique);
 }
@@ -881,7 +881,7 @@ void ConstDecl::print(std::ostream& os) const
 	os << "const ";
 	if (attrs.size() > 0)
 		print_seq(os, attrs, "", " ", " ");
-	os << (unique ? "unique " : "") << name << ": " << type << ";";
+	os << (unique ? "unique " : "") << name << ": " << type->getName() << ";";
 }
 
 void FuncDecl::print(std::ostream& os) const
