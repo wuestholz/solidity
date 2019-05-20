@@ -1234,15 +1234,8 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	}
 	string declName = ASTBoogieUtils::mapDeclName(*(_node.annotation().referencedDeclaration));
 
-	// Check if a state variable is referenced
-	bool referencesStateVar = false;
-	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration))
-	{
-		referencesStateVar = varDecl->isStateVariable();
-	}
-
 	// State variables must be referenced by accessing the map
-	if (referencesStateVar)
+	if (ASTBoogieUtils::isStateVar(_node.annotation().referencedDeclaration))
 		m_currentExpr = Expr::sel(declName, ASTBoogieUtils::BOOGIE_THIS);
 	// Other identifiers can be referenced by their name
 	else

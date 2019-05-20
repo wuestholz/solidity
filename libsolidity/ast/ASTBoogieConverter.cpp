@@ -66,7 +66,7 @@ boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type)
 	return nullptr;
 }
 
-void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<std::string>& output)
+void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<boogie::Expr::Ref>& output)
 {
 	std::string target = _type->toString();
 	DeclarationContainer const* decl_container = m_context.scopes()[&_scope].get();
@@ -79,7 +79,10 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 			{
 				if (decl->type()->toString() == target)
 				{
-					output.push_back(ASTBoogieUtils::mapDeclName(*decl));
+					if (ASTBoogieUtils::isStateVar(decl))
+						output.push_back(boogie::Expr::sel(ASTBoogieUtils::mapDeclName(*decl), ASTBoogieUtils::BOOGIE_THIS));
+					else
+						output.push_back(boogie::Expr::id(ASTBoogieUtils::mapDeclName(*decl)));
 				}
 				else
 				{
@@ -89,7 +92,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 						auto s = dynamic_cast<StructType const*>(decl->type());
 						for (auto const& s_member: s->members(nullptr))
 							if (s_member.declaration->type()->toString() == target)
-								output.push_back(ASTBoogieUtils::mapDeclName(*s_member.declaration));
+								output.push_back(boogie::Expr::id(ASTBoogieUtils::mapDeclName(*s_member.declaration)));
 					}
 					// Magic
 					if (decl->type()->category() == Type::Category::Magic)
@@ -100,7 +103,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 								// Only sender for now. TODO: Better handling of magic variables
 								// and names
 								if (m_member.name == ASTBoogieUtils::SOLIDITY_SENDER)
-									output.push_back(ASTBoogieUtils::BOOGIE_MSG_SENDER);
+									output.push_back(boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER));
 					}
 				}
 			}
@@ -142,7 +145,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 			if (value)
 			{
 				// Get all ids to initialize
-				std::vector<std::string> index_ids;
+				std::vector<boogie::Expr::Ref> index_ids;
 				getVariablesOfType(key_type, _scope, index_ids);
 				// Initialize all instantiations to default value
 				for (auto index_id: index_ids)
@@ -153,10 +156,9 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 					//     )
 					auto map_id = boogie::Expr::id(id);
 					auto this_i = boogie::Expr::id(ASTBoogieUtils::BOOGIE_THIS);
-					auto index_i = boogie::Expr::id(index_id);
 					auto valueAssign = boogie::Stmt::assign(map_id,
 							boogie::Expr::upd(map_id, this_i,
-									boogie::Expr::upd(boogie::Expr::sel(map_id, this_i), index_i, value)));
+									boogie::Expr::upd(boogie::Expr::sel(map_id, this_i), index_id, value)));
 					output.push_back(valueAssign);
 				}
 				// Initialize the sum, if there, to default value

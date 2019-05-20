@@ -869,5 +869,13 @@ Expr::Ref ASTBoogieUtils::getTCCforExpr(Expr::Ref expr, TypePointer tp)
 	return Expr::lit(true);
 }
 
+bool ASTBoogieUtils::isStateVar(Declaration const *decl)
+{
+	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))
+		return varDecl->isStateVariable();
+
+	return false;
+}
+
 }
 }

@@ -63,7 +63,7 @@ private:
 	/**
 	 * Helper method to get all Boogie IDs of a given type in the current scope.
 	 */
-	void getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<std::string>& output);
+	void getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<boogie::Expr::Ref>& output);
 
 	/**
 	 * Helper method to produce statement assigning a default value for a declared variable.

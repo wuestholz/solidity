@@ -180,6 +180,9 @@ public:
 	 */
 	static
 	boogie::Expr::Ref getTCCforExpr(boogie::Expr::Ref expr, TypePointer tp);
+
+	static
+	bool isStateVar(Declaration const *decl);
 };
 
 }
