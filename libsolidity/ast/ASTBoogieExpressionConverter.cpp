@@ -1104,7 +1104,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// msg.value
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
-		m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+		m_currentExpr = m_context.boogieMsgValue();
 		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 		addTCC(m_currentExpr, tp_uint256);
 		return false;

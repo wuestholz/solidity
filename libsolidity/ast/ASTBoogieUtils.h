@@ -33,7 +33,6 @@ public:
 	// Identifiers related to 'msg'
 	static std::string const SOLIDITY_SENDER;
 	static std::string const SOLIDITY_VALUE;
-	static std::string const BOOGIE_MSG_VALUE;
 
 	// Error handling
 	static std::string const SOLIDITY_ASSERT;

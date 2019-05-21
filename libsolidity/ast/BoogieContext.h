@@ -137,6 +137,7 @@ public:
 	boogie::Expr::Ref boogieBalance() const;
 	boogie::Expr::Ref boogieThis() const;
 	boogie::Expr::Ref boogieMsgSender() const;
+	boogie::Expr::Ref boogieMsgValue() const;
 
 	boogie::Expr::Ref intLit(long lit, int bits) const;
 

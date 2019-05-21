@@ -221,7 +221,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	std::vector<boogie::Binding> params {
 		{m_context.boogieThis(), m_context.addressType() }, // this
 		{m_context.boogieMsgSender(), m_context.addressType() }, // msg.sender
-		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), m_context.intType(256) } // msg.value
+		{m_context.boogieMsgValue(), m_context.intType(256) } // msg.value
 	};
 
 	// Create the procedure
@@ -537,7 +537,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		// Globally available stuff
 		{m_context.boogieThis(), m_context.addressType()}, // this
 		{m_context.boogieMsgSender(), m_context.addressType() }, // msg.sender
-		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), m_context.intType(256) } // msg.value
+		{m_context.boogieMsgValue(), m_context.intType(256) } // msg.value
 	};
 	// Add original parameters of the function
 	for (auto par : _node.parameters())
@@ -605,7 +605,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	if (_node.isPayable())
 	{
 		boogie::Expr::Ref this_bal = boogie::Expr::sel(m_context.boogieBalance(), m_context.boogieThis());
-		boogie::Expr::Ref msg_val = boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE);
+		boogie::Expr::Ref msg_val = m_context.boogieMsgValue();
 		// balance[this] += msg.value
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{

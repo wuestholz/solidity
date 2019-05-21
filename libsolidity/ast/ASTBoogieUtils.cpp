@@ -32,7 +32,6 @@ string const ASTBoogieUtils::SOLIDITY_SUPER = "super";
 
 string const ASTBoogieUtils::SOLIDITY_SENDER = "sender";
 string const ASTBoogieUtils::SOLIDITY_VALUE = "value";
-string const ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 
 string const ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
 string const ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
@@ -61,7 +60,7 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	vector<Binding> transferParams{
 		{context.boogieThis(), context.addressType() },
 		{context.boogieMsgSender(), context.addressType() },
-		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
+		{context.boogieMsgValue(), context.intType(256) },
 		{Expr::id("amount"), context.intType(256) }
 	};
 
@@ -129,7 +128,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	vector<Binding> callParams {
 		{context.boogieThis(), context.addressType()},
 		{context.boogieMsgSender(), context.addressType()},
-		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) }
+		{context.boogieMsgValue(), context.intType(256) }
 	};
 
 	// Type to pass around
@@ -152,7 +151,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
 	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref msg_val = Expr::id(BOOGIE_MSG_VALUE);
+	Expr::Ref msg_val = context.boogieMsgValue();
 	Expr::Ref result = Expr::id("__result");
 
 	// balance[this] += msg.value
@@ -195,7 +194,7 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	vector<Binding> sendParams {
 		{context.boogieThis(), context.addressType()},
 		{context.boogieMsgSender(), context.addressType()},
-		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
+		{context.boogieMsgValue(), context.intType(256) },
 		{Expr::id("amount"), context.intType(256) }
 	};
 
