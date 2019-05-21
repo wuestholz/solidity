@@ -219,9 +219,9 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 
 	// Input parameters
 	std::vector<boogie::Binding> params {
-		{ASTBoogieUtils::BOOGIE_THIS, m_context.addressType() }, // this
-		{ASTBoogieUtils::BOOGIE_MSG_SENDER, m_context.addressType() }, // msg.sender
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.intType(256) } // msg.value
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_THIS), m_context.addressType() }, // this
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER), m_context.addressType() }, // msg.sender
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), m_context.intType(256) } // msg.value
 	};
 
 	// Create the procedure
@@ -535,17 +535,17 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Input parameters
 	vector<boogie::Binding> params {
 		// Globally available stuff
-		{ASTBoogieUtils::BOOGIE_THIS, m_context.addressType()}, // this
-		{ASTBoogieUtils::BOOGIE_MSG_SENDER, m_context.addressType() }, // msg.sender
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, m_context.intType(256) } // msg.value
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_THIS), m_context.addressType()}, // this
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_SENDER), m_context.addressType() }, // msg.sender
+		{boogie::Expr::id(ASTBoogieUtils::BOOGIE_MSG_VALUE), m_context.intType(256) } // msg.value
 	};
 	// Add original parameters of the function
 	for (auto par : _node.parameters())
 	{
-		params.push_back({ASTBoogieUtils::mapDeclName(*par), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)});
+		params.push_back({boogie::Expr::id(ASTBoogieUtils::mapDeclName(*par)), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)});
 		if (par->type()->category() == Type::Category::Array) // Array length
 		{
-			params.push_back({ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH, m_context.intType(256) });
+			params.push_back({boogie::Expr::id(ASTBoogieUtils::mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
 		}
 	}
 
@@ -562,7 +562,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		std::string id = ASTBoogieUtils::mapDeclName(*ret);
 		boogie::TypeDeclRef type = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
 		retIds.push_back(boogie::Expr::id(id));
-		rets.push_back({id, type});
+		rets.push_back({boogie::Expr::id(id), type});
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)

@@ -332,11 +332,6 @@ Stmt::Ref Stmt::skip()
 	return std::make_shared<AssumeStmt const>(Expr::lit(true));
 }
 
-Stmt::Ref Stmt::code(std::string s)
-{
-	return std::make_shared<CodeStmt const>(s);
-}
-
 Stmt::Ref Stmt::ifelse(Expr::Ref cond, Block::ConstRef then, Block::ConstRef elze)
 {
 	return std::make_shared<IfElseStmt const>(cond, then, elze);
@@ -406,38 +401,6 @@ Decl::Ref Decl::code(std::string name, std::string s)
 	return std::make_shared<CodeDecl>(name, s);
 }
 
-FuncDeclRef Decl::code(ProcDeclRef P)
-{
-	std::vector<Decl::Ref> decls;
-	std::vector<Block::Ref> blocks;
-	for (auto B : *P)
-	{
-		blocks.push_back(Block::block(B->getName()));
-		for (auto S : *B)
-		{
-			Stmt::Ref SS;
-			// Original version was: if (llvm::isa<ReturnStmt>(S))
-			if (std::dynamic_pointer_cast<ReturnStmt const>(S))
-				SS = Stmt::return_(Expr::neq(Expr::id(P->getReturns().front().id),Expr::lit(0U)));
-			else
-				SS = S;
-			blocks.back()->getStatements().push_back(SS);
-		}
-	}
-	for (auto D : P->getDeclarations())
-		decls.push_back(D);
-
-	// HACK to avoid spurious global-var modification
-	//decls.push_back(Decl::variable(Naming::EXN_VAR, "bool"));
-
-	for (auto R : P->getReturns())
-		decls.push_back(Decl::variable(R.id, R.type));
-
-	return Decl::function(
-		P->getName(), P->getParameters(), Decl::typee("bool"), std::make_shared<CodeExpr const>(decls, blocks),
-		{Attr::attr("inline")}
-	);
-}
 Decl::Ref Decl::comment(std::string name, std::string str)
 {
 	return std::make_shared<CommentDecl>(name, str);
@@ -802,11 +765,6 @@ void ReturnStmt::print(std::ostream& os) const
 	os << ";";
 }
 
-void CodeStmt::print(std::ostream& os) const
-{
-	os << code;
-}
-
 void IfElseStmt::print(std::ostream& os) const
 {
 	os << "if (";
@@ -891,7 +849,11 @@ void FuncDecl::print(std::ostream& os) const
 		print_seq(os, attrs, "", " ", " ");
 	os << name << "(";
 	for (auto P = params.begin(), E = params.end(); P != E; ++P)
-		os << (P == params.begin() ? "" : ", ") << (P->id != "" ? P->id + ": " : "") << P->type->getName();
+	{
+		std::stringstream pname;
+		pname << *(P->id);
+		os << (P == params.begin() ? "" : ", ") << (pname.str() != "" ? pname.str() + ": " : "") << P->type->getName();
+	}
 	os << ") returns (" << type->getName() << ")";
 	if (body)
 		os << " { " << body << " }";

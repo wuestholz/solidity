@@ -49,7 +49,6 @@ public:
 
 	// Other identifiers
 	static std::string const BOOGIE_THIS;
-	static std::string const VERIFIER_MAIN;
 	static std::string const VERIFIER_SUM;
 	static std::string const BOOGIE_CONSTRUCTOR;
 	static std::string const BOOGIE_LENGTH;

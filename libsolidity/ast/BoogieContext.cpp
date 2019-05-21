@@ -213,7 +213,7 @@ boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned expr
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
+				{ { boogie::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
@@ -247,7 +247,7 @@ boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned expr
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
+				{ { boogie::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
@@ -281,7 +281,7 @@ boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned expr
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ {"", exprType} }, // Arguments
+				{ { boogie::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
@@ -422,7 +422,7 @@ boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boo
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { "", exprType }, { "", exprType } }, // Arguments
+				{ { boogie::Expr::id(""), exprType }, { boogie::Expr::id(""), exprType } }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
@@ -455,7 +455,7 @@ boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boog
 		// Boogie declaration
 		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
 				fnNameSS.str(),       // Name
-				{ { "", exprType } }, // Arguments
+				{ { boogie::Expr::id(""), exprType } }, // Arguments
 				exprType,  // Type
 				nullptr,              // Body = null
 				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes

@@ -18,11 +18,7 @@ using bigint = boost::multiprecision::int1024_t;
 class TypeDecl;
 using TypeDeclRef = std::shared_ptr<TypeDecl>;
 
-struct Binding
-{
-	std::string id;
-	TypeDeclRef type;
-};
+struct Binding;
 
 class Expr
 {
@@ -77,6 +73,12 @@ public:
 	static Ref if_then_else(Ref c, Ref t, Ref e);
 	static Ref old(Ref expr);
 	static Ref tuple(std::vector<Ref> const& e);
+};
+
+struct Binding
+{
+	Expr::Ref id;
+	TypeDeclRef type;
 };
 
 class BinExpr : public Expr
@@ -276,7 +278,7 @@ using SpecificationRef = std::shared_ptr<Specification const>;
 class Stmt {
 public:
 	enum Kind {
-		ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, CODE, COMMENT, IFELSE, WHILE, BREAK, LABEL
+		ASSERT, ASSUME, ASSIGN, HAVOC, GOTO, CALL, RETURN, COMMENT, IFELSE, WHILE, BREAK, LABEL
 	};
 
 	using Ref = std::shared_ptr<Stmt const>;
@@ -309,7 +311,6 @@ public:
 	static Ref return_();
 	static Ref return_(Expr::Ref e);
 	static Ref skip();
-	static Ref code(std::string s);
 	static Ref ifelse(Expr::Ref cond, BlockConstRef then, BlockConstRef elze = nullptr);
 	static Ref while_(
 			Expr::Ref cond,
@@ -405,14 +406,6 @@ public:
 	ReturnStmt(Expr::Ref e = nullptr) : Stmt(RETURN), expr(e) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Ref S) { return S->getKind() == RETURN; }
-};
-
-class CodeStmt : public Stmt {
-	std::string code;
-public:
-	CodeStmt(std::string s) : Stmt(CODE), code(s) {}
-	void print(std::ostream& os) const override;
-	static bool classof(Ref S) { return S->getKind() == CODE; }
 };
 
 class IfElseStmt : public Stmt {

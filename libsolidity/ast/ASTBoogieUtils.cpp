@@ -42,7 +42,6 @@ string const ASTBoogieUtils::SOLIDITY_REVERT = "revert";
 
 string const ASTBoogieUtils::SOLIDITY_THIS = "this";
 string const ASTBoogieUtils::BOOGIE_THIS = "__this";
-string const ASTBoogieUtils::VERIFIER_MAIN = "__verifier_main";
 string const ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 string const ASTBoogieUtils::BOOGIE_LENGTH = "#length";
@@ -63,10 +62,10 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> transferParams{
-		{BOOGIE_THIS, context.addressType() },
-		{BOOGIE_MSG_SENDER, context.addressType() },
-		{BOOGIE_MSG_VALUE, context.intType(256) },
-		{"amount", context.intType(256) }
+		{Expr::id(BOOGIE_THIS), context.addressType() },
+		{Expr::id(BOOGIE_MSG_SENDER), context.addressType() },
+		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
+		{Expr::id("amount"), context.intType(256) }
 	};
 
 	// Type to pass around
@@ -131,9 +130,9 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Parameters: this, msg.sender, msg.value
 	vector<Binding> callParams {
-		{BOOGIE_THIS, context.addressType()},
-		{BOOGIE_MSG_SENDER, context.addressType()},
-		{BOOGIE_MSG_VALUE, context.intType(256) }
+		{Expr::id(BOOGIE_THIS), context.addressType()},
+		{Expr::id(BOOGIE_MSG_SENDER), context.addressType()},
+		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) }
 	};
 
 	// Type to pass around
@@ -148,8 +147,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Return value
 	vector<Binding> callReturns{
-		{"__result", toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
-		{"__calldata", toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
+		{Expr::id("__result"), toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
+		{Expr::id("__calldata"), toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
 	};
 
 	// Body
@@ -197,17 +196,17 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> sendParams {
-		{BOOGIE_THIS, context.addressType()},
-		{BOOGIE_MSG_SENDER, context.addressType()},
-		{ASTBoogieUtils::BOOGIE_MSG_VALUE, context.intType(256) },
-		{"amount", context.intType(256) }
+		{Expr::id(BOOGIE_THIS), context.addressType()},
+		{Expr::id(BOOGIE_MSG_SENDER), context.addressType()},
+		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
+		{Expr::id("amount"), context.intType(256) }
 	};
 
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
-	vector<Binding> sendReturns{ {"__result", context.boolType()} };
+	vector<Binding> sendReturns{ {Expr::id("__result"), context.boolType()} };
 
 	// Body
 	// Successful transfer
@@ -300,7 +299,6 @@ string ASTBoogieUtils::dataLocToStr(DataLocation loc)
 string ASTBoogieUtils::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
-	if (decl.name() == VERIFIER_MAIN) return "main";
 	if (decl.name() == SOLIDITY_ASSERT) return SOLIDITY_ASSERT;
 	if (decl.name() == SOLIDITY_REQUIRE) return SOLIDITY_REQUIRE;
 	if (decl.name() == SOLIDITY_REVERT) return SOLIDITY_REVERT;
