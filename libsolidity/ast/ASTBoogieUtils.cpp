@@ -22,7 +22,6 @@ namespace dev
 namespace solidity
 {
 string const ASTBoogieUtils::SOLIDITY_BALANCE = "balance";
-string const ASTBoogieUtils::BOOGIE_BALANCE = "__balance";
 string const ASTBoogieUtils::SOLIDITY_TRANSFER = "transfer";
 string const ASTBoogieUtils::BOOGIE_TRANSFER = "__transfer";
 string const ASTBoogieUtils::SOLIDITY_SEND = "send";
@@ -33,7 +32,6 @@ string const ASTBoogieUtils::SOLIDITY_SUPER = "super";
 
 string const ASTBoogieUtils::SOLIDITY_SENDER = "sender";
 string const ASTBoogieUtils::SOLIDITY_VALUE = "value";
-string const ASTBoogieUtils::BOOGIE_MSG_SENDER = "__msg_sender";
 string const ASTBoogieUtils::BOOGIE_MSG_VALUE = "__msg_value";
 
 string const ASTBoogieUtils::SOLIDITY_ASSERT = "assert";
@@ -41,7 +39,6 @@ string const ASTBoogieUtils::SOLIDITY_REQUIRE = "require";
 string const ASTBoogieUtils::SOLIDITY_REVERT = "revert";
 
 string const ASTBoogieUtils::SOLIDITY_THIS = "this";
-string const ASTBoogieUtils::BOOGIE_THIS = "__this";
 string const ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 string const ASTBoogieUtils::BOOGIE_LENGTH = "#length";
@@ -62,8 +59,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> transferParams{
-		{Expr::id(BOOGIE_THIS), context.addressType() },
-		{Expr::id(BOOGIE_MSG_SENDER), context.addressType() },
+		{context.boogieThis(), context.addressType() },
+		{context.boogieMsgSender(), context.addressType() },
 		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
 		{Expr::id("amount"), context.intType(256) }
 	};
@@ -73,8 +70,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
-	Expr::Ref sender_bal = Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
+	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
+	Expr::Ref sender_bal = Expr::sel(context.boogieBalance(), context.boogieMsgSender());
 	Expr::Ref amount = Expr::id("amount");
 
 	// Precondition: there is enough ether to transfer
@@ -97,8 +94,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		});
 	}
 	transferImpl->addStmt(Stmt::assign(
-			Expr::id(BOOGIE_BALANCE),
-			Expr::upd(Expr::id(BOOGIE_BALANCE), Expr::id(BOOGIE_THIS), addBalance.expr)));
+			context.boogieBalance(),
+			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -112,8 +109,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		transferImpl->addStmt(Stmt::assume(subSenderBalance.cc));
 	}
 	transferImpl->addStmt(Stmt::assign(
-			Expr::id(BOOGIE_BALANCE),
-			Expr::upd(Expr::id(BOOGIE_BALANCE), Expr::id(BOOGIE_MSG_SENDER), subSenderBalance.expr)));
+			context.boogieBalance(),
+			Expr::upd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
 	transferImpl->addStmt(Stmt::comment("TODO: call fallback, exception handling"));
 
 	ProcDeclRef transfer = Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
@@ -130,8 +127,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Parameters: this, msg.sender, msg.value
 	vector<Binding> callParams {
-		{Expr::id(BOOGIE_THIS), context.addressType()},
-		{Expr::id(BOOGIE_MSG_SENDER), context.addressType()},
+		{context.boogieThis(), context.addressType()},
+		{context.boogieMsgSender(), context.addressType()},
 		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) }
 	};
 
@@ -154,7 +151,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
+	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
 	Expr::Ref msg_val = Expr::id(BOOGIE_MSG_VALUE);
 	Expr::Ref result = Expr::id("__result");
 
@@ -175,8 +172,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			Expr::id(BOOGIE_BALANCE),
-			Expr::upd(Expr::id(BOOGIE_BALANCE), Expr::id(BOOGIE_THIS), addBalance.expr)));
+			context.boogieBalance(),
+			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 	// Unsuccessful transfer
 	bg::Block::Ref elseBlock = bg::Block::block();
@@ -196,8 +193,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> sendParams {
-		{Expr::id(BOOGIE_THIS), context.addressType()},
-		{Expr::id(BOOGIE_MSG_SENDER), context.addressType()},
+		{context.boogieThis(), context.addressType()},
+		{context.boogieMsgSender(), context.addressType()},
 		{Expr::id(BOOGIE_MSG_VALUE), context.intType(256) },
 		{Expr::id("amount"), context.intType(256) }
 	};
@@ -211,8 +208,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(BOOGIE_BALANCE, BOOGIE_THIS);
-	Expr::Ref sender_bal = Expr::sel(BOOGIE_BALANCE, BOOGIE_MSG_SENDER);
+	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
+	Expr::Ref sender_bal = Expr::sel(context.boogieBalance(), context.boogieMsgSender());
 	Expr::Ref amount = Expr::id("amount");
 	Expr::Ref result = Expr::id("__result");
 
@@ -233,8 +230,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			Expr::id(BOOGIE_BALANCE),
-			Expr::upd(Expr::id(BOOGIE_BALANCE), Expr::id(BOOGIE_THIS), addBalance.expr)));
+			context.boogieBalance(),
+			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -252,8 +249,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			Expr::id(BOOGIE_BALANCE),
-			Expr::upd(Expr::id(BOOGIE_BALANCE), Expr::id(BOOGIE_MSG_SENDER), subSenderBalance.expr)));
+			context.boogieBalance(),
+			Expr::upd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 
 	// Unsuccessful transfer
@@ -294,26 +291,6 @@ string ASTBoogieUtils::dataLocToStr(DataLocation loc)
 		solAssert(false, "Unknown storage location.");
 	}
 	return "";
-}
-
-string ASTBoogieUtils::mapDeclName(Declaration const& decl)
-{
-	// Check for special names
-	if (decl.name() == SOLIDITY_ASSERT) return SOLIDITY_ASSERT;
-	if (decl.name() == SOLIDITY_REQUIRE) return SOLIDITY_REQUIRE;
-	if (decl.name() == SOLIDITY_REVERT) return SOLIDITY_REVERT;
-	if (decl.name() == SOLIDITY_THIS) return BOOGIE_THIS;
-	if (decl.name() == SOLIDITY_NOW) return BOOGIE_NOW;
-
-	// ID is important to append, since (1) even fully qualified names can be
-	// same for state variables and local variables in functions, (2) return
-	// variables might have no name (whereas Boogie requires a name)
-	return decl.name() + "#" + to_string(decl.id());
-}
-
-string ASTBoogieUtils::mapStructMemberName(Declaration const& decl, DataLocation loc)
-{
-	return mapDeclName(decl) + "_" + dataLocToStr(loc);
 }
 
 string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)

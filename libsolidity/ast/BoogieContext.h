@@ -57,6 +57,8 @@ private:
 
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
+	boogie::Decl::Ref m_boogieBalance;
+	boogie::Decl::Ref m_boogieThis;
 
 	Encoding m_encoding;
 	bool m_overflow;
@@ -101,6 +103,16 @@ public:
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 
 	/**
+	 * Map a declaration name to a name in Boogie
+	 */
+	std::string mapDeclName(Declaration const& decl);
+
+	/**
+	 * Map a structure member with a given data location to a name in Boogie
+	 */
+	std::string mapStructMemberName(Declaration const& decl, DataLocation loc);
+
+	/**
 	 * Print the actual Boogie program to an output stream
 	 */
 	void print(std::ostream& _stream) { m_program.print(_stream); }
@@ -119,9 +131,12 @@ public:
 	boogie::TypeDeclRef addressType() const;
 	boogie::TypeDeclRef boolType() const;
 	boogie::TypeDeclRef stringType() const;
-
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
+
+	boogie::Expr::Ref boogieBalance() const;
+	boogie::Expr::Ref boogieThis() const;
+	boogie::Expr::Ref boogieMsgSender() const;
 
 	boogie::Expr::Ref intLit(long lit, int bits) const;
 

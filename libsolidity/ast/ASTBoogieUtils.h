@@ -19,7 +19,6 @@ public:
 
 	// Identifiers related to the 'address' type
 	static std::string const SOLIDITY_BALANCE;
-	static std::string const BOOGIE_BALANCE;
 	static std::string const SOLIDITY_TRANSFER;
 	static std::string const BOOGIE_TRANSFER;
 	static std::string const SOLIDITY_SEND;
@@ -34,7 +33,6 @@ public:
 	// Identifiers related to 'msg'
 	static std::string const SOLIDITY_SENDER;
 	static std::string const SOLIDITY_VALUE;
-	static std::string const BOOGIE_MSG_SENDER;
 	static std::string const BOOGIE_MSG_VALUE;
 
 	// Error handling
@@ -48,7 +46,6 @@ public:
 	static std::string const ERR_TYPE;
 
 	// Other identifiers
-	static std::string const BOOGIE_THIS;
 	static std::string const VERIFIER_SUM;
 	static std::string const BOOGIE_CONSTRUCTOR;
 	static std::string const BOOGIE_LENGTH;
@@ -87,19 +84,6 @@ public:
 	 */
 	static
 	std::string dataLocToStr(DataLocation loc);
-
-	/**
-	 * Map a declaration name to a name in Boogie
-	 */
-	static
-	std::string mapDeclName(Declaration const& decl);
-
-	/**
-	 * Map a structure member with a given data location
-	 * to a name in Boogie
-	 */
-	static
-	std::string mapStructMemberName(Declaration const& decl, DataLocation loc);
 
 	static
 	std::string getConstructorName(ContractDefinition const* contract);

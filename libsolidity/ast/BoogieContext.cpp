@@ -47,15 +47,16 @@ BoogieContext::BoogieContext(Encoding encoding,
 		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
-;
 	// Initialize global declarations
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	addDecl(addressType());
 	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, addressType(), true));
 	// address.balance
-	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BALANCE,
-			ASTBoogieUtils::mappingType(addressType(), intType(256))));
+	m_boogieBalance = boogie::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
+	addDecl(m_boogieBalance);
+	// This
+	m_boogieThis = boogie::Decl::variable("__this", addressType());
 	// Uninterpreted type for strings
 	addDecl(stringType());
 	// now
@@ -63,6 +64,26 @@ BoogieContext::BoogieContext(Encoding encoding,
 	// overflow
 	if (m_overflow)
 		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
+}
+
+string BoogieContext::mapDeclName(Declaration const& decl)
+{
+	// Check for special names
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_ASSERT) return ASTBoogieUtils::SOLIDITY_ASSERT;
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_REQUIRE) return ASTBoogieUtils::SOLIDITY_REQUIRE;
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_REVERT) return ASTBoogieUtils::SOLIDITY_REVERT;
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_THIS) return m_boogieThis->getName();
+	if (decl.name() == ASTBoogieUtils::SOLIDITY_NOW) return ASTBoogieUtils::BOOGIE_NOW;
+
+	// ID is important to append, since (1) even fully qualified names can be
+	// same for state variables and local variables in functions, (2) return
+	// variables might have no name (whereas Boogie requires a name)
+	return decl.name() + "#" + to_string(decl.id());
+}
+
+string BoogieContext::mapStructMemberName(Declaration const& decl, DataLocation loc)
+{
+	return mapDeclName(decl) + "_" + ASTBoogieUtils::dataLocToStr(loc);
 }
 
 void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl)
@@ -158,6 +179,21 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return boogie::Decl::typee("bv" + toString(size));
 	else
 		return boogie::Decl::typee("int");
+}
+
+boogie::Expr::Ref BoogieContext::boogieBalance() const
+{
+	return boogie::Expr::id(m_boogieBalance->getName());
+}
+
+boogie::Expr::Ref BoogieContext::boogieThis() const
+{
+	return boogie::Expr::id(m_boogieThis->getName());
+}
+
+boogie::Expr::Ref BoogieContext::boogieMsgSender() const
+{
+	return boogie::Expr::id("__msg_sender");
 }
 
 boogie::Expr::Ref BoogieContext::intLit(long lit, int bits) const
