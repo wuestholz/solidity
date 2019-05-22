@@ -992,22 +992,11 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 
 void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 {
-	TypePointer tp = nullptr;
+	TypePointer tp = _node.annotation().type;
 	if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
 	{
 		auto sumDecl = id->annotation().referencedDeclaration;
-
-		MagicVariableDeclaration const* magicVar = nullptr;
-		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-			magicVar = dynamic_cast<MagicVariableDeclaration const *>(exprId->annotation().referencedDeclaration);
-
-		if (magicVar)
-		{
-			m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0];
-			tp = m_context.currentSumDecls()[sumDecl];
-		}
-		else
-			solAssert(false, "Magic variable for sum function not found.");
+		m_context.currentSumDecls()[sumDecl] = tp;
 
 		auto declCategory = id->annotation().type->category();
 		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
@@ -1021,22 +1010,10 @@ void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 }
 
 void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, vector<Expr::Ref> const& args)
-{
-	TypePointer tp = nullptr;
-
-	MagicVariableDeclaration const* magicVar = nullptr;
-	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-		magicVar = dynamic_cast<MagicVariableDeclaration const *>(exprId->annotation().referencedDeclaration);
-
-	if (magicVar)
-	{
-		tp = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0];
-		solAssert(args.size() == 1, "Verifier old function must have exactly one argument");
-		m_currentExpr = Expr::old(args[0]);
-		addTCC(m_currentExpr, tp);
-	}
-	else
-		solAssert(false, "Magic variable for old expression not found.");
+{;
+	solAssert(args.size() == 1, "Verifier old function must have exactly one argument");
+	m_currentExpr = Expr::old(args[0]);
+	addTCC(m_currentExpr, _node.annotation().type);
 }
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
