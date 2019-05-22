@@ -42,8 +42,8 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 
 	for (string oldType : oldTypes)
 	{
-		auto funType = TypeProvider::function(strings { }, strings { oldType },
-				FunctionType::Kind::Internal, true, StateMutability::Pure);
+		auto funType = TypeProvider::function(strings { oldType }, strings { oldType },
+				FunctionType::Kind::Internal, false, StateMutability::Pure);
 		auto old = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_OLD + "_" + oldType, funType);
 		m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(old));
 	}
