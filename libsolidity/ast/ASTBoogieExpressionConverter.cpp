@@ -1006,7 +1006,8 @@ void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 			m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0];
 			tp = m_context.currentSumDecls()[sumDecl];
 		}
-		else { m_context.reportError(&_node, "Could not find sum function"); }
+		else
+			solAssert(false, "Magic variable for sum function not found.");
 
 		auto declCategory = id->annotation().type->category();
 		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
@@ -1035,9 +1036,7 @@ void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, ve
 		addTCC(m_currentExpr, tp);
 	}
 	else
-	{
-		m_context.reportError(&_node, "Could not find old function for type");
-	}
+		solAssert(false, "Magic variable for old expression not found.");
 }
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)

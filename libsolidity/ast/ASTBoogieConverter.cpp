@@ -281,15 +281,13 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 							// Convert expression to Boogie representation
 							auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
 
-							// Report unsupported cases
-							if (!result.newStatements.empty()) // Make sure that there are no side effects
-							{
+							// Report unsupported cases (side effects)
+							if (!result.newStatements.empty())
 								m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
-							}
-							if (!result.newDecls.empty()) // Make sure that there are no side effects
-							{
+							if (!result.newDecls.empty())
 								m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-							}
+							if (!result.newConstants.empty())
+								m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
 
 							// Success
 							exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs));

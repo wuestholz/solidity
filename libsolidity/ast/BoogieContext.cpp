@@ -35,7 +35,7 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 	}
 
 	// Add magic variables for the 'old' function
-	vector<string> oldTypes = { "address" };
+	vector<string> oldTypes = { "address", "bool" };
 	for (string base : { "int", "uint" })
 		for (int bits = 8; bits <= 256; bits += 8)
 			oldTypes.push_back(base + to_string(bits));
