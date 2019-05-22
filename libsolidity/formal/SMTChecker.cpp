@@ -111,7 +111,6 @@ bool SMTChecker::visit(FunctionDefinition const& _function)
 		m_pathConditions.clear();
 		m_callStack.clear();
 		pushCallStack({&_function, nullptr});
-		m_globalContext.clear();
 		m_uninterpretedTerms.clear();
 		m_overflowTargets.clear();
 		resetStateVariables();
@@ -335,7 +334,9 @@ void SMTChecker::endVisit(VariableDeclarationStatement const& _varDecl)
 			solAssert(symbTuple, "");
 			auto const& components = symbTuple->components();
 			auto const& declarations = _varDecl.declarations();
-			if (components.size() == declarations.size())
+			if (!components.empty())
+			{
+				solAssert(components.size() == declarations.size(), "");
 				for (unsigned i = 0; i < declarations.size(); ++i)
 					if (
 						components.at(i) &&
@@ -343,6 +344,7 @@ void SMTChecker::endVisit(VariableDeclarationStatement const& _varDecl)
 						m_context.knownVariable(*declarations.at(i))
 					)
 						assignment(*declarations.at(i), components.at(i)->currentValue(), declarations.at(i)->location());
+			}
 		}
 	}
 	else if (m_context.knownVariable(*_varDecl.declarations().front()))
@@ -633,6 +635,7 @@ void SMTChecker::endVisit(BinaryOperation const& _op)
 void SMTChecker::endVisit(FunctionCall const& _funCall)
 {
 	solAssert(_funCall.annotation().kind != FunctionCallKind::Unset, "");
+	createExpr(_funCall);
 	if (_funCall.annotation().kind == FunctionCallKind::StructConstructorCall)
 	{
 		m_errorReporter.warning(
@@ -694,7 +697,6 @@ void SMTChecker::endVisit(FunctionCall const& _funCall)
 		checkCondition(thisBalance < expr(*value), _funCall.location(), "Insufficient funds", "address(this).balance", &thisBalance);
 
 		m_context.transfer(m_context.thisAddress(), expr(address), expr(*value));
-		createExpr(_funCall);
 		break;
 	}
 	default:
@@ -730,7 +732,7 @@ void SMTChecker::visitGasLeft(FunctionCall const& _funCall)
 	// We increase the variable index since gasleft changes
 	// inside a tx.
 	defineGlobalVariable(gasLeft, _funCall, true);
-	auto const& symbolicVar = m_globalContext.at(gasLeft);
+	auto const& symbolicVar = m_context.globalSymbol(gasLeft);
 	unsigned index = symbolicVar->index();
 	// We set the current value to unknown anyway to add type constraints.
 	m_context.setUnknownValue(*symbolicVar);
@@ -741,14 +743,8 @@ void SMTChecker::visitGasLeft(FunctionCall const& _funCall)
 void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
 {
 	FunctionDefinition const* funDef = inlinedFunctionCallToDefinition(_funCall);
-	if (!funDef)
-	{
-		m_errorReporter.warning(
-			_funCall.location(),
-			"Assertion checker does not yet implement this type of function call."
-		);
-	}
-	else if (visitedFunction(funDef))
+	solAssert(funDef, "");
+	if (visitedFunction(funDef))
 		m_errorReporter.warning(
 			_funCall.location(),
 			"Assertion checker does not support recursive function calls.",
@@ -779,7 +775,6 @@ void SMTChecker::inlineFunctionCall(FunctionCall const& _funCall)
 		// The callstack entry is popped only in endVisit(FunctionDefinition) instead of here
 		// as well to avoid code duplication (not all entries are from inlined function calls).
 
-		createExpr(_funCall);
 		auto const& returnParams = funDef->returnParameters();
 		if (returnParams.size() > 1)
 		{
@@ -866,7 +861,6 @@ void SMTChecker::visitTypeConversion(FunctionCall const& _funCall)
 		defineExpr(_funCall, expr(*argument));
 	else
 	{
-		createExpr(_funCall);
 		m_context.setUnknownValue(*m_context.expression(_funCall));
 		auto const& funCallCategory = _funCall.annotation().type->category();
 		// TODO: truncating and bytesX needs a different approach because of right padding.
@@ -897,8 +891,8 @@ void SMTChecker::visitFunctionIdentifier(Identifier const& _identifier)
 	auto const& fType = dynamic_cast<FunctionType const&>(*_identifier.annotation().type);
 	if (fType.returnParameterTypes().size() == 1)
 	{
-		defineGlobalFunction(fType.richIdentifier(), _identifier);
-		m_context.createExpression(_identifier, m_globalContext.at(fType.richIdentifier()));
+		defineGlobalVariable(fType.richIdentifier(), _identifier);
+		m_context.createExpression(_identifier, m_context.globalSymbol(fType.richIdentifier()));
 	}
 }
 
@@ -1117,37 +1111,21 @@ void SMTChecker::arrayIndexAssignment(Expression const& _expr, smt::Expression c
 
 void SMTChecker::defineGlobalVariable(string const& _name, Expression const& _expr, bool _increaseIndex)
 {
-	if (!knownGlobalSymbol(_name))
+	if (!m_context.knownGlobalSymbol(_name))
 	{
-		auto result = smt::newSymbolicVariable(*_expr.annotation().type, _name, *m_interface);
-		m_globalContext.emplace(_name, result.second);
-		m_context.setUnknownValue(*result.second);
-		if (result.first)
+		bool abstract = m_context.createGlobalSymbol(_name, _expr);
+		if (abstract)
 			m_errorReporter.warning(
 				_expr.location(),
 				"Assertion checker does not yet support this global variable."
 			);
 	}
 	else if (_increaseIndex)
-		m_globalContext.at(_name)->increaseIndex();
+		m_context.globalSymbol(_name)->increaseIndex();
 	// The default behavior is not to increase the index since
 	// most of the global values stay the same throughout a tx.
 	if (smt::isSupportedType(_expr.annotation().type->category()))
-		defineExpr(_expr, m_globalContext.at(_name)->currentValue());
-}
-
-void SMTChecker::defineGlobalFunction(string const& _name, Expression const& _expr)
-{
-	if (!knownGlobalSymbol(_name))
-	{
-		auto result = smt::newSymbolicVariable(*_expr.annotation().type, _name, *m_interface);
-		m_globalContext.emplace(_name, result.second);
-		if (result.first)
-			m_errorReporter.warning(
-				_expr.location(),
-				"Assertion checker does not yet support the type of this function."
-			);
-	}
+		defineExpr(_expr, m_context.globalSymbol(_name)->currentValue());
 }
 
 bool SMTChecker::shortcutRationalNumber(Expression const& _expr)
@@ -1365,10 +1343,13 @@ void SMTChecker::assignment(
 	else if (auto tuple = dynamic_cast<TupleExpression const*>(&_left))
 	{
 		auto const& components = tuple->components();
-		solAssert(_right.size() == components.size(), "");
-		for (unsigned i = 0; i < _right.size(); ++i)
-			if (auto component = components.at(i))
-				assignment(*component, {_right.at(i)}, component->annotation().type, component->location());
+		if (!_right.empty())
+		{
+			solAssert(_right.size() == components.size(), "");
+			for (unsigned i = 0; i < _right.size(); ++i)
+				if (auto component = components.at(i))
+					assignment(*component, {_right.at(i)}, component->annotation().type, component->location());
+		}
 	}
 	else
 		m_errorReporter.warning(
@@ -1462,7 +1443,7 @@ void SMTChecker::checkCondition(
 				expressionNames.push_back(var.first->name());
 			}
 		}
-		for (auto const& var: m_globalContext)
+		for (auto const& var: m_context.globalSymbols())
 		{
 			auto const& type = var.second->type();
 			if (
@@ -1761,11 +1742,6 @@ smt::Expression SMTChecker::expr(Expression const& _e)
 		createExpr(_e);
 	}
 	return m_context.expression(_e)->currentValue();
-}
-
-bool SMTChecker::knownGlobalSymbol(string const& _var) const
-{
-	return m_globalContext.count(_var);
 }
 
 void SMTChecker::createExpr(Expression const& _e)

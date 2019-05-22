@@ -346,6 +346,34 @@ string YulUtilFunctions::overflowCheckedUIntAddFunction(size_t _bits)
 	});
 }
 
+string YulUtilFunctions::overflowCheckedUIntMulFunction(size_t _bits)
+{
+	solAssert(0 < _bits && _bits <= 256 && _bits % 8 == 0, "");
+	string functionName = "checked_mul_uint_" + to_string(_bits);
+	return m_functionCollector->createFunction(functionName, [&]() {
+		return
+			// - The current overflow check *before* the multiplication could
+			//   be replaced by the following check *after* the multiplication:
+			//   if and(iszero(iszero(x)), iszero(eq(div(product, x), y))) { revert(0, 0) }
+			// - The case the x equals 0 could be treated separately and directly return zero.
+			Whiskers(R"(
+			function <functionName>(x, y) -> product {
+				if and(iszero(iszero(x)), lt(div(<mask>, x), y)) { revert(0, 0) }
+				<?shortType>
+					product := mulmod(x, y, <powerOfTwo>)
+				<!shortType>
+					product := mul(x, y)
+				</shortType>
+			}
+			)")
+				("shortType", _bits < 256)
+				("functionName", functionName)
+				("powerOfTwo", toCompactHexWithPrefix(u256(1) << _bits))
+				("mask", toCompactHexWithPrefix((u256(1) << _bits) - 1))
+				.render();
+	});
+}
+
 string YulUtilFunctions::overflowCheckedUIntSubFunction()
 {
 	string functionName = "checked_sub_uint";
@@ -1030,6 +1058,84 @@ string YulUtilFunctions::suffixedVariableNameList(string const& _baseName, size_
 			result = _baseName + to_string(_endSuffix++) + ", " + result;
 	}
 	return result;
+}
+
+std::string YulUtilFunctions::decrementCheckedFunction(Type const& _type)
+{
+	IntegerType const& type = dynamic_cast<IntegerType const&>(_type);
+
+	string const functionName = "decrement_" + _type.identifier();
+
+	return m_functionCollector->createFunction(functionName, [&]() {
+		u256 minintval;
+
+		// Smallest admissible value to decrement
+		if (type.isSigned())
+			minintval = 0 - (u256(1) << (type.numBits() - 1)) + 1;
+		else
+			minintval = 1;
+
+		return Whiskers(R"(
+			function <functionName>(value) -> ret {
+				if <lt>(value, <minval>) { revert(0,0) }
+				ret := sub(value, 1)
+			}
+		)")
+			("functionName", functionName)
+			("minval", toCompactHexWithPrefix(minintval))
+			("lt", type.isSigned() ? "slt" : "lt")
+			.render();
+	});
+}
+
+std::string YulUtilFunctions::incrementCheckedFunction(Type const& _type)
+{
+	IntegerType const& type = dynamic_cast<IntegerType const&>(_type);
+
+	string const functionName = "increment_" + _type.identifier();
+
+	return m_functionCollector->createFunction(functionName, [&]() {
+		u256 maxintval;
+
+		// Biggest admissible value to increment
+		if (type.isSigned())
+			maxintval = (u256(1) << (type.numBits() - 1)) - 2;
+		else
+			maxintval = (u256(1) << type.numBits()) - 2;
+
+		return Whiskers(R"(
+			function <functionName>(value) -> ret {
+				if <gt>(value, <maxval>) { revert(0,0) }
+				ret := add(value, 1)
+			}
+		)")
+			("functionName", functionName)
+			("maxval", toCompactHexWithPrefix(maxintval))
+			("gt", type.isSigned() ? "sgt" : "gt")
+			.render();
+	});
+}
+
+string YulUtilFunctions::negateNumberCheckedFunction(Type const& _type)
+{
+	IntegerType const& type = dynamic_cast<IntegerType const&>(_type);
+	solAssert(type.isSigned(), "Expected signed type!");
+
+	string const functionName = "negate_" + _type.identifier();
+
+	u256 const minintval = 0 - (u256(1) << (type.numBits() - 1)) + 1;
+
+	return m_functionCollector->createFunction(functionName, [&]() {
+		return Whiskers(R"(
+			function <functionName>(_value) -> ret {
+				if slt(_value, <minval>) { revert(0,0) }
+				ret := sub(0, _value)
+			}
+		)")
+			("functionName", functionName)
+			("minval", toCompactHexWithPrefix(minintval))
+			.render();
+		});
 }
 
 string YulUtilFunctions::conversionFunctionSpecial(Type const& _from, Type const& _to)

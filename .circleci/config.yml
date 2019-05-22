@@ -30,7 +30,9 @@ defaults:
       command: scripts/tests.sh --junit_report test_results
   - run_regressions: &run_regressions
       name: Regression tests
-      command: scripts/regressions.py -o test_results
+      command: |
+        export ASAN_OPTIONS="check_initialization_order=true:detect_stack_use_after_return=true:strict_init_order=true:strict_string_checks=true:detect_invalid_pointer_pairs=2"
+        scripts/regressions.py -o test_results
   - solc_artifact: &solc_artifact
       path: build/solc/solc
       destination: solc
@@ -444,6 +446,7 @@ jobs:
             ulimit -a
             # Increase stack size because ASan makes stack frames bigger and that breaks our assumptions (in tests).
             ulimit -s 16384
+            export ASAN_OPTIONS="check_initialization_order=true:detect_stack_use_after_return=true:strict_init_order=true:strict_string_checks=true:detect_invalid_pointer_pairs=2"
             build/test/soltest --logger=JUNIT,test_suite,test_results/result.xml -- --no-ipc --testpath test
       - run:
           name: Run commandline tests with ASAN
@@ -451,6 +454,7 @@ jobs:
             ulimit -a
             # Increase stack size because ASan makes stack frames bigger and that breaks our assumptions (in tests).
             ulimit -s 16384
+            export ASAN_OPTIONS="check_initialization_order=true:detect_stack_use_after_return=true:strict_init_order=true:strict_string_checks=true:detect_invalid_pointer_pairs=2"
             test/cmdlineTests.sh
       - store_test_results:
           path: test_results/
@@ -560,8 +564,6 @@ jobs:
             update-alternatives --install /usr/bin/llvm-symbolizer llvm-symbolizer /usr/bin/llvm-symbolizer-7 1
       - run: mkdir -p test_results
       - run: *run_regressions
-      - store_test_results:
-          path: test_results/
       - store_artifacts:
           path: test_results/
           destination: test_results/
