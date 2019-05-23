@@ -76,6 +76,8 @@ private:
 	 */
 	void createImplicitConstructor(ContractDefinition const& _node);
 
+	BoogieContext::DocTagExpr parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope);
+
 	/**
 	 * Parse expressions from documentation for a given doctag
 	 */
