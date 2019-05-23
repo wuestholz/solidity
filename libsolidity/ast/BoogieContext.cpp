@@ -34,19 +34,11 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 		}
 	}
 
-	// Add magic variables for the 'old' function
-	vector<string> oldTypes = { "address", "bool" };
-	for (string base : { "int", "uint" })
-		for (int bits = 8; bits <= 256; bits += 8)
-			oldTypes.push_back(base + to_string(bits));
-
-	for (string oldType : oldTypes)
-	{
-		auto funType = TypeProvider::function(strings { oldType }, strings { oldType },
-				FunctionType::Kind::Internal, false, StateMutability::Pure);
-		auto old = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_OLD + "_" + oldType, funType);
-		m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(old));
-	}
+	// Add magic variable for the 'old' function
+	auto funType = TypeProvider::function(strings { }, strings { },
+			FunctionType::Kind::Internal, true, StateMutability::Pure);
+	auto old = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_OLD, funType);
+	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(old));
 }
 
 BoogieContext::BoogieContext(Encoding encoding,
