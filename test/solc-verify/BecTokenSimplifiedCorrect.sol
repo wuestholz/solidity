@@ -31,7 +31,7 @@ library SafeMath {
 }
 
 /**
- * @notice invariant totalSupply == __verifier_sum_uint256(balances)
+ * @notice invariant totalSupply == __verifier_sum_uint(balances)
  */
 contract BecTokenSimplified {
     using SafeMath for uint256;
@@ -65,7 +65,7 @@ contract BecTokenSimplified {
 
         balances[msg.sender] = balances[msg.sender].sub(amount);
         /**
-         * @notice invariant totalSupply == __verifier_sum_uint256(balances) + (cnt - i) * _value
+         * @notice invariant totalSupply == __verifier_sum_uint(balances) + (cnt - i) * _value
          * @notice invariant i <= cnt
          */
         for (uint i = 0; i < cnt; i++) {

@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /**
- * @notice invariant __verifier_sum_uint8(user_balances) == total_supply
+ * @notice invariant __verifier_sum_uint(user_balances) == total_supply
  */
 contract SomeContract {
     uint8 total_supply;

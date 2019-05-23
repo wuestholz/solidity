@@ -3,6 +3,7 @@ pragma solidity >=0.5.0;
 contract OldExpr {
     address owner;
     int256 counter;
+    uint40 counter2;
 
     constructor() public {
         owner = msg.sender;
@@ -19,9 +20,13 @@ contract OldExpr {
         owner = newOwner;
     }
 
-    /** @notice postcondition counter == __verifier_old_int256(counter) + 1 */
+    /**
+     * @notice postcondition counter == __verifier_old_int(counter) + 1
+     * @notice postcondition counter2 == __verifier_old_uint(counter2) + 1
+     */
     function increment() public {
         counter++;
+        counter2++;
     }
 
 }

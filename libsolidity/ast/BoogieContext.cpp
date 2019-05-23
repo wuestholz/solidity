@@ -22,25 +22,16 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 	m_magicVariables.clear();
 
 	// Add magic variables for the 'sum' function for all sizes of int and uint
-	for (string base : { "int", "uint" })
+	for (string sumType : { "int", "uint" })
 	{
-		for (int bits = 8; bits <= 256; bits += 8)
-		{
-			string resultType = base + to_string(bits);
-			auto funType = TypeProvider::function(strings { }, strings { resultType },
-					FunctionType::Kind::Internal, true, StateMutability::Pure);
-			auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + resultType, funType);
-			m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(sum));
-		}
+		auto funType = TypeProvider::function(strings { }, strings { sumType },
+				FunctionType::Kind::Internal, true, StateMutability::Pure);
+		auto sum = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_SUM + "_" + sumType, funType);
+		m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(sum));
 	}
 
 	// Add magic variables for the 'old' function
-	vector<string> oldTypes = { "address", "bool" };
-	for (string base : { "int", "uint" })
-		for (int bits = 8; bits <= 256; bits += 8)
-			oldTypes.push_back(base + to_string(bits));
-
-	for (string oldType : oldTypes)
+	for (string oldType : { "address", "bool", "int", "uint" })
 	{
 		auto funType = TypeProvider::function(strings { oldType }, strings { oldType },
 				FunctionType::Kind::Internal, false, StateMutability::Pure);

@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /**
- * @notice invariant __verifier_sum_uint256(balances) == address(this).balance
+ * @notice invariant __verifier_sum_uint(balances) == address(this).balance
  */
 contract SimpleBank {
     mapping(address=>uint) balances;
