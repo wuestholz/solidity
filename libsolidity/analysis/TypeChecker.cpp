@@ -23,7 +23,6 @@
 #include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/TypeProvider.h>
-#include <libsolidity/ast/ASTBoogieUtils.h>
 
 #include <libyul/AsmAnalysis.h>
 #include <libyul/AsmAnalysisInfo.h>
@@ -1927,10 +1926,6 @@ bool TypeChecker::visit(FunctionCall const& _functionCall)
 		funcCallAnno.type = returnTypes.size() == 1 ?
 			move(returnTypes.front()) :
 			TypeProvider::tuple(move(returnTypes));
-
-		if (auto id = dynamic_cast<Identifier const*>(&_functionCall.expression()))
-			if (id->annotation().referencedDeclaration->name() == ASTBoogieUtils::VERIFIER_OLD)
-				funcCallAnno.type = _functionCall.arguments()[0]->annotation().type;
 
 		break;
 	}
