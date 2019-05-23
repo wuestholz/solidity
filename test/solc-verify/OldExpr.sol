@@ -8,15 +8,17 @@ contract OldExpr {
         owner = msg.sender;
     }
 
+    // Correct version, only owner can change the owner
     /** @notice postcondition msg.sender == __verifier_old(owner) || owner == __verifier_old(owner) */
-    function changeOwnerCorrect() public {
+    function changeOwnerCorrect(address newOwner) public {
         require(msg.sender == owner);
-        owner = msg.sender;
+        owner = newOwner;
     }
 
+    // Incorrect version, anyone can change the owner
     /** @notice postcondition msg.sender == __verifier_old(owner) || owner == __verifier_old(owner) */
-    function changeOwnerIncorrect() public {
-        owner = msg.sender;
+    function changeOwnerIncorrect(address newOwner) public {
+        owner = newOwner;
     }
 
     /** @notice postcondition counter == __verifier_old(counter) + 1 */
