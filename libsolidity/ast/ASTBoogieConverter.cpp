@@ -336,17 +336,36 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 
 void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
 {
-	std::map<Declaration const*, bool> modSpecs;
+	struct ModSpec {
+		boogie::Expr::Ref cond;
+
+		ModSpec() {}
+		ModSpec(boogie::Expr::Ref cond) : cond(cond) {}
+	};
+
+	std::map<Declaration const*, ModSpec> modSpecs;
 
 	for (auto docTag : _node.annotation().docTags)
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
 		{
+			size_t targetEnd = docTag.second.content.length();
+			size_t condStart = docTag.second.content.find(" if ");
+			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
+			if (condStart != string::npos)
+			{
+				targetEnd = condStart;
+				BoogieContext::DocTagExpr cond;
+				if (parseExpr(docTag.second.content.substr(condStart + 4), _node, &_node, cond))
+				{
+					condExpr = cond.expr;
+				}
+			}
 			BoogieContext::DocTagExpr target;
-			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1), _node, m_currentContract, target))
+			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, m_currentContract, target))
 			{
 				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
-					modSpecs[id->annotation().referencedDeclaration] = true;
+					modSpecs[id->annotation().referencedDeclaration] = ModSpec(condExpr);
 				else
 					m_context.reportError(&_node, "Target of modifies clause must be an identifier");
 			}
@@ -359,12 +378,20 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		{
 			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
 			{
+				boogie::Expr::Ref varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
 				if (modSpecs.find(varDecl) == modSpecs.end())
 				{
-					boogie::Expr::Ref varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
 					boogie::Expr::Ref expr = boogie::Expr::eq(varId, boogie::Expr::old(varId));
 					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "'", *m_context.currentScanner())));
+				}
+				else
+				{
+					boogie::Expr::Ref expr = boogie::Expr::or_(
+							modSpecs[varDecl].cond,
+							boogie::Expr::eq(varId, boogie::Expr::old(varId)));
+					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' when condition does not hold", *m_context.currentScanner())));
 				}
 			}
 		}
