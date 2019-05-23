@@ -48,6 +48,7 @@ private:
 	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;
 	static std::string const DOCTAG_PRECOND;
 	static std::string const DOCTAG_POSTCOND;
+	static std::string const DOCTAG_MODIFIES;
 
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,
@@ -76,7 +77,7 @@ private:
 	 */
 	void createImplicitConstructor(ContractDefinition const& _node);
 
-	BoogieContext::DocTagExpr parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope);
+	bool parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result);
 
 	/**
 	 * Parse expressions from documentation for a given doctag
@@ -84,6 +85,7 @@ private:
 	void getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
 			ASTNode const* _scope, std::string _tag, std::vector<BoogieContext::DocTagExpr>& out);
 
+	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);
 
 	/**
 	 * Chronological stack of scoppable nodes.

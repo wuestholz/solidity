@@ -10,6 +10,8 @@
 #include <liblangutil/SourceReferenceFormatter.h>
 #include <liblangutil/ErrorReporter.h>
 
+#include <map>
+
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
@@ -25,6 +27,7 @@ string const ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInva
 string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
 string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
 string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
+string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
@@ -236,7 +239,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	m_context.addDecl(procDecl);
 }
 
-BoogieContext::DocTagExpr ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode const* _scope)
+bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result)
 {
 	// We temporarily replace the error reporter in the context, because the locations
 	// are pointing to positions in the docstring
@@ -247,7 +250,8 @@ BoogieContext::DocTagExpr ASTBoogieConverter::parseExpr(string exprStr, ASTNode 
 	ErrorReporter* originalErrReporter = m_context.errorReporter();
 	m_context.errorReporter() = &errorReporter;
 
-	BoogieContext::DocTagExpr parsedExpr(boogie::Expr::id(ASTBoogieUtils::ERR_EXPR), exprStr, {}, {});
+	bool success = false;
+
 	try
 	{
 		// Parse
@@ -264,23 +268,29 @@ BoogieContext::DocTagExpr ASTBoogieConverter::parseExpr(string exprStr, ASTNode 
 			if (typeChecker.checkTypeRequirements(*expr))
 			{
 				// Convert expression to Boogie representation
-				auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
+				auto convResult = ASTBoogieExpressionConverter(m_context).convert(*expr);
 
 				// Report unsupported cases (side effects)
-				if (!result.newStatements.empty())
+				if (!convResult.newStatements.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
-				if (!result.newDecls.empty())
+				if (!convResult.newDecls.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-				if (!result.newConstants.empty())
+				if (!convResult.newConstants.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
 
-				// Success
-				parsedExpr = BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs);
+				success = true;
+				result.expr = convResult.expr;
+				result.exprStr = exprStr;
+				result.exprSol = expr;
+				result.tccs = convResult.tccs;
+				result.ocs = convResult.ocs;
 			}
 		}
 	}
 	catch (langutil::FatalError const& fe)
-	{}
+	{
+		m_context.reportError(&_node, "Error while parsing annotation.");
+	}
 
 	// Print errors relating to the expression string
 	SourceReferenceFormatter formatter(cerr);
@@ -298,7 +308,7 @@ BoogieContext::DocTagExpr ASTBoogieConverter::parseExpr(string exprStr, ASTNode 
 		m_context.reportError(&_node, "Error while processing annotation for node");
 	}
 
-	return parsedExpr;
+	return success;
 }
 
 void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
@@ -316,7 +326,46 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 			}
 			else // Normal tags just parse the expression afterwards
 			{
-				exprs.push_back(parseExpr(docTag.second.content.substr(_tag.length() + 1), _node, _scope));
+				BoogieContext::DocTagExpr expr;
+				if (parseExpr(docTag.second.content.substr(_tag.length() + 1), _node, _scope, expr))
+					exprs.push_back(expr);
+			}
+		}
+	}
+}
+
+void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
+{
+	std::map<Declaration const*, bool> modSpecs;
+
+	for (auto docTag : _node.annotation().docTags)
+	{
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
+		{
+			BoogieContext::DocTagExpr target;
+			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1), _node, m_currentContract, target))
+			{
+				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
+					modSpecs[id->annotation().referencedDeclaration] = true;
+				else
+					m_context.reportError(&_node, "Target of modifies clause must be an identifier");
+			}
+		}
+	}
+
+	if (!modSpecs.empty())
+	{
+		for (auto sn : m_currentContract->subNodes())
+		{
+			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
+			{
+				if (modSpecs.find(varDecl) == modSpecs.end())
+				{
+					boogie::Expr::Ref varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+					boogie::Expr::Ref expr = boogie::Expr::eq(varId, boogie::Expr::old(varId));
+					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "'", *m_context.currentScanner())));
+				}
 			}
 		}
 	}
@@ -797,6 +846,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 	}
 	// TODO: check that no new sum variables were introduced
+
+	// Modifies specifications
+	addModifiesSpecs(_node, procDecl);
 
 	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
