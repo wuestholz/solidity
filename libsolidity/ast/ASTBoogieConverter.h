@@ -95,6 +95,11 @@ private:
 	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);
 
 	/**
+	 * Helper method to recursively process a modifier
+	 */
+	void processModifier();
+
+	/**
 	 * Chronological stack of scoppable nodes.
 	 */
 	std::stack<ASTNode const*> m_scopes;

@@ -469,6 +469,62 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 	}
 }
 
+void ASTBoogieConverter::processModifier()
+{
+	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
+	{
+		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
+		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+
+		if (modifierDecl)
+		{
+			// Duplicated modifiers currently do not work, because they will introduce
+			// local variables for their parameters with the same name
+			for (unsigned long i = 0; i < m_currentModifier; ++i)
+			{
+				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
+					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
+			}
+
+			string oldReturnLabel = m_currentReturnLabel;
+			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+			++m_nextReturnLabelId;
+			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+
+			// Introduce and assign local variables for modifier arguments
+			if (modifier->arguments())
+			{
+				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
+				{
+					auto paramDecls = modifierDecl->parameters()[i];
+					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
+							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
+					m_localDecls.push_back(modifierParam);
+					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
+					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
+				}
+			}
+			modifierDecl->body().accept(*this);
+			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
+			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
+			m_currentReturnLabel = oldReturnLabel;
+		}
+		else
+			m_context.reportError(&*modifier, "Unsupported modifier invocation");
+	}
+	else if (m_currentFunc->isImplemented()) // We reached the function
+	{
+		string oldReturnLabel = m_currentReturnLabel;
+		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+		++m_nextReturnLabelId;
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body starts here"));
+		m_currentFunc->body().accept(*this);
+		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body ends here"));
+		m_currentReturnLabel = oldReturnLabel;
+	}
+}
+
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 				m_context(context),
 				m_currentContract(nullptr),
@@ -788,37 +844,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else
 	{
 		m_currentModifier = 0;
-		auto modifier = _node.modifiers()[m_currentModifier];
-		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
-
-		if (modifierDecl)
-		{
-			string retLabel = "$return" + to_string(m_nextReturnLabelId);
-			++m_nextReturnLabelId;
-			m_currentReturnLabel = retLabel;
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-
-			// Introduce and assign local variables for modifier arguments
-			if (modifier->arguments())
-			{
-				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
-				{
-					auto modifierParamDecl = modifierDecl->parameters()[i];
-					boogie::Decl::Ref modifierParam = boogie::Decl::variable(
-							m_context.mapDeclName(*modifierParamDecl),
-							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, modifierParamDecl.get(), m_context));
-					m_localDecls.push_back(modifierParam);
-					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
-				}
-			}
-
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(retLabel));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
-		}
-		else
-			m_context.reportError(&*modifier, "Unsupported modifier invocation");
+		processModifier();
 	}
 
 	vector<boogie::Block::Ref> blocks;
@@ -1095,65 +1121,9 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
 	rememberScope(_node);
 
-	// We go one level deeper in the modifier list
-	m_currentModifier++;
-
-	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
-	{
-		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
-		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
-
-		if (modifierDecl)
-		{
-			// Duplicated modifiers currently do not work, because they will introduce
-			// local variables for their parameters with the same name
-			for (unsigned long i = 0; i < m_currentModifier; ++i)
-			{
-				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
-					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
-			}
-
-			string oldReturnLabel = m_currentReturnLabel;
-			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
-			++m_nextReturnLabelId;
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-
-			// Introduce and assign local variables for modifier arguments
-			if (modifier->arguments())
-			{
-				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
-				{
-					auto paramDecls = modifierDecl->parameters()[i];
-					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
-							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
-					m_localDecls.push_back(modifierParam);
-					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
-				}
-			}
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
-			m_currentReturnLabel = oldReturnLabel;
-		}
-		else
-		{
-			m_context.reportError(&*modifier, "Unsupported modifier invocation");
-		}
-	}
-	else if (m_currentFunc->isImplemented()) // We reached the function
-	{
-		string oldReturnLabel = m_currentReturnLabel;
-		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
-		++m_nextReturnLabelId;
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body starts here"));
-		m_currentFunc->body().accept(*this);
-		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body ends here"));
-		m_currentReturnLabel = oldReturnLabel;
-	}
-
-	m_currentModifier--; // Go back one level in the modifier list
+	m_currentModifier++; // Go one level deeper
+	processModifier();   // Process the body
+	m_currentModifier--; // We are back
 
 	return false;
 }
