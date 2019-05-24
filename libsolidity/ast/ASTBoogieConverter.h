@@ -90,6 +90,11 @@ private:
 			ASTNode const* _scope, std::string _tag, std::vector<BoogieContext::DocTagExpr>& out);
 
 	/**
+	 * Checks if contract invariants are explicitly requested (for non-public functions)
+	 */
+	bool includeContractInvars(DocumentedAnnotation const& _annot);
+
+	/**
 	 * Helper method to extract and add modifies specifications to a function
 	 */
 	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);

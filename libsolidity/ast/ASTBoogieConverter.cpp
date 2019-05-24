@@ -314,20 +314,20 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
 		{
-			if (_tag == DOCTAG_CONTRACT_INVARS_INCLUDE) // Special tag to include contract invariants
-			{
-				// TODO: warning when currentinvars is empty
-				for (auto invar : m_context.currentContractInvars())
-					exprs.push_back(invar);
-			}
-			else // Normal tags just parse the expression afterwards
-			{
-				BoogieContext::DocTagExpr expr;
-				if (parseExpr(docTag.second.content.substr(_tag.length() + 1), _node, _scope, expr))
-					exprs.push_back(expr);
-			}
+			BoogieContext::DocTagExpr expr;
+			if (parseExpr(docTag.second.content.substr(_tag.length() + 1), _node, _scope, expr))
+				exprs.push_back(expr);
 		}
 	}
+}
+
+bool ASTBoogieConverter::includeContractInvars(DocumentedAnnotation const& _annot)
+{
+	for (auto docTag : _annot.docTags)
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_CONTRACT_INVARS_INCLUDE))
+			return true;
+
+	return false;
 }
 
 void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
@@ -750,9 +750,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		params.push_back({boogie::Expr::id(m_context.mapDeclName(*par)), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)});
 		if (par->type()->category() == Type::Category::Array) // Array length
-		{
 			params.push_back({boogie::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
-		}
 	}
 
 	// Return values
@@ -765,10 +763,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_context.reportError(&_node, "Arrays are not supported as return values");
 			return false;
 		}
-		std::string id = m_context.mapDeclName(*ret);
-		boogie::TypeDeclRef type = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
-		retIds.push_back(boogie::Expr::id(id));
-		rets.push_back({boogie::Expr::id(id), type});
+		boogie::Expr::Ref retId = boogie::Expr::id(m_context.mapDeclName(*ret));
+		boogie::TypeDeclRef retType = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
+		retIds.push_back(retId);
+		rets.push_back({retId, retType});
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -793,8 +791,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 						m_context.boogieBalance(),
 						m_context.boogieThis(),
 						defaultValue(tp_uint256))));
-		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
-		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+		for (auto i : m_stateVarInitializers)
+			m_currentBlocks.top()->addStmt(i);
 		// Assign uninitialized state variables to default values
 		for (auto declNode : m_stateVarsToInitialize)
 		{
@@ -805,7 +803,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			for (auto stmt : stmts)
 				m_currentBlocks.top()->addStmt(stmt);
 		}
-		m_stateVarsToInitialize.clear();
 	}
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
@@ -871,7 +868,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
 	}
 
-	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
+	// add invariants as pre/postconditions for: public functions and if explicitly requested
+	if (_node.isPublic() || includeContractInvars(_node.annotation()))
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
@@ -898,37 +896,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
-	else // Private functions: inline
-	{
+
+	if (!_node.isPublic()) // Non-public functions: inline
 		procDecl->addAttr(boogie::Attr::attr("inline", 1));
-
-		// Add contract invariants only if explicitly requested
-		std::vector<BoogieContext::DocTagExpr> cInvs;
-		getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE, cInvs);
-		for (auto cInv : cInvs)
-		{
-			procDecl->getRequires().push_back(boogie::Specification::spec(cInv.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
-			procDecl->getEnsures().push_back(boogie::Specification::spec(cInv.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
-
-			for (auto tcc : cInv.tccs)
-			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + cInv.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + cInv.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
-			}
-
-			for (auto oc : cInv.ocs)
-			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' at end of function.", *m_context.currentScanner())));
-			}
-		}
-	}
 
 	// Add other pre/postconditions
 	std::vector<BoogieContext::DocTagExpr> preconds;
@@ -1187,35 +1157,19 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR, loopInvars);
+	if (includeContractInvars(_node.annotation()))
+		for (auto invar : m_context.currentContractInvars())
+			loopInvars.push_back(invar);
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
-		{
 			invars.push_back(boogie::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		for (auto oc : invar.ocs)
-		{
-			invars.push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
 
-	std::vector<BoogieContext::DocTagExpr> contractInvars;
-	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE, contractInvars);
-	for (auto invar : contractInvars)
-	{
-		for (auto tcc : invar.tccs)
-		{
-			invars.push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
 		for (auto oc : invar.ocs)
-		{
 			invars.push_back(boogie::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
@@ -1266,34 +1220,19 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR, loopInvars);
+	if (includeContractInvars(_node.annotation()))
+		for (auto invar : m_context.currentContractInvars())
+			loopInvars.push_back(invar);
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
-		{
 			invars.push_back(boogie::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		for (auto oc : invar.ocs)
-		{
 			invars.push_back(boogie::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	std::vector<BoogieContext::DocTagExpr> contractInvars;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE, contractInvars);
-	for (auto invar : contractInvars)
-	{
-		for (auto tcc : invar.tccs)
-		{
-			invars.push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		for (auto oc : invar.ocs)
-		{
-			invars.push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
