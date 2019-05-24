@@ -21,14 +21,28 @@ contract Simple {
     }
 
     /**
-    * @notice modifies xs
+    * @notice modifies xs[msg.sender]
     * @notice modifies counter if msg.sender == __verifier_old_address(owner)
     * @notice postcondition msg.sender != owner || counter == __verifier_old_int(counter) + 1
     */
-    function set(int x) public {
+    function setCorrect(int x) public {
         xs[msg.sender] = x;
         if (msg.sender == owner)
             counter++;
+    }
+
+    /**
+    * @notice modifies xs[msg.sender]
+    */
+    function setInorrect(int x) public {
+        xs[address(this)] = x;
+    }
+
+    /**
+    * @notice modifies xs[msg.sender] if x > 0
+    */
+    function setInorrect2(int x) public {
+        xs[address(this)] = x;
     }
 
     function get() public view returns (int) {

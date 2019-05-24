@@ -2,6 +2,11 @@ Verifying Simple::[constructor]: OK
 Verifying Simple::changeOwner: OK
 Verifying Simple::changeOwnerIncorrect: ERROR
  - Source test/solc-verify/Modifies.sol, line 19, col 5: Function might modify 'owner' when condition does not hold
-Verifying Simple::set: OK
+Verifying Simple::setCorrect: OK
+Verifying Simple::setInorrect: ERROR
+ - Source test/solc-verify/Modifies.sol, line 37, col 5: Function might modify 'xs' outside defined index
+Verifying Simple::setInorrect2: ERROR
+ - Source test/solc-verify/Modifies.sol, line 44, col 5: Function might modify 'xs' when condition does not hold
+ - Source test/solc-verify/Modifies.sol, line 44, col 5: Function might modify 'xs' outside defined index
 Verifying Simple::get: OK
 Errors were found by the verifier.

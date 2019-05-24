@@ -49,6 +49,7 @@ private:
 	static std::string const DOCTAG_PRECOND;
 	static std::string const DOCTAG_POSTCOND;
 	static std::string const DOCTAG_MODIFIES;
+	static std::string const DOCTAG_MODIFIES_COND;
 
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,

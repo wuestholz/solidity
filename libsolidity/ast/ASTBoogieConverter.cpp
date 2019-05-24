@@ -28,6 +28,7 @@ string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
 string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
 string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
 string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
+string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
@@ -336,13 +337,16 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 
 void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
 {
+	// Modifies specifier
 	struct ModSpec {
-		boogie::Expr::Ref cond;
+		boogie::Expr::Ref cond; // Condition
+		boogie::Expr::Ref idx;  // Index / selector
 
 		ModSpec() {}
-		ModSpec(boogie::Expr::Ref cond) : cond(cond) {}
+		ModSpec(boogie::Expr::Ref cond, boogie::Expr::Ref idx) : cond(cond), idx(idx) {}
 	};
 
+	// Modifies specifier for each variable
 	std::map<Declaration const*, ModSpec> modSpecs;
 
 	for (auto docTag : _node.annotation().docTags)
@@ -350,48 +354,118 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
 		{
 			size_t targetEnd = docTag.second.content.length();
-			size_t condStart = docTag.second.content.find(" if ");
 			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
+			// Check if there is a condition part
+			size_t condStart = docTag.second.content.find(DOCTAG_MODIFIES_COND);
 			if (condStart != string::npos)
 			{
 				targetEnd = condStart;
+				// Parse the condition
 				BoogieContext::DocTagExpr cond;
-				if (parseExpr(docTag.second.content.substr(condStart + 4), _node, &_node, cond))
-				{
+				if (parseExpr(docTag.second.content.substr(condStart + DOCTAG_MODIFIES_COND.length()), _node, &_node, cond))
 					condExpr = cond.expr;
-				}
 			}
+			// Parse the target (variable)
 			BoogieContext::DocTagExpr target;
 			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, m_currentContract, target))
 			{
+				// TODO: structs?
+				Declaration const* varDecl = nullptr;
+				boogie::Expr::Ref indexer = nullptr;
 				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
-					modSpecs[id->annotation().referencedDeclaration] = ModSpec(condExpr);
+				{
+					varDecl = id->annotation().referencedDeclaration;
+				}
+				else if (auto idx = dynamic_cast<IndexAccess const*>(&*target.exprSol))
+				{
+					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
+					{
+						varDecl = id->annotation().referencedDeclaration;
+						if (auto selExpr = dynamic_cast<boogie::SelExpr const*>(&*target.expr))
+							indexer = selExpr->getIdxs()[0];
+						else
+							solAssert(false, "Invalid indexer in modifies");
+					}
+					else
+						m_context.reportError(&_node, "Base of indexer in modifies must be identifier");
+				}
 				else
-					m_context.reportError(&_node, "Target of modifies clause must be an identifier");
+					m_context.reportError(&_node, "Target of modifies must be identifier or indexer");
+
+				if (varDecl)
+				{
+					if (modSpecs.find(varDecl) == modSpecs.end())
+						modSpecs[varDecl] = ModSpec(condExpr, indexer);
+					else
+						m_context.reportError(&_node, "Multiple modifies specification for '" + varDecl->name() + "'");
+				}
 			}
 		}
 	}
 
+	// If there is at least one modifies spec, we have to loop through variables
+	// and add constraints
 	if (!modSpecs.empty())
 	{
+		// TODO: inheritance?
 		for (auto sn : m_currentContract->subNodes())
 		{
 			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
 			{
-				boogie::Expr::Ref varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+				auto varThis = boogie::Expr::sel(varId, m_context.boogieThis());
+				// If there is no modifies spec, it cannot change
 				if (modSpecs.find(varDecl) == modSpecs.end())
 				{
-					boogie::Expr::Ref expr = boogie::Expr::eq(varId, boogie::Expr::old(varId));
+					auto expr = boogie::Expr::eq(varThis, boogie::Expr::old(varThis));
 					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "'", *m_context.currentScanner())));
 				}
+				// If there is a modifies spec, use the condition and indexer
 				else
 				{
-					boogie::Expr::Ref expr = boogie::Expr::or_(
+					// If the condition does not hold, no modifications allowed
+					auto expr = boogie::Expr::or_(
 							modSpecs[varDecl].cond,
-							boogie::Expr::eq(varId, boogie::Expr::old(varId)));
+							boogie::Expr::eq(varThis, boogie::Expr::old(varThis)));
 					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' when condition does not hold", *m_context.currentScanner())));
+					// If there is an indexer, modification is only allowed
+					// for that index, regardless of the condition
+					if (modSpecs[varDecl].idx)
+					{
+						TypePointer elemType = nullptr;
+						Type::Category typeCat = varDecl->annotation().type->category();
+						if (typeCat == Type::Category::Array)
+							elemType = dynamic_cast<ArrayType const*>(varDecl->annotation().type)->baseType();
+						else if (typeCat == Type::Category::Mapping)
+							elemType = dynamic_cast<MappingType const*>(varDecl->annotation().type)->valueType();
+						else
+							m_context.reportError(&_node, "Unsupported collection kind in modifies");
+
+						if (elemType)
+						{
+							boogie::Expr::Ref defaultVal = defaultValue(elemType);
+
+							if (defaultVal)
+							{
+								auto expr = boogie::Expr::eq(
+										boogie::Expr::upd(
+												varId,
+												m_context.boogieThis(),
+												boogie::Expr::upd(varThis, modSpecs[varDecl].idx, defaultVal)),
+										boogie::Expr::upd(
+												boogie::Expr::old(varId),
+												m_context.boogieThis(),
+												boogie::Expr::upd(boogie::Expr::old(varThis), modSpecs[varDecl].idx, defaultVal))
+										);
+								procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+										ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' outside defined index", *m_context.currentScanner())));
+							}
+							else
+								m_context.reportError(&_node, "Unsupported default value for indexer");
+						}
+					}
 				}
 			}
 		}
