@@ -267,7 +267,7 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 					// Parse
 					string exprStr = docTag.second.content.substr(_tag.length() + 1);
 					CharStream exprStream(exprStr, "DocString");
-					ASTPointer<Expression> expr = Parser(*m_context.errorReporter())
+					ASTPointer<Expression> expr = Parser(*m_context.errorReporter(), m_context.evmVersion())
 						.parseExpression(std::make_shared<Scanner>(exprStream));
 
 					// Resolve references, using the given scope
