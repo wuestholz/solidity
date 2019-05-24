@@ -78,6 +78,9 @@ private:
 	 */
 	void createImplicitConstructor(ContractDefinition const& _node);
 
+	/**
+	 * Helper method to parse an expression from a string with a given scope
+	 */
 	bool parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result);
 
 	/**
@@ -86,6 +89,9 @@ private:
 	void getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
 			ASTNode const* _scope, std::string _tag, std::vector<BoogieContext::DocTagExpr>& out);
 
+	/**
+	 * Helper method to extract and add modifies specifications to a function
+	 */
 	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);
 
 	/**

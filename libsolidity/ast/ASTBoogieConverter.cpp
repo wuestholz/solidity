@@ -251,8 +251,6 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	ErrorReporter* originalErrReporter = m_context.errorReporter();
 	m_context.errorReporter() = &errorReporter;
 
-	bool success = false;
-
 	try
 	{
 		// Parse
@@ -270,6 +268,11 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 			{
 				// Convert expression to Boogie representation
 				auto convResult = ASTBoogieExpressionConverter(m_context).convert(*expr);
+				result.expr = convResult.expr;
+				result.exprStr = exprStr;
+				result.exprSol = expr;
+				result.tccs = convResult.tccs;
+				result.ocs = convResult.ocs;
 
 				// Report unsupported cases (side effects)
 				if (!convResult.newStatements.empty())
@@ -279,12 +282,6 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 				if (!convResult.newConstants.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
 
-				success = true;
-				result.expr = convResult.expr;
-				result.exprStr = exprStr;
-				result.exprSol = expr;
-				result.tccs = convResult.tccs;
-				result.ocs = convResult.ocs;
 			}
 		}
 	}
@@ -296,10 +293,8 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	// Print errors relating to the expression string
 	SourceReferenceFormatter formatter(cerr);
 	for (auto const& error: m_context.errorReporter()->errors())
-	{
 		formatter.printExceptionInformation(*error,
 				(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
-	}
 
 	// Restore error reporter
 	m_context.errorReporter() = originalErrReporter;
@@ -307,9 +302,9 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	if (!Error::containsOnlyWarnings(errorList))
 	{
 		m_context.reportError(&_node, "Error while processing annotation for node");
+		return false;
 	}
-
-	return success;
+	return true;
 }
 
 void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
@@ -434,6 +429,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 					// for that index, regardless of the condition
 					if (modSpecs[varDecl].idx)
 					{
+						// Get the type of the element
 						TypePointer elemType = nullptr;
 						Type::Category typeCat = varDecl->annotation().type->category();
 						if (typeCat == Type::Category::Array)
@@ -443,6 +439,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 						else
 							m_context.reportError(&_node, "Unsupported collection kind in modifies");
 
+						// var[idx := default] == old(var)[idx := default]
 						if (elemType)
 						{
 							boogie::Expr::Ref defaultVal = defaultValue(elemType);
@@ -821,18 +818,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 		}
 		else
-		{
 			m_context.reportError(&*modifier, "Unsupported modifier invocation");
-		}
 	}
 
 	vector<boogie::Block::Ref> blocks;
 	if (!m_currentBlocks.top()->getStatements().empty())
 		blocks.push_back(m_currentBlocks.top());
 	m_currentBlocks.pop();
-	if (!m_currentBlocks.empty())
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-				errinfo_comment("Non-empty stack of blocks at the end of function."));
+	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
 	// Get the name of the function
 	string funcName = _node.isConstructor() ?
