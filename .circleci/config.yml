@@ -402,6 +402,9 @@ jobs:
       - run:
           name: Test solc-verify with Boogie
           command: ./test/solc-verify/test_with_boogie.sh
+      - run:
+          name: Test solc-verify on Syntax tests
+          command: ./test/solc-verify/test_syntax_with_boogie.sh 
 
   test_x86_linux_solcverify_truffle:
     docker:
