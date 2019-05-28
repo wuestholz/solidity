@@ -203,4 +203,4 @@ def getFunctionName(boogieName, bplFile):
 if __name__== '__main__':
     with tempfile.TemporaryDirectory() as tmpDir:
         ret = main(tmpDir)
-    sys.exit(ret)    
+    sys.exit(ret)

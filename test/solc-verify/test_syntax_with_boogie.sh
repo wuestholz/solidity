@@ -63,7 +63,7 @@ function report() {
         echo -n $YELLOW
         echo ?? [$elapsed s]
         FAILED_TESTS+=("$YELLOW$test_name$BLACK"$'\n'"$message")
-    else 
+    else
         echo -n $GREEN
         echo OK [$elapsed s]
         UNKN=$((UNKN+1))
@@ -103,23 +103,23 @@ function solcverify_check()
 
 # Get the test list
 cd $REPO_ROOT
-TESTS="" 
-for filename in `find $SOLCSYNTAX_TESTS -name "*.sol"`; 
-do 
+TESTS=""
+for filename in `find $SOLCSYNTAX_TESTS -name "*.sol"`;
+do
     GR=`grep -n -m 1 '// ----' $filename`
-    if [ "$?" -eq "0" ]; 
+    if [ "$?" -eq "0" ];
         then
-        # Start of the expected comment 
+        # Start of the expected comment
         L1=`echo $GR | sed s/:.*//`
         L1=$((L1+1))
         # Rest of the file can only contain warning
         HAS_ERRORS=`tail -n +$L1 $filename | grep -v Warning`
         if [ -z "$HAS_ERRORS" ];
-        then 
+        then
             # Run the test
 	        solcverify_check "$filename" "" ""
         fi
-    else 
+    else
     	solcverify_check "$filename" "" ""
     fi
 done
@@ -128,7 +128,7 @@ done
 rm -f $OUT_PATH $TIME_PATH
 
 # Print the details of the failed tests
-for i in "${!FAILED_TESTS[@]}"; 
-do 
-    echo "$((i+1)). ${FAILED_TESTS[$i]}"; 
+for i in "${!FAILED_TESTS[@]}";
+do
+    echo "$((i+1)). ${FAILED_TESTS[$i]}";
 done
