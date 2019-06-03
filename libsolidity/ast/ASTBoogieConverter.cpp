@@ -363,7 +363,6 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			BoogieContext::DocTagExpr target;
 			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, m_currentContract, target))
 			{
-				// TODO: structs?
 				Declaration const* varDecl = nullptr;
 				boogie::Expr::Ref indexer = nullptr;
 				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
@@ -408,6 +407,10 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			{
 				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
 				auto varThis = boogie::Expr::sel(varId, m_context.boogieThis());
+
+				if (varDecl->type()->category() == Type::Category::Struct)
+					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
+
 				// If there is no modifies spec, it cannot change
 				if (modSpecs.find(varDecl) == modSpecs.end())
 				{
@@ -441,6 +444,9 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 						// var[idx := default] == old(var)[idx := default]
 						if (elemType)
 						{
+							if (elemType->category() == Type::Category::Struct)
+								m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
+
 							boogie::Expr::Ref defaultVal = defaultValue(elemType);
 
 							if (defaultVal)
