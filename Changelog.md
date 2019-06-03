@@ -1,32 +1,50 @@
-### 0.5.9 (unreleased)
+### 0.5.10 (unreleased)
 
 Language Features:
+
+
+
+Compiler Features:
+
+
+
+Bugfixes:
+
+
+
+### 0.5.9 (2019-05-28)
+
+Language Features:
+ * Inline Assembly: Revert change introduced in 0.5.7: The ``callvalue()`` instruction does not require ``payable`` anymore.
  * Static Analyzer: Disallow libraries calling themselves externally.
 
 
 Compiler Features:
+ * Assembler: Encode the compiler version in the deployed bytecode.
  * Code Generator: Fix handling of structs of dynamic size as constructor parameters.
+ * Inline Assembly: Disallow the combination of ``msize()`` and the Yul optimizer.
+ * Metadata: Add IPFS hashes of source files.
  * Optimizer: Add rule to simplify SHL/SHR combinations.
+ * Optimizer: Add rules for multiplication and division by left-shifted one.
  * SMTChecker: Support inherited state variables.
  * SMTChecker: Support tuples and function calls with multiple return values.
  * SMTChecker: Support ``delete``.
  * SMTChecker: Inline external function calls to ``this``.
- * Inline Assembly: Revert change introduced in 0.5.7: The ``callvalue()`` instruction does not require ``payable`` anymore.
- * Metadata: Add IPFS hashes of source files.
- * Assembler: Encode the compiler version in the deployed bytecode.
  * Yul Optimizer: Simplify single-run ``for`` loops to ``if`` statements.
+ * Yul Optimizer: Optimize representation of numbers.
  * Yul Optimizer: Do not inline recursive functions.
- * Optimizer: Add rules for multiplication and division by left-shifted one.
+ * Yul Optimizer: Do not remove instructions that affect ``msize()`` if ``msize()`` is used.
 
 
 Bugfixes:
+ * Code Generator: Explicitly turn uninitialized internal function pointers into invalid functions when loaded from storage.
+ * Code Generator: Fix assertion failure when assigning structs containing array of mapping.
+ * Compiler Internals: Reset the Yul string repository before each compilation, freeing up memory.
  * SMTChecker: Fix bad cast in base constructor modifier.
  * SMTChecker: Fix internal error when visiting state variable inherited from base class.
  * SMTChecker: Fix internal error in fixed point operations.
  * SMTChecker: Fix internal error in assignment to unsupported type.
  * SMTChecker: Fix internal error in branching when inlining function calls that modify local variables.
-
-
 
 
 ### 0.5.8 (2019-04-30)

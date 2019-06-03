@@ -88,11 +88,9 @@ void DataFlowAnalyzer::operator()(FunctionDefinition& _fun)
 	// Save all information. We might rather reinstantiate this class,
 	// but this could be difficult if it is subclassed.
 	map<YulString, Expression const*> value;
-	map<YulString, set<YulString>> references;
-	map<YulString, set<YulString>> referencedBy;
+	InvertibleRelation<YulString> references;
 	m_value.swap(value);
-	m_references.swap(references);
-	m_referencedBy.swap(referencedBy);
+	swap(m_references, references);
 	pushScope(true);
 
 	for (auto const& parameter: _fun.parameters)
@@ -106,8 +104,7 @@ void DataFlowAnalyzer::operator()(FunctionDefinition& _fun)
 
 	popScope();
 	m_value.swap(value);
-	m_references.swap(references);
-	m_referencedBy.swap(referencedBy);
+	swap(m_references, references);
 }
 
 void DataFlowAnalyzer::operator()(ForLoop& _for)
@@ -142,7 +139,6 @@ void DataFlowAnalyzer::operator()(Block& _block)
 
 void DataFlowAnalyzer::handleAssignment(set<YulString> const& _variables, Expression* _value)
 {
-	static Expression const zero{Literal{{}, LiteralKind::Number, YulString{"0"}, {}}};
 	clearValues(_variables);
 
 	MovableChecker movableChecker{m_dialect};
@@ -150,7 +146,7 @@ void DataFlowAnalyzer::handleAssignment(set<YulString> const& _variables, Expres
 		movableChecker.visit(*_value);
 	else
 		for (auto const& var: _variables)
-			m_value[var] = &zero;
+			m_value[var] = &m_zero;
 
 	if (_value && _variables.size() == 1)
 	{
@@ -163,11 +159,7 @@ void DataFlowAnalyzer::handleAssignment(set<YulString> const& _variables, Expres
 
 	auto const& referencedVariables = movableChecker.referencedVariables();
 	for (auto const& name: _variables)
-	{
-		m_references[name] = referencedVariables;
-		for (auto const& ref: referencedVariables)
-			m_referencedBy[ref].emplace(name);
-	}
+		m_references.set(name, referencedVariables);
 }
 
 void DataFlowAnalyzer::pushScope(bool _functionScope)
@@ -198,18 +190,14 @@ void DataFlowAnalyzer::clearValues(set<YulString> _variables)
 
 	// Clear variables that reference variables to be cleared.
 	for (auto const& name: _variables)
-		for (auto const& ref: m_referencedBy[name])
+		for (auto const& ref: m_references.backward[name])
 			_variables.emplace(ref);
 
 	// Clear the value and update the reference relation.
 	for (auto const& name: _variables)
 		m_value.erase(name);
 	for (auto const& name: _variables)
-	{
-		for (auto const& ref: m_references[name])
-			m_referencedBy[ref].erase(name);
-		m_references[name].clear();
-	}
+		m_references.eraseKey(name);
 }
 
 bool DataFlowAnalyzer::inScope(YulString _variableName) const

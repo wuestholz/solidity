@@ -24,6 +24,9 @@
 
 #include <libyul/optimiser/ASTWalker.h>
 #include <libyul/YulString.h>
+#include <libyul/AsmData.h>
+
+#include <libdevcore/InvertibleMap.h>
 
 #include <map>
 #include <set>
@@ -74,10 +77,9 @@ protected:
 
 	/// Current values of variables, always movable.
 	std::map<YulString, Expression const*> m_value;
-	/// m_references[a].contains(b) <=> the current expression assigned to a references b
-	std::map<YulString, std::set<YulString>> m_references;
-	/// m_referencedBy[b].contains(a) <=> the current expression assigned to a references b
-	std::map<YulString, std::set<YulString>> m_referencedBy;
+	/// m_references.forward[a].contains(b) <=> the current expression assigned to a references b
+	/// m_references.backward[b].contains(a) <=> the current expression assigned to a references b
+	InvertibleRelation<YulString> m_references;
 
 	struct Scope
 	{
@@ -85,6 +87,9 @@ protected:
 		std::set<YulString> variables;
 		bool isFunction;
 	};
+	/// Special expression whose address will be used in m_value.
+	/// YulString does not need to be reset because DataFlowAnalyzer is short-lived.
+	Expression const m_zero{Literal{{}, LiteralKind::Number, YulString{"0"}, {}}};
 	/// List of scopes.
 	std::vector<Scope> m_variableScopes;
 	Dialect const& m_dialect;
