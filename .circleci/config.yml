@@ -419,9 +419,11 @@ jobs:
           name: Install dependencies
           command: |
             apt-get -qq update
-            apt-get -qy install libcvc4-dev nodejs nodejs-dev node-gyp libssl1.0-dev
-            apt-get -qy install npm
-            npm install -g truffle
+            apt-get -qy install libcvc4-dev libssl1.0-dev
+            wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+            source ~/.nvm/nvm.sh
+            nvm install 11.14.0
+            npm install -g truffle --unsafe-perm
       - run:
           name: Test solc-verify with Truffle
           command: ./test/solc-verify/test_with_truffle.sh
