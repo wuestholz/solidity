@@ -34,8 +34,7 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
 
-	for (auto d : result.newDecls)
-		m_localDecls.push_back(d);
+	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc : result.tccs)
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assume(tcc));
 	for (auto oc : result.ocs)
@@ -969,8 +968,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		{
 			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
 		}
-		for (auto stmt : *m_currentBlocks.top())
-			m_stateVarInitializers.push_back(stmt);
+		m_stateVarInitializers.insert(end(m_stateVarInitializers), begin(*m_currentBlocks.top()), end(*m_currentBlocks.top()));
+
 		m_currentBlocks.pop();
 		m_stateVarInitializers.push_back(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
 				boogie::Expr::upd(
@@ -1158,8 +1157,7 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR, loopInvars);
 	if (includeContractInvars(_node.annotation()))
-		for (auto invar : m_context.currentContractInvars())
-			loopInvars.push_back(invar);
+		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
@@ -1221,8 +1219,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR, loopInvars);
 	if (includeContractInvars(_node.annotation()))
-		for (auto invar : m_context.currentContractInvars())
-			loopInvars.push_back(invar);
+		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
