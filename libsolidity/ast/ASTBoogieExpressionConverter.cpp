@@ -543,6 +543,7 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 
 	return false;
 }
+
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
 	// Check for conversions
@@ -728,31 +729,14 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Sum function
 	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 	{
-		TypePointer tp = nullptr;
-		if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
-		{
-			auto sumDecl = id->annotation().referencedDeclaration;
+		functionCallSum(_node);
+		return false;
+	}
 
-			MagicVariableDeclaration const* magicVar = nullptr;
-			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-				magicVar = dynamic_cast<MagicVariableDeclaration const *>(exprId->annotation().referencedDeclaration);
-
-			if (magicVar)
-			{
-				m_context.currentSumDecls()[sumDecl] = dynamic_cast<FunctionType const*>(&*magicVar->type())->returnParameterTypes()[0];
-				tp = m_context.currentSumDecls()[sumDecl];
-			}
-			else { m_context.reportError(&_node, "Could not find sum function"); }
-
-			auto declCategory = id->annotation().type->category();
-			if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
-				m_context.reportError(&_node, "Argument of sum must be an array or a mapping");
-		}
-		else
-			m_context.reportError(&_node, "Argument of sum must be an identifier");
-
-		m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
-		addTCC(m_currentExpr, tp);
+	// Old function
+	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_OLD))
+	{
+		functionCallOld(_node, regularArgs);
 		return false;
 	}
 
@@ -932,7 +916,6 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* struct
 	return varDecl;
 }
 
-
 void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _node,
 		StructDefinition const* structDef, vector<Expr::Ref> const& args)
 {
@@ -1005,6 +988,32 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
 	solAssert(okDataTuple, "");
 	addSideEffect(Stmt::ifelse(Expr::not_(okDataTuple->elements()[0]), revert));
+}
+
+void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
+{
+	TypePointer tp = _node.annotation().type;
+	if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
+	{
+		auto sumDecl = id->annotation().referencedDeclaration;
+		m_context.currentSumDecls()[sumDecl] = tp;
+
+		auto declCategory = id->annotation().type->category();
+		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
+			m_context.reportError(&_node, "Argument of sum must be an array or a mapping");
+	}
+	else
+		m_context.reportError(&_node, "Argument of sum must be an identifier");
+
+	m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
+	addTCC(m_currentExpr, tp);
+}
+
+void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, vector<Expr::Ref> const& args)
+{
+	solAssert(args.size() == 1, "Verifier old function must have exactly one argument");
+	m_currentExpr = Expr::old(args[0]);
+	addTCC(m_currentExpr, _node.annotation().type);
 }
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)

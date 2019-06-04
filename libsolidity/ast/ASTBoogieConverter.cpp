@@ -10,6 +10,8 @@
 #include <liblangutil/SourceReferenceFormatter.h>
 #include <liblangutil/ErrorReporter.h>
 
+#include <map>
+
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
@@ -25,13 +27,14 @@ string const ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInva
 string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
 string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
 string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
+string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
+string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
 
-	for (auto d : result.newDecls)
-		m_localDecls.push_back(d);
+	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc : result.tccs)
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assume(tcc));
 	for (auto oc : result.ocs)
@@ -236,86 +239,294 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	m_context.addDecl(procDecl);
 }
 
-void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
-		ASTNode const* _scope, string _tag, std::vector<BoogieContext::DocTagExpr>& exprs)
+bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result)
 {
 	// We temporarily replace the error reporter in the context, because the locations
 	// are pointing to positions in the docstring
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-
-	// Typechecker
 	TypeChecker typeChecker(m_context.evmVersion(), errorReporter, m_currentContract);
 
+	ErrorReporter* originalErrReporter = m_context.errorReporter();
+	m_context.errorReporter() = &errorReporter;
+
+	try
+	{
+		// Parse
+		CharStream exprStream(exprStr, "DocString");
+		ASTPointer<Expression> expr = Parser(*m_context.errorReporter(), m_context.evmVersion())
+			.parseExpression(std::make_shared<Scanner>(exprStream));
+
+		// Resolve references, using the given scope
+		m_context.scopes()[expr.get()] = m_context.scopes()[_scope];
+		NameAndTypeResolver resolver(*m_context.globalContext(), m_context.scopes(), *m_context.errorReporter());
+		if (resolver.resolveNamesAndTypes(*expr))
+		{
+			// Do type checking
+			if (typeChecker.checkTypeRequirements(*expr))
+			{
+				// Convert expression to Boogie representation
+				auto convResult = ASTBoogieExpressionConverter(m_context).convert(*expr);
+				result.expr = convResult.expr;
+				result.exprStr = exprStr;
+				result.exprSol = expr;
+				result.tccs = convResult.tccs;
+				result.ocs = convResult.ocs;
+
+				// Report unsupported cases (side effects)
+				if (!convResult.newStatements.empty())
+					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
+				if (!convResult.newDecls.empty())
+					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
+				if (!convResult.newConstants.empty())
+					m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
+
+			}
+		}
+	}
+	catch (langutil::FatalError const& fe)
+	{
+		m_context.reportError(&_node, "Error while parsing annotation.");
+	}
+
+	// Print errors relating to the expression string
+	SourceReferenceFormatter formatter(cerr);
+	for (auto const& error: m_context.errorReporter()->errors())
+		formatter.printExceptionInformation(*error,
+				(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
+
+	// Restore error reporter
+	m_context.errorReporter() = originalErrReporter;
+	// Add a single error in the original reporter if there were errors
+	if (!Error::containsOnlyWarnings(errorList))
+	{
+		m_context.reportError(&_node, "Error while processing annotation for node");
+		return false;
+	}
+	return true;
+}
+
+void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
+		ASTNode const* _scope, string _tag, vector<BoogieContext::DocTagExpr>& exprs)
+{
 	for (auto docTag : _annot.docTags)
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
 		{
-			if (_tag == DOCTAG_CONTRACT_INVARS_INCLUDE) // Special tag to include contract invariants
+			BoogieContext::DocTagExpr expr;
+			if (parseExpr(docTag.second.content.substr(_tag.length() + 1), _node, _scope, expr))
+				exprs.push_back(expr);
+		}
+	}
+}
+
+bool ASTBoogieConverter::includeContractInvars(DocumentedAnnotation const& _annot)
+{
+	for (auto docTag : _annot.docTags)
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_CONTRACT_INVARS_INCLUDE))
+			return true;
+
+	return false;
+}
+
+void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
+{
+	// Modifies specifier
+	struct ModSpec {
+		boogie::Expr::Ref cond; // Condition
+		boogie::Expr::Ref idx;  // Index / selector
+
+		ModSpec() {}
+		ModSpec(boogie::Expr::Ref cond, boogie::Expr::Ref idx) : cond(cond), idx(idx) {}
+	};
+
+	// Modifies specifier for each variable
+	std::map<Declaration const*, ModSpec> modSpecs;
+
+	for (auto docTag : _node.annotation().docTags)
+	{
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
+		{
+			size_t targetEnd = docTag.second.content.length();
+			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
+			// Check if there is a condition part
+			size_t condStart = docTag.second.content.find(DOCTAG_MODIFIES_COND);
+			if (condStart != string::npos)
 			{
-				// TODO: warning when currentinvars is empty
-				for (auto invar : m_context.currentContractInvars())
-					exprs.push_back(invar);
+				targetEnd = condStart;
+				// Parse the condition
+				BoogieContext::DocTagExpr cond;
+				if (parseExpr(docTag.second.content.substr(condStart + DOCTAG_MODIFIES_COND.length()), _node, &_node, cond))
+					condExpr = cond.expr;
 			}
-			else // Normal tags just parse the expression afterwards
+			// Parse the target (variable)
+			BoogieContext::DocTagExpr target;
+			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, m_currentContract, target))
 			{
-				ErrorReporter* originalErrReporter = m_context.errorReporter();
-				m_context.errorReporter() = &errorReporter;
-
-				try
+				Declaration const* varDecl = nullptr;
+				boogie::Expr::Ref indexer = nullptr;
+				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
 				{
-					// Parse
-					string exprStr = docTag.second.content.substr(_tag.length() + 1);
-					CharStream exprStream(exprStr, "DocString");
-					ASTPointer<Expression> expr = Parser(*m_context.errorReporter(), m_context.evmVersion())
-						.parseExpression(std::make_shared<Scanner>(exprStream));
-
-					// Resolve references, using the given scope
-					m_context.scopes()[expr.get()] = m_context.scopes()[_scope];
-					NameAndTypeResolver resolver(*m_context.globalContext(), m_context.scopes(), *m_context.errorReporter());
-					if (resolver.resolveNamesAndTypes(*expr))
+					varDecl = id->annotation().referencedDeclaration;
+				}
+				else if (auto idx = dynamic_cast<IndexAccess const*>(&*target.exprSol))
+				{
+					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
 					{
-						// Do type checking
-						if (typeChecker.checkTypeRequirements(*expr))
-						{
-							// Convert expression to Boogie representation
-							auto result = ASTBoogieExpressionConverter(m_context).convert(*expr);
-
-							// Report unsupported cases
-							if (!result.newStatements.empty()) // Make sure that there are no side effects
-							{
-								m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
-							}
-							if (!result.newDecls.empty()) // Make sure that there are no side effects
-							{
-								m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-							}
-
-							// Success
-							exprs.push_back(BoogieContext::DocTagExpr(result.expr, exprStr, result.tccs, result.ocs));
-						}
+						varDecl = id->annotation().referencedDeclaration;
+						if (auto selExpr = dynamic_cast<boogie::SelExpr const*>(&*target.expr))
+							indexer = selExpr->getIdxs()[0];
+						else
+							solAssert(false, "Invalid indexer in modifies");
 					}
+					else
+						m_context.reportError(&_node, "Base of indexer in modifies must be identifier");
 				}
-				catch (langutil::FatalError const& fe)
-				{}
+				else
+					m_context.reportError(&_node, "Target of modifies must be identifier or indexer");
 
-				// Print errors relating to the expression string
-				SourceReferenceFormatter formatter(cerr);
-				for (auto const& error: m_context.errorReporter()->errors())
+				if (varDecl)
 				{
-					formatter.printExceptionInformation(*error,
-							(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
-				}
-
-				// Restore error reporter
-				m_context.errorReporter() = originalErrReporter;
-				// Add a single error in the original reporter if there were errors
-				if (!Error::containsOnlyWarnings(errorList))
-				{
-					m_context.reportError(&_node, "Error while processing annotation for node");
+					if (modSpecs.find(varDecl) == modSpecs.end())
+						modSpecs[varDecl] = ModSpec(condExpr, indexer);
+					else
+						m_context.reportError(&_node, "Multiple modifies specification for '" + varDecl->name() + "'");
 				}
 			}
 		}
+	}
+
+	// If there is at least one modifies spec, we have to loop through variables
+	// and add constraints
+	if (!modSpecs.empty())
+	{
+		// TODO: inheritance?
+		for (auto sn : m_currentContract->subNodes())
+		{
+			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
+			{
+				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+				auto varThis = boogie::Expr::sel(varId, m_context.boogieThis());
+
+				if (varDecl->type()->category() == Type::Category::Struct)
+					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
+
+				// If there is no modifies spec, it cannot change
+				if (modSpecs.find(varDecl) == modSpecs.end())
+				{
+					auto expr = boogie::Expr::eq(varThis, boogie::Expr::old(varThis));
+					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "'", *m_context.currentScanner())));
+				}
+				// If there is a modifies spec, use the condition and indexer
+				else
+				{
+					// If the condition does not hold, no modifications allowed
+					auto expr = boogie::Expr::or_(
+							modSpecs[varDecl].cond,
+							boogie::Expr::eq(varThis, boogie::Expr::old(varThis)));
+					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' when condition does not hold", *m_context.currentScanner())));
+					// If there is an indexer, modification is only allowed
+					// for that index, regardless of the condition
+					if (modSpecs[varDecl].idx)
+					{
+						// Get the type of the element
+						TypePointer elemType = nullptr;
+						Type::Category typeCat = varDecl->annotation().type->category();
+						if (typeCat == Type::Category::Array)
+							elemType = dynamic_cast<ArrayType const*>(varDecl->annotation().type)->baseType();
+						else if (typeCat == Type::Category::Mapping)
+							elemType = dynamic_cast<MappingType const*>(varDecl->annotation().type)->valueType();
+						else
+							m_context.reportError(&_node, "Unsupported collection kind in modifies");
+
+						// var[idx := default] == old(var)[idx := default]
+						if (elemType)
+						{
+							if (elemType->category() == Type::Category::Struct)
+								m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
+
+							boogie::Expr::Ref defaultVal = defaultValue(elemType);
+
+							if (defaultVal)
+							{
+								auto expr = boogie::Expr::eq(
+										boogie::Expr::upd(
+												varId,
+												m_context.boogieThis(),
+												boogie::Expr::upd(varThis, modSpecs[varDecl].idx, defaultVal)),
+										boogie::Expr::upd(
+												boogie::Expr::old(varId),
+												m_context.boogieThis(),
+												boogie::Expr::upd(boogie::Expr::old(varThis), modSpecs[varDecl].idx, defaultVal))
+										);
+								procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+										ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' outside defined index", *m_context.currentScanner())));
+							}
+							else
+								m_context.reportError(&_node, "Unsupported default value for indexer");
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void ASTBoogieConverter::processModifier()
+{
+	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
+	{
+		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
+		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
+
+		if (modifierDecl)
+		{
+			// Duplicated modifiers currently do not work, because they will introduce
+			// local variables for their parameters with the same name
+			for (unsigned long i = 0; i < m_currentModifier; ++i)
+			{
+				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
+					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
+			}
+
+			string oldReturnLabel = m_currentReturnLabel;
+			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+			++m_nextReturnLabelId;
+			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+
+			// Introduce and assign local variables for modifier arguments
+			if (modifier->arguments())
+			{
+				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
+				{
+					auto paramDecls = modifierDecl->parameters()[i];
+					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
+							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
+					m_localDecls.push_back(modifierParam);
+					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
+					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
+				}
+			}
+			modifierDecl->body().accept(*this);
+			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
+			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
+			m_currentReturnLabel = oldReturnLabel;
+		}
+		else
+			m_context.reportError(&*modifier, "Unsupported modifier invocation");
+	}
+	else if (m_currentFunc->isImplemented()) // We reached the function
+	{
+		string oldReturnLabel = m_currentReturnLabel;
+		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+		++m_nextReturnLabelId;
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body starts here"));
+		m_currentFunc->body().accept(*this);
+		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body ends here"));
+		m_currentReturnLabel = oldReturnLabel;
 	}
 }
 
@@ -544,9 +755,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		params.push_back({boogie::Expr::id(m_context.mapDeclName(*par)), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)});
 		if (par->type()->category() == Type::Category::Array) // Array length
-		{
 			params.push_back({boogie::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
-		}
 	}
 
 	// Return values
@@ -559,10 +768,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_context.reportError(&_node, "Arrays are not supported as return values");
 			return false;
 		}
-		std::string id = m_context.mapDeclName(*ret);
-		boogie::TypeDeclRef type = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
-		retIds.push_back(boogie::Expr::id(id));
-		rets.push_back({boogie::Expr::id(id), type});
+		boogie::Expr::Ref retId = boogie::Expr::id(m_context.mapDeclName(*ret));
+		boogie::TypeDeclRef retType = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
+		retIds.push_back(retId);
+		rets.push_back({retId, retType});
 	}
 
 	// Boogie treats return as an assignment to the return variable(s)
@@ -587,8 +796,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 						m_context.boogieBalance(),
 						m_context.boogieThis(),
 						defaultValue(tp_uint256))));
-		for (auto i : m_stateVarInitializers) m_currentBlocks.top()->addStmt(i);
-		m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
+		for (auto i : m_stateVarInitializers)
+			m_currentBlocks.top()->addStmt(i);
 		// Assign uninitialized state variables to default values
 		for (auto declNode : m_stateVarsToInitialize)
 		{
@@ -599,7 +808,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			for (auto stmt : stmts)
 				m_currentBlocks.top()->addStmt(stmt);
 		}
-		m_stateVarsToInitialize.clear();
 	}
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
@@ -638,48 +846,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else
 	{
 		m_currentModifier = 0;
-		auto modifier = _node.modifiers()[m_currentModifier];
-		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
-
-		if (modifierDecl)
-		{
-			string retLabel = "$return" + to_string(m_nextReturnLabelId);
-			++m_nextReturnLabelId;
-			m_currentReturnLabel = retLabel;
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-
-			// Introduce and assign local variables for modifier arguments
-			if (modifier->arguments())
-			{
-				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
-				{
-					auto modifierParamDecl = modifierDecl->parameters()[i];
-					boogie::Decl::Ref modifierParam = boogie::Decl::variable(
-							m_context.mapDeclName(*modifierParamDecl),
-							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, modifierParamDecl.get(), m_context));
-					m_localDecls.push_back(modifierParam);
-					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
-				}
-			}
-
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(retLabel));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
-		}
-		else
-		{
-			m_context.reportError(&*modifier, "Unsupported modifier invocation");
-		}
+		processModifier();
 	}
 
 	vector<boogie::Block::Ref> blocks;
 	if (!m_currentBlocks.top()->getStatements().empty())
 		blocks.push_back(m_currentBlocks.top());
 	m_currentBlocks.pop();
-	if (!m_currentBlocks.empty())
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-				errinfo_comment("Non-empty stack of blocks at the end of function."));
+	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
 	// Get the name of the function
 	string funcName = _node.isConstructor() ?
@@ -699,7 +873,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
 	}
 
-	if (_node.isPublic()) // Public functions: add invariants as pre/postconditions
+	// add invariants as pre/postconditions for: public functions and if explicitly requested
+	if (_node.isPublic() || includeContractInvars(_node.annotation()))
 	{
 		for (auto invar : m_context.currentContractInvars())
 		{
@@ -726,37 +901,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
-	else // Private functions: inline
-	{
+
+	if (!_node.isPublic()) // Non-public functions: inline
 		procDecl->addAttr(boogie::Attr::attr("inline", 1));
-
-		// Add contract invariants only if explicitly requested
-		std::vector<BoogieContext::DocTagExpr> cInvs;
-		getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE, cInvs);
-		for (auto cInv : cInvs)
-		{
-			procDecl->getRequires().push_back(boogie::Specification::spec(cInv.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
-			procDecl->getEnsures().push_back(boogie::Specification::spec(cInv.expr,
-					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + cInv.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
-
-			for (auto tcc : cInv.tccs)
-			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + cInv.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + cInv.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
-			}
-
-			for (auto oc : cInv.ocs)
-			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + cInv.exprStr + "' at end of function.", *m_context.currentScanner())));
-			}
-		}
-	}
 
 	// Add other pre/postconditions
 	std::vector<BoogieContext::DocTagExpr> preconds;
@@ -795,6 +942,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 	// TODO: check that no new sum variables were introduced
 
+	// Modifies specifications
+	addModifiesSpecs(_node, procDecl);
+
 	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
@@ -824,8 +974,8 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		{
 			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
 		}
-		for (auto stmt : *m_currentBlocks.top())
-			m_stateVarInitializers.push_back(stmt);
+		m_stateVarInitializers.insert(end(m_stateVarInitializers), begin(*m_currentBlocks.top()), end(*m_currentBlocks.top()));
+
 		m_currentBlocks.pop();
 		m_stateVarInitializers.push_back(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
 				boogie::Expr::upd(
@@ -946,65 +1096,9 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 {
 	rememberScope(_node);
 
-	// We go one level deeper in the modifier list
-	m_currentModifier++;
-
-	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
-	{
-		auto modifier = m_currentFunc->modifiers()[m_currentModifier];
-		auto modifierDecl = dynamic_cast<ModifierDefinition const*>(modifier->name()->annotation().referencedDeclaration);
-
-		if (modifierDecl)
-		{
-			// Duplicated modifiers currently do not work, because they will introduce
-			// local variables for their parameters with the same name
-			for (unsigned long i = 0; i < m_currentModifier; ++i)
-			{
-				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
-					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
-			}
-
-			string oldReturnLabel = m_currentReturnLabel;
-			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
-			++m_nextReturnLabelId;
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
-
-			// Introduce and assign local variables for modifier arguments
-			if (modifier->arguments())
-			{
-				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
-				{
-					auto paramDecls = modifierDecl->parameters()[i];
-					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
-							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
-					m_localDecls.push_back(modifierParam);
-					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
-				}
-			}
-			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
-			m_currentReturnLabel = oldReturnLabel;
-		}
-		else
-		{
-			m_context.reportError(&*modifier, "Unsupported modifier invocation");
-		}
-	}
-	else if (m_currentFunc->isImplemented()) // We reached the function
-	{
-		string oldReturnLabel = m_currentReturnLabel;
-		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
-		++m_nextReturnLabelId;
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body starts here"));
-		m_currentFunc->body().accept(*this);
-		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body ends here"));
-		m_currentReturnLabel = oldReturnLabel;
-	}
-
-	m_currentModifier--; // Go back one level in the modifier list
+	m_currentModifier++; // Go one level deeper
+	processModifier();   // Process the body
+	m_currentModifier--; // We are back
 
 	return false;
 }
@@ -1068,35 +1162,18 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR, loopInvars);
+	if (includeContractInvars(_node.annotation()))
+		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
-		{
 			invars.push_back(boogie::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		for (auto oc : invar.ocs)
-		{
-			invars.push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
 
-	std::vector<BoogieContext::DocTagExpr> contractInvars;
-	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_CONTRACT_INVARS_INCLUDE, contractInvars);
-	for (auto invar : contractInvars)
-	{
-		for (auto tcc : invar.tccs)
-		{
-			invars.push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
 		for (auto oc : invar.ocs)
-		{
 			invars.push_back(boogie::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
@@ -1147,34 +1224,18 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 	std::vector<BoogieContext::DocTagExpr> loopInvars;
 	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR, loopInvars);
+	if (includeContractInvars(_node.annotation()))
+		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar : loopInvars)
 	{
 		for (auto tcc : invar.tccs)
-		{
 			invars.push_back(boogie::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		for (auto oc : invar.ocs)
-		{
 			invars.push_back(boogie::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
-	}
-	std::vector<BoogieContext::DocTagExpr> contractInvars;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVARS_INCLUDE, contractInvars);
-	for (auto invar : contractInvars)
-	{
-		for (auto tcc : invar.tccs)
-		{
-			invars.push_back(boogie::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
-		for (auto oc : invar.ocs)
-		{
-			invars.push_back(boogie::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
-		}
+
 		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables

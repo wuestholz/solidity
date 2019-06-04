@@ -34,13 +34,17 @@ public:
 	struct DocTagExpr {
 		boogie::Expr::Ref expr; // Expression converted to Boogie
 		std::string exprStr; // Expression in original format
+		ASTPointer<Expression> exprSol; // Expression in Solidity AST format
 		std::list<boogie::Expr::Ref> tccs; // TCCs for the expression
 		std::list<boogie::Expr::Ref> ocs; // OCs for the expression
 
+		DocTagExpr() {}
+
 		DocTagExpr(boogie::Expr::Ref expr, std::string exprStr,
+				ASTPointer<Expression> exprSol,
 				std::list<boogie::Expr::Ref> const& tccs,
 				std::list<boogie::Expr::Ref> const& ocs) :
-			expr(expr), exprStr(exprStr), tccs(tccs), ocs(ocs) {}
+			expr(expr), exprStr(exprStr), exprSol(exprSol), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**
