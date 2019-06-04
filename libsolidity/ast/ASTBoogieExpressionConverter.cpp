@@ -1191,6 +1191,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 				if (dynamic_cast<ContractDefinition const *>(exprId->annotation().referencedDeclaration))
 					m_isLibraryCallStatic = true;
 			}
+			return false;
 		}
 	}
 
