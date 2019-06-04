@@ -30,7 +30,7 @@ contract ModifiesStructs {
     function modifyStructMapIncorrect(int value) public {
         ss[msg.sender].t.z = value;
     }
-    
+
     /** @notice modifies ss[address(this)] if value > 0 */
     function modifyStructMapCorrect(int value) public {
         require(value > 0);
