@@ -189,6 +189,8 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 {
 	m_context.addGlobalComment("\nDefault constructor");
 
+	m_localDecls.clear();
+
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
@@ -203,6 +205,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers)
 		block->addStmt(i);
+	m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
 	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
 	// Assign uninitialized state variables to default values
 	for (auto declNode : m_stateVarsToInitialize)
@@ -228,7 +231,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	};
 
 	// Create the procedure
-	auto procDecl = boogie::Decl::procedure(funcName, params, {}, {}, {block});
+	auto procDecl = boogie::Decl::procedure(funcName, params, {}, m_localDecls, {block});
 	for (auto invar : m_context.currentContractInvars())
 	{
 		auto attrs = ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner());
@@ -797,6 +800,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 						defaultValue(tp_uint256))));
 		for (auto i : m_stateVarInitializers)
 			m_currentBlocks.top()->addStmt(i);
+		m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
 		// Assign uninitialized state variables to default values
 		for (auto declNode : m_stateVarsToInitialize)
 		{
@@ -968,7 +972,10 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		// Initialization is saved for the constructor
 		// A new block is introduced to collect side effects of the initializer expression
 		m_currentBlocks.push(boogie::Block::block());
+		m_localDecls.clear();
 		boogie::Expr::Ref initExpr = convertExpression(*_node.value());
+		m_stateVarInitTmpDecls.insert(end(m_stateVarInitTmpDecls), begin(m_localDecls), end(m_localDecls));
+
 		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
 			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);

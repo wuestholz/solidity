@@ -28,6 +28,7 @@ private:
 	// Collect initializers for state variables to be added to the beginning of the constructor
 	// If there is no constructor, we create one
 	std::vector<boogie::Stmt::Ref> m_stateVarInitializers;
+	std::vector<boogie::Decl::Ref> m_stateVarInitTmpDecls;
 
 	// Collect variables to be initialized to default values
 	std::vector<VariableDeclaration const*> m_stateVarsToInitialize;
