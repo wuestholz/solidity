@@ -859,29 +859,27 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	solAssert(_node.arguments().size() == 1, "Type conversion should have exactly one argument");
 	auto arg = _node.arguments()[0];
 	// Converting to address
+	bool toAddress = false;
 	if (auto expr = dynamic_cast<ElementaryTypeNameExpression const*>(&_node.expression()))
-	{
 		if (expr->typeName().token() == Token::Address)
-		{
-			arg->accept(*this);
-			if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
-			{
-				if (lit->getVal() == 0)
-					m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
-				else
-					m_context.reportError(&_node, "Unsupported conversion to address");
-			}
-			return;
-		}
-	}
+			toAddress = true;
+
 	// Converting to other kind of contract
 	if (auto expr = dynamic_cast<Identifier const*>(&_node.expression()))
-	{
 		if (dynamic_cast<ContractDefinition const *>(expr->annotation().referencedDeclaration))
+			toAddress = true;
+
+	if (toAddress)
+	{
+		arg->accept(*this);
+		if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
 		{
-			arg->accept(*this);
-			return;
+			if (lit->getVal() == 0)
+				m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
+			else
+				m_context.reportError(&_node, "Unsupported conversion to address");
 		}
+		return;
 	}
 
 	TypeDeclRef targetType = ASTBoogieUtils::toBoogieType(_node.annotation().type, &_node, m_context);
