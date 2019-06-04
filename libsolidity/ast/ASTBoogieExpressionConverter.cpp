@@ -1311,7 +1311,22 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 			// For now, just the integers
 			if (!rationalType->isFractional())
 			{
-				m_currentExpr = Expr::lit(bg::bigint(_node.value()));
+				string litStr = _node.value();
+				// Remove readability separators
+				litStr.erase(remove(litStr.begin(), litStr.end(), '_'), litStr.end());
+				size_t epos = litStr.find('e');
+				if (epos == string::npos)
+				{
+					m_currentExpr = Expr::lit(bg::bigint(litStr));
+				}
+				else
+				{
+					bg::bigint base(litStr.substr(0, epos));
+					unsigned exp = stoul(litStr.substr(epos + 1));
+					bg::bigint prod;
+					boost::multiprecision::multiply(prod, base, boost::multiprecision::pow(bg::bigint(10), exp));
+					m_currentExpr = Expr::lit(prod);
+				}
 				return false;
 			}
 		}
