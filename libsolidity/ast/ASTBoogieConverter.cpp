@@ -767,8 +767,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (ret->type()->category() == Type::Category::Array)
 		{
-			m_context.reportError(&_node, "Arrays are not supported as return values");
-			return false;
+			auto arrType = dynamic_cast<ArrayType const*>(&*ret->type());
+			if (!arrType->isString())
+			{
+				m_context.reportError(&_node, "Arrays are not supported as return values");
+				return false;
+			}
 		}
 		boogie::Expr::Ref retId = boogie::Expr::id(m_context.mapDeclName(*ret));
 		boogie::TypeDeclRef retType = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
