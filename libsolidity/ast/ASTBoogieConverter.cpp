@@ -712,8 +712,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 bool ASTBoogieConverter::visit(EnumDefinition const& _node)
 {
 	rememberScope(_node);
-
-	m_context.reportError(&_node, "Enum definitions are not supported");
+	m_context.addGlobalComment("Enum definition " + _node.name() + " mapped to int");
 	return false;
 }
 

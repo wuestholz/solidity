@@ -883,6 +883,7 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 			return;
 		}
 	}
+
 	TypeDeclRef targetType = ASTBoogieUtils::toBoogieType(_node.annotation().type, &_node, m_context);
 	TypeDeclRef sourceType = ASTBoogieUtils::toBoogieType(arg->annotation().type, arg.get(), m_context);
 	// Nothing to do when the two types are mapped to same type in Boogie,
@@ -891,6 +892,18 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	if (targetType->getName() == sourceType->getName() || (targetType->getName() == "int" && sourceType->getName() == "int_const"))
 	{
 		arg->accept(*this);
+		// Range assertion for enums, TODO: bit precise
+		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+		{
+			if (auto enumDef = dynamic_cast<EnumDefinition const*>(exprId->annotation().referencedDeclaration))
+			{
+				m_newStatements.push_back(bg::Stmt::assert_(
+						bg::Expr::and_(
+								bg::Expr::lte(m_context.intLit(0, 256), m_currentExpr),
+								bg::Expr::lt(m_currentExpr, m_context.intLit(enumDef->members().size(), 256))),
+						ASTBoogieUtils::createAttrs(_node.location(), "Conversion to enum might be out of range", *m_context.currentScanner())));
+			}
+		}
 		return;
 	}
 
@@ -1132,6 +1145,29 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		m_currentExpr = Expr::lit(fbType->numBytes());
 		return false;
 	}
+
+	// Enums
+	if (_node.annotation().type->category() == Type::Category::Enum)
+	{
+		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+		{
+			if (auto enumDef = dynamic_cast<EnumDefinition const*>(exprId->annotation().referencedDeclaration))
+			{
+				// TODO: better way to get index?
+				for (size_t i = 0; i < enumDef->members().size(); ++i)
+				{
+					if (enumDef->members()[i]->name() == _node.memberName())
+					{
+						m_currentExpr = m_context.intLit(i, 256);
+						return false;
+					}
+				}
+				solAssert(false, "Enum member not found");
+			}
+		}
+		solAssert(false, "Enum definition not found");
+	}
+
 	// Non-special member access: 'referencedDeclaration' should point to the
 	// declaration corresponding to 'memberName'
 	if (_node.annotation().referencedDeclaration == nullptr)

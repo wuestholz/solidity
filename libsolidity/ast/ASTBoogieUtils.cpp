@@ -360,6 +360,8 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 		auto structTp = dynamic_cast<StructType const*>(tp);
 		return getStructAddressType(&structTp->structDefinition(), structTp->location());
 	}
+	case Type::Category::Enum:
+		return context.intType(256);
 	default:
 		std::string tpStr = tp->toString();
 		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
