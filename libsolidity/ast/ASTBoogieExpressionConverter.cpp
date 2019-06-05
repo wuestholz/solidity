@@ -882,6 +882,7 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 		return;
 	}
 
+	bool converted = false;
 	TypeDeclRef targetType = ASTBoogieUtils::toBoogieType(_node.annotation().type, &_node, m_context);
 	TypeDeclRef sourceType = ASTBoogieUtils::toBoogieType(arg->annotation().type, arg.get(), m_context);
 	// Nothing to do when the two types are mapped to same type in Boogie,
@@ -890,30 +891,38 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	if (targetType->getName() == sourceType->getName() || (targetType->getName() == "int" && sourceType->getName() == "int_const"))
 	{
 		arg->accept(*this);
-		// Range assertion for enums, TODO: bit precise
-		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-		{
-			if (auto enumDef = dynamic_cast<EnumDefinition const*>(exprId->annotation().referencedDeclaration))
-			{
-				m_newStatements.push_back(bg::Stmt::assert_(
-						bg::Expr::and_(
-								bg::Expr::lte(m_context.intLit(0, 256), m_currentExpr),
-								bg::Expr::lt(m_currentExpr, m_context.intLit(enumDef->members().size(), 256))),
-						ASTBoogieUtils::createAttrs(_node.location(), "Conversion to enum might be out of range", *m_context.currentScanner())));
-			}
-		}
-		return;
+		converted = true;
 	}
 
 	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 	{
 		arg->accept(*this);
 		m_currentExpr = ASTBoogieUtils::checkExplicitBvConversion(m_currentExpr, arg->annotation().type, _node.annotation().type, m_context);
-		return;
+		converted = true;
 	}
 
-	m_context.reportError(&_node, "Unsupported type conversion");
-	m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+	if (converted)
+	{
+		// Range assertion for enums
+		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+		{
+			if (auto enumDef = dynamic_cast<EnumDefinition const*>(exprId->annotation().referencedDeclaration))
+			{
+				m_newStatements.push_back(bg::Stmt::assert_(
+						bg::Expr::and_(
+								ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, langutil::Token::LessThanOrEqual,
+										m_context.intLit(0, 256), m_currentExpr, 256, false).expr,
+								ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, langutil::Token::LessThan,
+										m_currentExpr, m_context.intLit(enumDef->members().size(), 256), 256, false).expr),
+						ASTBoogieUtils::createAttrs(_node.location(), "Conversion to enum might be out of range", *m_context.currentScanner())));
+			}
+		}
+	}
+	else
+	{
+		m_context.reportError(&_node, "Unsupported type conversion");
+		m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+	}
 }
 
 Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* structDef, string id)

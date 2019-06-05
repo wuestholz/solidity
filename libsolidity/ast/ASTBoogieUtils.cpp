@@ -676,6 +676,7 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 	{
 	case Type::Category::Integer:
 	case Type::Category::FixedBytes:
+	case Type::Category::Enum:
 		return true;
 	case Type::Category::Tuple:
 	{
@@ -693,16 +694,24 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 
 unsigned ASTBoogieUtils::getBits(TypePointer type)
 {
-	auto intType = dynamic_cast<IntegerType const*>(type);
-	solAssert(intType, "");
-	return intType->numBits();
+	if (auto intType = dynamic_cast<IntegerType const*>(type))
+		return intType->numBits();
+	if (dynamic_cast<EnumType const*>(type))
+		return 256;
+
+	solAssert(false, "Trying to get bits for non-bitprecise type");
+	return 0;
 }
 
 bool ASTBoogieUtils::isSigned(TypePointer type)
 {
-	auto intType = dynamic_cast<IntegerType const*>(type);
-	solAssert(intType, "");
-	return intType->isSigned();
+	if (auto intType = dynamic_cast<IntegerType const*>(type))
+		return intType->isSigned();
+	if (dynamic_cast<EnumType const*>(type))
+		return false;
+
+	solAssert(false, "Trying to get sign for non-bitprecise type");
+	return false;
 }
 
 Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
