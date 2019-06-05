@@ -832,6 +832,17 @@ Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer 
 
 Expr::Ref ASTBoogieUtils::getTCCforExpr(Expr::Ref expr, TypePointer tp)
 {
+	// For enums we know the number of members
+	if (tp->category() == Type::Category::Enum)
+	{
+		auto enumTp = dynamic_cast<EnumType const *>(tp);
+		solAssert(enumTp, "");
+		return Expr::and_(
+				Expr::lte(Expr::lit((long)0), expr),
+				Expr::lt(expr, Expr::lit(enumTp->enumDefinition().members().size())));
+
+	}
+	// Otherwise get smallest and largest
 	if (isBitPreciseType(tp))
 	{
 		unsigned bits = getBits(tp);
