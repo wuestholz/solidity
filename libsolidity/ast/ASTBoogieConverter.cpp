@@ -603,6 +603,10 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 					ASTBoogieUtils::toBoogieType(sumDecl.second, sumDecl.first, m_context))));
 	}
 
+	// Process inheritance specifiers (not included in subNodes)
+	for (auto ispec : _node.baseContracts())
+		ispec->accept(*this);
+
 	// Process state variables first (to get initializer expressions)
 	m_stateVarInitializers.clear();
 	m_stateVarsToInitialize.clear();
