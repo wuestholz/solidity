@@ -517,6 +517,8 @@ void ASTBoogieConverter::processModifier()
 			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 			m_currentReturnLabel = oldReturnLabel;
 		}
+		else if(dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
+			m_context.reportError(&*modifier, "Base constructor call is not supported as modifier invocation");
 		else
 			m_context.reportError(&*modifier, "Unsupported modifier invocation");
 	}
