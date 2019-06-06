@@ -517,7 +517,7 @@ void ASTBoogieConverter::processModifier()
 			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 			m_currentReturnLabel = oldReturnLabel;
 		}
-		else if(dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
+		else if(dynamic_cast<ContractDefinition const *>(modifier->name()->annotation().referencedDeclaration))
 			m_context.reportError(&*modifier, "Base constructor call is not supported as modifier invocation");
 		else
 			m_context.reportError(&*modifier, "Unsupported modifier invocation");
@@ -578,6 +578,9 @@ bool ASTBoogieConverter::visit(ImportDirective const& _node)
 bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
 	rememberScope(_node);
+	for (auto x : _node.annotation().baseConstructorArguments){
+		m_context.reportError(&_node, toString(x.first->id()) + " - " + toString(x.second->id()));
+	}
 
 	m_currentContract = &_node;
 	// Boogie programs are flat, contracts do not appear explicitly
