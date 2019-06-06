@@ -979,6 +979,11 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 				errinfo_comment("Non-state variable appearing in VariableDeclaration") <<
 				errinfo_sourceLocation(_node.location()));
 	}
+
+	// Constants are inlined
+	if (_node.isConstant())
+		return false;
+
 	if (_node.value())
 	{
 		// Initialization is saved for the constructor

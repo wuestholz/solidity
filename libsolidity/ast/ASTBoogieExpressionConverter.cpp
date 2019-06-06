@@ -1285,6 +1285,17 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 		m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 		return false;
 	}
+
+	// Inline constants
+	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration))
+	{
+		if (varDecl->isConstant())
+		{
+			varDecl->value()->accept(*this);
+			return false;
+		}
+	}
+
 	string declName = m_context.mapDeclName(*(_node.annotation().referencedDeclaration));
 
 	// State variables must be referenced by accessing the map
