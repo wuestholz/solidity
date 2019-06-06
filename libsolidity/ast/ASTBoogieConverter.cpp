@@ -488,11 +488,10 @@ void ASTBoogieConverter::processModifier()
 		{
 			// Duplicated modifiers currently do not work, because they will introduce
 			// local variables for their parameters with the same name
-			for (unsigned long i = 0; i < m_currentModifier; ++i)
-			{
-				if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
-					m_context.reportError(m_currentFunc, "Duplicated modifiers are not supported");
-			}
+			if (modifier->arguments())
+				for (unsigned long i = 0; i < m_currentModifier; ++i)
+					if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
+						m_context.reportError(m_currentFunc, "Duplicated modifiers with arguments are not supported");
 
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
