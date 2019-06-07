@@ -607,7 +607,6 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 	case BoogieContext::Encoding::INT:
 		switch(op)
 		{
-		case Token::Add: result = subExpr; break; // Unary plus does not do anything
 		case Token::Sub: result = Expr::neg(subExpr); break;
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + TokenTraits::toString(op));
@@ -621,7 +620,6 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 			string name("");
 			switch (op)
 			{
-			case Token::Add: result = subExpr; break; // Unary plus does not do anything
 			case Token::Sub: result = context.bvNeg(bits, subExpr); break;
 			case Token::BitNot: result = context.bvNot(bits, subExpr); break;
 			default:
@@ -635,7 +633,6 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 	case BoogieContext::Encoding::MOD:
 		switch(op)
 		{
-		case Token::Add: result = subExpr; break; // Unary plus does not do anything
 		case Token::Sub:
 		{
 			auto sub = Expr::neg(subExpr);
