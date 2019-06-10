@@ -20,6 +20,6 @@ Any contributions are welcome!
 
 # Formal Verification Extension
 
-This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
+This is an extended version of the compiler (v0.4.25) that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development (the latest version avalilable on the [boogie-devel](https://github.com/SRI-CSL/solidity/tree/boogie-devel/) branch) and not all features of Solidity are supported yet (e.g. structs).
 
 For more information on building, installing and examples, see [SOLC-VERIFY-README.md](SOLC-VERIFY-README.md).
