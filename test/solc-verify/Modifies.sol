@@ -32,6 +32,13 @@ contract Simple {
     }
 
     /**
+    * @notice modifies xs[at]
+    */
+    function setCorrect2(address at, int x) public {
+        xs[at] = x;
+    }
+
+    /**
     * @notice modifies xs[msg.sender]
     */
     function setInorrect(int x) public {

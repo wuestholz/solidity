@@ -364,7 +364,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			}
 			// Parse the target (variable)
 			BoogieContext::DocTagExpr target;
-			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, m_currentContract, target))
+			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
 			{
 				Declaration const* varDecl = nullptr;
 				boogie::Expr::Ref indexer = nullptr;
