@@ -53,6 +53,8 @@ public:
 	static std::string const BOOGIE_ZERO_ADDRESS;
 	static std::string const SOLIDITY_NOW;
 	static std::string const BOOGIE_NOW;
+	static std::string const SOLIDITY_NUMBER;
+	static std::string const BOOGIE_BLOCKNO;
 	static std::string const VERIFIER_OVERFLOW;
 
 	// Return this expression as an identifier when something cannot be evaluated

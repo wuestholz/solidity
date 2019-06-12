@@ -48,6 +48,8 @@ string const ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 string const ASTBoogieUtils::BOOGIE_ZERO_ADDRESS = "__zero__address";
 string const ASTBoogieUtils::SOLIDITY_NOW = "now";
 string const ASTBoogieUtils::BOOGIE_NOW = "__now";
+string const ASTBoogieUtils::SOLIDITY_NUMBER = "number";
+string const ASTBoogieUtils::BOOGIE_BLOCKNO = "__block__number";
 string const ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
 string const ASTBoogieUtils::ERR_EXPR = "__ERROR";

@@ -66,6 +66,8 @@ BoogieContext::BoogieContext(Encoding encoding,
 	addDecl(stringType());
 	// now
 	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, intType(256)));
+	// block number
+	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BLOCKNO, intType(256)));
 	// overflow
 	if (m_overflow)
 		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
