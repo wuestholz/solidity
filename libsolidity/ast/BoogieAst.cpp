@@ -681,7 +681,7 @@ void CodeExpr::print(std::ostream& os) const
 
 void IfThenElseExpr::print(std::ostream& os) const
 {
-	os << "if " << cond << " then " << true_value << " else " << false_value;
+	os << "(if " << cond << " then " << true_value << " else " << false_value << ")";
 }
 
 void TupleExpr::print(std::ostream& os) const
