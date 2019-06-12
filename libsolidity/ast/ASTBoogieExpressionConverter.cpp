@@ -473,10 +473,10 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 {
 	// Check if constant propagation could infer the result
-	string tpStr = _node.annotation().type->toString();
-	if (boost::starts_with(tpStr, "int_const"))
+	TypePointer tp = _node.annotation().type;
+	if (auto tpRational = dynamic_cast<RationalNumberType const*>(tp))
 	{
-		m_currentExpr = Expr::lit(bg::bigint(tpStr.substr(10)));
+		m_currentExpr = Expr::lit(bg::bigint(tpRational->literalValue(nullptr)));
 		return false;
 	}
 
@@ -1336,27 +1336,8 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 		auto rationalType = dynamic_cast<RationalNumberType const*>(type);
 		if (rationalType != nullptr)
 		{
-			// For now, just the integers
-			if (!rationalType->isFractional())
-			{
-				string litStr = _node.value();
-				// Remove readability separators
-				litStr.erase(remove(litStr.begin(), litStr.end(), '_'), litStr.end());
-				size_t epos = litStr.find_first_of("eE");
-				if (epos == string::npos)
-				{
-					m_currentExpr = Expr::lit(bg::bigint(litStr));
-				}
-				else
-				{
-					bg::bigint base(litStr.substr(0, epos));
-					unsigned exp = stoul(litStr.substr(epos + 1));
-					bg::bigint prod;
-					boost::multiprecision::multiply(prod, base, boost::multiprecision::pow(bg::bigint(10), exp));
-					m_currentExpr = Expr::lit(prod);
-				}
-				return false;
-			}
+			m_currentExpr = boogie::Expr::lit(rationalType->literalValue(nullptr));
+			return false;
 		}
 		break;
 	}
