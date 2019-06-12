@@ -259,6 +259,8 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 		CharStream exprStream(exprStr, "DocString");
 		ASTPointer<Expression> expr = Parser(*m_context.errorReporter(), m_context.evmVersion())
 			.parseExpression(std::make_shared<Scanner>(exprStream));
+		if (!expr)
+			throw langutil::FatalError();
 
 		// Resolve references, using the given scope
 		m_context.scopes()[expr.get()] = m_context.scopes()[_scope];
