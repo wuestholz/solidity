@@ -1342,7 +1342,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 				string litStr = _node.value();
 				// Remove readability separators
 				litStr.erase(remove(litStr.begin(), litStr.end(), '_'), litStr.end());
-				size_t epos = litStr.find('e');
+				size_t epos = litStr.find_first_of("eE");
 				if (epos == string::npos)
 				{
 					m_currentExpr = Expr::lit(bg::bigint(litStr));
