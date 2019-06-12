@@ -85,7 +85,25 @@ string BoogieContext::mapDeclName(Declaration const& decl)
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for state variables and local variables in functions, (2) return
 	// variables might have no name (whereas Boogie requires a name)
-	return decl.name() + "#" + to_string(decl.id());
+	string name = decl.name() + "#" + to_string(decl.id());
+
+	// Check if the current declaration is enclosed by any of the
+	// extra scopes, if yes, add extra ID
+	for (auto extraScope : m_extraScopes)
+	{
+		ASTNode const* running = decl.scope();
+		while (running)
+		{
+			if (running == extraScope.first)
+			{
+				name += "#" + extraScope.second;
+				break;
+			}
+			running = m_scopes[running]->enclosingNode();
+		}
+	}
+
+	return name;
 }
 
 string BoogieContext::mapStructMemberName(Declaration const& decl, DataLocation loc)

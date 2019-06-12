@@ -486,12 +486,7 @@ void ASTBoogieConverter::processModifier()
 
 		if (modifierDecl)
 		{
-			// Duplicated modifiers currently do not work, because they will introduce
-			// local variables for their parameters with the same name
-			if (modifier->arguments())
-				for (unsigned long i = 0; i < m_currentModifier; ++i)
-					if (m_currentFunc->modifiers()[i]->name()->annotation().referencedDeclaration->id() == modifierDecl->id())
-						m_context.reportError(m_currentFunc, "Duplicated modifiers with arguments are not supported");
+			m_context.pushExtraScope(modifierDecl, toString(modifier->id()));
 
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
@@ -515,6 +510,7 @@ void ASTBoogieConverter::processModifier()
 			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
 			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 			m_currentReturnLabel = oldReturnLabel;
+			m_context.popExtraScope();
 		}
 		else if (dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
 			m_context.reportError(&*modifier, "Base constructor call is not supported as modifier invocation");

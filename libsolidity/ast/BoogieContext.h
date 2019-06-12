@@ -69,8 +69,7 @@ private:
 	langutil::ErrorReporter* m_errorReporter; // Report errors with this member
 	langutil::Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
 
-	// Some members required to parse invariants. (Invariants can be found
-	// in comments, so they are not parsed when the contract is parsed.)
+	// Some members required to parse expressions from comments
 	BoogieGlobalContext m_globalContext;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	langutil::EVMVersion m_evmVersion;
@@ -86,6 +85,8 @@ private:
 	bool m_transferIncluded;
 	bool m_callIncluded;
 	bool m_sendIncluded;
+
+	std::list<std::pair<ASTNode const*, std::string>> m_extraScopes;
 
 public:
 
@@ -124,6 +125,9 @@ public:
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
+
+	void pushExtraScope(ASTNode const* node, std::string id) { m_extraScopes.push_back(std::make_pair(node, id)); }
+	void popExtraScope() { m_extraScopes.pop_back(); }
 
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
