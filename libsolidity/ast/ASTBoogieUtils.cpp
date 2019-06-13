@@ -606,6 +606,23 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 		case Token::GreaterThanOrEqual:
 			result = Expr::gte(lhs, rhs);
 			break;
+		case Token::Exp:
+		{
+			auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs);
+			if (lhsLit && rhsLit)
+			{
+				auto power = boost::multiprecision::pow(lhsLit->getVal(),rhsLit->getVal().convert_to<unsigned>());
+				result = context.intLit(power % boost::multiprecision::pow(boogie::bigint(2), isSigned ? bits - 1 : bits), bits);
+				ecc = Expr::eq(context.intLit(power, bits), result);
+			}
+			else
+			{
+				context.reportError(associatedNode, "Exponentiation is not supported in 'mod' encoding");
+				result = Expr::id(ERR_EXPR);
+			}
+			break;
+		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + TokenTraits::toString(op));
 			result = Expr::id(ERR_EXPR);
