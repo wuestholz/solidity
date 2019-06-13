@@ -144,6 +144,7 @@ public:
 		s << v;
 		val = s.str();
 	}
+	std::string getVal() const { return val; }
 	void print(std::ostream& os) const override;
 };
 

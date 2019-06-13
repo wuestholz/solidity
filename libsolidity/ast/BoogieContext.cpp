@@ -227,10 +227,10 @@ boogie::Expr::Ref BoogieContext::boogieMsgValue() const
 	return boogie::Expr::id("__msg_value");
 }
 
-boogie::Expr::Ref BoogieContext::intLit(long lit, int bits) const
+boogie::Expr::Ref BoogieContext::intLit(boogie::bigint lit, int bits) const
 {
 	if (isBvEncoding())
-		return boogie::Expr::lit(boogie::bigint(lit), bits);
+		return boogie::Expr::lit(lit, bits);
 	else
 		return boogie::Expr::lit(lit);
 }

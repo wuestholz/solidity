@@ -1,2 +1,3 @@
-Verifying IntegerExp::[constructor]: OK
+Verifying IntegerExp::: OK
+Verifying IntegerExp::[implicit_constructor]: OK
 No errors found.

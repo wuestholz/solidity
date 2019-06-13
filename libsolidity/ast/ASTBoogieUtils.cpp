@@ -506,6 +506,23 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 			else
 				result = context.bvUge(bits, lhs, rhs);
 			break;
+		case Token::Exp:
+		{
+			auto lhsLit = dynamic_pointer_cast<BvLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<BvLit const>(rhs);
+			if (lhsLit && rhsLit)
+			{
+				auto power = boost::multiprecision::pow(boogie::bigint(lhsLit->getVal()),
+						boogie::bigint(rhsLit->getVal()).convert_to<unsigned>());
+				result = context.intLit(power % boost::multiprecision::pow(boogie::bigint(2), bits), bits);
+			}
+			else
+			{
+				context.reportError(associatedNode, "Exponentiation is not supported in 'bv' encoding");
+				result = Expr::id(ERR_EXPR);
+			}
+			break;
+		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
 			result = Expr::id(ERR_EXPR);
