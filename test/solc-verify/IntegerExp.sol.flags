@@ -1,1 +1,1 @@
---boogie-arith bv
+--boogie-arith bv --no-modifies-analysis

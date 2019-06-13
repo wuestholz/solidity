@@ -1,1 +1,1 @@
---solver cvc4 --boogie-arith mod-overflow
+--solver cvc4 --boogie-arith mod-overflow --no-modifies-analysis

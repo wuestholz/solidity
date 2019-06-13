@@ -1,1 +1,1 @@
---boogie-arith mod-overflow
+--boogie-arith mod-overflow --no-modifies-analysis

@@ -66,6 +66,7 @@ private:
 
 	Encoding m_encoding;
 	bool m_overflow;
+	bool m_modAnalysis;
 	langutil::ErrorReporter* m_errorReporter; // Report errors with this member
 	langutil::Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
 
@@ -92,6 +93,7 @@ public:
 
 	BoogieContext(Encoding encoding,
 			bool overflow,
+			bool modAnalysis,
 			langutil::ErrorReporter* errorReporter,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
 			langutil::EVMVersion evmVersion);
@@ -99,6 +101,7 @@ public:
 	Encoding encoding() const { return m_encoding; }
 	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
 	bool overflow() const { return m_overflow; }
+	bool modAnalysis() const { return m_modAnalysis; }
 	langutil::ErrorReporter*& errorReporter() { return m_errorReporter; }
 	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
 	GlobalContext* globalContext() { return &m_globalContext; }

@@ -401,15 +401,15 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		}
 	}
 
-	// If there is at least one modifies spec, we have to loop through variables
-	// and add constraints
-	if (!modSpecs.empty())
+	if (m_context.modAnalysis() && !_node.isConstructor())
 	{
 		// TODO: inheritance?
 		for (auto sn : m_currentContract->subNodes())
 		{
 			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
 			{
+				if (varDecl->isConstant())
+					continue;
 				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
 				auto varThis = boogie::Expr::sel(varId, m_context.boogieThis());
 

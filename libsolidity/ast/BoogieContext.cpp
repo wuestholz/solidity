@@ -42,12 +42,13 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 
 BoogieContext::BoogieContext(Encoding encoding,
 		bool overflow,
+		bool modAnalysis,
 		ErrorReporter* errorReporter,
 		std::map<ASTNode const*,
 		std::shared_ptr<DeclarationContainer>> scopes,
 		EVMVersion evmVersion)
 :
-		m_program(), m_encoding(encoding), m_overflow(overflow), m_errorReporter(errorReporter),
+		m_program(), m_encoding(encoding), m_overflow(overflow), m_modAnalysis(modAnalysis), m_errorReporter(errorReporter),
 		m_currentScanner(nullptr), m_scopes(scopes), m_evmVersion(evmVersion),
 		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
