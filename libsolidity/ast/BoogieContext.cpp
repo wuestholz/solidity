@@ -185,7 +185,8 @@ void BoogieContext::addConstant(boogie::Decl::Ref decl)
 
 boogie::TypeDeclRef BoogieContext::addressType() const
 {
-	return boogie::Decl::typee("address_t");
+	boogie::TypeDeclRef it = intType(256);
+	return boogie::Decl::typee("address_t", it->getName());
 }
 
 boogie::TypeDeclRef BoogieContext::boolType() const
