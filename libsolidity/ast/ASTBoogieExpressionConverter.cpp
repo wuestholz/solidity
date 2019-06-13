@@ -387,8 +387,11 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 			elements.push_back(nullptr);
 	}
 
-	// Make the expression
-	m_currentExpr = Expr::tuple(elements);
+	// Make the expression (tuples of size 1, just use the expression)
+	if (elements.size() == 1)
+		m_currentExpr = elements.back();
+	else
+		m_currentExpr = Expr::tuple(elements);
 
 	return false;
 }

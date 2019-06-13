@@ -421,13 +421,18 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 		case Token::GreaterThanOrEqual: result = Expr::gte(lhs, rhs); break;
 
 		case Token::Exp:
-			if (auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs))
-				if (auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs))
-					result = Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
-			context.reportError(associatedNode, "Exponentiation is not supported in 'int' encoding");
-			if (result == nullptr)
+		{
+			auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs);
+			if (lhsLit && rhsLit)
+				result = Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
+			else
+			{
+				context.reportError(associatedNode, "Exponentiation is not supported in 'int' encoding");
 				result = Expr::id(ERR_EXPR);
+			}
 			break;
+		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + TokenTraits::toString(op));
 			result = Expr::id(ERR_EXPR);
