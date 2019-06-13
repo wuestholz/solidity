@@ -56,4 +56,11 @@ contract Simple {
         return xs[msg.sender];
     }
 
+    /** @notice modifies * */
+    function all() public {
+        xs[msg.sender] = 0;
+        owner = msg.sender;
+        counter = 0;
+    }
+
 }

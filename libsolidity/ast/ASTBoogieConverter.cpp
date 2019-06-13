@@ -1,5 +1,6 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
@@ -28,6 +29,7 @@ string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
 string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
 string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
 string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
+string const ASTBoogieConverter::DOCTAG_MODIFIES_ALL = DOCTAG_MODIFIES + " *";
 string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
@@ -347,11 +349,17 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 
 	// Modifies specifier for each variable
 	std::map<Declaration const*, ModSpec> modSpecs;
+	bool modAll = false;
 
 	for (auto docTag : _node.annotation().docTags)
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
 		{
+			if (boost::algorithm::trim_copy(docTag.second.content) == DOCTAG_MODIFIES_ALL)
+			{
+				modAll = true;
+				break;
+			}
 			size_t targetEnd = docTag.second.content.length();
 			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
 			// Check if there is a condition part
@@ -401,7 +409,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		}
 	}
 
-	if (m_context.modAnalysis() && !_node.isConstructor())
+	if (m_context.modAnalysis() && !_node.isConstructor() && !modAll)
 	{
 		// TODO: inheritance?
 		for (auto sn : m_currentContract->subNodes())

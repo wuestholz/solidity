@@ -10,4 +10,5 @@ Verifying Simple::setInorrect2: ERROR
  - Source test/solc-verify/Modifies.sol, line 51, col 5: Function might modify 'xs' when condition does not hold
  - Source test/solc-verify/Modifies.sol, line 51, col 5: Function might modify 'xs' outside defined index
 Verifying Simple::get: OK
+Verifying Simple::all: OK
 Errors were found by the verifier.
