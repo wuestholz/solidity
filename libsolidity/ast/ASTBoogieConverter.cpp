@@ -378,16 +378,16 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			{
 				Declaration const* varDecl = nullptr;
 				boogie::Expr::Ref indexer = nullptr;
-				if (auto id = dynamic_cast<Identifier const*>(&*target.exprSol))
+				if (auto id = dynamic_pointer_cast<Identifier const>(target.exprSol))
 				{
 					varDecl = id->annotation().referencedDeclaration;
 				}
-				else if (auto idx = dynamic_cast<IndexAccess const*>(&*target.exprSol))
+				else if (auto idx = dynamic_pointer_cast<IndexAccess const>(target.exprSol))
 				{
 					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
 					{
 						varDecl = id->annotation().referencedDeclaration;
-						if (auto selExpr = dynamic_cast<boogie::SelExpr const*>(&*target.expr))
+						if (auto selExpr = dynamic_pointer_cast<boogie::SelExpr const>(target.expr))
 							indexer = selExpr->getIdxs()[0];
 						else
 							solAssert(false, "Invalid indexer in modifies");
@@ -414,7 +414,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		// TODO: inheritance?
 		for (auto sn : m_currentContract->subNodes())
 		{
-			if (auto varDecl = dynamic_cast<VariableDeclaration const*>(&*sn))
+			if (auto varDecl = dynamic_pointer_cast<VariableDeclaration const>(sn))
 			{
 				if (varDecl->isConstant())
 					continue;
@@ -425,7 +425,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
 
 				// If there is no modifies spec, it cannot change
-				if (modSpecs.find(varDecl) == modSpecs.end())
+				if (modSpecs.find(varDecl.get()) == modSpecs.end())
 				{
 					auto expr = boogie::Expr::eq(varThis, boogie::Expr::old(varThis));
 					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
@@ -436,13 +436,13 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				{
 					// If the condition does not hold, no modifications allowed
 					auto expr = boogie::Expr::or_(
-							modSpecs[varDecl].cond,
+							modSpecs[varDecl.get()].cond,
 							boogie::Expr::eq(varThis, boogie::Expr::old(varThis)));
 					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' when condition does not hold", *m_context.currentScanner())));
 					// If there is an indexer, modification is only allowed
 					// for that index, regardless of the condition
-					if (modSpecs[varDecl].idx)
+					if (modSpecs[varDecl.get()].idx)
 					{
 						// Get the type of the element
 						TypePointer elemType = nullptr;
@@ -468,11 +468,11 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 										boogie::Expr::upd(
 												varId,
 												m_context.boogieThis(),
-												boogie::Expr::upd(varThis, modSpecs[varDecl].idx, defaultVal)),
+												boogie::Expr::upd(varThis, modSpecs[varDecl.get()].idx, defaultVal)),
 										boogie::Expr::upd(
 												boogie::Expr::old(varId),
 												m_context.boogieThis(),
-												boogie::Expr::upd(boogie::Expr::old(varThis), modSpecs[varDecl].idx, defaultVal))
+												boogie::Expr::upd(boogie::Expr::old(varThis), modSpecs[varDecl.get()].idx, defaultVal))
 										);
 								procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
 										ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' outside defined index", *m_context.currentScanner())));
@@ -523,9 +523,9 @@ void ASTBoogieConverter::processModifier()
 			m_context.popExtraScope();
 		}
 		else if (dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
-			m_context.reportError(&*modifier, "Base constructor call is not supported as modifier invocation");
+			m_context.reportError(modifier.get(), "Base constructor call is not supported as modifier invocation");
 		else
-			m_context.reportError(&*modifier, "Unsupported modifier invocation");
+			m_context.reportError(modifier.get(), "Unsupported modifier invocation");
 	}
 	else if (m_currentFunc->isImplemented()) // We reached the function
 	{
@@ -621,17 +621,13 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	m_stateVarInitializers.clear();
 	m_stateVarsToInitialize.clear();
 	for (auto sn : _node.subNodes())
-	{
-		if (dynamic_cast<VariableDeclaration const*>(&*sn))
+		if (dynamic_pointer_cast<VariableDeclaration const>(sn))
 			sn->accept(*this);
-	}
 
 	// Process other elements
 	for (auto sn : _node.subNodes())
-	{
-		if (!dynamic_cast<VariableDeclaration const*>(&*sn))
+		if (!dynamic_pointer_cast<VariableDeclaration const>(sn))
 			sn->accept(*this);
-	}
 
 	// If no constructor exists, create an implicit one
 	if (!_node.isLibrary())
@@ -639,7 +635,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		bool hasConstructor = false;
 		for (auto sn : _node.subNodes())
 		{
-			if (FunctionDefinition const* fn = dynamic_cast<FunctionDefinition const*>(&*sn))
+			if (auto fn = dynamic_pointer_cast<FunctionDefinition const>(sn))
 			{
 				if (fn->isConstructor())
 				{
@@ -706,7 +702,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		}
 		else // Other types are the same for both memory/storage
 		{
-			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::toBoogieType(member->type(), &*member, m_context);
+			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::toBoogieType(member->type(), member.get(), m_context);
 		}
 		// TODO: arrays?
 
@@ -781,7 +777,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		if (ret->type()->category() == Type::Category::Array)
 		{
-			auto arrType = dynamic_cast<ArrayType const*>(&*ret->type());
+			auto arrType = dynamic_cast<ArrayType const*>(ret->type());
 			if (!arrType->isString())
 			{
 				m_context.reportError(&_node, "Arrays are not supported as return values");
@@ -1435,7 +1431,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			else
 			{
 				// TODO: maybe this should be an error
-				m_context.reportWarning(&*declNode, "Boogie: Unhandled default value, verification might fail.");
+				m_context.reportWarning(declNode.get(), "Boogie: Unhandled default value, verification might fail.");
 			}
 		}
 	}

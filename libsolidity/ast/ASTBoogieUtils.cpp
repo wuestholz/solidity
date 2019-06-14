@@ -336,7 +336,7 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 		return context.addressType();
 	case Type::Category::Array:
 	{
-		auto arrType = dynamic_cast<ArrayType const*>(&*tp);
+		auto arrType = dynamic_cast<ArrayType const*>(tp);
 		if (arrType->isString())
 			return context.stringType();
 		else
@@ -344,14 +344,14 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 	}
 	case Type::Category::Mapping:
 	{
-		auto mapType = dynamic_cast<MappingType const*>(&*tp);
+		auto mapType = dynamic_cast<MappingType const*>(tp);
 		return mappingType(toBoogieType(mapType->keyType(), _associatedNode, context),
 				toBoogieType(mapType->valueType(), _associatedNode, context));
 	}
 	case Type::Category::FixedBytes:
 	{
 		// up to 32 bytes (use integer and slice it up)
-		auto fbType = dynamic_cast<FixedBytesType const*>(&*tp);
+		auto fbType = dynamic_cast<FixedBytesType const*>(tp);
 		return context.intType(fbType->numBytes() * 8);
 	}
 	case Type::Category::Tuple:

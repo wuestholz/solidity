@@ -1016,7 +1016,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 {
 	TypePointer tp = _node.annotation().type;
-	if (auto id = dynamic_cast<Identifier const*>(&*_node.arguments()[0]))
+	if (auto id = dynamic_pointer_cast<Identifier const>(_node.arguments()[0]))
 	{
 		auto sumDecl = id->annotation().referencedDeclaration;
 		m_context.currentSumDecls()[sumDecl] = tp;
@@ -1028,7 +1028,7 @@ void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 	else
 		m_context.reportError(&_node, "Argument of sum must be an identifier");
 
-	m_currentExpr = getSumShadowVar(&*_node.arguments()[0]);
+	m_currentExpr = getSumShadowVar(_node.arguments()[0].get());
 	addTCC(m_currentExpr, tp);
 }
 
@@ -1159,7 +1159,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// fixed size byte array length
 	if (type->category() == Type::Category::FixedBytes && _node.memberName() == "length")
 	{
-		auto fbType = dynamic_cast<FixedBytesType const*>(&*_node.expression().annotation().type);
+		auto fbType = dynamic_cast<FixedBytesType const*>(_node.expression().annotation().type);
 		m_currentExpr = Expr::lit(fbType->numBytes());
 		return false;
 	}
@@ -1218,7 +1218,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// Member access on structures: create selector expression
 	if (typeCategory == Type::Category::Struct)
 	{
-		auto structType = dynamic_cast<StructType const*>(&*type);
+		auto structType = dynamic_cast<StructType const*>(type);
 		m_currentExpr = Expr::id(m_context.mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
 		m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
 	}
