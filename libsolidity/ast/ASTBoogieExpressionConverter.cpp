@@ -1074,7 +1074,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// If we are accessing something on 'super', the current address should be 'this'
 	// and not 'super', because that does not exist
 	if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
-		if (id->annotation().referencedDeclaration->name() == ASTBoogieUtils::SOLIDITY_SUPER)
+		if (dynamic_cast<MagicVariableDeclaration const*>(id->annotation().referencedDeclaration) &&
+				id->annotation().referencedDeclaration->name() == ASTBoogieUtils::SOLIDITY_SUPER)
 			m_currentAddress = m_context.boogieThis();
 
 	// Type of the expression

@@ -77,11 +77,14 @@ BoogieContext::BoogieContext(Encoding encoding,
 string BoogieContext::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_ASSERT) return ASTBoogieUtils::SOLIDITY_ASSERT;
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_REQUIRE) return ASTBoogieUtils::SOLIDITY_REQUIRE;
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_REVERT) return ASTBoogieUtils::SOLIDITY_REVERT;
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_THIS) return m_boogieThis->getName();
-	if (decl.name() == ASTBoogieUtils::SOLIDITY_NOW) return ASTBoogieUtils::BOOGIE_NOW;
+	if (dynamic_cast<MagicVariableDeclaration const*>(&decl))
+	{
+		if (decl.name() == ASTBoogieUtils::SOLIDITY_ASSERT) return decl.name();
+		if (decl.name() == ASTBoogieUtils::SOLIDITY_REQUIRE) return decl.name();
+		if (decl.name() == ASTBoogieUtils::SOLIDITY_REVERT) return decl.name();
+		if (decl.name() == ASTBoogieUtils::SOLIDITY_THIS) return m_boogieThis->getName();
+		if (decl.name() == ASTBoogieUtils::SOLIDITY_NOW) return ASTBoogieUtils::BOOGIE_NOW;
+	}
 
 	// ID is important to append, since (1) even fully qualified names can be
 	// same for state variables and local variables in functions, (2) return
