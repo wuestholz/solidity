@@ -630,23 +630,20 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 			sn->accept(*this);
 
 	// If no constructor exists, create an implicit one
-	if (!_node.isLibrary())
+	bool hasConstructor = false;
+	for (auto sn : _node.subNodes())
 	{
-		bool hasConstructor = false;
-		for (auto sn : _node.subNodes())
+		if (auto fn = dynamic_pointer_cast<FunctionDefinition const>(sn))
 		{
-			if (auto fn = dynamic_pointer_cast<FunctionDefinition const>(sn))
+			if (fn->isConstructor())
 			{
-				if (fn->isConstructor())
-				{
-					hasConstructor = true;
-					break;
-				}
+				hasConstructor = true;
+				break;
 			}
 		}
-		if (!hasConstructor)
-			createImplicitConstructor(_node);
 	}
+	if (!hasConstructor)
+		createImplicitConstructor(_node);
 
 	return false;
 }

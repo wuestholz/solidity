@@ -1,0 +1,4 @@
+Verifying L::[implicit_constructor]: OK
+Verifying C::f: OK
+Verifying C::[implicit_constructor]: OK
+No errors found.
