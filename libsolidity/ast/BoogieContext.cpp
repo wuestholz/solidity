@@ -57,7 +57,6 @@ BoogieContext::BoogieContext(Encoding encoding,
 	addGlobalComment("Global declarations and definitions related to the address type");
 	// address type
 	addDecl(addressType());
-	addDecl(boogie::Decl::constant(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS, addressType(), true));
 	// address.balance
 	m_boogieBalance = boogie::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
 	addDecl(m_boogieBalance);

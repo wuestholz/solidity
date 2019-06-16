@@ -875,13 +875,6 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	if (toAddress)
 	{
 		arg->accept(*this);
-		if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
-		{
-			if (lit->getVal() == 0)
-				m_currentExpr = Expr::id(ASTBoogieUtils::BOOGIE_ZERO_ADDRESS);
-			else
-				m_context.reportError(&_node, "Unsupported conversion to address");
-		}
 		return;
 	}
 
