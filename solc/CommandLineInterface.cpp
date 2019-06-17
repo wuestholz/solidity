@@ -1226,13 +1226,13 @@ void CommandLineInterface::handleBoogie()
 		}
 		catch (CompilerError const& _exception)
 		{
-			formatter.printExceptionInformation(_exception, "Boogie exception");
+			formatter.printExceptionInformation(_exception, "solc-verify exception");
 			m_error = true;
 			return;
 		}
 		catch (InternalCompilerError const& _exception)
 		{
-			formatter.printExceptionInformation(_exception, "Boogie internal exception");
+			formatter.printExceptionInformation(_exception, "solc-verify internal exception");
 			serr() << "Details:" << endl << boost::diagnostic_information(_exception);
 			m_error = true;
 			return;
@@ -1242,7 +1242,7 @@ void CommandLineInterface::handleBoogie()
 	for (auto const& error: errorReporter.errors())
 	{
 		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
+				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
 	}
 
 	if (!Error::containsOnlyWarnings(errorReporter.errors()))

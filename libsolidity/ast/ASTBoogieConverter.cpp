@@ -300,7 +300,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	SourceReferenceFormatter formatter(cerr);
 	for (auto const& error: m_context.errorReporter()->errors())
 		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "Boogie error");
+				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
 
 	// Restore error reporter
 	m_context.errorReporter() = originalErrReporter;
