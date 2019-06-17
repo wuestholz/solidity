@@ -127,8 +127,14 @@ done
 # Remove temps
 rm -f $OUT_PATH $TIME_PATH
 
+echo "---------- Details ----------"
 # Print the details of the failed tests
 for i in "${!FAILED_TESTS[@]}";
 do
     echo "$((i+1)). ${FAILED_TESTS[$i]}";
 done
+
+echo "---------- Summary ----------"
+printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "Boogie error:.*" -o | sort | uniq -c
+printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "Boogie.*exception:.*" -o | sort | uniq -c
+printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e ".bpl\(.*\): Error" | grep -e ": Error:.*" -o | sort | uniq -c
