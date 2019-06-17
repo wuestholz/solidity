@@ -1,9 +1,11 @@
 pragma solidity >=0.5.0;
 
+interface I {
+    enum Other { A, B, C, D, E }
+}
+
 contract Enums {
     enum Dir { Up, Down, Left, Right }
-
-    enum Other { A, B, C, D, E }
 
     Dir dir;
 
@@ -26,7 +28,7 @@ contract Enums {
         dir = Dir(x); // Guarded, cannot fail
     }
 
-    function conversion2(Other other) public {
+    function conversion2(I.Other other) public {
         dir = Dir(int(other)); // Conversion might fail
     }
 }

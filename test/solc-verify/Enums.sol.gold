@@ -1,7 +1,8 @@
+Verifying I::[implicit_constructor]: OK
 Verifying Enums::[constructor]: OK
 Verifying Enums::setDir: OK
 Verifying Enums::goUp: OK
 Verifying Enums::conversion: OK
 Verifying Enums::conversion2: ERROR
- - Source test/solc-verify/Enums.sol, line 30, col 15: Conversion to enum might be out of range
+ - Source test/solc-verify/Enums.sol, line 32, col 15: Conversion to enum might be out of range
 Errors were found by the verifier.
