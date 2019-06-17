@@ -1162,7 +1162,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (_node.annotation().type->category() == Type::Category::Enum)
 	{
 		// Try to get the enum definition
-		EnumDefinition const* enumDef;
+		EnumDefinition const* enumDef = nullptr;
 		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 			enumDef = dynamic_cast<EnumDefinition const*>(exprId->annotation().referencedDeclaration);
 		if (auto exprMemAcc = dynamic_cast<MemberAccess const*>(&_node.expression()))
