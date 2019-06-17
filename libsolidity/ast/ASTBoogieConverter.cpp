@@ -358,7 +358,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			if (boost::algorithm::trim_copy(docTag.second.content) == DOCTAG_MODIFIES_ALL)
 			{
 				modAll = true;
-				break;
+				continue; // Still parse the rest to catch syntax errors
 			}
 			size_t targetEnd = docTag.second.content.length();
 			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
@@ -403,6 +403,9 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			}
 		}
 	}
+
+	if (modAll && !modSpecs.empty())
+		m_context.reportWarning(&_node, "Modifies all was given, other modifies specs are ignored");
 
 	if (m_context.modAnalysis() && !_node.isConstructor() && !modAll)
 	{
