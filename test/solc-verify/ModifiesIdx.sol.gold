@@ -1,0 +1,6 @@
+Verifying ModifiesIdx::f: OK
+Verifying ModifiesIdx::g: OK
+Verifying ModifiesIdx::g_incorrect: ERROR
+ - Source test/solc-verify/ModifiesIdx.sol, line 34, col 5: Function might modify 'xs' illegally
+Verifying ModifiesIdx::[implicit_constructor]: OK
+Errors were found by the verifier.

@@ -49,9 +49,6 @@ private:
 	void deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
 			boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
 
-	// Helper method to transform a select to an update
-	boogie::Expr::Ref selectToUpdate(std::shared_ptr<boogie::SelExpr const> sel, boogie::Expr::Ref value);
-
 	// Helper method to get the length of an array
 	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
 
@@ -109,6 +106,10 @@ public:
 	 * introduce new statements and declarations (included in the result).
 	 */
 	Result convert(Expression const& _node);
+
+	// Helper method to transform a select to an update
+	static
+	boogie::Expr::Ref selectToUpdate(std::shared_ptr<boogie::SelExpr const> sel, boogie::Expr::Ref value);
 
 	// Only need to handle expressions
 	bool visit(Conditional const& _node) override;

@@ -1,0 +1,4 @@
+Verifying ModifiesSimple::f: OK
+Verifying ModifiesSimple::g: OK
+Verifying ModifiesSimple::[implicit_constructor]: OK
+No errors found.

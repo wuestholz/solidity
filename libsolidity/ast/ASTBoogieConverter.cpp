@@ -348,7 +348,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 	};
 
 	// Modifies specifier for each variable
-	std::map<Declaration const*, ModSpec> modSpecs;
+	map<Declaration const*, list<ModSpec>> modSpecs;
 	bool modAll = false;
 
 	for (auto docTag : _node.annotation().docTags)
@@ -399,12 +399,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 					m_context.reportError(&_node, "Target of modifies must be identifier or indexer");
 
 				if (varDecl)
-				{
-					if (modSpecs.find(varDecl) == modSpecs.end())
-						modSpecs[varDecl] = ModSpec(condExpr, indexer);
-					else
-						m_context.reportError(&_node, "Multiple modifies specification for '" + varDecl->name() + "'");
-				}
+					modSpecs[varDecl].push_back(ModSpec(condExpr, indexer));
 			}
 		}
 	}
@@ -424,64 +419,25 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				if (varDecl->type()->category() == Type::Category::Struct)
 					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
 
-				// If there is no modifies spec, it cannot change
-				if (modSpecs.find(varDecl.get()) == modSpecs.end())
+				// Build up expression recursively
+				boogie::Expr::Ref expr = boogie::Expr::old(varThis);
+
+				for (auto modSpec : modSpecs[varDecl.get()])
 				{
-					auto expr = boogie::Expr::eq(varThis, boogie::Expr::old(varThis));
-					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
-							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "'", *m_context.currentScanner())));
-				}
-				// If there is a modifies spec, use the condition and indexer
-				else
-				{
-					// If the condition does not hold, no modifications allowed
-					auto expr = boogie::Expr::or_(
-							modSpecs[varDecl.get()].cond,
-							boogie::Expr::eq(varThis, boogie::Expr::old(varThis)));
-					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
-							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' when condition does not hold", *m_context.currentScanner())));
-					// If there is an indexer, modification is only allowed
-					// for that index, regardless of the condition
-					if (modSpecs[varDecl.get()].idx)
+					if (modSpec.idx)
 					{
-						// Get the type of the element
-						TypePointer elemType = nullptr;
-						Type::Category typeCat = varDecl->annotation().type->category();
-						if (typeCat == Type::Category::Array)
-							elemType = dynamic_cast<ArrayType const*>(varDecl->annotation().type)->baseType();
-						else if (typeCat == Type::Category::Mapping)
-							elemType = dynamic_cast<MappingType const*>(varDecl->annotation().type)->valueType();
-						else
-							m_context.reportError(&_node, "Unsupported collection kind in modifies");
-
-						// var[idx := default] == old(var)[idx := default]
-						if (elemType)
-						{
-							if (elemType->category() == Type::Category::Struct)
-								m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
-
-							boogie::Expr::Ref defaultVal = defaultValue(elemType);
-
-							if (defaultVal)
-							{
-								auto expr = boogie::Expr::eq(
-										boogie::Expr::upd(
-												varId,
-												m_context.boogieThis(),
-												boogie::Expr::upd(varThis, modSpecs[varDecl.get()].idx, defaultVal)),
-										boogie::Expr::upd(
-												boogie::Expr::old(varId),
-												m_context.boogieThis(),
-												boogie::Expr::upd(boogie::Expr::old(varThis), modSpecs[varDecl.get()].idx, defaultVal))
-										);
-								procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
-										ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' outside defined index", *m_context.currentScanner())));
-							}
-							else
-								m_context.reportError(&_node, "Unsupported default value for indexer");
-						}
+						auto selExpr = dynamic_pointer_cast<boogie::SelExpr const>(boogie::Expr::sel(expr, modSpec.idx));
+						auto writeExpr = ASTBoogieExpressionConverter::selectToUpdate(selExpr,
+								boogie::Expr::sel(varThis, modSpec.idx));
+						expr = boogie::Expr::if_then_else(modSpec.cond, writeExpr, expr);
 					}
+					else
+						expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
 				}
+
+				expr = boogie::Expr::eq(varThis, expr);
+				procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+						ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' illegally", *m_context.currentScanner())));
 			}
 		}
 	}
