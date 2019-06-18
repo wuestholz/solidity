@@ -39,14 +39,12 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc : result.tccs)
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assume(tcc));
+	for (auto s : result.newStatements)
+		m_currentBlocks.top()->addStmt(s);
 	for (auto oc : result.ocs)
-	{
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
 			boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
 			boogie::Expr::or_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), boogie::Expr::not_(oc))));
-	}
-	for (auto s : result.newStatements)
-		m_currentBlocks.top()->addStmt(s);
 	for (auto c : result.newConstants)
 		m_context.addConstant(c);
 
