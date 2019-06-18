@@ -44,6 +44,8 @@ private:
 	std::string m_currentReturnLabel;
 	int m_nextReturnLabelId;
 
+	std::string m_currentContinueLabel;
+
 	static std::string const DOCTAG_CONTRACT_INVAR;
 	static std::string const DOCTAG_LOOP_INVAR;
 	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;

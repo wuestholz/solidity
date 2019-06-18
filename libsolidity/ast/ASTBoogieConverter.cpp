@@ -1121,14 +1121,19 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 		return false;
 	}
 
+	string oldContinueLabel = m_currentContinueLabel;
+	m_currentContinueLabel = "$continue" + toString(_node.id());
+
 	// Get condition recursively
 	boogie::Expr::Ref cond = convertExpression(_node.condition());
 
 	// Get if branch recursively
 	m_currentBlocks.push(boogie::Block::block());
 	_node.body().accept(*this);
+	m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentContinueLabel));
 	boogie::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
+	m_currentContinueLabel = oldContinueLabel;
 
 	std::vector<boogie::Specification::Ref> invars;
 
@@ -1175,22 +1180,34 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	//
 	// initExpr; while (cond) { body; loopExpr }
 
+	string oldContinueLabel = m_currentContinueLabel;
+	m_currentContinueLabel = "$continue" + toString(_node.id());
+
 	// Get initialization recursively (adds statement to current block)
 	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("The following while loop was mapped from a for loop"));
 	if (_node.initializationExpression())
+	{
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Initialization"));
 		_node.initializationExpression()->accept(*this);
+	}
 
 	// Get condition recursively
 	boogie::Expr::Ref cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
 
 	// Get body recursively
 	m_currentBlocks.push(boogie::Block::block());
+	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Body"));
 	_node.body().accept(*this);
+	m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentContinueLabel));
 	// Include loop expression at the end of body
 	if (_node.loopExpression())
+	{
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Loop expression"));
 		_node.loopExpression()->accept(*this); // Adds statements to current block
+	}
 	boogie::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
+	m_currentContinueLabel = oldContinueLabel;
 
 	std::vector<boogie::Specification::Ref> invars;
 
@@ -1229,10 +1246,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	rememberScope(_node);
-
-	// TODO: Boogie does not support continue, this must be mapped manually
-	// using labels and gotos
-	m_context.reportError(&_node, "Continue statement is not supported");
+	m_currentBlocks.top()->addStmt(boogie::Stmt::goto_({m_currentContinueLabel}));
 	return false;
 }
 
