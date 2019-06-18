@@ -94,7 +94,13 @@ public:
 	 * Get address type for a struct with a given data location
 	 */
 	static
-	boogie::TypeDeclRef getStructAddressType(StructDefinition const* structDef, DataLocation loc);
+	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
+
+	/*
+	 * Get name for the constructor of a given struct
+	 */
+	static
+	std::string getStructConstructorName(StructDefinition const* structDef);
 
 	/**
 	 * Map a Solidity type to a Boogie type

@@ -210,6 +210,24 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return boogie::Decl::typee("int");
 }
 
+boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition const* structDef)
+{
+	vector<boogie::Binding> params;
+
+	for (auto member : structDef->members())
+		params.push_back({
+			boogie::Expr::id(mapDeclName(*member)),
+			ASTBoogieUtils::toBoogieType(member->annotation().type, structDef, *this)});
+
+	vector<boogie::Attr::Ref> attrs;
+	attrs.push_back(boogie::Attr::attr("constructor"));
+	auto funcDecl = boogie::Decl::function(ASTBoogieUtils::getStructConstructorName(structDef),
+			params, ASTBoogieUtils::getStructType(structDef, DataLocation::Storage), nullptr,
+			attrs);
+	addDecl(funcDecl);
+	return funcDecl;
+}
+
 boogie::Expr::Ref BoogieContext::boogieBalance() const
 {
 	return boogie::Expr::id(m_boogieBalance->getName());

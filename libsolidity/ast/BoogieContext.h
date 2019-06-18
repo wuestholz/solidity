@@ -145,6 +145,8 @@ public:
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 
+	boogie::FuncDeclRef createStructConstructor(StructDefinition const* structDef);
+
 	boogie::Expr::Ref boogieBalance() const;
 	boogie::Expr::Ref boogieThis() const;
 	boogie::Expr::Ref boogieMsgSender() const;

@@ -233,7 +233,7 @@ Attr::Ref Attr::attr(std::string s, std::vector<Expr::Ref> const& vs)
 
 Attr::Ref Attr::attr(std::string s)
 {
-	return attr(s, {});
+	return attr(s, std::vector<Expr::Ref>());
 }
 
 Attr::Ref Attr::attr(std::string s, std::string v)

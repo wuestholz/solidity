@@ -634,43 +634,35 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
 	rememberScope(_node);
 
-	// First define memory/storage address types for the struct type
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
-	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Storage);
-	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructAddressType(&_node, DataLocation::Memory);
-	m_context.addDecl(structStorageType);
+	// Define types and constructor
+	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructType(&_node, DataLocation::Storage);
+	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructType(&_node, DataLocation::Memory);
 	m_context.addDecl(structMemType);
-
-	// Create mappings for each member (both memory and storage)
+	m_context.addDecl(structStorageType);
+	m_context.createStructConstructor(&_node);
+	// Create mappings for each member (only for memory structs)
 	for (auto member : _node.members())
 	{
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
-		auto memberType = member->type();
-		boogie::TypeDeclRef memberTypeForMem, memberTypeForStor;
-		// Nested structures need separate types for the memory/storage member
+		boogie::TypeDeclRef memberType = nullptr;
+		// Nested structures
 		if (member->type()->category() == Type::Category::Struct)
 		{
-			auto structTp = dynamic_cast<StructType const*>(memberType);
-			memberTypeForMem = ASTBoogieUtils::getStructAddressType(&structTp->structDefinition(), DataLocation::Memory);
-			memberTypeForStor = ASTBoogieUtils::getStructAddressType(&structTp->structDefinition(), DataLocation::Storage);
+			auto structTp = dynamic_cast<StructType const*>(member->type());
+			memberType = ASTBoogieUtils::getStructType(&structTp->structDefinition(), DataLocation::Memory);
 		}
-		else // Other types are the same for both memory/storage
+		else // Other types
 		{
-			memberTypeForMem = memberTypeForStor = ASTBoogieUtils::toBoogieType(member->type(), member.get(), m_context);
+			memberType = ASTBoogieUtils::toBoogieType(member->type(), member.get(), m_context);
 		}
 		// TODO: arrays?
 
-		// Storage member
-		auto varDeclStor = boogie::Decl::variable(m_context.mapStructMemberName(*member, DataLocation::Storage),
-				ASTBoogieUtils::mappingType(structStorageType, memberTypeForStor));
-		varDeclStor->addAttrs(attrs);
-		m_context.addDecl(varDeclStor);
-
 		// Memory member
-		auto varDeclMem = boogie::Decl::variable(m_context.mapStructMemberName(*member, DataLocation::Memory),
-				ASTBoogieUtils::mappingType(structMemType, memberTypeForMem));
-		varDeclMem->addAttrs(attrs);
-		m_context.addDecl(varDeclMem);
+		auto memberDecl = boogie::Decl::variable(m_context.mapStructMemberName(*member, DataLocation::Memory),
+				ASTBoogieUtils::mappingType(structMemType, memberType));
+		memberDecl->addAttrs(attrs);
+		m_context.addDecl(memberDecl);
 	}
 
 	return false;
@@ -929,12 +921,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	rememberScope(_node);
 
 	// Non-state variables should be handled in the VariableDeclarationStatement
-	if (!_node.isStateVariable())
-	{
-		BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-				errinfo_comment("Non-state variable appearing in VariableDeclaration") <<
-				errinfo_sourceLocation(_node.location()));
-	}
+	solAssert(!_node.isStateVariable(), "Non-state variable appearing in VariableDeclaration");
 
 	// Constants are inlined
 	if (_node.isConstant())

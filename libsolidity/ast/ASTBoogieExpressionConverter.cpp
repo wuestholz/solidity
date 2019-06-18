@@ -926,7 +926,7 @@ Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* struct
 	// Address of the new struct
 	// TODO: make sure that it is a new address
 	string varName = "new_struct_" + structDef->name() + "#" + id;
-	TypeDeclRef varType = ASTBoogieUtils::getStructAddressType(structDef, DataLocation::Memory);
+	TypeDeclRef varType = ASTBoogieUtils::getStructType(structDef, DataLocation::Memory);
 	auto varDecl = bg::Decl::variable(varName, varType);
 	m_newDecls.push_back(varDecl);
 	return varDecl;
