@@ -102,4 +102,10 @@ contract OverflowSimple {
             i = i + 1;
         } // Overflow in loop
     }
+
+     function arrayLength(uint[] memory arr) public pure {
+        for (uint i = 0; i < arr.length; i++) {
+            // No overflow for i++
+        }
+    }
 }

@@ -16,5 +16,6 @@ Verifying OverflowSimple::loop_overflow: ERROR
 Verifying OverflowSimple::whileloop_no_overflow: OK
 Verifying OverflowSimple::whileloop_overflow: ERROR
  - Source test/solc-verify/OverflowSimple.sol, line 99, col 9: Invariant 'No overflow' might not be maintained by the loop
+Verifying OverflowSimple::arrayLength: OK
 Verifying OverflowSimple::[implicit_constructor]: OK
 Errors were found by the verifier.

@@ -1148,6 +1148,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (isArray && _node.memberName() == "length")
 	{
 		m_currentExpr = getArrayLength(expr, _node);
+		addTCC(m_currentExpr, tp_uint256);
 		return false;
 	}
 	// fixed size byte array length
