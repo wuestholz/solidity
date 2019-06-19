@@ -316,7 +316,7 @@ TypeDeclRef ASTBoogieUtils::getStructType(StructDefinition const* structDef, Dat
 string ASTBoogieUtils::getStructConstructorName(StructDefinition const* structDef)
 {
 	return structDef->name() + "#" + toString(structDef->id()) + "#constr";
- }
+}
 
 TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
 {
