@@ -311,11 +311,10 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 				m_currentExpr = lhsExpr;
 				return;
 			}
-			// LHS is storage --> deep copy
+			// LHS is storage --> deep copy by data types
 			else
 			{
-				deepCopyStruct(_node, &lhsStructType->structDefinition(), lhsExpr, rhsExpr,
-						lhsStructType->location(), rhsStructType->location());
+				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
 				m_currentExpr = lhsExpr;
 				return;
 			}
