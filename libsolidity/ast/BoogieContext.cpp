@@ -212,20 +212,55 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 
 boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition const* structDef)
 {
-	vector<boogie::Binding> params;
+	if (m_storStructConstrs.find(structDef) == m_storStructConstrs.end())
+	{
+		vector<boogie::Binding> params;
 
-	for (auto member : structDef->members())
-		params.push_back({
-			boogie::Expr::id(mapDeclName(*member)),
-			ASTBoogieUtils::toBoogieType(member->annotation().type, structDef, *this)});
+		for (auto member : structDef->members())
+			params.push_back({
+				boogie::Expr::id(mapDeclName(*member)),
+				ASTBoogieUtils::toBoogieType(member->annotation().type, structDef, *this)});
 
-	vector<boogie::Attr::Ref> attrs;
-	attrs.push_back(boogie::Attr::attr("constructor"));
-	auto funcDecl = boogie::Decl::function(ASTBoogieUtils::getStructConstructorName(structDef),
-			params, ASTBoogieUtils::getStructType(structDef, DataLocation::Storage, *this), nullptr,
-			attrs);
-	addDecl(funcDecl);
-	return funcDecl;
+		vector<boogie::Attr::Ref> attrs;
+		attrs.push_back(boogie::Attr::attr("constructor"));
+		string name = structDef->name() + "#" + toString(structDef->id()) + "#constr";
+		m_storStructConstrs[structDef] = boogie::Decl::function(name, params,
+				getStructType(structDef, DataLocation::Storage), nullptr, attrs);
+		addDecl(m_storStructConstrs[structDef]);
+	}
+	return m_storStructConstrs[structDef];
+}
+
+boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, DataLocation loc)
+{
+	string typeName = "struct_" + ASTBoogieUtils::dataLocToStr(loc) +
+			"_" + structDef->name() + "#" + toString(structDef->id());
+
+	if (loc == DataLocation::Storage)
+	{
+		if (m_storStructTypes.find(structDef) == m_storStructTypes.end())
+		{
+			vector<boogie::TypeDeclRef> members;
+			for (auto member : structDef->members())
+				members.push_back({ASTBoogieUtils::toBoogieType(member->type(), structDef, *this)});
+			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
+			addDecl(m_storStructTypes[structDef]);
+			createStructConstructor(structDef);
+		}
+		return m_storStructTypes[structDef];
+	}
+	if (loc == DataLocation::Memory)
+	{
+		if (m_memStructTypes.find(structDef) == m_memStructTypes.end())
+		{
+			m_memStructTypes[structDef] = boogie::Decl::typee("address_" + typeName);
+			addDecl(m_memStructTypes[structDef]);
+		}
+		return m_memStructTypes[structDef];
+	}
+
+	solAssert(false, "Unsupported data location for structs");
+	return nullptr;
 }
 
 boogie::Expr::Ref BoogieContext::boogieBalance() const

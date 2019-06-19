@@ -63,6 +63,9 @@ private:
 	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
 	boogie::Decl::Ref m_boogieBalance;
 	boogie::Decl::Ref m_boogieThis;
+	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
+	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
+	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
 
 	Encoding m_encoding;
 	bool m_overflow;
@@ -146,6 +149,7 @@ public:
 	boogie::TypeDeclRef intType(unsigned size) const;
 
 	boogie::FuncDeclRef createStructConstructor(StructDefinition const* structDef);
+	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
 
 	boogie::Expr::Ref boogieBalance() const;
 	boogie::Expr::Ref boogieThis() const;

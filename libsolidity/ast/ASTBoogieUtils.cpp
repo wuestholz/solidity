@@ -299,30 +299,6 @@ string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
 }
 
-TypeDeclRef ASTBoogieUtils::getStructType(StructDefinition const* structDef, DataLocation loc, BoogieContext& context)
-{
-	string typeName = "struct_" + dataLocToStr(loc) +
-			"_" + structDef->name() + "#" + toString(structDef->id());
-
-	if (loc == DataLocation::Storage)
-	{
-		vector<TypeDeclRef> members;
-		for (auto member : structDef->members())
-			members.push_back({toBoogieType(member->type(), structDef, context)});
-		return Decl::datatype(typeName, members);
-	}
-	if (loc == DataLocation::Memory)
-		return Decl::typee("address_" + typeName);
-
-	solAssert(false, "Unsupported data location for structs");
-	return nullptr;
-}
-
-string ASTBoogieUtils::getStructConstructorName(StructDefinition const* structDef)
-{
-	return structDef->name() + "#" + toString(structDef->id()) + "#constr";
-}
-
 TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
 {
 	Type::Category tpCategory = tp->category();
@@ -377,7 +353,7 @@ TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associa
 	case Type::Category::Struct:
 	{
 		auto structTp = dynamic_cast<StructType const*>(tp);
-		return getStructType(&structTp->structDefinition(), structTp->location(), context);
+		return context.getStructType(&structTp->structDefinition(), structTp->location());
 	}
 	case Type::Category::Enum:
 		return context.intType(256);

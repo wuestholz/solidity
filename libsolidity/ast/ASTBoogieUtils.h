@@ -91,18 +91,6 @@ public:
 	std::string getConstructorName(ContractDefinition const* contract);
 
 	/**
-	 * Get address type for a struct with a given data location
-	 */
-	static
-	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc, BoogieContext& context);
-
-	/*
-	 * Get name for the constructor of a given struct
-	 */
-	static
-	std::string getStructConstructorName(StructDefinition const* structDef);
-
-	/**
 	 * Map a Solidity type to a Boogie type
 	 */
 	static

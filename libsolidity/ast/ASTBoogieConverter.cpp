@@ -635,30 +635,23 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 	rememberScope(_node);
 
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
-	// Define types and constructor
-	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructType(&_node, DataLocation::Storage, m_context);
-	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructType(&_node, DataLocation::Memory, m_context);
-	m_context.addDecl(structMemType);
-	m_context.addDecl(structStorageType);
-	m_context.createStructConstructor(&_node);
+	// Define type for memory
+	boogie::TypeDeclRef structMemType = m_context.getStructType(&_node, DataLocation::Memory);
 	// Create mappings for each member (only for memory structs)
 	for (auto member : _node.members())
 	{
-		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
 		boogie::TypeDeclRef memberType = nullptr;
 		// Nested structures
 		if (member->type()->category() == Type::Category::Struct)
 		{
 			auto structTp = dynamic_cast<StructType const*>(member->type());
-			memberType = ASTBoogieUtils::getStructType(&structTp->structDefinition(), DataLocation::Memory, m_context);
+			memberType = m_context.getStructType(&structTp->structDefinition(), DataLocation::Memory);
 		}
 		else // Other types
-		{
 			memberType = ASTBoogieUtils::toBoogieType(member->type(), member.get(), m_context);
-		}
-		// TODO: arrays?
+		// TODO: array members?
 
-		// Memory member
+		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
 		auto memberDecl = boogie::Decl::variable(m_context.mapStructMemberName(*member, DataLocation::Memory),
 				ASTBoogieUtils::mappingType(structMemType, memberType));
 		memberDecl->addAttrs(attrs);
