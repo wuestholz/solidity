@@ -94,7 +94,7 @@ public:
 	 * Get address type for a struct with a given data location
 	 */
 	static
-	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
+	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc, BoogieContext& context);
 
 	/*
 	 * Get name for the constructor of a given struct

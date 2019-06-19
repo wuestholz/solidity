@@ -482,6 +482,8 @@ public:
 
 	static TypeDeclRef typee(std::string name, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
+	static TypeDeclRef datatype(std::string name, std::vector<TypeDeclRef> members = {}, std::string type = "",
+		std::vector<Attr::Ref> const& attrs = {});
 	static Ref axiom(Expr::Ref e, std::string name = "");
 	static FuncDeclRef function(
 		std::string name,
@@ -504,12 +506,21 @@ public:
 };
 
 class TypeDecl : public Decl {
+protected:
 	std::string alias;
 public:
 	TypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax)
 		: Decl(TYPE, n, ax), alias(t) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == TYPE; }
+};
+
+class DataTypeDecl : public TypeDecl {
+	std::vector<TypeDeclRef> members;
+public:
+	DataTypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, std::vector<TypeDeclRef> members)
+		: TypeDecl(n, t, ax), members(members) { attrs.push_back(Attr::attr("datatype")); }
+	void print(std::ostream& os) const override;
 };
 
 class AxiomDecl : public Decl {

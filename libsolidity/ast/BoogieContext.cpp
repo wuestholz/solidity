@@ -222,7 +222,7 @@ boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition cons
 	vector<boogie::Attr::Ref> attrs;
 	attrs.push_back(boogie::Attr::attr("constructor"));
 	auto funcDecl = boogie::Decl::function(ASTBoogieUtils::getStructConstructorName(structDef),
-			params, ASTBoogieUtils::getStructType(structDef, DataLocation::Storage), nullptr,
+			params, ASTBoogieUtils::getStructType(structDef, DataLocation::Storage, *this), nullptr,
 			attrs);
 	addDecl(funcDecl);
 	return funcDecl;

@@ -636,8 +636,8 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
 	// Define types and constructor
-	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructType(&_node, DataLocation::Storage);
-	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructType(&_node, DataLocation::Memory);
+	boogie::TypeDeclRef structStorageType = ASTBoogieUtils::getStructType(&_node, DataLocation::Storage, m_context);
+	boogie::TypeDeclRef structMemType = ASTBoogieUtils::getStructType(&_node, DataLocation::Memory, m_context);
 	m_context.addDecl(structMemType);
 	m_context.addDecl(structStorageType);
 	m_context.createStructConstructor(&_node);
@@ -650,7 +650,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		if (member->type()->category() == Type::Category::Struct)
 		{
 			auto structTp = dynamic_cast<StructType const*>(member->type());
-			memberType = ASTBoogieUtils::getStructType(&structTp->structDefinition(), DataLocation::Memory);
+			memberType = ASTBoogieUtils::getStructType(&structTp->structDefinition(), DataLocation::Memory, m_context);
 		}
 		else // Other types
 		{
@@ -921,7 +921,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	rememberScope(_node);
 
 	// Non-state variables should be handled in the VariableDeclarationStatement
-	solAssert(!_node.isStateVariable(), "Non-state variable appearing in VariableDeclaration");
+	solAssert(_node.isStateVariable(), "Non-state variable appearing in VariableDeclaration");
 
 	// Constants are inlined
 	if (_node.isConstant())

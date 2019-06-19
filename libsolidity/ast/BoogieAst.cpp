@@ -357,6 +357,12 @@ TypeDeclRef Decl::typee(std::string name, std::string type, std::vector<Attr::Re
 	return std::make_shared<TypeDecl>(name,type,attrs);
 }
 
+TypeDeclRef Decl::datatype(std::string name, std::vector<TypeDeclRef> members,
+		std::string type, std::vector<Attr::Ref> const& attrs)
+{
+	return std::make_shared<DataTypeDecl>(name, type, attrs, members);
+}
+
 Decl::Ref Decl::axiom(Expr::Ref e, std::string name)
 {
 	return std::make_shared<AxiomDecl>(name, e);
@@ -816,6 +822,17 @@ void LabelStmt::print(std::ostream& os) const
 }
 
 void TypeDecl::print(std::ostream& os) const
+{
+	os << "type ";
+	if (attrs.size() > 0)
+		print_seq(os, attrs, "", " ", " ");
+	os << name;
+	if (alias != "")
+		os << " = " << alias;
+	os << ";";
+}
+
+void DataTypeDecl::print(std::ostream& os) const
 {
 	os << "type ";
 	if (attrs.size() > 0)
