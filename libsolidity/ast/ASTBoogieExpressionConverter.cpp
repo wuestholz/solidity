@@ -1219,8 +1219,22 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (typeCategory == Type::Category::Struct)
 	{
 		auto structType = dynamic_cast<StructType const*>(type);
-		m_currentExpr = Expr::id(m_context.mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
-		m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
+		if (structType->location() == DataLocation::Memory)
+		{
+			m_currentExpr = Expr::id(m_context.mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
+			m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
+		}
+		else if (structType->location() == DataLocation::Storage)
+		{
+			m_currentExpr = Expr::dtsel(m_currentAddress,
+					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
+					m_context.createStructConstructor(&structType->structDefinition()));
+		}
+		else
+		{
+			m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
+		}
+		return false;
 	}
 
 	return false;

@@ -211,6 +211,16 @@ Expr::Ref Expr::upd(Ref b, std::vector<Ref> const& i, Ref v)
 	return std::make_shared<UpdExpr const>(b, i, v);
 }
 
+Expr::Ref Expr::dtsel(Ref b, std::string mem, FuncDeclRef constr)
+{
+	return std::make_shared<DtSelExpr>(b, mem, constr);
+}
+
+Expr::Ref Expr::dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr)
+{
+	return std::make_shared<DtUpdExpr>(b, mem, v, constr);
+}
+
 Expr::Ref Expr::if_then_else(Ref c, Ref t, Ref e)
 {
 	return std::make_shared<IfThenElseExpr const>(c, t, e);
@@ -841,6 +851,19 @@ void DataTypeDecl::print(std::ostream& os) const
 	if (alias != "")
 		os << " = " << alias;
 	os << ";";
+}
+
+void DtSelExpr::print(std::ostream& os) const
+{
+	os << member << "#" << constr->getName();
+	os << "(";
+	base->print(os);
+	os << ")";
+}
+
+void DtUpdExpr::print(std::ostream& os) const
+{
+	os << "NOT IMPLEMENTED";
 }
 
 void AxiomDecl::print(std::ostream& os) const
