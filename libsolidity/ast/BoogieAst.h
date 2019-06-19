@@ -24,6 +24,8 @@ class ProcDecl;
 using ProcDeclRef = std::shared_ptr<ProcDecl>;
 class FuncDecl;
 using FuncDeclRef = std::shared_ptr<FuncDecl>;
+class DataTypeDecl;
+using DataTypeDeclRef = std::shared_ptr<DataTypeDecl>;
 
 class Expr
 {
@@ -75,8 +77,8 @@ public:
 	static Ref sel(Ref a, std::vector<Ref> const& i);
 	static Ref upd(Ref b, Ref i, Ref v);
 	static Ref upd(Ref a, std::vector<Ref> const& i, Ref v);
-	static Ref dtsel(Ref b, std::string mem, FuncDeclRef constr);
-	static Ref dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr);
+	static Ref dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt);
+	static Ref dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref if_then_else(Ref c, Ref t, Ref e);
 	static Ref old(Ref expr);
 	static Ref tuple(std::vector<Ref> const& e);
@@ -484,7 +486,7 @@ public:
 
 	static TypeDeclRef typee(std::string name, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
-	static TypeDeclRef datatype(std::string name, std::vector<TypeDeclRef> members = {}, std::string type = "",
+	static TypeDeclRef datatype(std::string name, std::vector<Binding> members = {}, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
 	static Ref axiom(Expr::Ref e, std::string name = "");
 	static FuncDeclRef function(
@@ -518,10 +520,11 @@ public:
 };
 
 class DataTypeDecl : public TypeDecl {
-	std::vector<TypeDeclRef> members;
+	std::vector<Binding> members;
 public:
-	DataTypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, std::vector<TypeDeclRef> members)
+	DataTypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, std::vector<Binding> members)
 		: TypeDecl(n, t, ax), members(members) { attrs.push_back(Attr::attr("datatype")); }
+	std::vector<Binding> getMembers() const { return members; }
 	void print(std::ostream& os) const override;
 };
 
@@ -529,12 +532,14 @@ class DtSelExpr : public Expr {
 	Ref base;
 	std::string member;
 	FuncDeclRef constr;
+	DataTypeDeclRef dt;
 public:
-	DtSelExpr(Ref base, std::string member, FuncDeclRef constr)
-		: base(base), member(member), constr(constr) {}
+	DtSelExpr(Ref base, std::string member, FuncDeclRef constr, DataTypeDeclRef dt)
+		: base(base), member(member), constr(constr), dt(dt) {}
 	Ref getBase() const { return base; }
 	std::string getMember() const { return member; }
 	FuncDeclRef getConstr() const { return constr; }
+	DataTypeDeclRef getDataType() const { return dt; }
 	void print(std::ostream& os) const override;
 };
 
@@ -542,13 +547,15 @@ class DtUpdExpr : public Expr {
 	Ref base;
 	std::string member;
 	FuncDeclRef constr;
+	DataTypeDeclRef dt;
 	Ref value;
 public:
-	DtUpdExpr(Ref base, std::string member, Ref value, FuncDeclRef constr)
-		: base(base), member(member), constr(constr), value(value) {}
+	DtUpdExpr(Ref base, std::string member, Ref value, FuncDeclRef constr, DataTypeDeclRef dt)
+		: base(base), member(member), constr(constr), dt(dt), value(value) {}
 	Ref getBase() const { return base; }
 	std::string getMember() const { return member; }
 	FuncDeclRef getConstr() const { return constr; }
+	DataTypeDeclRef getDataType() const { return dt; }
 	Ref getValue() const { return value; }
 	void print(std::ostream& os) const override;
 };

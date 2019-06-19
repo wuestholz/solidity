@@ -211,14 +211,14 @@ Expr::Ref Expr::upd(Ref b, std::vector<Ref> const& i, Ref v)
 	return std::make_shared<UpdExpr const>(b, i, v);
 }
 
-Expr::Ref Expr::dtsel(Ref b, std::string mem, FuncDeclRef constr)
+Expr::Ref Expr::dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt)
 {
-	return std::make_shared<DtSelExpr>(b, mem, constr);
+	return std::make_shared<DtSelExpr>(b, mem, constr, dt);
 }
 
-Expr::Ref Expr::dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr)
+Expr::Ref Expr::dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTypeDeclRef dt)
 {
-	return std::make_shared<DtUpdExpr>(b, mem, v, constr);
+	return std::make_shared<DtUpdExpr>(b, mem, v, constr, dt);
 }
 
 Expr::Ref Expr::if_then_else(Ref c, Ref t, Ref e)
@@ -367,7 +367,7 @@ TypeDeclRef Decl::typee(std::string name, std::string type, std::vector<Attr::Re
 	return std::make_shared<TypeDecl>(name,type,attrs);
 }
 
-TypeDeclRef Decl::datatype(std::string name, std::vector<TypeDeclRef> members,
+TypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members,
 		std::string type, std::vector<Attr::Ref> const& attrs)
 {
 	return std::make_shared<DataTypeDecl>(name, type, attrs, members);
@@ -863,7 +863,21 @@ void DtSelExpr::print(std::ostream& os) const
 
 void DtUpdExpr::print(std::ostream& os) const
 {
-	os << "NOT IMPLEMENTED";
+	os << constr->getName();
+	os << "(";
+	for (size_t i = 0; i < dt->getMembers().size(); i++)
+	{
+		auto mem = dt->getMembers()[i];
+		std::string memberName = std::dynamic_pointer_cast<VarExpr const>(mem.id)->name();
+		if (memberName == member)
+			value->print(os);
+		else
+			Expr::dtsel(base, memberName, constr, dt)->print(os);
+
+		if (i < dt->getMembers().size() - 1)
+			os << ", ";
+	}
+	os << ")";
 }
 
 void AxiomDecl::print(std::ostream& os) const

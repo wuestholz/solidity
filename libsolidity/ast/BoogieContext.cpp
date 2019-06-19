@@ -240,9 +240,10 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 	{
 		if (m_storStructTypes.find(structDef) == m_storStructTypes.end())
 		{
-			vector<boogie::TypeDeclRef> members;
+			vector<boogie::Binding> members;
 			for (auto member : structDef->members())
-				members.push_back({ASTBoogieUtils::toBoogieType(member->type(), structDef, *this)});
+				members.push_back({boogie::Expr::id(mapDeclName(*member)),
+				ASTBoogieUtils::toBoogieType(member->type(), structDef, *this)});
 			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
 			createStructConstructor(structDef);

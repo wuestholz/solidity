@@ -233,7 +233,28 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	// If LHS is an indexer (arrays/maps), it needs to be transformed to an update
 	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs))
 	{
-		if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhs)))
+		auto upd = selectToUpdate(lhsSel, rhs);
+		if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd))
+		{
+			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			return;
+		}
+		if (auto lhsUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(upd))
+		{
+			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			return;
+		}
+	}
+	// If LHS is an data type member access (structs), it needs to be transformed to an update
+	if (auto lhsSel = dynamic_pointer_cast<bg::DtSelExpr const>(lhs))
+	{
+		auto upd = selectToUpdate(lhsSel, rhs);
+		if (auto lhsUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(upd))
+		{
+			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			return;
+		}
+		if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd))
 		{
 			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
@@ -364,12 +385,30 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 	}
 }
 
-Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(std::shared_ptr<bg::SelExpr const> sel, Expr::Ref value)
+Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(Expr::Ref sel, Expr::Ref value)
 {
-	if (auto base = dynamic_pointer_cast<bg::SelExpr const>(sel->getBase()))
-		return selectToUpdate(base, Expr::upd(base, sel->getIdxs(), value));
-	else
-		return Expr::upd(sel->getBase(), sel->getIdxs(), value);
+	if (auto arrSel = dynamic_pointer_cast<SelExpr const>(sel))
+	{
+		if (auto base = dynamic_pointer_cast<SelExpr const>(arrSel->getBase()))
+			return selectToUpdate(base, Expr::upd(base, arrSel->getIdxs(), value));
+		else if (auto base = dynamic_pointer_cast<DtSelExpr const>(arrSel->getBase()))
+			return selectToUpdate(base, Expr::upd(base, arrSel->getIdxs(), value));
+		else
+			return Expr::upd(arrSel->getBase(), arrSel->getIdxs(), value);
+	}
+
+	if (auto dtSel = dynamic_pointer_cast<DtSelExpr const>(sel))
+	{
+		if (auto base = dynamic_pointer_cast<DtSelExpr const>(dtSel->getBase()))
+			return selectToUpdate(base, Expr::dtupd(base, dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType()));
+		else if (auto base = dynamic_pointer_cast<SelExpr const>(dtSel->getBase()))
+			return selectToUpdate(base, Expr::dtupd(base, dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType()));
+		else
+			return Expr::dtupd(dtSel->getBase(), dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType());
+	}
+
+	solAssert(false, "Expected datatype/array select");
+	return nullptr;
 }
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
@@ -1228,7 +1267,8 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		{
 			m_currentExpr = Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
-					m_context.createStructConstructor(&structType->structDefinition()));
+					m_context.createStructConstructor(&structType->structDefinition()),
+					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(&structType->structDefinition(), structType->location())));
 		}
 		else
 		{

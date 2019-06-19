@@ -109,7 +109,7 @@ public:
 
 	// Helper method to transform a select to an update
 	static
-	boogie::Expr::Ref selectToUpdate(std::shared_ptr<boogie::SelExpr const> sel, boogie::Expr::Ref value);
+	boogie::Expr::Ref selectToUpdate(boogie::Expr::Ref sel, boogie::Expr::Ref value);
 
 	// Only need to handle expressions
 	bool visit(Conditional const& _node) override;
