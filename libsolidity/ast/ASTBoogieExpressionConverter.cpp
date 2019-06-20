@@ -307,8 +307,8 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 			// LHS is local storage --> reference copy
 			if (lhsStructType->isPointer())
 			{
-				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
-				m_currentExpr = lhsExpr;
+				m_context.reportError(&_node, "Local storage pointers are not supported");
+				m_currentExpr = Expr::id(ASTBoogieUtils::ERR_EXPR);
 				return;
 			}
 			// LHS is storage --> deep copy by data types
@@ -346,12 +346,23 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 	// Loop through each member
 	for (auto member : structDef->members())
 	{
-		// Get the mapping for the member
-		Expr::Ref lhsMemberMapping = Expr::id(m_context.mapStructMemberName(*member, lhsLoc));
-		Expr::Ref rhsMemberMapping = Expr::id(m_context.mapStructMemberName(*member, rhsLoc));
-		// Select the lhs and rhs from the mapping
-		auto lhsSel = dynamic_pointer_cast<SelExpr const>(Expr::sel(lhsMemberMapping, lhsBase));
-		auto rhsSel = Expr::sel(rhsMemberMapping, rhsBase);
+		// Get expressions for accessing members
+		Expr::Ref lhsSel = nullptr;
+		if (lhsLoc == DataLocation::Storage)
+			lhsSel = Expr::dtsel(lhsBase, m_context.mapDeclName(*member),
+					m_context.createStructConstructor(structDef),
+					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, lhsLoc)));
+		else
+			lhsSel = Expr::sel(Expr::id(m_context.mapStructMemberName(*member, lhsLoc)), lhsBase);
+
+		Expr::Ref rhsSel = nullptr;
+		if (rhsLoc == DataLocation::Storage)
+			rhsSel = Expr::dtsel(rhsBase, m_context.mapDeclName(*member),
+					m_context.createStructConstructor(structDef),
+					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, rhsLoc)));
+		else
+			rhsSel = Expr::sel(Expr::id(m_context.mapStructMemberName(*member, rhsLoc)), rhsBase);
+
 
 		auto memberTypeCat = member->annotation().type->category();
 		// For nested structs do recursion
@@ -378,8 +389,10 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhsSel));
-			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
+				addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			else if (auto lhsDtUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
+				addSideEffect(Stmt::assign(lhsDtUpd->getBase(), lhsDtUpd));
 		}
 	}
 }

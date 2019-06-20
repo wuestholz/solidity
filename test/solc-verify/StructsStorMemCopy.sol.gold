@@ -1,0 +1,5 @@
+Verifying StructsStorMemCopy::storToMem: OK
+Verifying StructsStorMemCopy::memToStor: OK
+Verifying StructsStorMemCopy::: OK
+Verifying StructsStorMemCopy::[implicit_constructor]: OK
+No errors found.
