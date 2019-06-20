@@ -703,7 +703,35 @@ void IRGeneratorForStatements::endVisit(MemberAccess const& _memberAccess)
 	}
 	case Type::Category::Array:
 	{
-		solUnimplementedAssert(false, "");
+		auto const& type = dynamic_cast<ArrayType const&>(*_memberAccess.expression().annotation().type);
+
+		solAssert(member == "length", "");
+
+		if (!type.isDynamicallySized())
+			defineExpression(_memberAccess) << type.length() << "\n";
+		else
+			switch (type.location())
+			{
+			case DataLocation::CallData:
+				solUnimplementedAssert(false, "");
+				//m_context << Instruction::SWAP1 << Instruction::POP;
+				break;
+			case DataLocation::Storage:
+				setLValue(_memberAccess, make_unique<IRStorageArrayLength>(
+					m_context,
+					m_context.variable(_memberAccess.expression()),
+					*_memberAccess.annotation().type,
+					type
+				));
+
+				break;
+			case DataLocation::Memory:
+				solUnimplementedAssert(false, "");
+				//m_context << Instruction::MLOAD;
+				break;
+			}
+
+		break;
 	}
 	case Type::Category::FixedBytes:
 	{
@@ -1098,18 +1126,28 @@ string IRGeneratorForStatements::binaryOperation(
 	if (IntegerType const* type = dynamic_cast<IntegerType const*>(&_type))
 	{
 		string fun;
-		// TODO: Only division is implemented for signed integers for now.
-		if (!type->isSigned())
+		// TODO: Implement all operations for signed and unsigned types.
+		switch (_operator)
 		{
-			if (_operator == Token::Add)
-				fun = m_utils.overflowCheckedUIntAddFunction(type->numBits());
-			else if (_operator == Token::Sub)
-				fun = m_utils.overflowCheckedUIntSubFunction();
-			else if (_operator == Token::Mul)
-				fun = m_utils.overflowCheckedUIntMulFunction(type->numBits());
+			case Token::Add:
+				fun = m_utils.overflowCheckedIntAddFunction(*type);
+				break;
+			case Token::Sub:
+				fun = m_utils.overflowCheckedIntSubFunction(*type);
+				break;
+			case Token::Mul:
+				fun = m_utils.overflowCheckedIntMulFunction(*type);
+				break;
+			case Token::Div:
+				fun = m_utils.overflowCheckedIntDivFunction(*type);
+				break;
+			case Token::Mod:
+				fun = m_utils.checkedIntModFunction(*type);
+				break;
+			default:
+				break;
 		}
-		if (_operator == Token::Div)
-			fun = m_utils.overflowCheckedIntDivFunction(*type);
+
 		solUnimplementedAssert(!fun.empty(), "");
 		return fun + "(" + _left + ", " + _right + ")\n";
 	}

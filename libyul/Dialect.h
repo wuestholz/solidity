@@ -25,6 +25,7 @@
 #include <boost/noncopyable.hpp>
 
 #include <vector>
+#include <set>
 
 namespace yul
 {
@@ -65,6 +66,11 @@ struct Dialect: boost::noncopyable
 	AsmFlavour const flavour = AsmFlavour::Loose;
 	/// @returns the builtin function of the given name or a nullptr if it is not a builtin function.
 	virtual BuiltinFunction const* builtin(YulString /*_name*/) const { return nullptr; }
+
+	virtual BuiltinFunction const* discardFunction() const { return nullptr; }
+	virtual BuiltinFunction const* equalityFunction() const { return nullptr; }
+
+	virtual std::set<YulString> fixedFunctionNames() const { return {}; }
 
 	Dialect(AsmFlavour _flavour): flavour(_flavour) {}
 	virtual ~Dialect() = default;

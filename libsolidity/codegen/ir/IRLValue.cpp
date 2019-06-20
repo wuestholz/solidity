@@ -54,8 +54,8 @@ string IRLocalVariable::setToZero() const
 IRStorageItem::IRStorageItem(
 	IRGenerationContext& _context,
 	VariableDeclaration const& _varDecl
-)
-:IRStorageItem(
+):
+	IRStorageItem(
 	_context,
 	*_varDecl.annotation().type,
 	_context.storageLocationOfVariable(_varDecl)
@@ -66,8 +66,8 @@ IRStorageItem::IRStorageItem(
 	IRGenerationContext& _context,
 	Type const& _type,
 	std::pair<u256, unsigned> slot_offset
-)
-:	IRLValue(_context, &_type),
+):
+	IRLValue(_context, &_type),
 	m_slot(toCompactHexWithPrefix(slot_offset.first)),
 	m_offset(slot_offset.second)
 {
@@ -94,7 +94,7 @@ string IRStorageItem::retrieveValue() const
 	solUnimplementedAssert(m_type->category() != Type::Category::Function, "");
 	if (m_offset.type() == typeid(string))
 		return
-			m_context.utils().dynamicReadFromStorage(*m_type, false) +
+			m_context.utils().readFromStorageDynamic(*m_type, false) +
 			"(" +
 			m_slot +
 			", " +
@@ -136,4 +136,32 @@ string IRStorageItem::storeValue(string const& _value, Type const& _sourceType) 
 string IRStorageItem::setToZero() const
 {
 	solUnimplemented("Delete for storage location not yet implemented");
+}
+
+IRStorageArrayLength::IRStorageArrayLength(IRGenerationContext& _context, string _slot, Type const& _type, ArrayType const& _arrayType):
+	IRLValue(_context, &_type), m_arrayType(_arrayType), m_slot(move(_slot))
+{
+	solAssert(*m_type == *TypeProvider::uint256(), "Must be uint256!");
+}
+
+string IRStorageArrayLength::retrieveValue() const
+{
+	return m_context.utils().arrayLengthFunction(m_arrayType) + "(" + m_slot + ")\n";
+}
+
+string IRStorageArrayLength::storeValue(std::string const& _value, Type const& _type) const
+{
+	solAssert(_type == *m_type, "Different type, but might not be an error.");
+
+	return m_context.utils().resizeDynamicArrayFunction(m_arrayType) +
+		"(" +
+		m_slot +
+		", " +
+		_value +
+		")\n";
+}
+
+string IRStorageArrayLength::setToZero() const
+{
+	return storeValue("0", *TypeProvider::uint256());
 }
