@@ -186,29 +186,24 @@ Expr::Ref Expr::neg(Ref e)
 	return std::make_shared<NegExpr const>(e);
 }
 
-Expr::Ref Expr::sel(Ref b, Ref i)
+Expr::Ref Expr::arrsel(Ref b, Ref i)
 {
-	return std::make_shared<SelExpr const>(b, i);
+	return std::make_shared<ArrSelExpr const>(b, i);
 }
 
-Expr::Ref Expr::sel(std::string b, std::string i)
+Expr::Ref Expr::arrsel(Ref b, std::vector<Ref> const& i)
 {
-	return std::make_shared<SelExpr const>(id(b), id(i));
+	return std::make_shared<ArrSelExpr const>(b, i);
 }
 
-Expr::Ref Expr::sel(Ref b, std::vector<Ref> const& i)
+Expr::Ref Expr::arrupd(Ref b, Ref i, Ref v)
 {
-	return std::make_shared<SelExpr const>(b, i);
+	return std::make_shared<ArrUpdExpr const>(b, i, v);
 }
 
-Expr::Ref Expr::upd(Ref b, Ref i, Ref v)
+Expr::Ref Expr::arrupd(Ref b, std::vector<Ref> const& i, Ref v)
 {
-	return std::make_shared<UpdExpr const>(b, i, v);
-}
-
-Expr::Ref Expr::upd(Ref b, std::vector<Ref> const& i, Ref v)
-{
-	return std::make_shared<UpdExpr const>(b, i, v);
+	return std::make_shared<ArrUpdExpr const>(b, i, v);
 }
 
 Expr::Ref Expr::dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt)
@@ -661,13 +656,13 @@ void QuantExpr::print(std::ostream& os) const
 	os << " :: " << expr << ")";
 }
 
-void SelExpr::print(std::ostream& os) const
+void ArrSelExpr::print(std::ostream& os) const
 {
 	os << base;
 	print_seq(os, idxs, "[", ", ", "]");
 }
 
-void UpdExpr::print(std::ostream& os) const
+void ArrUpdExpr::print(std::ostream& os) const
 {
 	os << base << "[";
 	print_seq(os, idxs, ", ");

@@ -72,11 +72,10 @@ public:
 	static Ref neq(Ref l, Ref r);
 	static Ref not_(Ref e);
 	static Ref neg(Ref e);
-	static Ref sel(Ref b, Ref i);
-	static Ref sel(std::string b, std::string i);
-	static Ref sel(Ref a, std::vector<Ref> const& i);
-	static Ref upd(Ref b, Ref i, Ref v);
-	static Ref upd(Ref a, std::vector<Ref> const& i, Ref v);
+	static Ref arrsel(Ref b, Ref i);
+	static Ref arrsel(Ref a, std::vector<Ref> const& i);
+	static Ref arrupd(Ref b, Ref i, Ref v);
+	static Ref arrupd(Ref a, std::vector<Ref> const& i, Ref v);
 	static Ref dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref if_then_else(Ref c, Ref t, Ref e);
@@ -201,26 +200,26 @@ public:
 	void print(std::ostream& os) const override;
 };
 
-class SelExpr : public Expr {
+class ArrSelExpr : public Expr {
 	Ref base;
 	std::vector<Ref> idxs;
 public:
-	SelExpr(Ref a, std::vector<Ref> const& i) : base(a), idxs(i) {}
-	SelExpr(Ref a, Ref i) : base(a), idxs(std::vector<Ref>(1, i)) {}
+	ArrSelExpr(Ref a, std::vector<Ref> const& i) : base(a), idxs(i) {}
+	ArrSelExpr(Ref a, Ref i) : base(a), idxs(std::vector<Ref>(1, i)) {}
 	Ref getBase() const { return base; }
 	std::vector<Ref> const& getIdxs() const { return idxs; }
 	void print(std::ostream& os) const override;
-	Ref toUpdate(Ref v) const { return Expr::upd(base, idxs, v); }
+	Ref toUpdate(Ref v) const { return Expr::arrupd(base, idxs, v); }
 };
 
-class UpdExpr : public Expr {
+class ArrUpdExpr : public Expr {
 	Ref base;
 	std::vector<Ref> idxs;
 	Ref val;
 public:
-	UpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
+	ArrUpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
 		: base(a), idxs(i), val(v) {}
-	UpdExpr(Ref a, Ref i, Ref v)
+	ArrUpdExpr(Ref a, Ref i, Ref v)
 		: base(a), idxs(std::vector<Ref>(1, i)), val(v) {}
 	Ref getBase() const { return base; }
 	void print(std::ostream& os) const override;

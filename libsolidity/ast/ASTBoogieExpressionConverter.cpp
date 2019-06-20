@@ -24,10 +24,10 @@ Expr::Ref ASTBoogieExpressionConverter::getArrayLength(Expr::Ref expr, ASTNode c
 	if (auto localArray = dynamic_pointer_cast<bg::VarExpr const>(expr))
 		return Expr::id(localArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
 	// Array is state variable
-	if (auto stateArray = dynamic_pointer_cast<bg::SelExpr const>(expr))
+	if (auto stateArray = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 		if (auto baseArray = dynamic_pointer_cast<bg::VarExpr const>(stateArray->getBase()))
 		{
-			return Expr::sel(
+			return Expr::arrsel(
 							Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
 							stateArray->getIdxs());
 		}
@@ -41,7 +41,7 @@ Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
 	if (auto sumBase = dynamic_cast<Identifier const*>(node))
 		if (auto sumBaseDecl = sumBase->annotation().referencedDeclaration)
 		{
-			return Expr::sel(
+			return Expr::arrsel(
 					Expr::id(m_context.mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
 					m_context.boogieThis());
 		}
@@ -205,7 +205,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
 				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
 
-				auto selExpr = Expr::sel(sumId, m_context.boogieThis());
+				auto selExpr = Expr::arrsel(sumId, m_context.boogieThis());
 				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub, selExpr, lhs, bits, isSigned);
 				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, subResult.expr, rhs, bits, isSigned);
 				if (m_context.overflow())
@@ -215,7 +215,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				}
 				addSideEffect(Stmt::assign(
 						sumId,
-						Expr::upd(sumId, m_context.boogieThis(), updResult.expr)));
+						Expr::arrupd(sumId, m_context.boogieThis(), updResult.expr)));
 
 			}
 		}
@@ -231,10 +231,10 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	}
 
 	// If LHS is an indexer (arrays/maps), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs))
+	if (auto lhsSel = dynamic_pointer_cast<bg::ArrSelExpr const>(lhs))
 	{
 		auto upd = selectToUpdate(lhsSel, rhs);
-		if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd))
+		if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(upd))
 		{
 			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
@@ -254,7 +254,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
 		}
-		if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd))
+		if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(upd))
 		{
 			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			return;
@@ -353,7 +353,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 					m_context.createStructConstructor(structDef),
 					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, lhsLoc)));
 		else
-			lhsSel = Expr::sel(Expr::id(m_context.mapStructMemberName(*member, lhsLoc)), lhsBase);
+			lhsSel = Expr::arrsel(Expr::id(m_context.mapStructMemberName(*member, lhsLoc)), lhsBase);
 
 		Expr::Ref rhsSel = nullptr;
 		if (rhsLoc == DataLocation::Storage)
@@ -361,7 +361,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 					m_context.createStructConstructor(structDef),
 					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, rhsLoc)));
 		else
-			rhsSel = Expr::sel(Expr::id(m_context.mapStructMemberName(*member, rhsLoc)), rhsBase);
+			rhsSel = Expr::arrsel(Expr::id(m_context.mapStructMemberName(*member, rhsLoc)), rhsBase);
 
 
 		auto memberTypeCat = member->annotation().type->category();
@@ -375,7 +375,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 				// Create new
 				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(_node.id()) + toString(member->id()));
 				// Update member to point to new
-				auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, Expr::id(varDecl->getName())));
+				auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(selectToUpdate(lhsSel, Expr::id(varDecl->getName())));
 				addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			}
 			// Do the deep copy
@@ -389,7 +389,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			if (auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
+			if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
 				addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 			else if (auto lhsDtUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
 				addSideEffect(Stmt::assign(lhsDtUpd->getBase(), lhsDtUpd));
@@ -399,9 +399,9 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 
 Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(Expr::Ref sel, Expr::Ref value)
 {
-	if (auto arrSel = dynamic_pointer_cast<SelExpr const>(sel))
+	if (auto arrSel = dynamic_pointer_cast<ArrSelExpr const>(sel))
 	{
-		if (auto base = dynamic_pointer_cast<SelExpr const>(arrSel->getBase()))
+		if (auto base = dynamic_pointer_cast<ArrSelExpr const>(arrSel->getBase()))
 			return selectToUpdate(base, arrSel->toUpdate(value));
 		else if (auto base = dynamic_pointer_cast<DtSelExpr const>(arrSel->getBase()))
 			return selectToUpdate(base, arrSel->toUpdate(value));
@@ -413,7 +413,7 @@ Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(Expr::Ref sel, Expr::Ref 
 	{
 		if (auto base = dynamic_pointer_cast<DtSelExpr const>(dtSel->getBase()))
 			return selectToUpdate(base, dtSel->toUpdate(value));
-		else if (auto base = dynamic_pointer_cast<SelExpr const>(dtSel->getBase()))
+		else if (auto base = dynamic_pointer_cast<ArrSelExpr const>(dtSel->getBase()))
 			return selectToUpdate(base, dtSel->toUpdate(value));
 		else
 			return dtSel->toUpdate(value);
@@ -860,7 +860,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// Getters are replaced with map access (instead of function call)
 		m_currentExpr = returnVars[0];
-		addSideEffect(Stmt::assign(returnVars[0], Expr::sel(Expr::id(funcName), m_currentAddress)));
+		addSideEffect(Stmt::assign(returnVars[0], Expr::arrsel(Expr::id(funcName), m_currentAddress)));
 	}
 	else
 	{
@@ -991,7 +991,7 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _no
 	for (size_t i = 0; i < structDef->members().size(); ++i)
 	{
 		auto member = bg::Expr::id(m_context.mapStructMemberName(*structDef->members()[i], DataLocation::Memory));
-		auto init = bg::Expr::upd(member, bg::Expr::id(varDecl->getName()), args[i]);
+		auto init = bg::Expr::arrupd(member, bg::Expr::id(varDecl->getName()), args[i]);
 		m_newStatements.push_back(bg::Stmt::assign(member, init));
 	}
 	// Return the address
@@ -1002,13 +1002,13 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 {
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	// assert(balance[this] >= msg.value)
-	auto selExpr = Expr::sel(m_context.boogieBalance(), m_context.boogieThis());
+	auto selExpr = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
 	auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr,
 			langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
 	addSideEffect(Stmt::comment("Implicit assumption that we have enough ether"));
 	addSideEffect(Stmt::assume(geqResult.expr));
 	// balance[this] -= msg.value
-	Expr::Ref this_balance = Expr::sel(m_context.boogieBalance(),
+	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance(),
 			m_context.boogieThis());
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -1024,7 +1024,7 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 	}
 	addSideEffect(
 			Stmt::assign(m_context.boogieBalance(),
-					Expr::upd(m_context.boogieBalance(),
+					Expr::arrupd(m_context.boogieBalance(),
 							m_context.boogieThis(), subResult.expr)));
 }
 
@@ -1033,7 +1033,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	bg::Block::Ref revert = bg::Block::block();
 	// balance[this] += msg.value
-	Expr::Ref this_balance = Expr::sel(m_context.boogieBalance(), m_context.boogieThis());
+	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		revert->addStmts( { Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
@@ -1048,7 +1048,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	}
 	revert->addStmt(
 			Stmt::assign(m_context.boogieBalance(),
-					Expr::upd(m_context.boogieBalance(),
+					Expr::arrupd(m_context.boogieBalance(),
 							m_context.boogieThis(), addResult.expr)));
 	// Final statement for balance update in case of failure. Return value of call
 	// is always a tuple (ok, data).
@@ -1135,7 +1135,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		if (isAddress)
 		{
-			m_currentExpr = Expr::sel(m_context.boogieBalance(), expr);
+			m_currentExpr = Expr::arrsel(m_context.boogieBalance(), expr);
 			addTCC(m_currentExpr, tp_uint256);
 			return false;
 		}
@@ -1143,7 +1143,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		{
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
-				m_currentExpr = Expr::sel(m_context.boogieBalance(), m_context.boogieThis());
+				m_currentExpr = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
 				addTCC(m_currentExpr, tp_uint256);
 				return false;
 			}
@@ -1273,7 +1273,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		if (structType->location() == DataLocation::Memory)
 		{
 			m_currentExpr = Expr::id(m_context.mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
-			m_currentExpr = Expr::sel(m_currentExpr, m_currentAddress);
+			m_currentExpr = Expr::arrsel(m_currentExpr, m_currentAddress);
 		}
 		else if (structType->location() == DataLocation::Storage)
 		{
@@ -1342,7 +1342,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
 	// that case is handled when converting assignments
-	m_currentExpr = Expr::sel(baseExpr, indexExpr);
+	m_currentExpr = Expr::arrsel(baseExpr, indexExpr);
 	addTCC(m_currentExpr, _node.annotation().type);
 
 	return false;
@@ -1377,7 +1377,7 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 	// State variables must be referenced by accessing the map
 	if (ASTBoogieUtils::isStateVar(_node.annotation().referencedDeclaration))
-		m_currentExpr = Expr::sel(Expr::id(declName), m_context.boogieThis());
+		m_currentExpr = Expr::arrsel(Expr::id(declName), m_context.boogieThis());
 	// Other identifiers can be referenced by their name
 	else
 		m_currentExpr = Expr::id(declName);

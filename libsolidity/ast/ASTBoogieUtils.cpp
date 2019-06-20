@@ -71,8 +71,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref sender_bal = Expr::sel(context.boogieBalance(), context.boogieMsgSender());
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
+	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance(), context.boogieMsgSender());
 	Expr::Ref amount = Expr::id("amount");
 
 	// Precondition: there is enough ether to transfer
@@ -96,7 +96,7 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	}
 	transferImpl->addStmt(Stmt::assign(
 			context.boogieBalance(),
-			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -111,7 +111,7 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 	}
 	transferImpl->addStmt(Stmt::assign(
 			context.boogieBalance(),
-			Expr::upd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
+			Expr::arrupd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
 	transferImpl->addStmt(Stmt::comment("TODO: call fallback, exception handling"));
 
 	ProcDeclRef transfer = Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
@@ -152,7 +152,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
 	Expr::Ref msg_val = context.boogieMsgValue();
 	Expr::Ref result = Expr::id("__result");
 
@@ -174,7 +174,7 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	}
 	thenBlock->addStmt(Stmt::assign(
 			context.boogieBalance(),
-			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 	// Unsuccessful transfer
 	bg::Block::Ref elseBlock = bg::Block::block();
@@ -209,8 +209,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::sel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref sender_bal = Expr::sel(context.boogieBalance(), context.boogieMsgSender());
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
+	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance(), context.boogieMsgSender());
 	Expr::Ref amount = Expr::id("amount");
 	Expr::Ref result = Expr::id("__result");
 
@@ -232,7 +232,7 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	}
 	thenBlock->addStmt(Stmt::assign(
 			context.boogieBalance(),
-			Expr::upd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -251,7 +251,7 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	}
 	thenBlock->addStmt(Stmt::assign(
 			context.boogieBalance(),
-			Expr::upd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
+			Expr::arrupd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 
 	// Unsuccessful transfer

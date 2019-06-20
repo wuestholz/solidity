@@ -83,7 +83,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 				if (decl->type()->toString() == target)
 				{
 					if (ASTBoogieUtils::isStateVar(decl))
-						output.push_back(boogie::Expr::sel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()));
+						output.push_back(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()));
 					else
 						output.push_back(boogie::Expr::id(m_context.mapDeclName(*decl)));
 				}
@@ -127,9 +127,8 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	// If there just assign
 	if (value)
 	{
-		boogie::Stmt::Ref valueAssign = boogie::Stmt::assign(boogie::Expr::id(id), boogie::Expr::upd(
-				boogie::Expr::id(id),
-				m_context.boogieThis(), value));
+		boogie::Stmt::Ref valueAssign = boogie::Stmt::assign(boogie::Expr::id(id), boogie::Expr::arrupd(
+				boogie::Expr::id(id), m_context.boogieThis(), value));
 		output.push_back(valueAssign);
 		ok = true;
 	}
@@ -160,8 +159,8 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 					auto map_id = boogie::Expr::id(id);
 					auto this_i = m_context.boogieThis();
 					auto valueAssign = boogie::Stmt::assign(map_id,
-							boogie::Expr::upd(map_id, this_i,
-									boogie::Expr::upd(boogie::Expr::sel(map_id, this_i), index_id, value)));
+							boogie::Expr::arrupd(map_id, this_i,
+									boogie::Expr::arrupd(boogie::Expr::arrsel(map_id, this_i), index_id, value)));
 					output.push_back(valueAssign);
 				}
 				// Initialize the sum, if there, to default value
@@ -169,7 +168,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 				{
 					boogie::Expr::Ref sum = boogie::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
 					boogie::Stmt::Ref sum_default = boogie::Stmt::assign(sum,
-							boogie::Expr::upd(sum, m_context.boogieThis(), value));
+							boogie::Expr::arrupd(sum, m_context.boogieThis(), value));
 					output.push_back(sum_default);
 				}
 				ok = true;
@@ -198,7 +197,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	// this.balance = 0
 	block->addStmt(boogie::Stmt::assign(
 			m_context.boogieBalance(),
-			boogie::Expr::upd(
+			boogie::Expr::arrupd(
 					m_context.boogieBalance(),
 					m_context.boogieThis(),
 					defaultValue(tp_uint256))));
@@ -385,7 +384,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
 					{
 						varDecl = id->annotation().referencedDeclaration;
-						if (auto selExpr = dynamic_pointer_cast<boogie::SelExpr const>(target.expr))
+						if (auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(target.expr))
 							indexer = selExpr->getIdxs()[0];
 						else
 							solAssert(false, "Invalid indexer in modifies");
@@ -415,7 +414,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				if (varDecl->isConstant())
 					continue;
 				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
-				auto varThis = boogie::Expr::sel(varId, m_context.boogieThis());
+				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis());
 
 				if (varDecl->type()->category() == Type::Category::Struct)
 					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
@@ -427,9 +426,9 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				{
 					if (modSpec.idx)
 					{
-						auto selExpr = dynamic_pointer_cast<boogie::SelExpr const>(boogie::Expr::sel(expr, modSpec.idx));
+						auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(boogie::Expr::arrsel(expr, modSpec.idx));
 						auto writeExpr = ASTBoogieExpressionConverter::selectToUpdate(selExpr,
-								boogie::Expr::sel(varThis, modSpec.idx));
+								boogie::Expr::arrsel(varThis, modSpec.idx));
 						expr = boogie::Expr::if_then_else(modSpec.cond, writeExpr, expr);
 					}
 					else
@@ -747,7 +746,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		// this.balance = 0
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
 				m_context.boogieBalance(),
-				boogie::Expr::upd(
+				boogie::Expr::arrupd(
 						m_context.boogieBalance(),
 						m_context.boogieThis(),
 						defaultValue(tp_uint256))));
@@ -768,7 +767,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
-		boogie::Expr::Ref this_bal = boogie::Expr::sel(m_context.boogieBalance(), m_context.boogieThis());
+		boogie::Expr::Ref this_bal = boogie::Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
 		boogie::Expr::Ref msg_val = m_context.boogieMsgValue();
 		// balance[this] += msg.value
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
@@ -784,7 +783,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		}
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
 				m_context.boogieBalance(),
-					boogie::Expr::upd(m_context.boogieBalance(), m_context.boogieThis(), addResult.expr)));
+					boogie::Expr::arrupd(m_context.boogieBalance(), m_context.boogieThis(), addResult.expr)));
 	}
 
 	// Modifiers need to be inlined
@@ -937,7 +936,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 
 		m_currentBlocks.pop();
 		m_stateVarInitializers.push_back(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
-				boogie::Expr::upd(
+				boogie::Expr::arrupd(
 						boogie::Expr::id(m_context.mapDeclName(_node)),
 						m_context.boogieThis(),
 						initExpr)));
