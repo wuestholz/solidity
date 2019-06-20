@@ -230,35 +230,14 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 		return;
 	}
 
-	// If LHS is an indexer (arrays/maps), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::ArrSelExpr const>(lhs))
+	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
+	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs))
 	{
 		auto upd = selectToUpdate(lhsSel, rhs);
-		if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(upd))
-		{
-			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
-			return;
-		}
-		if (auto lhsUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(upd))
-		{
-			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
-			return;
-		}
-	}
-	// If LHS is an data type member access (structs), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::DtSelExpr const>(lhs))
-	{
-		auto upd = selectToUpdate(lhsSel, rhs);
-		if (auto lhsUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(upd))
-		{
-			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
-			return;
-		}
-		if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(upd))
-		{
-			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
-			return;
-		}
+		auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd);
+		solAssert(lhsUpd, "Update expression expected");
+		addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
+		return;
 	}
 
 	m_context.reportError(&originalLhs, "Unsupported assignment (LHS must be identifier/indexer)");
@@ -389,36 +368,22 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			if (auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
-				addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
-			else if (auto lhsDtUpd = dynamic_pointer_cast<bg::DtUpdExpr const>(selectToUpdate(lhsSel, rhsSel)))
-				addSideEffect(Stmt::assign(lhsDtUpd->getBase(), lhsDtUpd));
+			auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(lhsSel, rhsSel));
+			solAssert(lhsUpd, "Selector expression expected");
+			addSideEffect(Stmt::assign(lhsUpd->getBase(), lhsUpd));
 		}
 	}
 }
 
 Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(Expr::Ref sel, Expr::Ref value)
 {
-	if (auto arrSel = dynamic_pointer_cast<ArrSelExpr const>(sel))
+	if (auto selExpr = dynamic_pointer_cast<SelExpr const>(sel))
 	{
-		if (auto base = dynamic_pointer_cast<ArrSelExpr const>(arrSel->getBase()))
-			return selectToUpdate(base, arrSel->toUpdate(value));
-		else if (auto base = dynamic_pointer_cast<DtSelExpr const>(arrSel->getBase()))
-			return selectToUpdate(base, arrSel->toUpdate(value));
+		if (auto base = dynamic_pointer_cast<SelExpr const>(selExpr->getBase()))
+			return selectToUpdate(base, selExpr->toUpdate(value));
 		else
-			return arrSel->toUpdate(value);
+			return selExpr->toUpdate(value);
 	}
-
-	if (auto dtSel = dynamic_pointer_cast<DtSelExpr const>(sel))
-	{
-		if (auto base = dynamic_pointer_cast<DtSelExpr const>(dtSel->getBase()))
-			return selectToUpdate(base, dtSel->toUpdate(value));
-		else if (auto base = dynamic_pointer_cast<ArrSelExpr const>(dtSel->getBase()))
-			return selectToUpdate(base, dtSel->toUpdate(value));
-		else
-			return dtSel->toUpdate(value);
-	}
-
 	solAssert(false, "Expected datatype/array select");
 	return nullptr;
 }

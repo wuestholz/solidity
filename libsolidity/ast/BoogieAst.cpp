@@ -865,7 +865,7 @@ void DtUpdExpr::print(std::ostream& os) const
 		auto mem = dt->getMembers()[i];
 		std::string memberName = std::dynamic_pointer_cast<VarExpr const>(mem.id)->name();
 		if (memberName == member)
-			value->print(os);
+			val->print(os);
 		else
 			Expr::dtsel(base, memberName, constr, dt)->print(os);
 

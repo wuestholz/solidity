@@ -200,28 +200,41 @@ public:
 	void print(std::ostream& os) const override;
 };
 
-class ArrSelExpr : public Expr {
+class SelExpr : public Expr {
+protected:
 	Ref base;
-	std::vector<Ref> idxs;
 public:
-	ArrSelExpr(Ref a, std::vector<Ref> const& i) : base(a), idxs(i) {}
-	ArrSelExpr(Ref a, Ref i) : base(a), idxs(std::vector<Ref>(1, i)) {}
+	SelExpr(Ref base) : base(base) {}
 	Ref getBase() const { return base; }
-	std::vector<Ref> const& getIdxs() const { return idxs; }
-	void print(std::ostream& os) const override;
-	Ref toUpdate(Ref v) const { return Expr::arrupd(base, idxs, v); }
+	virtual Ref toUpdate(Ref v) const = 0;
 };
 
-class ArrUpdExpr : public Expr {
+class UpdExpr : public Expr {
+protected:
 	Ref base;
-	std::vector<Ref> idxs;
 	Ref val;
 public:
-	ArrUpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
-		: base(a), idxs(i), val(v) {}
-	ArrUpdExpr(Ref a, Ref i, Ref v)
-		: base(a), idxs(std::vector<Ref>(1, i)), val(v) {}
+	UpdExpr(Ref base, Ref val) : base(base), val(val) {}
 	Ref getBase() const { return base; }
+};
+
+class ArrSelExpr : public SelExpr {
+	std::vector<Ref> idxs;
+public:
+	ArrSelExpr(Ref a, std::vector<Ref> const& i) : SelExpr(a), idxs(i) {}
+	ArrSelExpr(Ref a, Ref i) : SelExpr(a), idxs(std::vector<Ref>(1, i)) {}
+	std::vector<Ref> const& getIdxs() const { return idxs; }
+	void print(std::ostream& os) const override;
+	Ref toUpdate(Ref v) const override { return Expr::arrupd(base, idxs, v); }
+};
+
+class ArrUpdExpr : public UpdExpr {
+	std::vector<Ref> idxs;
+public:
+	ArrUpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
+		: UpdExpr(a, v), idxs(i) {}
+	ArrUpdExpr(Ref a, Ref i, Ref v)
+		: UpdExpr(a, v), idxs(std::vector<Ref>(1, i)) {}
 	void print(std::ostream& os) const override;
 };
 
@@ -528,36 +541,31 @@ public:
 	void print(std::ostream& os) const override;
 };
 
-class DtSelExpr : public Expr {
-	Ref base;
+class DtSelExpr : public SelExpr {
 	std::string member;
 	FuncDeclRef constr;
 	DataTypeDeclRef dt;
 public:
 	DtSelExpr(Ref base, std::string member, FuncDeclRef constr, DataTypeDeclRef dt)
-		: base(base), member(member), constr(constr), dt(dt) {}
-	Ref getBase() const { return base; }
+		: SelExpr(base), member(member), constr(constr), dt(dt) {}
 	std::string getMember() const { return member; }
 	FuncDeclRef getConstr() const { return constr; }
 	DataTypeDeclRef getDataType() const { return dt; }
 	void print(std::ostream& os) const override;
-	Ref toUpdate(Ref v) const { return Expr::dtupd(base, member, v, constr, dt); }
+	Ref toUpdate(Ref v) const override { return Expr::dtupd(base, member, v, constr, dt); }
 };
 
-class DtUpdExpr : public Expr {
-	Ref base;
+class DtUpdExpr : public UpdExpr {
 	std::string member;
 	FuncDeclRef constr;
 	DataTypeDeclRef dt;
-	Ref value;
 public:
-	DtUpdExpr(Ref base, std::string member, Ref value, FuncDeclRef constr, DataTypeDeclRef dt)
-		: base(base), member(member), constr(constr), dt(dt), value(value) {}
+	DtUpdExpr(Ref base, std::string member, Ref v, FuncDeclRef constr, DataTypeDeclRef dt)
+		: UpdExpr(base, v), member(member), constr(constr), dt(dt) {}
 	Ref getBase() const { return base; }
 	std::string getMember() const { return member; }
 	FuncDeclRef getConstr() const { return constr; }
 	DataTypeDeclRef getDataType() const { return dt; }
-	Ref getValue() const { return value; }
 	void print(std::ostream& os) const override;
 };
 
