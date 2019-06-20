@@ -217,9 +217,16 @@ boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition cons
 		vector<boogie::Binding> params;
 
 		for (auto member : structDef->members())
+		{
+			// Make sure that the location of the member is storage (this is
+			// important for struct members as there is a single type per struct
+			// definition, which is storage pointer by default).
+			// TODO: can we do better?
+			TypePointer memberType = TypeProvider::withLocationIfReference(DataLocation::Storage, member->type());
 			params.push_back({
 				boogie::Expr::id(mapDeclName(*member)),
-				ASTBoogieUtils::toBoogieType(member->annotation().type, structDef, *this)});
+				ASTBoogieUtils::toBoogieType(memberType, structDef, *this)});
+		}
 
 		vector<boogie::Attr::Ref> attrs;
 		attrs.push_back(boogie::Attr::attr("constructor"));
@@ -242,8 +249,15 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 		{
 			vector<boogie::Binding> members;
 			for (auto member : structDef->members())
+			{
+				// Make sure that the location of the member is storage (this is
+				// important for struct members as there is a single type per struct
+				// definition, which is storage pointer by default).
+				// TODO: can we do better?
+				TypePointer memberType = TypeProvider::withLocationIfReference(loc, member->type());
 				members.push_back({boogie::Expr::id(mapDeclName(*member)),
-				ASTBoogieUtils::toBoogieType(member->type(), structDef, *this)});
+					ASTBoogieUtils::toBoogieType(memberType, structDef, *this)});
+			}
 			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
 			createStructConstructor(structDef);
