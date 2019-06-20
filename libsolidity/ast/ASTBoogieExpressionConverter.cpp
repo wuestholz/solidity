@@ -402,21 +402,21 @@ Expr::Ref ASTBoogieExpressionConverter::selectToUpdate(Expr::Ref sel, Expr::Ref 
 	if (auto arrSel = dynamic_pointer_cast<SelExpr const>(sel))
 	{
 		if (auto base = dynamic_pointer_cast<SelExpr const>(arrSel->getBase()))
-			return selectToUpdate(base, Expr::upd(base, arrSel->getIdxs(), value));
+			return selectToUpdate(base, arrSel->toUpdate(value));
 		else if (auto base = dynamic_pointer_cast<DtSelExpr const>(arrSel->getBase()))
-			return selectToUpdate(base, Expr::upd(base, arrSel->getIdxs(), value));
+			return selectToUpdate(base, arrSel->toUpdate(value));
 		else
-			return Expr::upd(arrSel->getBase(), arrSel->getIdxs(), value);
+			return arrSel->toUpdate(value);
 	}
 
 	if (auto dtSel = dynamic_pointer_cast<DtSelExpr const>(sel))
 	{
 		if (auto base = dynamic_pointer_cast<DtSelExpr const>(dtSel->getBase()))
-			return selectToUpdate(base, Expr::dtupd(base, dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType()));
+			return selectToUpdate(base, dtSel->toUpdate(value));
 		else if (auto base = dynamic_pointer_cast<SelExpr const>(dtSel->getBase()))
-			return selectToUpdate(base, Expr::dtupd(base, dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType()));
+			return selectToUpdate(base, dtSel->toUpdate(value));
 		else
-			return Expr::dtupd(dtSel->getBase(), dtSel->getMember(), value, dtSel->getConstr(), dtSel->getDataType());
+			return dtSel->toUpdate(value);
 	}
 
 	solAssert(false, "Expected datatype/array select");

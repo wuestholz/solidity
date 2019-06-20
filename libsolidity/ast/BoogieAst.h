@@ -210,6 +210,7 @@ public:
 	Ref getBase() const { return base; }
 	std::vector<Ref> const& getIdxs() const { return idxs; }
 	void print(std::ostream& os) const override;
+	Ref toUpdate(Ref v) const { return Expr::upd(base, idxs, v); }
 };
 
 class UpdExpr : public Expr {
@@ -541,6 +542,7 @@ public:
 	FuncDeclRef getConstr() const { return constr; }
 	DataTypeDeclRef getDataType() const { return dt; }
 	void print(std::ostream& os) const override;
+	Ref toUpdate(Ref v) const { return Expr::dtupd(base, member, v, constr, dt); }
 };
 
 class DtUpdExpr : public Expr {
