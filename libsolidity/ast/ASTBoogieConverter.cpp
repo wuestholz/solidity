@@ -108,13 +108,19 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 				}
 				else
 				{
-					// Structs: go through fields
+					// Structs: go through fields: TODO: memory structs, recursion
 					if (decl->type()->category() == Type::Category::Struct)
 					{
 						auto s = dynamic_cast<StructType const*>(decl->type());
 						for (auto const& s_member: s->members(nullptr))
 							if (s_member.declaration->type()->toString() == target)
-								output.push_back(boogie::Expr::id(m_context.mapDeclName(*s_member.declaration)));
+							{
+								if (ASTBoogieUtils::isStateVar(decl))
+									boogie::Expr::dtsel(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()),
+											m_context.mapDeclName(*s_member.declaration),
+											m_context.getStructConstructor(&s->structDefinition()),
+											dynamic_pointer_cast<boogie::DataTypeDecl>(m_context.getStructType(&s->structDefinition(), DataLocation::Storage)));
+							}
 					}
 					// Magic
 					if (decl->type()->category() == Type::Category::Magic)
