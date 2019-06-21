@@ -557,7 +557,7 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 		break;
 	}
 	default:
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
+		solAssert(false, "Unknown arithmetic encoding");
 	}
 
 	assert(result != nullptr);
@@ -629,7 +629,7 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 		break;
 
 	default:
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unknown encoding"));
+		solAssert(false, "Unknown arithmetic encoding");
 	}
 	assert(result != nullptr);
 	return ExprWithCC{result, ecc};
@@ -727,11 +727,7 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 			if (targetBits == exprBits && targetSigned == exprSigned)
 				return expr;
 			// Conversion to smaller type should have already been detected by the compiler
-			if (targetBits < exprBits)
-			{
-				BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion to smaller type"));
-				return nullptr;
-			}
+			solAssert (targetBits >= exprBits, "Implicit conversion to smaller type");
 
 			if (!exprSigned) // Unsigned can be converted to larger (signed or unsigned) with zero extension
 				return context.bvZeroExt(expr, exprBits, targetBits);
@@ -739,7 +735,7 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 				return context.bvSignExt(expr, exprBits, targetBits);
 			else // Signed to unsigned should have already been detected by the compiler
 			{
-				BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Implicit conversion from signed to unsigned"));
+				solAssert(false, "Implicit conversion from signed to unsigned");
 				return nullptr;
 			}
 		}

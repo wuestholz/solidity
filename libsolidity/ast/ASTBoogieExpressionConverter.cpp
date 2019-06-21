@@ -591,12 +591,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (exprMa->memberName() == "value")
 		{
 			// Process the argument
-			if (_node.arguments().size() != 1)
-			{
-				BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-								errinfo_comment("Call to the value function should have exactly one argument") <<
-								errinfo_sourceLocation(_node.location()));
-			}
+			solAssert(_node.arguments().size() == 1, "Call to the value function should have exactly one argument");
 			auto arg = *_node.arguments().begin();
 			arg->accept(*this);
 			m_currentMsgValue = m_currentExpr;
@@ -709,11 +704,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Assert is a separate statement in Boogie (instead of a function call)
 	if (funcName == ASTBoogieUtils::SOLIDITY_ASSERT)
 	{
-		if (_node.arguments().size() != 1)
-			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-							errinfo_comment("Assert should have exactly one argument") <<
-							errinfo_sourceLocation(_node.location()));
-
+		solAssert(_node.arguments().size() == 1, "Assert should have exactly one argument");
 		// Parameter of assert is the first (and only) normal argument
 		addSideEffect(Stmt::assert_(regularArgs[0], ASTBoogieUtils::createAttrs(_node.location(), "Assertion might not hold.", *m_context.currentScanner())));
 		return false;
@@ -722,11 +713,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Require is mapped to assume statement in Boogie (instead of a function call)
 	if (funcName == ASTBoogieUtils::SOLIDITY_REQUIRE)
 	{
-		if (2 < _node.arguments().size() || _node.arguments().size() < 1)
-			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-							errinfo_comment("Require should have one or two argument(s)") <<
-							errinfo_sourceLocation(_node.location()));
-
+		solAssert(1 <= _node.arguments().size() && _node.arguments().size() <=2, "Require should have one or two argument(s)");
 		// Parameter of assume is the first normal argument (second is optional message omitted in Boogie)
 		addSideEffect(Stmt::assume(regularArgs[0]));
 		return false;
@@ -736,11 +723,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Its argument is an optional message, omitted in Boogie
 	if (funcName == ASTBoogieUtils::SOLIDITY_REVERT)
 	{
-		if (_node.arguments().size() > 1)
-			BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-							errinfo_comment("Revert should have at most one argument") <<
-							errinfo_sourceLocation(_node.location()));
-
+		solAssert(_node.arguments().size() <= 1, "Revert should have at most one argument");
 		addSideEffect(Stmt::assume(Expr::lit(false)));
 		return false;
 	}
@@ -1352,9 +1335,9 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	return false;
 }
 
-bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _node)
+bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const&)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ElementaryTypeNameExpression") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: ElementaryTypeNameExpression");
 	return false;
 }
 
@@ -1405,9 +1388,9 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	return false;
 }
 
-bool ASTBoogieExpressionConverter::visitNode(ASTNode const& _node)
+bool ASTBoogieExpressionConverter::visitNode(ASTNode const&)
 {
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node (unknown)");
 	return true;
 }
 

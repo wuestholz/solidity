@@ -531,8 +531,6 @@ bool ASTBoogieConverter::visit(PragmaDirective const& _node)
 bool ASTBoogieConverter::visit(ImportDirective const& _node)
 {
 	rememberScope(_node);
-
-//	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ImportDirective") << errinfo_sourceLocation(_node.location()));
 	return false;
 }
 
@@ -671,7 +669,7 @@ bool ASTBoogieConverter::visit(EnumValue const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: EnumValue") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: EnumValue");
 	return false;
 }
 
@@ -679,7 +677,7 @@ bool ASTBoogieConverter::visit(ParameterList const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ParameterList") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: ParameterList");
 	return false;
 }
 
@@ -978,7 +976,7 @@ bool ASTBoogieConverter::visit(ModifierInvocation const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ModifierInvocation") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: ModifierInvocation");
 	return false;
 }
 
@@ -994,7 +992,7 @@ bool ASTBoogieConverter::visit(ElementaryTypeName const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ElementaryTypeName") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: ElementaryTypeName");
 	return false;
 }
 
@@ -1002,7 +1000,7 @@ bool ASTBoogieConverter::visit(UserDefinedTypeName const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: UserDefinedTypeName") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: UserDefinedTypeName");
 	return false;
 }
 
@@ -1010,7 +1008,7 @@ bool ASTBoogieConverter::visit(FunctionTypeName const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: FunctionTypeName") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: FunctionTypeName");
 	return false;
 }
 
@@ -1018,7 +1016,7 @@ bool ASTBoogieConverter::visit(Mapping const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: Mapping") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: Mapping");
 	return false;
 }
 
@@ -1026,7 +1024,7 @@ bool ASTBoogieConverter::visit(ArrayTypeName const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node: ArrayTypeName") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node: ArrayTypeName");
 	return false;
 }
 
@@ -1303,22 +1301,13 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		// In this case we just ignore it
 		if (decl != nullptr)
 		{
-			if (decl->isLocalVariable())
-			{
-				// Boogie requires local variables to be declared at the beginning of the procedure
-				auto varDecl = boogie::Decl::variable(
-						m_context.mapDeclName(*decl),
-						m_context.toBoogieType(decl->type(), decl.get()));
-				varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
-				m_localDecls.push_back(varDecl);
-			}
-			else
-			{
-				// Non-local variables should be handled elsewhere
-				BOOST_THROW_EXCEPTION(InternalCompilerError() <<
-						errinfo_comment("Non-local variable appearing in VariableDeclarationStatement") <<
-						errinfo_sourceLocation(_node.location()));
-			}
+			solAssert(decl->isLocalVariable(), "Non-local variable appearing in VariableDeclarationStatement");
+			// Boogie requires local variables to be declared at the beginning of the procedure
+			auto varDecl = boogie::Decl::variable(
+					m_context.mapDeclName(*decl),
+					m_context.toBoogieType(decl->type(), decl.get()));
+			varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
+			m_localDecls.push_back(varDecl);
 		}
 	}
 
@@ -1432,7 +1421,7 @@ bool ASTBoogieConverter::visitNode(ASTNode const& _node)
 {
 	rememberScope(_node);
 
-	BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Unhandled node (unknown)") << errinfo_sourceLocation(_node.location()));
+	solAssert(false, "Unhandled node (unknown)");
 	return true;
 }
 

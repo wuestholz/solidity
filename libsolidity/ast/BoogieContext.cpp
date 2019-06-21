@@ -140,18 +140,14 @@ void BoogieContext::includeSendFunction()
 
 void BoogieContext::reportError(ASTNode const* associatedNode, string message)
 {
-	if (associatedNode)
-		m_errorReporter->error(Error::Type::ParserError, associatedNode->location(), message);
-	else
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Error at unknown node: " + message));
+	solAssert(associatedNode, "Error at unknown node: " + message);
+	m_errorReporter->error(Error::Type::ParserError, associatedNode->location(), message);
 }
 
 void BoogieContext::reportWarning(ASTNode const* associatedNode, string message)
 {
-	if (associatedNode)
-		m_errorReporter->warning(associatedNode->location(), message);
-	else
-		BOOST_THROW_EXCEPTION(InternalCompilerError() << errinfo_comment("Warning at unknown node: " + message));
+	solAssert(associatedNode, "Warning at unknown node: " + message);
+	m_errorReporter->warning(associatedNode->location(), message);
 }
 
 void BoogieContext::addGlobalComment(string str)
