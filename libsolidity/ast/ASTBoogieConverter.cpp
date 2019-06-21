@@ -83,7 +83,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 				if (decl->type()->toString() == target)
 				{
 					if (ASTBoogieUtils::isStateVar(decl))
-						output.push_back(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()));
+						output.push_back(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()));
 					else
 						output.push_back(boogie::Expr::id(m_context.mapDeclName(*decl)));
 				}
@@ -106,7 +106,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 								// Only sender for now. TODO: Better handling of magic variables
 								// and names
 								if (m_member.name == ASTBoogieUtils::SOLIDITY_SENDER)
-									output.push_back(m_context.boogieMsgSender());
+									output.push_back(m_context.boogieMsgSender()->getRefTo());
 					}
 				}
 			}
@@ -128,7 +128,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	if (value)
 	{
 		boogie::Stmt::Ref valueAssign = boogie::Stmt::assign(boogie::Expr::id(id), boogie::Expr::arrupd(
-				boogie::Expr::id(id), m_context.boogieThis(), value));
+				boogie::Expr::id(id), m_context.boogieThis()->getRefTo(), value));
 		output.push_back(valueAssign);
 		ok = true;
 	}
@@ -157,7 +157,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 					//        update(sel(a, this), i, v)
 					//     )
 					auto map_id = boogie::Expr::id(id);
-					auto this_i = m_context.boogieThis();
+					auto this_i = m_context.boogieThis()->getRefTo();
 					auto valueAssign = boogie::Stmt::assign(map_id,
 							boogie::Expr::arrupd(map_id, this_i,
 									boogie::Expr::arrupd(boogie::Expr::arrsel(map_id, this_i), index_id, value)));
@@ -168,7 +168,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 				{
 					boogie::Expr::Ref sum = boogie::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
 					boogie::Stmt::Ref sum_default = boogie::Stmt::assign(sum,
-							boogie::Expr::arrupd(sum, m_context.boogieThis(), value));
+							boogie::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), value));
 					output.push_back(sum_default);
 				}
 				ok = true;
@@ -196,10 +196,10 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	boogie::Block::Ref block = boogie::Block::block();
 	// this.balance = 0
 	block->addStmt(boogie::Stmt::assign(
-			m_context.boogieBalance(),
+			m_context.boogieBalance()->getRefTo(),
 			boogie::Expr::arrupd(
-					m_context.boogieBalance(),
-					m_context.boogieThis(),
+					m_context.boogieBalance()->getRefTo(),
+					m_context.boogieThis()->getRefTo(),
 					defaultValue(tp_uint256))));
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers)
@@ -224,9 +224,9 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 
 	// Input parameters
 	std::vector<boogie::Binding> params {
-		{m_context.boogieThis(), m_context.addressType() }, // this
-		{m_context.boogieMsgSender(), m_context.addressType() }, // msg.sender
-		{m_context.boogieMsgValue(), m_context.intType(256) } // msg.value
+		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() }, // this
+		{m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() }, // msg.sender
+		{m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() } // msg.value
 	};
 
 	// Create the procedure
@@ -414,7 +414,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				if (varDecl->isConstant())
 					continue;
 				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
-				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis());
+				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
 
 				if (varDecl->type()->category() == Type::Category::Struct)
 					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
@@ -466,7 +466,7 @@ void ASTBoogieConverter::processModifier()
 				{
 					auto paramDecls = modifierDecl->parameters()[i];
 					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
-							ASTBoogieUtils::toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get(), m_context));
+							m_context.toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get()));
 					m_localDecls.push_back(modifierParam);
 					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
 					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
@@ -565,8 +565,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.addDecl(
 					boogie::Decl::variable(m_context.mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
-					ASTBoogieUtils::mappingType(m_context.addressType(),
-					ASTBoogieUtils::toBoogieType(sumDecl.second, sumDecl.first, m_context))));
+							ASTBoogieUtils::mappingType(m_context.addressType(),
+							m_context.toBoogieType(sumDecl.second, sumDecl.first))));
 	}
 
 	// Process inheritance specifiers (not included in subNodes)
@@ -647,7 +647,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 			memberType = m_context.getStructType(&structTp->structDefinition(), DataLocation::Memory);
 		}
 		else // Other types
-			memberType = ASTBoogieUtils::toBoogieType(member->type(), member.get(), m_context);
+			memberType = m_context.toBoogieType(member->type(), member.get());
 		// TODO: array members?
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
@@ -696,14 +696,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Input parameters
 	vector<boogie::Binding> params {
 		// Globally available stuff
-		{m_context.boogieThis(), m_context.addressType()}, // this
-		{m_context.boogieMsgSender(), m_context.addressType() }, // msg.sender
-		{m_context.boogieMsgValue(), m_context.intType(256) } // msg.value
+		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() }, // this
+		{m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() }, // msg.sender
+		{m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() } // msg.value
 	};
 	// Add original parameters of the function
 	for (auto par : _node.parameters())
 	{
-		params.push_back({boogie::Expr::id(m_context.mapDeclName(*par)), ASTBoogieUtils::toBoogieType(par->type(), par.get(), m_context)});
+		params.push_back({boogie::Expr::id(m_context.mapDeclName(*par)), m_context.toBoogieType(par->type(), par.get())});
 		if (par->type()->category() == Type::Category::Array) // Array length
 			params.push_back({boogie::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
 	}
@@ -723,7 +723,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			}
 		}
 		boogie::Expr::Ref retId = boogie::Expr::id(m_context.mapDeclName(*ret));
-		boogie::TypeDeclRef retType = ASTBoogieUtils::toBoogieType(ret->type(), ret.get(), m_context);
+		boogie::TypeDeclRef retType = m_context.toBoogieType(ret->type(), ret.get());
 		retIds.push_back(retId);
 		rets.push_back({retId, retType});
 	}
@@ -745,10 +745,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	{
 		// this.balance = 0
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-				m_context.boogieBalance(),
+				m_context.boogieBalance()->getRefTo(),
 				boogie::Expr::arrupd(
-						m_context.boogieBalance(),
-						m_context.boogieThis(),
+						m_context.boogieBalance()->getRefTo(),
+						m_context.boogieThis()->getRefTo(),
 						defaultValue(tp_uint256))));
 		for (auto i : m_stateVarInitializers)
 			m_currentBlocks.top()->addStmt(i);
@@ -767,8 +767,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
-		boogie::Expr::Ref this_bal = boogie::Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
-		boogie::Expr::Ref msg_val = m_context.boogieMsgValue();
+		boogie::Expr::Ref this_bal = boogie::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
+		boogie::Expr::Ref msg_val = m_context.boogieMsgValue()->getRefTo();
 		// balance[this] += msg.value
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
@@ -782,8 +782,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(addResult.cc));
 		}
 		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-				m_context.boogieBalance(),
-					boogie::Expr::arrupd(m_context.boogieBalance(), m_context.boogieThis(), addResult.expr)));
+				m_context.boogieBalance()->getRefTo(),
+					boogie::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
 	}
 
 	// Modifiers need to be inlined
@@ -938,7 +938,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		m_stateVarInitializers.push_back(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
 				boogie::Expr::arrupd(
 						boogie::Expr::id(m_context.mapDeclName(_node)),
-						m_context.boogieThis(),
+						m_context.boogieThis()->getRefTo(),
 						initExpr)));
 	} else {
 		// Use implicit default value (will generate later, once we are in scope of constructor)
@@ -950,7 +950,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	auto varDecl = boogie::Decl::variable(m_context.mapDeclName(_node),
 			ASTBoogieUtils::mappingType(
 					m_context.addressType(),
-					ASTBoogieUtils::toBoogieType(_node.type(), &_node, m_context)));
+					m_context.toBoogieType(_node.type(), &_node)));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.addDecl(varDecl);
 
@@ -1308,7 +1308,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				// Boogie requires local variables to be declared at the beginning of the procedure
 				auto varDecl = boogie::Decl::variable(
 						m_context.mapDeclName(*decl),
-						ASTBoogieUtils::toBoogieType(decl->type(), decl.get(), m_context));
+						m_context.toBoogieType(decl->type(), decl.get()));
 				varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
 				m_localDecls.push_back(varDecl);
 			}
@@ -1420,7 +1420,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 
 	boogie::Expr::Ref expr = convertExpression(_node.expression());
 	boogie::Decl::Ref tmpVar = boogie::Decl::variable("tmpVar" + to_string(_node.id()),
-			ASTBoogieUtils::toBoogieType(_node.expression().annotation().type, &_node, m_context));
+			m_context.toBoogieType(_node.expression().annotation().type, &_node));
 	m_localDecls.push_back(tmpVar);
 	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
 	m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(tmpVar->getName()), expr));

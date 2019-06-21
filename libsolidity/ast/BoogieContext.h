@@ -61,8 +61,10 @@ private:
 
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
-	boogie::Decl::Ref m_boogieBalance;
-	boogie::Decl::Ref m_boogieThis;
+	boogie::VarDeclRef m_boogieBalance;
+	boogie::VarDeclRef m_boogieThis;
+	boogie::VarDeclRef m_boogieMsgSender;
+	boogie::VarDeclRef m_boogieMsgValue;
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
@@ -151,10 +153,15 @@ public:
 	boogie::FuncDeclRef createStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
 
-	boogie::Expr::Ref boogieBalance() const;
-	boogie::Expr::Ref boogieThis() const;
-	boogie::Expr::Ref boogieMsgSender() const;
-	boogie::Expr::Ref boogieMsgValue() const;
+	/**
+	 * Map a Solidity type to a Boogie type
+	 */
+	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode);
+
+	boogie::VarDeclRef boogieBalance() const { return m_boogieBalance; }
+	boogie::VarDeclRef boogieThis() const { return m_boogieThis; }
+	boogie::VarDeclRef boogieMsgSender() const { return m_boogieMsgSender; }
+	boogie::VarDeclRef boogieMsgValue() const { return m_boogieMsgValue; }
 
 	boogie::Expr::Ref intLit(boogie::bigint lit, int bits) const;
 

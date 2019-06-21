@@ -43,7 +43,7 @@ Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
 		{
 			return Expr::arrsel(
 					Expr::id(m_context.mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
-					m_context.boogieThis());
+					m_context.boogieThis()->getRefTo());
 		}
 
 	m_context.reportError(node, "Unsupported identifier for sum function");
@@ -205,7 +205,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
 				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
 
-				auto selExpr = Expr::arrsel(sumId, m_context.boogieThis());
+				auto selExpr = Expr::arrsel(sumId, m_context.boogieThis()->getRefTo());
 				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub, selExpr, lhs, bits, isSigned);
 				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, subResult.expr, rhs, bits, isSigned);
 				if (m_context.overflow())
@@ -215,7 +215,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				}
 				addSideEffect(Stmt::assign(
 						sumId,
-						Expr::arrupd(sumId, m_context.boogieThis(), updResult.expr)));
+						Expr::arrupd(sumId, m_context.boogieThis()->getRefTo(), updResult.expr)));
 
 			}
 		}
@@ -456,7 +456,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							m_context.intLit(1, bits),
 							bits, isSigned);
 			bg::Decl::Ref tempVar = bg::Decl::variable("inc#" + to_string(_node.id()),
-					ASTBoogieUtils::toBoogieType(_node.subExpression().annotation().type, &_node, m_context));
+					m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
 			m_newDecls.push_back(tempVar);
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
@@ -625,7 +625,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	m_currentExpr = nullptr;
-	m_currentAddress = m_context.boogieThis();
+	m_currentAddress = m_context.boogieThis()->getRefTo();
 	m_currentMsgValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
@@ -654,10 +654,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	vector<Expr::Ref> regularArgs;
 	// First, pass extra arguments
 	if (m_isLibraryCall)
-		allArgs.push_back(m_context.boogieThis()); // this
+		allArgs.push_back(m_context.boogieThis()->getRefTo()); // this
 	else
 		allArgs.push_back(m_currentAddress); // this
-	allArgs.push_back(m_context.boogieThis()); // msg.sender
+	allArgs.push_back(m_context.boogieThis()->getRefTo()); // msg.sender
 	Expr::Ref defaultMsgValue = m_context.intLit(0, 256);
 	Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
 	allArgs.push_back(msgValue); // msg.value
@@ -800,7 +800,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		for (size_t i = 0; i < returnTypes.size(); ++ i)
 		{
 			auto varName = funcName + "#" + to_string(i) + "#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::toBoogieType(returnTypes[i], &_node, m_context);
+			auto varType = m_context.toBoogieType(returnTypes[i], &_node);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
 			returnVarNames.push_back(varName);
@@ -813,7 +813,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (!dynamic_cast<NewExpression const*>(&_node.expression()))
 		{
 			auto varName = funcName + "#" + to_string(_node.id());
-			auto varType = ASTBoogieUtils::toBoogieType(returnType, &_node, m_context);
+			auto varType = m_context.toBoogieType(returnType, &_node);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
 			returnVarNames.push_back(varName);
@@ -895,8 +895,8 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	}
 
 	bool converted = false;
-	TypeDeclRef targetType = ASTBoogieUtils::toBoogieType(_node.annotation().type, &_node, m_context);
-	TypeDeclRef sourceType = ASTBoogieUtils::toBoogieType(arg->annotation().type, arg.get(), m_context);
+	TypeDeclRef targetType = m_context.toBoogieType(_node.annotation().type, &_node);
+	TypeDeclRef sourceType = m_context.toBoogieType(arg->annotation().type, arg.get());
 	// Nothing to do when the two types are mapped to same type in Boogie,
 	// e.g., conversion from uint256 to int256 if both are mapped to int
 	// TODO: check the type instance instead of name as soon as it is a singleton
@@ -967,14 +967,14 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 {
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	// assert(balance[this] >= msg.value)
-	auto selExpr = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
+	auto selExpr = Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
 	auto geqResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr,
 			langutil::Token::GreaterThanOrEqual, selExpr, msgValue, 256, false);
 	addSideEffect(Stmt::comment("Implicit assumption that we have enough ether"));
 	addSideEffect(Stmt::assume(geqResult.expr));
 	// balance[this] -= msg.value
-	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance(),
-			m_context.boogieThis());
+	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance()->getRefTo(),
+			m_context.boogieThis()->getRefTo());
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		addSideEffect(Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)));
@@ -988,9 +988,9 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(Expr::Ref msgValue)
 		addSideEffect(Stmt::assume(subResult.cc));
 	}
 	addSideEffect(
-			Stmt::assign(m_context.boogieBalance(),
-					Expr::arrupd(m_context.boogieBalance(),
-							m_context.boogieThis(), subResult.expr)));
+			Stmt::assign(m_context.boogieBalance()->getRefTo(),
+					Expr::arrupd(m_context.boogieBalance()->getRefTo(),
+							m_context.boogieThis()->getRefTo(), subResult.expr)));
 }
 
 void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
@@ -998,7 +998,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 	bg::Block::Ref revert = bg::Block::block();
 	// balance[this] += msg.value
-	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
+	Expr::Ref this_balance = Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		revert->addStmts( { Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
@@ -1012,9 +1012,9 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(Expr::Ref msgValue)
 			Stmt::assume(addResult.cc) });
 	}
 	revert->addStmt(
-			Stmt::assign(m_context.boogieBalance(),
-					Expr::arrupd(m_context.boogieBalance(),
-							m_context.boogieThis(), addResult.expr)));
+			Stmt::assign(m_context.boogieBalance()->getRefTo(),
+					Expr::arrupd(m_context.boogieBalance()->getRefTo(),
+							m_context.boogieThis()->getRefTo(), addResult.expr)));
 	// Final statement for balance update in case of failure. Return value of call
 	// is always a tuple (ok, data).
 	auto okDataTuple = dynamic_pointer_cast<TupleExpr const>(m_currentExpr);
@@ -1085,7 +1085,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
 		if (dynamic_cast<MagicVariableDeclaration const*>(id->annotation().referencedDeclaration) &&
 				id->annotation().referencedDeclaration->name() == ASTBoogieUtils::SOLIDITY_SUPER)
-			m_currentAddress = m_context.boogieThis();
+			m_currentAddress = m_context.boogieThis()->getRefTo();
 
 	// Type of the expression
 	TypePointer type = _node.expression().annotation().type;
@@ -1100,7 +1100,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		if (isAddress)
 		{
-			m_currentExpr = Expr::arrsel(m_context.boogieBalance(), expr);
+			m_currentExpr = Expr::arrsel(m_context.boogieBalance()->getRefTo(), expr);
 			addTCC(m_currentExpr, tp_uint256);
 			return false;
 		}
@@ -1108,7 +1108,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		{
 			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
 			{
-				m_currentExpr = Expr::arrsel(m_context.boogieBalance(), m_context.boogieThis());
+				m_currentExpr = Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
 				addTCC(m_currentExpr, tp_uint256);
 				return false;
 			}
@@ -1140,13 +1140,13 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	bool isMessage = magicType != nullptr && magicType->kind() == MagicType::Kind::Message;
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_SENDER)
 	{
-		m_currentExpr = m_context.boogieMsgSender();
+		m_currentExpr = m_context.boogieMsgSender()->getRefTo();
 		return false;
 	}
 	// msg.value
 	if (isMessage && _node.memberName() == ASTBoogieUtils::SOLIDITY_VALUE)
 	{
-		m_currentExpr = m_context.boogieMsgValue();
+		m_currentExpr = m_context.boogieMsgValue()->getRefTo();
 		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 		addTCC(m_currentExpr, tp_uint256);
 		return false;
@@ -1342,7 +1342,7 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 
 	// State variables must be referenced by accessing the map
 	if (ASTBoogieUtils::isStateVar(_node.annotation().referencedDeclaration))
-		m_currentExpr = Expr::arrsel(Expr::id(declName), m_context.boogieThis());
+		m_currentExpr = Expr::arrsel(Expr::id(declName), m_context.boogieThis()->getRefTo());
 	// Other identifiers can be referenced by their name
 	else
 		m_currentExpr = Expr::id(declName);

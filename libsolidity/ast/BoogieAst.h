@@ -468,6 +468,9 @@ public:
 	static bool classof(Ref S) { return S->getKind() == LABEL; }
 };
 
+class VarDecl;
+using VarDeclRef = std::shared_ptr<VarDecl>;
+
 class Decl {
 public:
 	enum Kind {
@@ -494,6 +497,7 @@ public:
 	virtual void print(std::ostream& os) const = 0;
 	unsigned getId() const { return id; }
 	std::string getName() const { return name; }
+	Expr::Ref getRefTo() const { return Expr::id(name); }
 	void addAttr(Attr::Ref a) { attrs.push_back(a); }
 	void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a : ax) addAttr(a); }
 
@@ -511,7 +515,7 @@ public:
 	static Ref constant(std::string name, TypeDeclRef type);
 	static Ref constant(std::string name, TypeDeclRef type, bool unique);
 	static Ref constant(std::string name, TypeDeclRef type, std::vector<Attr::Ref> const& ax, bool unique);
-	static Ref variable(std::string name, TypeDeclRef type);
+	static VarDeclRef variable(std::string name, TypeDeclRef type);
 	static ProcDeclRef procedure(std::string name,
 		std::vector<Binding> const& params = {},
 		std::vector<Binding> const& rets = {},
@@ -606,6 +610,7 @@ public:
 	VarDecl(std::string n, TypeDeclRef t) : Decl(VARIABLE, n, {}), type(t) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == VARIABLE; }
+	TypeDeclRef getType() const { return type; }
 };
 
 class Block {

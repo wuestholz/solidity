@@ -394,7 +394,7 @@ Decl::Ref Decl::constant(std::string name, TypeDeclRef type, std::vector<Attr::R
 	return std::make_shared<ConstDecl>(name, type, ax, unique);
 }
 
-Decl::Ref Decl::variable(std::string name, TypeDeclRef type)
+VarDeclRef Decl::variable(std::string name, TypeDeclRef type)
 {
 	return std::make_shared<VarDecl>(name, type);
 }

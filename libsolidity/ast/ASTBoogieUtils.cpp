@@ -60,9 +60,9 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> transferParams{
-		{context.boogieThis(), context.addressType() },
-		{context.boogieMsgSender(), context.addressType() },
-		{context.boogieMsgValue(), context.intType(256) },
+		{context.boogieThis()->getRefTo(), context.boogieThis()->getType() },
+		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType() },
+		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType() },
 		{Expr::id("amount"), context.intType(256) }
 	};
 
@@ -71,8 +71,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance(), context.boogieMsgSender());
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
 	Expr::Ref amount = Expr::id("amount");
 
 	// Precondition: there is enough ether to transfer
@@ -95,8 +95,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		});
 	}
 	transferImpl->addStmt(Stmt::assign(
-			context.boogieBalance(),
-			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			context.boogieBalance()->getRefTo(),
+			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -110,8 +110,8 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		transferImpl->addStmt(Stmt::assume(subSenderBalance.cc));
 	}
 	transferImpl->addStmt(Stmt::assign(
-			context.boogieBalance(),
-			Expr::arrupd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
+			context.boogieBalance()->getRefTo(),
+			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
 	transferImpl->addStmt(Stmt::comment("TODO: call fallback, exception handling"));
 
 	ProcDeclRef transfer = Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
@@ -128,9 +128,9 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Parameters: this, msg.sender, msg.value
 	vector<Binding> callParams {
-		{context.boogieThis(), context.addressType()},
-		{context.boogieMsgSender(), context.addressType()},
-		{context.boogieMsgValue(), context.intType(256) }
+		{context.boogieThis()->getRefTo(), context.boogieThis()->getType() },
+		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType() },
+		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType() }
 	};
 
 	// Type to pass around
@@ -145,15 +145,15 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 	// Return value
 	vector<Binding> callReturns{
-		{Expr::id("__result"), toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr, context)},
-		{Expr::id("__calldata"), toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr, context)}
+		{Expr::id("__result"), context.toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr)},
+		{Expr::id("__calldata"), context.toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr)}
 	};
 
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref msg_val = context.boogieMsgValue();
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	Expr::Ref msg_val = context.boogieMsgValue()->getRefTo();
 	Expr::Ref result = Expr::id("__result");
 
 	// balance[this] += msg.value
@@ -173,8 +173,8 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			context.boogieBalance(),
-			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			context.boogieBalance()->getRefTo(),
+			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 	// Unsuccessful transfer
 	bg::Block::Ref elseBlock = bg::Block::block();
@@ -192,27 +192,27 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 
 ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
+	Expr::Ref amount = Expr::id("amount");
+	Expr::Ref result = Expr::id("__result");
 	// Parameters: this, msg.sender, msg.value, amount
 	vector<Binding> sendParams {
-		{context.boogieThis(), context.addressType()},
-		{context.boogieMsgSender(), context.addressType()},
-		{context.boogieMsgValue(), context.intType(256) },
-		{Expr::id("amount"), context.intType(256) }
+		{context.boogieThis()->getRefTo(), context.boogieThis()->getType()},
+		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType()},
+		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType()},
+		{amount, context.intType(256)}
 	};
 
 	// Type to pass around
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
-	vector<Binding> sendReturns{ {Expr::id("__result"), context.boolType()} };
+	vector<Binding> sendReturns{ {result, context.boolType()} };
 
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance(), context.boogieThis());
-	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance(), context.boogieMsgSender());
-	Expr::Ref amount = Expr::id("amount");
-	Expr::Ref result = Expr::id("__result");
+	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
 
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
@@ -231,8 +231,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			context.boogieBalance(),
-			Expr::arrupd(context.boogieBalance(), context.boogieThis(), addBalance.expr)));
+			context.boogieBalance()->getRefTo(),
+			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
@@ -250,8 +250,8 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	thenBlock->addStmt(Stmt::assign(
-			context.boogieBalance(),
-			Expr::arrupd(context.boogieBalance(), context.boogieMsgSender(), subSenderBalance.expr)));
+			context.boogieBalance()->getRefTo(),
+			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
 	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
 
 	// Unsuccessful transfer
@@ -297,74 +297,6 @@ string ASTBoogieUtils::dataLocToStr(DataLocation loc)
 string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 {
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
-}
-
-TypeDeclRef ASTBoogieUtils::toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context)
-{
-	Type::Category tpCategory = tp->category();
-
-	switch (tpCategory)
-	{
-	case Type::Category::Address:
-		return context.addressType();
-	case Type::Category::StringLiteral:
-		return context.stringType();
-	case Type::Category::Bool:
-		return context.boolType();
-	case Type::Category::RationalNumber:
-	{
-		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
-		if (!tpRational->isFractional())
-			return Decl::typee(BOOGIE_INT_CONST_TYPE);
-		else
-			context.reportError(_associatedNode, "Fractional numbers are not supported");
-		break;
-	}
-	case Type::Category::Integer:
-	{
-		auto tpInteger = dynamic_cast<IntegerType const*>(tp);
-		return context.intType(tpInteger->numBits());
-	}
-	case Type::Category::Contract:
-		return context.addressType();
-	case Type::Category::Array:
-	{
-		auto arrType = dynamic_cast<ArrayType const*>(tp);
-		if (arrType->isString())
-			return context.stringType();
-		else
-			return mappingType(context.intType(256), toBoogieType(arrType->baseType(), _associatedNode, context));
-	}
-	case Type::Category::Mapping:
-	{
-		auto mapType = dynamic_cast<MappingType const*>(tp);
-		return mappingType(toBoogieType(mapType->keyType(), _associatedNode, context),
-				toBoogieType(mapType->valueType(), _associatedNode, context));
-	}
-	case Type::Category::FixedBytes:
-	{
-		// up to 32 bytes (use integer and slice it up)
-		auto fbType = dynamic_cast<FixedBytesType const*>(tp);
-		return context.intType(fbType->numBytes() * 8);
-	}
-	case Type::Category::Tuple:
-		context.reportError(_associatedNode, "Tuples are not supported");
-		break;
-	case Type::Category::Struct:
-	{
-		auto structTp = dynamic_cast<StructType const*>(tp);
-		if (structTp->location() == DataLocation::Storage && structTp->isPointer())
-			context.reportError(_associatedNode, "Local storage pointers are not supported");
-		return context.getStructType(&structTp->structDefinition(), structTp->location());
-	}
-	case Type::Category::Enum:
-		return context.intType(256);
-	default:
-		std::string tpStr = tp->toString();
-		context.reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
-	}
-
-	return Decl::typee(ERR_TYPE);
 }
 
 TypeDeclRef ASTBoogieUtils::mappingType(TypeDeclRef keyType, TypeDeclRef valueType)

@@ -90,12 +90,6 @@ public:
 	static
 	std::string getConstructorName(ContractDefinition const* contract);
 
-	/**
-	 * Map a Solidity type to a Boogie type
-	 */
-	static
-	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode, BoogieContext& context);
-
 	static
 	boogie::TypeDeclRef mappingType(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType);
 

@@ -60,8 +60,10 @@ BoogieContext::BoogieContext(Encoding encoding,
 	// address.balance
 	m_boogieBalance = boogie::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
 	addDecl(m_boogieBalance);
-	// This
+	// This, sender, value
 	m_boogieThis = boogie::Decl::variable("__this", addressType());
+	m_boogieMsgSender = boogie::Decl::variable("__msg_sender", addressType());
+	m_boogieMsgValue = boogie::Decl::variable("__msg_value", intType(256));
 	// Uninterpreted type for strings
 	addDecl(stringType());
 	// now
@@ -225,7 +227,7 @@ boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition cons
 			TypePointer memberType = TypeProvider::withLocationIfReference(DataLocation::Storage, member->type());
 			params.push_back({
 				boogie::Expr::id(mapDeclName(*member)),
-				ASTBoogieUtils::toBoogieType(memberType, structDef, *this)});
+				toBoogieType(memberType, structDef)});
 		}
 
 		vector<boogie::Attr::Ref> attrs;
@@ -256,7 +258,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 				// TODO: can we do better?
 				TypePointer memberType = TypeProvider::withLocationIfReference(loc, member->type());
 				members.push_back({boogie::Expr::id(mapDeclName(*member)),
-					ASTBoogieUtils::toBoogieType(memberType, structDef, *this)});
+					toBoogieType(memberType, structDef)});
 			}
 			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
@@ -278,24 +280,72 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 	return nullptr;
 }
 
-boogie::Expr::Ref BoogieContext::boogieBalance() const
+boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)
 {
-	return boogie::Expr::id(m_boogieBalance->getName());
-}
+	Type::Category tpCategory = tp->category();
 
-boogie::Expr::Ref BoogieContext::boogieThis() const
-{
-	return boogie::Expr::id(m_boogieThis->getName());
-}
+	switch (tpCategory)
+	{
+	case Type::Category::Address:
+		return addressType();
+	case Type::Category::StringLiteral:
+		return stringType();
+	case Type::Category::Bool:
+		return boolType();
+	case Type::Category::RationalNumber:
+	{
+		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
+		if (!tpRational->isFractional())
+			return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_INT_CONST_TYPE);
+		else
+			reportError(_associatedNode, "Fractional numbers are not supported");
+		break;
+	}
+	case Type::Category::Integer:
+	{
+		auto tpInteger = dynamic_cast<IntegerType const*>(tp);
+		return intType(tpInteger->numBits());
+	}
+	case Type::Category::Contract:
+		return addressType();
+	case Type::Category::Array:
+	{
+		auto arrType = dynamic_cast<ArrayType const*>(tp);
+		if (arrType->isString())
+			return stringType();
+		else
+			return ASTBoogieUtils::mappingType(intType(256), toBoogieType(arrType->baseType(), _associatedNode));
+	}
+	case Type::Category::Mapping:
+	{
+		auto mapType = dynamic_cast<MappingType const*>(tp);
+		return ASTBoogieUtils::mappingType(toBoogieType(mapType->keyType(), _associatedNode),
+				toBoogieType(mapType->valueType(), _associatedNode));
+	}
+	case Type::Category::FixedBytes:
+	{
+		// up to 32 bytes (use integer and slice it up)
+		auto fbType = dynamic_cast<FixedBytesType const*>(tp);
+		return intType(fbType->numBytes() * 8);
+	}
+	case Type::Category::Tuple:
+		reportError(_associatedNode, "Tuples are not supported");
+		break;
+	case Type::Category::Struct:
+	{
+		auto structTp = dynamic_cast<StructType const*>(tp);
+		if (structTp->location() == DataLocation::Storage && structTp->isPointer())
+			reportError(_associatedNode, "Local storage pointers are not supported");
+		return getStructType(&structTp->structDefinition(), structTp->location());
+	}
+	case Type::Category::Enum:
+		return intType(256);
+	default:
+		std::string tpStr = tp->toString();
+		reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
+	}
 
-boogie::Expr::Ref BoogieContext::boogieMsgSender() const
-{
-	return boogie::Expr::id("__msg_sender");
-}
-
-boogie::Expr::Ref BoogieContext::boogieMsgValue() const
-{
-	return boogie::Expr::id("__msg_value");
+	return boogie::Decl::typee(ASTBoogieUtils::ERR_TYPE);
 }
 
 boogie::Expr::Ref BoogieContext::intLit(boogie::bigint lit, int bits) const
