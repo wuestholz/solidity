@@ -64,7 +64,7 @@ private:
 	/**
 	 * Helper method to give a default value for a type.
 	 */
-	boogie::Expr::Ref defaultValue(TypePointer _type);
+	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
 
 	/**
 	 * Helper method to get all Boogie IDs of a given type in the current scope.
