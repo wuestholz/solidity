@@ -51,16 +51,35 @@ boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 	return result.expr;
 }
 
-boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type)
+boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieContext& context)
 {
 	switch (type->category())
 	{
 	case Type::Category::Integer:
 		// 0
-		return m_context.intLit((long)0, ASTBoogieUtils::getBits(type));
+		return context.intLit(0, ASTBoogieUtils::getBits(type));
 	case Type::Category::Bool:
 		// False
 		return boogie::Expr::lit(false);
+	case Type::Category::Struct:
+	{
+		// default for all members
+		StructType const* structType = dynamic_cast<StructType const*>(type);
+		MemberList const& members = structType->members(0); // No need for scope, just regular struct members
+		// Get the default value for the members
+		std::vector<boogie::Expr::Ref> memberDefaultValues;
+		for (auto& member: members)
+		{
+			boogie::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
+			if (memberDefaultValue == nullptr)
+				return nullptr;
+			memberDefaultValues.push_back(memberDefaultValue);
+		}
+		// Now construct the struct value
+		StructDefinition const& structDefinition = structType->structDefinition();
+		boogie::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
+		return boogie::Expr::fn(decl->getName(), memberDefaultValues);
+	}
 	default:
 		// For unhandled, just return null
 		break;
@@ -122,7 +141,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	TypePointer type = _decl.type();
 
 	// Default value for the given type
-	boogie::Expr::Ref value = defaultValue(type);
+	boogie::Expr::Ref value = defaultValue(type, m_context);
 
 	// If there just assign
 	if (value)
@@ -143,7 +162,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 			TypePointer key_type = dynamic_cast<MappingType const&>(*type).keyType();
 			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
 			// Default value for elements
-			value = defaultValue(element_type);
+			value = defaultValue(element_type, m_context);
 			if (value)
 			{
 				// Get all ids to initialize
@@ -200,7 +219,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 			boogie::Expr::arrupd(
 					m_context.boogieBalance()->getRefTo(),
 					m_context.boogieThis()->getRefTo(),
-					defaultValue(tp_uint256))));
+					defaultValue(tp_uint256, m_context))));
 	// State variable initializers should go to the beginning of the constructor
 	for (auto i : m_stateVarInitializers)
 		block->addStmt(i);
@@ -747,7 +766,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				boogie::Expr::arrupd(
 						m_context.boogieBalance()->getRefTo(),
 						m_context.boogieThis()->getRefTo(),
-						defaultValue(tp_uint256))));
+						defaultValue(tp_uint256, m_context))));
 		for (auto i : m_stateVarInitializers)
 			m_currentBlocks.top()->addStmt(i);
 		m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
@@ -1357,7 +1376,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	{
 		for (auto declNode : _node.declarations())
 		{
-			boogie::Expr::Ref defaultVal = defaultValue(declNode->type());
+			boogie::Expr::Ref defaultVal = defaultValue(declNode->type(), m_context);
 			if (defaultVal)
 			{
 				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
