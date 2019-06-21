@@ -329,18 +329,18 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 		Expr::Ref lhsSel = nullptr;
 		if (lhsLoc == DataLocation::Storage)
 			lhsSel = Expr::dtsel(lhsBase, m_context.mapDeclName(*member),
-					m_context.createStructConstructor(structDef),
+					m_context.getStructConstructor(structDef),
 					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, lhsLoc)));
 		else
-			lhsSel = Expr::arrsel(Expr::id(m_context.mapStructMemberName(*member, lhsLoc)), lhsBase);
+			lhsSel = Expr::arrsel(Expr::id(m_context.mapDeclName(*member)), lhsBase);
 
 		Expr::Ref rhsSel = nullptr;
 		if (rhsLoc == DataLocation::Storage)
 			rhsSel = Expr::dtsel(rhsBase, m_context.mapDeclName(*member),
-					m_context.createStructConstructor(structDef),
+					m_context.getStructConstructor(structDef),
 					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(structDef, rhsLoc)));
 		else
-			rhsSel = Expr::arrsel(Expr::id(m_context.mapStructMemberName(*member, rhsLoc)), rhsBase);
+			rhsSel = Expr::arrsel(Expr::id(m_context.mapDeclName(*member)), rhsBase);
 
 
 		auto memberTypeCat = member->annotation().type->category();
@@ -955,7 +955,7 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _no
 	// Initialize each member
 	for (size_t i = 0; i < structDef->members().size(); ++i)
 	{
-		auto member = bg::Expr::id(m_context.mapStructMemberName(*structDef->members()[i], DataLocation::Memory));
+		auto member = bg::Expr::id(m_context.mapDeclName(*structDef->members()[i]));
 		auto init = bg::Expr::arrupd(member, bg::Expr::id(varDecl->getName()), args[i]);
 		m_newStatements.push_back(bg::Stmt::assign(member, init));
 	}
@@ -1237,14 +1237,14 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		auto structType = dynamic_cast<StructType const*>(type);
 		if (structType->location() == DataLocation::Memory)
 		{
-			m_currentExpr = Expr::id(m_context.mapStructMemberName(*_node.annotation().referencedDeclaration, structType->location()));
+			m_currentExpr = Expr::id(m_context.mapDeclName(*_node.annotation().referencedDeclaration));
 			m_currentExpr = Expr::arrsel(m_currentExpr, m_currentAddress);
 		}
 		else if (structType->location() == DataLocation::Storage)
 		{
 			m_currentExpr = Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
-					m_context.createStructConstructor(&structType->structDefinition()),
+					m_context.getStructConstructor(&structType->structDefinition()),
 					dynamic_pointer_cast<DataTypeDecl>(m_context.getStructType(&structType->structDefinition(), structType->location())));
 		}
 		else

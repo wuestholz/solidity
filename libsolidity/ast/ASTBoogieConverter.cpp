@@ -651,7 +651,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		// TODO: array members?
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
-		auto memberDecl = boogie::Decl::variable(m_context.mapStructMemberName(*member, DataLocation::Memory),
+		auto memberDecl = boogie::Decl::variable(m_context.mapDeclName(*member),
 				ASTBoogieUtils::mappingType(structMemType, memberType));
 		memberDecl->addAttrs(attrs);
 		m_context.addDecl(memberDecl);

@@ -111,11 +111,6 @@ string BoogieContext::mapDeclName(Declaration const& decl)
 	return name;
 }
 
-string BoogieContext::mapStructMemberName(Declaration const& decl, DataLocation loc)
-{
-	return mapDeclName(decl) + "_" + ASTBoogieUtils::dataLocToStr(loc);
-}
-
 void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl)
 {
 	m_builtinFunctions[fnDecl->getName()] = fnDecl;
@@ -212,7 +207,7 @@ boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return boogie::Decl::typee("int");
 }
 
-boogie::FuncDeclRef BoogieContext::createStructConstructor(StructDefinition const* structDef)
+boogie::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
 {
 	if (m_storStructConstrs.find(structDef) == m_storStructConstrs.end())
 	{
@@ -262,7 +257,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 			}
 			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
-			createStructConstructor(structDef);
+			getStructConstructor(structDef);
 		}
 		return m_storStructTypes[structDef];
 	}

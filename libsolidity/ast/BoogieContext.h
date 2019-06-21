@@ -121,11 +121,6 @@ public:
 	std::string mapDeclName(Declaration const& decl);
 
 	/**
-	 * Map a structure member with a given data location to a name in Boogie
-	 */
-	std::string mapStructMemberName(Declaration const& decl, DataLocation loc);
-
-	/**
 	 * Print the actual Boogie program to an output stream
 	 */
 	void print(std::ostream& _stream) { m_program.print(_stream); }
@@ -150,7 +145,7 @@ public:
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 
-	boogie::FuncDeclRef createStructConstructor(StructDefinition const* structDef);
+	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
 
 	/**
