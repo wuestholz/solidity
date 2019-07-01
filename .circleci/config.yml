@@ -571,7 +571,7 @@ jobs:
 
   b_ubu_sverif:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1904
     environment:
       TERM: xterm
       COVERAGE: "ON"
@@ -604,7 +604,7 @@ jobs:
 
   t_ubu_sverif_bg:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1904
     environment:
       TERM: xterm
     steps:
@@ -638,7 +638,7 @@ jobs:
 
   t_ubu_sverif_trf:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1904
     environment:
       TERM: xterm
     steps:
