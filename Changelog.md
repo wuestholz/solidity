@@ -1,30 +1,46 @@
-### 0.5.10 (unreleased)
-
-Important Bugfixes:
- * Fix incorrect abi encoding of storage array of data type that occupy multiple storage slots
+### 0.5.11 (unreleased)
 
 
 Language Features:
 
 
 
+
 Compiler Features:
- * Optimizer: Add rule to simplify SUB(~0, X) to NOT(X).
- * Commandline Interface: Experimental parser error recovery via the ``--error-recovery`` commandline switch.
- * Yul Optimizer: Make the optimizer work for all dialects of Yul including eWasm.
+ * eWasm: Highly experimental eWasm output using ``--ewasm`` in the commandline interface or output selection of ``ewasm.wast`` in standard-json.
+ * Metadata: Update the swarm hash, changes ``bzzr0`` to ``bzzr1`` and urls to use ``bzz-raw://``.
+
 
 
 
 Bugfixes:
+
+
+
+
+### 0.5.10 (2019-06-25)
+
+Important Bugfixes:
+ * ABIEncoderV2: Fix incorrect abi encoding of storage array of data type that occupy multiple storage slots
+ * Code Generator: Properly zero out higher order bits in elements of an array of negative numbers when assigning to storage and converting the type at the same time.
+
+
+Compiler Features:
+ * Commandline Interface: Experimental parser error recovery via the ``--error-recovery`` commandline switch.
+ * Optimizer: Add rule to simplify ``SUB(~0, X)`` to ``NOT(X)``.
+ * Yul Optimizer: Make the optimizer work for all dialects of Yul including eWasm.
+
+
+Bugfixes:
+ * Type Checker: Set state mutability of the function type members ``gas`` and ``value`` to pure (while their return type inherits state mutability from the function type).
  * Yul / Inline Assembly Parser: Disallow trailing commas in function call arguments.
- * Set state mutability of the function type members ``gas`` and ``value`` to pure (while their return type inherits state mutability from the function type).
 
 
 Build System:
  * Attempt to use stock Z3 cmake files to find Z3 and only fall back to manual discovery.
- * Generate a cmake error for gcc versions older than 5.0.
  * CMake: use imported targets for boost.
  * Emscripten build: upgrade to boost 1.70.
+ * Generate a cmake error for gcc versions older than 5.0.
 
 
 

@@ -42,6 +42,8 @@ add_library(yul
 	backends/evm/EVMMetrics.h
 	backends/evm/NoOutputAssembly.h
 	backends/evm/NoOutputAssembly.cpp
+	backends/wasm/EVMToEWasmTranslator.cpp
+	backends/wasm/EVMToEWasmTranslator.h
 	backends/wasm/EWasmCodeTransform.cpp
 	backends/wasm/EWasmCodeTransform.h
 	backends/wasm/EWasmObjectCompiler.cpp
@@ -94,6 +96,10 @@ add_library(yul
 	optimiser/FunctionHoister.h
 	optimiser/InlinableExpressionFunctionFinder.cpp
 	optimiser/InlinableExpressionFunctionFinder.h
+	optimiser/KnowledgeBase.cpp
+	optimiser/KnowledgeBase.h
+	optimiser/LoadResolver.cpp
+	optimiser/LoadResolver.h
 	optimiser/MainFunction.cpp
 	optimiser/MainFunction.h
 	optimiser/Metrics.cpp

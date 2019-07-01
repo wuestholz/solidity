@@ -53,7 +53,7 @@ public:
 	/// This is used if the SMT solver is not directly linked into this binary.
 	/// @returns a list of inputs to the SMT solver that were not part of the argument to
 	/// the constructor.
-	std::vector<std::string> unhandledQueries() { return m_interface.unhandledQueries(); }
+	std::vector<std::string> unhandledQueries() { return m_interface->unhandledQueries(); }
 
 	/// @returns the FunctionDefinition of a called function if possible and should inline,
 	/// otherwise nullptr.
@@ -91,10 +91,6 @@ private:
 	void endVisit(IndexAccess const& _node) override;
 	bool visit(InlineAssembly const& _node) override;
 
-	smt::Expression assertions() { return m_interface.assertions(); }
-	void push() { m_interface.push(); }
-	void pop() { m_interface.pop(); }
-
 	/// Do not visit subtree if node is a RationalNumber.
 	/// Symbolic _expr is the rational literal.
 	bool shortcutRationalNumber(Expression const& _expr);
@@ -107,7 +103,7 @@ private:
 		smt::Expression const& _left,
 		smt::Expression const& _right,
 		TypePointer const& _commonType,
-		langutil::SourceLocation const& _location
+		Expression const& _expression
 	);
 	void compareOperation(BinaryOperation const& _op);
 	void booleanOperation(BinaryOperation const& _op);
@@ -144,9 +140,9 @@ private:
 	/// of rounding for signed division.
 	smt::Expression division(smt::Expression _left, smt::Expression _right, IntegerType const& _type);
 
-	void assignment(VariableDeclaration const& _variable, Expression const& _value, langutil::SourceLocation const& _location);
+	void assignment(VariableDeclaration const& _variable, Expression const& _value);
 	/// Handles assignments to variables of different types.
-	void assignment(VariableDeclaration const& _variable, smt::Expression const& _value, langutil::SourceLocation const& _location);
+	void assignment(VariableDeclaration const& _variable, smt::Expression const& _value);
 	/// Handles assignments between generic expressions.
 	/// Will also be used for assignments of tuple components.
 	void assignment(
@@ -167,57 +163,68 @@ private:
 	VariableIndices visitBranch(ASTNode const* _statement, smt::Expression const* _condition = nullptr);
 	VariableIndices visitBranch(ASTNode const* _statement, smt::Expression _condition);
 
+	using CallStackEntry = std::pair<CallableDeclaration const*, ASTNode const*>;
+
+	/// Verification targets.
+	//@{
+	struct VerificationTarget
+	{
+		enum class Type { ConstantCondition, Underflow, Overflow, UnderOverflow, DivByZero, Balance, Assert } type;
+		smt::Expression value;
+		smt::Expression constraints;
+		Expression const* expression;
+		std::vector<CallStackEntry> callStack;
+		std::pair<std::vector<smt::Expression>, std::vector<std::string>> modelExpressions;
+	};
+
+	void checkVerificationTargets(smt::Expression const& _constraints);
+	void checkVerificationTarget(VerificationTarget& _target, smt::Expression const& _constraints = smt::Expression(true));
+	void checkConstantCondition(VerificationTarget& _target);
+	void checkUnderflow(VerificationTarget& _target, smt::Expression const& _constraints);
+	void checkOverflow(VerificationTarget& _target, smt::Expression const& _constraints);
+	void checkDivByZero(VerificationTarget& _target);
+	void checkBalance(VerificationTarget& _target);
+	void checkAssert(VerificationTarget& _target);
+	void addVerificationTarget(
+		VerificationTarget::Type _type,
+		smt::Expression const& _value,
+		Expression const* _expression
+	);
+	//@}
+
+	/// Solver related.
+	//@{
+
+	std::pair<std::vector<smt::Expression>, std::vector<std::string>> modelExpressions();
 	/// Check that a condition can be satisfied.
 	void checkCondition(
-		smt::Expression _condition,
+		smt::Expression const& _condition,
+		std::vector<CallStackEntry> const& callStack,
+		std::pair<std::vector<smt::Expression>, std::vector<std::string>> const& _modelExpressions,
 		langutil::SourceLocation const& _location,
 		std::string const& _description,
 		std::string const& _additionalValueName = "",
 		smt::Expression const* _additionalValue = nullptr
 	);
-	/// Checks that a boolean condition is not constant. Do not warn if the expression
-	/// is a literal constant.
+	/// Checks whether a Boolean condition is constant.
+	/// Do not warn if the expression is a literal constant.
+	/// @param _condition the Solidity expression, used to check whether it is a Literal and for location.
+	/// @param _constraints the program constraints, including control-flow.
+	/// @param _value the Boolean term to be checked.
+	/// @param _callStack the callStack to be shown with the model if applicable.
 	/// @param _description the warning string, $VALUE will be replaced by the constant value.
 	void checkBooleanNotConstant(
 		Expression const& _condition,
+		smt::Expression const& _constraints,
+		smt::Expression const& _value,
+		std::vector<CallStackEntry> const& _callStack,
 		std::string const& _description
 	);
-
-	using CallStackEntry = std::pair<CallableDeclaration const*, ASTNode const*>;
-
-	struct OverflowTarget
-	{
-		enum class Type { Underflow, Overflow, All } type;
-		TypePointer intType;
-		smt::Expression value;
-		smt::Expression path;
-		langutil::SourceLocation const& location;
-		std::vector<CallStackEntry> callStack;
-
-		OverflowTarget(Type _type, TypePointer _intType, smt::Expression _value, smt::Expression _path, langutil::SourceLocation const& _location, std::vector<CallStackEntry> _callStack):
-			type(_type),
-			intType(_intType),
-			value(_value),
-			path(_path),
-			location(_location),
-			callStack(move(_callStack))
-		{
-			solAssert(dynamic_cast<IntegerType const*>(intType), "");
-		}
-	};
-
-	/// Checks that the value is in the range given by the type.
-	void checkUnderflow(OverflowTarget& _target);
-	void checkOverflow(OverflowTarget& _target);
-	/// Calls the functions above for all elements in m_overflowTargets accordingly.
-	void checkUnderOverflow();
-	/// Adds an overflow target for lazy check at the end of the function.
-	void addOverflowTarget(OverflowTarget::Type _type, TypePointer _intType, smt::Expression _value, langutil::SourceLocation const& _location);
-
 	std::pair<smt::CheckResult, std::vector<std::string>>
 	checkSatisfiableAndGenerateModel(std::vector<smt::Expression> const& _expressionsToEvaluate);
 
 	smt::CheckResult checkSatisfiable();
+	//@}
 
 	void initializeLocalVariables(FunctionDefinition const& _function);
 	void initializeFunctionCallParameters(CallableDeclaration const& _function, std::vector<smt::Expression> const& _callArgs);
@@ -252,8 +259,8 @@ private:
 	void popPathCondition();
 	/// Returns the conjunction of all path conditions or True if empty
 	smt::Expression currentPathConditions();
-	/// Returns the current callstack. Used for models.
-	langutil::SecondarySourceLocation currentCallStack();
+	/// @returns a human-readable call stack. Used for models.
+	langutil::SecondarySourceLocation callStackMessage(std::vector<CallStackEntry> const& _callStack);
 	/// Copies and pops the last called node.
 	CallStackEntry popCallStack();
 	/// Adds (_definition, _node) to the callstack.
@@ -274,7 +281,7 @@ private:
 	/// @returns the VariableDeclaration referenced by an Identifier or nullptr.
 	VariableDeclaration const* identifierToVariable(Expression const& _expr);
 
-	smt::SMTPortfolio m_interface;
+	std::shared_ptr<smt::SolverInterface> m_interface;
 	smt::VariableUsage m_variableUsage;
 	bool m_loopExecutionHappened = false;
 	bool m_arrayAssignmentHappened = false;
@@ -304,7 +311,7 @@ private:
 	/// Returns true if _funDef was already visited.
 	bool visitedFunction(FunctionDefinition const* _funDef);
 
-	std::vector<OverflowTarget> m_overflowTargets;
+	std::vector<VerificationTarget> m_verificationTargets;
 
 	/// Depth of visit to modifiers.
 	/// When m_modifierDepth == #modifiers the function can be visited
