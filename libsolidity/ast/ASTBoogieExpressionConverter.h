@@ -59,7 +59,7 @@ private:
 	void addSideEffect(boogie::Stmt::Ref stmt);
 
 	// Helper method to add a side effects (statement)
-	void addSideEffects(std::vector<boogie::Stmt::Ref> const& stmts) { for (auto stmt : stmts) addSideEffect(stmt); }
+	void addSideEffects(std::vector<boogie::Stmt::Ref> const& stmts) { for (auto stmt: stmts) addSideEffect(stmt); }
 
 	// Helper methods for the different scenarios for function calls
 	void functionCallConversion(FunctionCall const& _node);

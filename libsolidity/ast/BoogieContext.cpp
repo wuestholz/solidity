@@ -22,7 +22,7 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 	m_magicVariables.clear();
 
 	// Add magic variables for the 'sum' function for all sizes of int and uint
-	for (string sumType : { "int", "uint" })
+	for (string sumType: { "int", "uint" })
 	{
 		auto funType = TypeProvider::function(strings { }, strings { sumType },
 				FunctionType::Kind::Internal, true, StateMutability::Pure);
@@ -31,7 +31,7 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 	}
 
 	// Add magic variables for the 'old' function
-	for (string oldType : { "address", "bool", "int", "uint" })
+	for (string oldType: { "address", "bool", "int", "uint" })
 	{
 		auto funType = TypeProvider::function(strings { oldType }, strings { oldType },
 				FunctionType::Kind::Internal, false, StateMutability::Pure);
@@ -94,7 +94,7 @@ string BoogieContext::mapDeclName(Declaration const& decl)
 
 	// Check if the current declaration is enclosed by any of the
 	// extra scopes, if yes, add extra ID
-	for (auto extraScope : m_extraScopes)
+	for (auto extraScope: m_extraScopes)
 	{
 		ASTNode const* running = decl.scope();
 		while (running)
@@ -163,7 +163,7 @@ void BoogieContext::addDecl(boogie::Decl::Ref decl)
 void BoogieContext::addConstant(boogie::Decl::Ref decl)
 {
 	bool alreadyDefined = false;
-	for (auto d : m_constants)
+	for (auto d: m_constants)
 	{
 		if (d->getName() == decl->getName())
 		{
@@ -209,7 +209,7 @@ boogie::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* 
 	{
 		vector<boogie::Binding> params;
 
-		for (auto member : structDef->members())
+		for (auto member: structDef->members())
 		{
 			// Make sure that the location of the member is storage (this is
 			// important for struct members as there is a single type per struct
@@ -241,7 +241,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 		if (m_storStructTypes.find(structDef) == m_storStructTypes.end())
 		{
 			vector<boogie::Binding> members;
-			for (auto member : structDef->members())
+			for (auto member: structDef->members())
 			{
 				// Make sure that the location of the member is storage (this is
 				// important for struct members as there is a single type per struct

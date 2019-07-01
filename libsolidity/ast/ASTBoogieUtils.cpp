@@ -646,7 +646,7 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 	case Type::Category::Tuple:
 	{
 		auto tupleType = dynamic_cast<TupleType const*>(type);
-		for (auto e : tupleType->components())
+		for (auto e: tupleType->components())
 			if (e && !isBitPreciseType(e))
 				return false;
 		return true;

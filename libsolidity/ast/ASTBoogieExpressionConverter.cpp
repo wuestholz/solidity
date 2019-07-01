@@ -58,7 +58,7 @@ void ASTBoogieExpressionConverter::addTCC(Expr::Ref expr, TypePointer tp)
 
 void ASTBoogieExpressionConverter::addSideEffect(Stmt::Ref stmt)
 {
-	for (auto oc : m_ocs)
+	for (auto oc: m_ocs)
 	{
 		m_newStatements.push_back(Stmt::assign(
 			Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
@@ -323,7 +323,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 {
 	addSideEffect(Stmt::comment("Deep copy struct " + structDef->name()));
 	// Loop through each member
-	for (auto member : structDef->members())
+	for (auto member: structDef->members())
 	{
 		// Get expressions for accessing members
 		Expr::Ref lhsSel = nullptr;
@@ -392,7 +392,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 {
 	// Get the elements
 	vector<Expr::Ref> elements;
-	for (auto element : _node.components())
+	for (auto element: _node.components())
 	{
 		if (element != nullptr)
 		{
@@ -758,9 +758,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// External calls require the invariants to hold
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 	{
-		for (auto invar : m_context.currentContractInvars())
+		for (auto invar: m_context.currentContractInvars())
 		{
-			for (auto tcc : invar.tccs)
+			for (auto tcc: invar.tccs)
 			{
 				addSideEffect(Stmt::assert_(tcc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Variables for invariant '" + invar.exprStr + "' might be out of range before external call.", *m_context.currentScanner())));
@@ -837,9 +837,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// Assume invariants after external call
 		if (funcName == ASTBoogieUtils::BOOGIE_CALL)
 		{
-			for (auto invar : m_context.currentContractInvars())
+			for (auto invar: m_context.currentContractInvars())
 			{
-				for (auto tcc : invar.tccs)
+				for (auto tcc: invar.tccs)
 					addSideEffect(Stmt::assume(tcc));
 				addSideEffect(Stmt::assume(invar.expr));
 			}

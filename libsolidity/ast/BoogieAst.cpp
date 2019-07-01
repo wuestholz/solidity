@@ -264,7 +264,7 @@ Attr::Ref Attr::attr(std::string s, std::string v, int i, int j)
 Stmt::Ref Stmt::annot(std::vector<Attr::Ref> const& attrs)
 {
 	AssumeStmt* s = new AssumeStmt(Expr::lit(true));
-	for (auto A : attrs)
+	for (auto A: attrs)
 		s->add(A);
 	return std::shared_ptr<AssumeStmt const>(s);
 }
@@ -805,7 +805,7 @@ void WhileStmt::print(std::ostream& os) const
 	else
 	{
 		os << "\n";
-		for (auto inv : invars)
+		for (auto inv: invars)
 		{
 			inv->print(os, "invariant");
 			os << "\n";
@@ -962,12 +962,12 @@ void ProcDecl::print(std::ostream& os) const
 	if (requires.size() > 0)
 	{
 		os << "\n";
-		for (auto req : requires) req->print(os, "requires");
+		for (auto req: requires) req->print(os, "requires");
 	}
 	if (ensures.size() > 0)
 	{
 		os << "\n";
-		for (auto ens : ensures) ens->print(os, "ensures");
+		for (auto ens: ensures) ens->print(os, "ensures");
 	}
 	if (blocks.size() > 0)
 	{
@@ -989,7 +989,7 @@ void CodeDecl::print(std::ostream& os) const
 void CommentDecl::print(std::ostream& os) const
 {
 	os << "// ";
-	for (char c : str)
+	for (char c: str)
 	{
 		os << c;
 		if (c == '\n')

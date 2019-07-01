@@ -499,7 +499,7 @@ public:
 	std::string getName() const { return name; }
 	Expr::Ref getRefTo() const { return Expr::id(name); }
 	void addAttr(Attr::Ref a) { attrs.push_back(a); }
-	void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a : ax) addAttr(a); }
+	void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a: ax) addAttr(a); }
 
 	static TypeDeclRef typee(std::string name, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
@@ -639,7 +639,7 @@ public:
 	}
 
 	void addStmts(std::vector<Stmt::Ref> const& stmts) {
-		for (auto s : stmts)
+		for (auto s: stmts)
 			addStmt(s);
 	}
 
