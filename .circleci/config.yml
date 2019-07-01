@@ -676,8 +676,8 @@ workflows:
       - b_ubu_ossfuzz: *workflow_trigger_on_tags
 
       # OS/X build and tests
-      - b_osx: *workflow_trigger_on_tags
-      - t_osx_cli: *workflow_osx
+      #- b_osx: *workflow_trigger_on_tags
+      #- t_osx_cli: *workflow_osx
 
       # Ubuntu 18.10 build and tests
       - b_ubu: *workflow_trigger_on_tags
