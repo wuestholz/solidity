@@ -1282,9 +1282,8 @@ void CommandLineInterface::handleBoogie()
 	{
 		stringstream data;
 		context.print(data);
-		// TODO: when multiple files are given, output file will have the name
-		// of the first file
-		boost::filesystem::path path(m_sourceCodes.begin()->first);
+		// When multiple files are given, output file will have the name of the first file
+		boost::filesystem::path path(m_args[g_argInputFile].as<vector<string>>()[0]);
 		createFile(path.filename().string() + ".bpl", data.str());
 	}
 	else
