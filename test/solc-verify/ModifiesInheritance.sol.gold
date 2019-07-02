@@ -1,9 +1,12 @@
 Verifying C::f: OK
 Verifying C::[implicit_constructor]: OK
-Verifying D::correct: OK
+Verifying D::correct1: OK
+Verifying D::correct2: OK
 Verifying D::incorrect1: ERROR
- - Source test/solc-verify/ModifiesInheritance.sol, line 15, col 5: Function might modify 'C::x' illegally
+ - Source test/solc-verify/ModifiesInheritance.sol, line 18, col 5: Function might modify 'C::x' illegally
 Verifying D::incorrect2: ERROR
- - Source test/solc-verify/ModifiesInheritance.sol, line 17, col 5: Function might modify 'D::x' illegally
+ - Source test/solc-verify/ModifiesInheritance.sol, line 20, col 5: Function might modify 'D::x' illegally
+Verifying D::incorrect3: ERROR
+ - Source test/solc-verify/ModifiesInheritance.sol, line 23, col 5: Function might modify 'C::x' illegally
 Verifying D::[implicit_constructor]: OK
 Errors were found by the verifier.
