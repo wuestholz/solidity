@@ -17,6 +17,7 @@ class ASTBoogieExpressionConverter : private ASTConstVisitor
 private:
 
 	BoogieContext& m_context;
+	ContractDefinition const* m_currentContract;
 
 	// Helper variables to pass information between the visit methods
 	boogie::Expr::Ref m_currentExpr;
@@ -99,7 +100,7 @@ public:
 	/**
 	 * Create a new instance with a given context and an optional location used for reporting errors.
 	 */
-	ASTBoogieExpressionConverter(BoogieContext& context);
+	ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side effect, the conversion might

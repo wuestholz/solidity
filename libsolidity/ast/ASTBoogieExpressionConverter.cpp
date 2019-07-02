@@ -68,8 +68,9 @@ void ASTBoogieExpressionConverter::addSideEffect(Stmt::Ref stmt)
 	m_newStatements.push_back(stmt);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context) :
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract) :
 		m_context(context),
+		m_currentContract(currentContract),
 		m_currentExpr(nullptr),
 		m_currentAddress(nullptr),
 		m_currentMsgValue(nullptr),
@@ -1063,12 +1064,22 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	Expr::Ref expr = m_currentExpr;
 	// The current expression gives the address on which something is done
 	m_currentAddress = m_currentExpr;
-	// If we are accessing something on 'super', the current address should be 'this'
-	// and not 'super', because that does not exist
+	// Check for explicit scopings and replace with 'this'
 	if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
-		if (dynamic_cast<MagicVariableDeclaration const*>(id->annotation().referencedDeclaration) &&
-				id->annotation().referencedDeclaration->name() == ASTBoogieUtils::SOLIDITY_SUPER)
+	{
+		auto refDecl = id->annotation().referencedDeclaration;
+		// 'super'
+		if (dynamic_cast<MagicVariableDeclaration const*>(refDecl) &&
+				refDecl->name() == ASTBoogieUtils::SOLIDITY_SUPER)
 			m_currentAddress = m_context.boogieThis()->getRefTo();
+		// current contract name
+		if (refDecl == m_currentContract)
+			m_currentAddress = m_context.boogieThis()->getRefTo();
+		// any base contract name
+		auto bases = m_currentContract->annotation().linearizedBaseContracts;
+		if (std::find(bases.begin(), bases.end(), refDecl) != bases.end())
+			m_currentAddress = m_context.boogieThis()->getRefTo();
+	}
 
 	// Type of the expression
 	TypePointer type = _node.expression().annotation().type;

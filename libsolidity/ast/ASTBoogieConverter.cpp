@@ -34,7 +34,7 @@ string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
 
 boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(_node);
 
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc: result.tccs)
@@ -295,7 +295,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 			if (typeChecker.checkTypeRequirements(*expr))
 			{
 				// Convert expression to Boogie representation
-				auto convResult = ASTBoogieExpressionConverter(m_context).convert(*expr);
+				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(*expr);
 				result.expr = convResult.expr;
 				result.exprStr = exprStr;
 				result.exprSol = expr;
