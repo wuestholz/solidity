@@ -404,6 +404,10 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				{
 					varDecl = id->annotation().referencedDeclaration;
 				}
+				else if (auto ma = dynamic_pointer_cast<MemberAccess const>(target.exprSol))
+				{
+					varDecl = ma->annotation().referencedDeclaration;
+				}
 				else if (auto idx = dynamic_pointer_cast<IndexAccess const>(target.exprSol))
 				{
 					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
@@ -431,38 +435,44 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 
 	if (m_context.modAnalysis() && !_node.isConstructor() && !modAll)
 	{
-		// TODO: inheritance?
-		for (auto sn: m_currentContract->subNodes())
+		// Linearized base contracts include the current contract as well
+		for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
 		{
-			if (auto varDecl = dynamic_pointer_cast<VariableDeclaration const>(sn))
+			for (auto sn: contract->subNodes())
 			{
-				if (varDecl->isConstant())
-					continue;
-				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
-				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
-
-				if (varDecl->type()->category() == Type::Category::Struct)
-					m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
-
-				// Build up expression recursively
-				boogie::Expr::Ref expr = boogie::Expr::old(varThis);
-
-				for (auto modSpec: modSpecs[varDecl.get()])
+				if (auto varDecl = dynamic_pointer_cast<VariableDeclaration const>(sn))
 				{
-					if (modSpec.idx)
-					{
-						auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(boogie::Expr::arrsel(expr, modSpec.idx));
-						auto writeExpr = ASTBoogieExpressionConverter::selectToUpdate(selExpr,
-								boogie::Expr::arrsel(varThis, modSpec.idx));
-						expr = boogie::Expr::if_then_else(modSpec.cond, writeExpr, expr);
-					}
-					else
-						expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
-				}
+					if (varDecl->isConstant())
+						continue;
+					auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+					auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
 
-				expr = boogie::Expr::eq(varThis, expr);
-				procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
-						ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varDecl->name() + "' illegally", *m_context.currentScanner())));
+					if (varDecl->type()->category() == Type::Category::Struct)
+						m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
+
+					// Build up expression recursively
+					boogie::Expr::Ref expr = boogie::Expr::old(varThis);
+
+					for (auto modSpec: modSpecs[varDecl.get()])
+					{
+						if (modSpec.idx)
+						{
+							auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(boogie::Expr::arrsel(expr, modSpec.idx));
+							auto writeExpr = ASTBoogieExpressionConverter::selectToUpdate(selExpr,
+									boogie::Expr::arrsel(varThis, modSpec.idx));
+							expr = boogie::Expr::if_then_else(modSpec.cond, writeExpr, expr);
+						}
+						else
+							expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
+					}
+
+					expr = boogie::Expr::eq(varThis, expr);
+					string varName = varDecl->name();
+					if (m_currentContract->annotation().linearizedBaseContracts.size() > 1)
+						varName = contract->name() + "::" + varName;
+					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varName + "' illegally", *m_context.currentScanner())));
+				}
 			}
 		}
 	}
