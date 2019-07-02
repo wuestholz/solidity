@@ -805,7 +805,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (m_isGetter)
 	{
-		// Getters are simply map accesses, noo ned to call function
+		// Getters are simply map accesses, no need to call function
 		m_currentExpr = returnVars[0];
 		addSideEffect(Stmt::assign(returnVars[0], m_currentExpr));
 	}
