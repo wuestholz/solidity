@@ -631,9 +631,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// 'm_currentExpr' should be an identifier, giving the name of the function
 	string funcName;
 	if (auto varExpr = dynamic_pointer_cast<bg::VarExpr const>(m_currentExpr))
-	{
 		funcName = varExpr->name();
-	}
+	else if (m_isGetter)
+		funcName = ""; // Map access is already constructed for getter, no need to call function
 	else
 	{
 		m_context.reportError(&_node, "Only identifiers are supported as function calls");
@@ -641,9 +641,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	}
 
 	if (m_isGetter && _node.arguments().size() > 0)
-	{
 		m_context.reportError(&_node, "Getter arguments are not supported");
-	}
 
 	// Process arguments recursively
 	vector<Expr::Ref> allArgs;
@@ -807,9 +805,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 
 	if (m_isGetter)
 	{
-		// Getters are replaced with map access (instead of function call)
+		// Getters are simply map accesses, noo ned to call function
 		m_currentExpr = returnVars[0];
-		addSideEffect(Stmt::assign(returnVars[0], Expr::arrsel(Expr::id(funcName), m_currentAddress)));
+		addSideEffect(Stmt::assign(returnVars[0], m_currentExpr));
 	}
 	else
 	{
@@ -1207,6 +1205,9 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	m_currentExpr = Expr::id(m_context.mapDeclName(*_node.annotation().referencedDeclaration));
 	// Check for getter
 	m_isGetter =  dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration);
+	if (m_isGetter)
+		m_currentExpr = Expr::arrsel(m_currentExpr, m_currentAddress);
+
 	// Check for library call
 	m_isLibraryCall = false;
 	if (auto fDef = dynamic_cast<FunctionDefinition const*>(_node.annotation().referencedDeclaration))
