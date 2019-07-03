@@ -268,6 +268,35 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		for (auto stmt: stmts)
 			m_currentBlocks.top()->addStmt(stmt);
 	}
+	// Inline base constructor statements
+	for (auto base: m_currentContract->annotation().linearizedBaseContracts)
+	{
+		if (base == m_currentContract)
+			continue; // Only include base statements, not ours
+
+		// Check if base has a constructor
+		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
+		for (auto sn: base->subNodes())
+			if (auto fndef = dynamic_pointer_cast<FunctionDefinition const>(sn))
+				if (fndef->isConstructor())
+					baseConstr = fndef;
+		if (!baseConstr)
+			continue;
+
+		if (!baseConstr->modifiers().empty())
+			m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
+		// TODO: get base constructor arguments
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
+		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
+		string oldReturnLabel = m_currentReturnLabel;
+		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
+		++m_nextReturnLabelId;
+		baseConstr->body().accept(*this);
+		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
+		m_currentReturnLabel = oldReturnLabel;
+		m_context.popExtraScope();
+	}
 }
 
 bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result)
