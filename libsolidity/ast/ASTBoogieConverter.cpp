@@ -285,12 +285,47 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		if (!baseConstr->modifiers().empty())
 			m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
-		// TODO: get base constructor arguments
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
+
 		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
+		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
 		++m_nextReturnLabelId;
+
+		// Try to get the argument list (from either inheritance specifiers or modifiers)
+		std::vector<ASTPointer<Expression>> const* argsList;
+		auto constrArgs = m_currentContract->annotation().baseConstructorArguments.find(baseConstr.get());
+		if (constrArgs != m_currentContract->annotation().baseConstructorArguments.end())
+		{
+			if (auto ispec = dynamic_cast<InheritanceSpecifier const*>(constrArgs->second))
+				argsList = ispec->arguments(); // Inheritance specifier
+			else if (auto mspec = dynamic_cast<ModifierInvocation const*>(constrArgs->second))
+				argsList = mspec->arguments(); // Modifier invocation
+		}
+
+		// Introduce and assign local variables for arguments
+		for (unsigned long i = 0; i < baseConstr->parameters().size(); i++)
+		{
+			// Introduce new variable for parameter
+			auto param = baseConstr->parameters()[i];
+			boogie::Decl::Ref constrParam = boogie::Decl::variable(m_context.mapDeclName(*param),
+					m_context.toBoogieType(param->annotation().type, param.get()));
+			m_localDecls.push_back(constrParam);
+			// Assign argument
+			if (argsList && argsList->size() > i)
+			{
+				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
+						boogie::Expr::id(constrParam->getName()),
+						convertExpression(*argsList->at(i))));
+			}
+			else // Or default value
+			{
+				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
+						boogie::Expr::id(constrParam->getName()),
+						defaultValue(param->annotation().type, m_context)));
+			}
+		}
+
 		baseConstr->body().accept(*this);
 		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
 		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
@@ -546,9 +581,7 @@ void ASTBoogieConverter::processModifier()
 			m_currentReturnLabel = oldReturnLabel;
 			m_context.popExtraScope();
 		}
-		else if (dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
-			m_context.reportError(modifier.get(), "Base constructor call is not supported as modifier invocation");
-		else
+		else if (!dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
 			m_context.reportError(modifier.get(), "Unsupported modifier invocation");
 	}
 	else if (m_currentFunc->isImplemented()) // We reached the function
@@ -675,10 +708,6 @@ bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 	// TODO: calling constructor of superclass?
 	// Boogie programs are flat, inheritance does not appear explicitly
 	m_context.addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
-	if (_node.arguments() && _node.arguments()->size() > 0)
-	{
-		m_context.reportError(&_node, "Arguments for base constructor in inheritance list is not supported");
-	}
 	return false;
 }
 
