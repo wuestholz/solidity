@@ -83,6 +83,12 @@ private:
 	void createImplicitConstructor(ContractDefinition const& _node);
 
 	/**
+	 * Helper method to add the extra preamble that a constructor requires.
+	 * Used by both regular and implicit constructors.
+	 */
+	void constructorPreamble(ASTNode const& _scope);
+
+	/**
 	 * Helper method to parse an expression from a string with a given scope
 	 */
 	bool parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result);

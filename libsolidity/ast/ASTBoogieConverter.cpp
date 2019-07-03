@@ -215,35 +215,12 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 
 	m_localDecls.clear();
 
-	// Type to pass around
-	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
-
-	boogie::Block::Ref block = boogie::Block::block();
-	// this.balance = 0
-	block->addStmt(boogie::Stmt::assign(
-			m_context.boogieBalance()->getRefTo(),
-			boogie::Expr::arrupd(
-					m_context.boogieBalance()->getRefTo(),
-					m_context.boogieThis()->getRefTo(),
-					defaultValue(tp_uint256, m_context))));
-	// State variable initializers should go to the beginning of the constructor
-	for (auto i: m_stateVarInitializers)
-		block->addStmt(i);
-	m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
-	m_stateVarInitializers.clear(); // Clear list so that we know that initializers have been included
-	// Assign uninitialized state variables to default values
-	for (auto declNode: m_stateVarsToInitialize)
-	{
-		std::vector<boogie::Stmt::Ref> stmts;
-		bool ok = defaultValueAssignment(*declNode, _node, stmts);
-		if (!ok)
-		{
-			m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
-		}
-		for (auto stmt: stmts)
-			block->addStmt(stmt);
-	}
-	m_stateVarsToInitialize.clear();
+	// Include preamble
+	m_currentBlocks.push(boogie::Block::block());
+	constructorPreamble(_node);
+	boogie::Block::Ref block = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
 	string funcName = ASTBoogieUtils::getConstructorName(&_node);
 
@@ -264,6 +241,33 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	auto attrs = ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[implicit_constructor]", *m_context.currentScanner());
 	procDecl->addAttrs(attrs);
 	m_context.addDecl(procDecl);
+}
+
+void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
+{
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+
+	// this.balance = 0
+	m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
+			m_context.boogieBalance()->getRefTo(),
+			boogie::Expr::arrupd(
+					m_context.boogieBalance()->getRefTo(),
+					m_context.boogieThis()->getRefTo(),
+					defaultValue(tp_uint256, m_context))));
+	// Assign state vars that have initializers
+	for (auto i: m_stateVarInitializers)
+		m_currentBlocks.top()->addStmt(i);
+	m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
+	// Assign uninitialized state variables to default values
+	for (auto declNode: m_stateVarsToInitialize)
+	{
+		std::vector<boogie::Stmt::Ref> stmts;
+		bool ok = defaultValueAssignment(*declNode, _scope, stmts);
+		if (!ok)
+			m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
+		for (auto stmt: stmts)
+			m_currentBlocks.top()->addStmt(stmt);
+	}
 }
 
 bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result)
@@ -771,30 +775,9 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_localDecls.clear();
 	// Create new empty block
 	m_currentBlocks.push(boogie::Block::block());
-	// State variable initializers should go to the beginning of the constructor
+	// Include constructor preamble
 	if (_node.isConstructor())
-	{
-		// this.balance = 0
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-				m_context.boogieBalance()->getRefTo(),
-				boogie::Expr::arrupd(
-						m_context.boogieBalance()->getRefTo(),
-						m_context.boogieThis()->getRefTo(),
-						defaultValue(tp_uint256, m_context))));
-		for (auto i: m_stateVarInitializers)
-			m_currentBlocks.top()->addStmt(i);
-		m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
-		// Assign uninitialized state variables to default values
-		for (auto declNode: m_stateVarsToInitialize)
-		{
-			std::vector<boogie::Stmt::Ref> stmts;
-			bool ok = defaultValueAssignment(*declNode, _node, stmts);
-			if (!ok)
-				m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
-			for (auto stmt: stmts)
-				m_currentBlocks.top()->addStmt(stmt);
-		}
-	}
+		constructorPreamble(_node);
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
