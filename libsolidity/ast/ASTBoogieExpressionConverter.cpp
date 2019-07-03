@@ -1044,6 +1044,16 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 
 bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 {
+	// Inline constants
+	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration))
+	{
+		if (varDecl->isConstant())
+		{
+			varDecl->value()->accept(*this);
+			return false;
+		}
+	}
+
 	// Normally, the expression of the MemberAccess will give the address and
 	// the memberName will give the name. For example, x.f() will have address
 	// 'x' and name 'f'.
