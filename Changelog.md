@@ -2,6 +2,7 @@
 
 
 Language Features:
+ * Inline Assembly: Support direct constants of value type in inline assembly.
 
 
 
@@ -9,11 +10,13 @@ Language Features:
 Compiler Features:
  * eWasm: Highly experimental eWasm output using ``--ewasm`` in the commandline interface or output selection of ``ewasm.wast`` in standard-json.
  * Metadata: Update the swarm hash, changes ``bzzr0`` to ``bzzr1`` and urls to use ``bzz-raw://``.
+ * Standard JSON Interface: Compile only selected sources and contracts.
 
 
 
 
 Bugfixes:
+ * View/Pure Checker: Properly detect state variable access through base class.
 
 
 
