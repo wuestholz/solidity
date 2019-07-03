@@ -603,17 +603,18 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	for (auto ispec: _node.baseContracts())
 		ispec->accept(*this);
 
-	// Process state variables first (to get initializer expressions)
+	// Collect state variable initializers first, must be done for
+	// base class members as well
 	m_stateVarInitializers.clear();
 	m_stateVarsToInitialize.clear();
-	for (auto sn: _node.subNodes())
-		if (dynamic_pointer_cast<VariableDeclaration const>(sn))
-			sn->accept(*this);
+	for (auto contract: _node.annotation().linearizedBaseContracts)
+		for (auto sn: contract->subNodes())
+			if (auto sv = dynamic_pointer_cast<VariableDeclaration const>(sn))
+				checkForInitializer(*sv);
 
-	// Process other elements
+	// Process subnodes
 	for (auto sn: _node.subNodes())
-		if (!dynamic_pointer_cast<VariableDeclaration const>(sn))
-			sn->accept(*this);
+		sn->accept(*this);
 
 	// If no constructor exists, create an implicit one
 	bool hasConstructor = false;
@@ -938,16 +939,11 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	return false;
 }
 
-bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
+void ASTBoogieConverter::checkForInitializer(VariableDeclaration const& _node)
 {
-	rememberScope(_node);
-
-	// Non-state variables should be handled in the VariableDeclarationStatement
-	solAssert(_node.isStateVariable(), "Non-state variable appearing in VariableDeclaration");
-
 	// Constants are inlined
 	if (_node.isConstant())
-		return false;
+		return;
 
 	if (_node.value())
 	{
@@ -974,6 +970,20 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 		// Use implicit default value (will generate later, once we are in scope of constructor)
 		m_stateVarsToInitialize.push_back(&_node);
 	}
+}
+
+bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
+{
+	rememberScope(_node);
+
+	// Non-state variables should be handled in the VariableDeclarationStatement
+	solAssert(_node.isStateVariable(), "Non-state variable appearing in VariableDeclaration");
+
+	// Initializers are collected by the visitor for ContractDefinition
+
+	// Constants are inlined
+	if (_node.isConstant())
+		return false;
 
 	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type

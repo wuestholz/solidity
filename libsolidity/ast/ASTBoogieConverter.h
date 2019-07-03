@@ -108,6 +108,8 @@ private:
 	 */
 	void processModifier();
 
+	void checkForInitializer(VariableDeclaration const& _node);
+
 	/**
 	 * Chronological stack of scoppable nodes.
 	 */
