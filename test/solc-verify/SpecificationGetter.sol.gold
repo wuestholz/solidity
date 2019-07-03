@@ -1,0 +1,7 @@
+Verifying A::setX: OK
+Verifying A::[implicit_constructor]: OK
+Verifying B::[constructor]: OK
+Verifying B::incr: OK
+Verifying B::incr_incorrect: ERROR
+ - Source test/solc-verify/SpecificationGetter.sol, line 25, col 5: Invariant 'a.x() == y ' might not hold at end of function.
+Errors were found by the verifier.

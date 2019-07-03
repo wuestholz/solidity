@@ -628,12 +628,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Process expression
 	_node.expression().accept(*this);
 
+	if (m_isGetter)
+		return false; // Result is already in the current expr
+
 	// 'm_currentExpr' should be an identifier, giving the name of the function
 	string funcName;
 	if (auto varExpr = dynamic_pointer_cast<bg::VarExpr const>(m_currentExpr))
 		funcName = varExpr->name();
-	else if (m_isGetter)
-		funcName = ""; // Map access is already constructed for getter, no need to call function
 	else
 	{
 		m_context.reportError(&_node, "Only identifiers are supported as function calls");
@@ -802,54 +803,44 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			returnVars.push_back(Expr::id(varName));
 		}
 	}
+	// Assign call to the fresh variable
+	addSideEffects({
+		Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())),
+		Stmt::call(funcName, allArgs, returnVarNames)
+	});
 
-	if (m_isGetter)
+	// Result is the none, single variable, or a tuple of variables
+	if (returnVars.size() == 0)
 	{
-		// Getters are simply map accesses, no need to call function
+		// For new expressions there is no return value, but the address should be used
+		if (dynamic_cast<NewExpression const*>(&_node.expression())) m_currentExpr = m_currentAddress;
+		else m_currentExpr = nullptr;
+	}
+	else if (returnVars.size() == 1)
+	{
 		m_currentExpr = returnVars[0];
-		addSideEffect(Stmt::assign(returnVars[0], m_currentExpr));
 	}
 	else
 	{
-		// Assign call to the fresh variable
-		addSideEffects({
-			Stmt::annot(ASTBoogieUtils::createAttrs(_node.location(), "", *m_context.currentScanner())),
-			Stmt::call(funcName, allArgs, returnVarNames)
-		});
+		m_currentExpr = Expr::tuple(returnVars);
+	}
 
-		// Result is the none, single variable, or a tuple of variables
-		if (returnVars.size() == 0)
+	// Assume invariants after external call
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL)
+	{
+		for (auto invar: m_context.currentContractInvars())
 		{
-			// For new expressions there is no return value, but the address should be used
-			if (dynamic_cast<NewExpression const*>(&_node.expression())) m_currentExpr = m_currentAddress;
-			else m_currentExpr = nullptr;
+			for (auto tcc: invar.tccs)
+				addSideEffect(Stmt::assume(tcc));
+			addSideEffect(Stmt::assume(invar.expr));
 		}
-		else if (returnVars.size() == 1)
-		{
-			m_currentExpr = returnVars[0];
-		}
-		else
-		{
-			m_currentExpr = Expr::tuple(returnVars);
-		}
+	}
 
-		// Assume invariants after external call
-		if (funcName == ASTBoogieUtils::BOOGIE_CALL)
-		{
-			for (auto invar: m_context.currentContractInvars())
-			{
-				for (auto tcc: invar.tccs)
-					addSideEffect(Stmt::assume(tcc));
-				addSideEffect(Stmt::assume(invar.expr));
-			}
-		}
-
-		// The call function is special as it indicates failure in a return value and in this case
-		// we must undo reducing our balance
-		if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
-		{
-			functionCallRevertBalance(msgValue);
-		}
+	// The call function is special as it indicates failure in a return value and in this case
+	// we must undo reducing our balance
+	if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
+	{
+		functionCallRevertBalance(msgValue);
 	}
 
 	return false;
