@@ -293,7 +293,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		++m_nextReturnLabelId;
 
 		// Try to get the argument list (from either inheritance specifiers or modifiers)
-		std::vector<ASTPointer<Expression>> const* argsList;
+		std::vector<ASTPointer<Expression>> const* argsList = nullptr;
 		auto constrArgs = m_currentContract->annotation().baseConstructorArguments.find(baseConstr.get());
 		if (constrArgs != m_currentContract->annotation().baseConstructorArguments.end())
 		{
