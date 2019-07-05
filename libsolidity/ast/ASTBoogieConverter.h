@@ -25,14 +25,6 @@ private:
 	// Collect local variable declarations (Boogie requires them at the beginning of the function).
 	std::vector<boogie::Decl::Ref> m_localDecls;
 
-	// Collect initializers for state variables to be added to the beginning of the constructor
-	// If there is no constructor, we create one
-	std::vector<boogie::Stmt::Ref> m_stateVarInitializers;
-	std::vector<boogie::Decl::Ref> m_stateVarInitTmpDecls;
-
-	// Collect variables to be initialized to default values
-	std::vector<VariableDeclaration const*> m_stateVarsToInitialize;
-
 	// Current block(s) where statements are appended, stack is needed due to nested blocks
 	std::stack<boogie::Block::Ref> m_currentBlocks;
 
@@ -89,6 +81,12 @@ private:
 	void constructorPreamble(ASTNode const& _scope);
 
 	/**
+	 * Helper method to initialize a state variable based on an explicit expression or
+	 * a default value
+	 */
+	void initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope);
+
+	/**
 	 * Helper method to parse an expression from a string with a given scope
 	 */
 	bool parseExpr(std::string exprStr, ASTNode const& _node, ASTNode const* _scope, BoogieContext::DocTagExpr& result);
@@ -96,8 +94,8 @@ private:
 	/**
 	 * Parse expressions from documentation for a given doctag
 	 */
-	void getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
-			ASTNode const* _scope, std::string _tag, std::vector<BoogieContext::DocTagExpr>& out);
+	std::vector<BoogieContext::DocTagExpr> getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
+			ASTNode const* _scope, std::string _tag);
 
 	/**
 	 * Checks if contract invariants are explicitly requested (for non-public functions)
@@ -123,11 +121,9 @@ private:
 	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);
 
 	/**
-	 * Helper method to recursively process a modifier
+	 * Helper method to recursively process modifiers and then finally the function body
 	 */
-	void processModifier();
-
-	void checkForInitializer(VariableDeclaration const& _node);
+	void processFuncModifiersAndBody();
 
 	/**
 	 * Chronological stack of scoppable nodes.

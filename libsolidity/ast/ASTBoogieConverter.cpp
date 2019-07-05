@@ -254,20 +254,13 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 					m_context.boogieBalance()->getRefTo(),
 					m_context.boogieThis()->getRefTo(),
 					defaultValue(tp_uint256, m_context))));
-	// Assign state vars that have initializers
-	for (auto i: m_stateVarInitializers)
-		m_currentBlocks.top()->addStmt(i);
-	m_localDecls.insert(end(m_localDecls), begin(m_stateVarInitTmpDecls), end(m_stateVarInitTmpDecls));
-	// Assign uninitialized state variables to default values
-	for (auto declNode: m_stateVarsToInitialize)
-	{
-		std::vector<boogie::Stmt::Ref> stmts;
-		bool ok = defaultValueAssignment(*declNode, _scope, stmts);
-		if (!ok)
-			m_context.reportWarning(declNode, "Boogie: Unhandled default value, constructor verification might fail.");
-		for (auto stmt: stmts)
-			m_currentBlocks.top()->addStmt(stmt);
-	}
+
+	// Initialize state variables first, must be done for
+	// base class members as well
+	for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
+		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
+			initializeStateVar(*sv, _scope);
+
 	// Inline base constructor statements
 	for (auto base: m_currentContract->annotation().linearizedBaseContracts)
 	{
@@ -331,6 +324,35 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
 		m_currentReturnLabel = oldReturnLabel;
 		m_context.popExtraScope();
+	}
+}
+
+void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope)
+{
+	// Constants are inlined
+	if (_node.isConstant())
+		return;
+
+	if (_node.value()) // If there is an explicit initializer
+	{
+		boogie::Expr::Ref initExpr = convertExpression(*_node.value());
+
+		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
+		{
+			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
+		}
+		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
+				boogie::Expr::arrupd(
+						boogie::Expr::id(m_context.mapDeclName(_node)),
+						m_context.boogieThis()->getRefTo(),
+						initExpr)));
+	} else { // Use implicit default value
+		std::vector<boogie::Stmt::Ref> stmts;
+		bool ok = defaultValueAssignment(_node, _scope, stmts);
+		if (!ok)
+			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+		for (auto stmt: stmts)
+			m_currentBlocks.top()->addStmt(stmt);
 	}
 }
 
@@ -403,9 +425,10 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	return true;
 }
 
-void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
-		ASTNode const* _scope, string _tag, vector<BoogieContext::DocTagExpr>& exprs)
+std::vector<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnnotation const& _annot,
+		ASTNode const* _scope, string _tag)
 {
+	std::vector<BoogieContext::DocTagExpr> exprs;
 	for (auto docTag: _annot.docTags)
 	{
 		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, _tag)) // Find expressions with the given tag
@@ -415,6 +438,7 @@ void ASTBoogieConverter::getExprsFromDocTags(ASTNode const& _node, DocumentedAnn
 				exprs.push_back(expr);
 		}
 	}
+	return exprs;
 }
 
 bool ASTBoogieConverter::includeContractInvars(DocumentedAnnotation const& _annot)
@@ -561,7 +585,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 	}
 }
 
-void ASTBoogieConverter::processModifier()
+void ASTBoogieConverter::processFuncModifiersAndBody()
 {
 	if (m_currentModifier < m_currentFunc->modifiers().size()) // We still have modifiers
 	{
@@ -662,9 +686,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	m_context.currentContractInvars().clear();
 	m_context.currentSumDecls().clear();
 
-	std::vector<BoogieContext::DocTagExpr> invars;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR, invars);
-	for (auto invar: invars)
+	for (auto invar: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR))
 	{
 		m_context.addGlobalComment("Contract invariant: " + invar.exprStr);
 		m_context.currentContractInvars().push_back(invar);
@@ -683,14 +705,6 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	// Process inheritance specifiers (not included in subNodes)
 	for (auto ispec: _node.baseContracts())
 		ispec->accept(*this);
-
-	// Collect state variable initializers first, must be done for
-	// base class members as well
-	m_stateVarInitializers.clear();
-	m_stateVarsToInitialize.clear();
-	for (auto contract: _node.annotation().linearizedBaseContracts)
-		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
-			checkForInitializer(*sv);
 
 	// Process subnodes
 	for (auto sn: _node.subNodes())
@@ -715,8 +729,6 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 bool ASTBoogieConverter::visit(InheritanceSpecifier const& _node)
 {
 	rememberScope(_node);
-
-	// TODO: calling constructor of superclass?
 	// Boogie programs are flat, inheritance does not appear explicitly
 	m_context.addGlobalComment("Inherits from: " + boost::algorithm::join(_node.name().namePath(), "#"));
 	return false;
@@ -870,22 +882,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	}
 
 	// Modifiers need to be inlined
-	if (_node.modifiers().empty())
-	{
-		if (_node.isImplemented())
-		{
-			string retLabel = "$return" + to_string(m_nextReturnLabelId);
-			++m_nextReturnLabelId;
-			m_currentReturnLabel = retLabel;
-			_node.body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(retLabel));
-		}
-	}
-	else
-	{
-		m_currentModifier = 0;
-		processModifier();
-	}
+	m_currentModifier = 0;
+	processFuncModifiersAndBody();
 
 	vector<boogie::Block::Ref> blocks;
 	if (!m_currentBlocks.top()->getStatements().empty())
@@ -944,39 +942,29 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(boogie::Attr::attr("inline", 1));
 
 	// Add other pre/postconditions
-	std::vector<BoogieContext::DocTagExpr> preconds;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND, preconds);
-	for (auto pre: preconds)
+	for (auto pre: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
 	{
 		procDecl->getRequires().push_back(boogie::Specification::spec(pre.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 		for (auto tcc: pre.tccs)
-		{
 			procDecl->getRequires().push_back(boogie::Specification::spec(tcc,
 				ASTBoogieUtils::createAttrs(_node.location(), "Variables in precondition '" + pre.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
-		}
+
 		for (auto oc: pre.ocs)
-		{
 			procDecl->getRequires().push_back(boogie::Specification::spec(oc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of precondition '" + pre.exprStr + "' when entering function.", *m_context.currentScanner())));
-		}
 	}
-	std::vector<BoogieContext::DocTagExpr> postconds;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND, postconds);
-	for (auto post: postconds)
+	for (auto post: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
 		procDecl->getEnsures().push_back(boogie::Specification::spec(post.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		for (auto tcc: post.tccs)
-		{
 			procDecl->getEnsures().push_back(boogie::Specification::spec(tcc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Variables in postcondition '" + post.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
-		}
+
 		for (auto oc: post.ocs)
-		{
 			procDecl->getEnsures().push_back(boogie::Specification::spec(oc,
 							ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of postcondition '" + post.exprStr + "' at end of function.", *m_context.currentScanner())));
-		}
 	}
 	// TODO: check that no new sum variables were introduced
 
@@ -989,39 +977,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
 	m_context.addDecl(procDecl);
 	return false;
-}
-
-void ASTBoogieConverter::checkForInitializer(VariableDeclaration const& _node)
-{
-	// Constants are inlined
-	if (_node.isConstant())
-		return;
-
-	if (_node.value())
-	{
-		// Initialization is saved for the constructor
-		// A new block is introduced to collect side effects of the initializer expression
-		m_currentBlocks.push(boogie::Block::block());
-		m_localDecls.clear();
-		boogie::Expr::Ref initExpr = convertExpression(*_node.value());
-		m_stateVarInitTmpDecls.insert(end(m_stateVarInitTmpDecls), begin(m_localDecls), end(m_localDecls));
-
-		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
-		{
-			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
-		}
-		m_stateVarInitializers.insert(end(m_stateVarInitializers), begin(*m_currentBlocks.top()), end(*m_currentBlocks.top()));
-
-		m_currentBlocks.pop();
-		m_stateVarInitializers.push_back(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
-				boogie::Expr::arrupd(
-						boogie::Expr::id(m_context.mapDeclName(_node)),
-						m_context.boogieThis()->getRefTo(),
-						initExpr)));
-	} else {
-		// Use implicit default value (will generate later, once we are in scope of constructor)
-		m_stateVarsToInitialize.push_back(&_node);
-	}
 }
 
 bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
@@ -1147,7 +1102,7 @@ bool ASTBoogieConverter::visit(PlaceholderStatement const& _node)
 	rememberScope(_node);
 
 	m_currentModifier++; // Go one level deeper
-	processModifier();   // Process the body
+	processFuncModifiersAndBody();   // Process the body
 	m_currentModifier--; // We are back
 
 	return false;
@@ -1215,8 +1170,7 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 		));
 	}
 
-	std::vector<BoogieContext::DocTagExpr> loopInvars;
-	getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR, loopInvars);
+	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR);
 	if (includeContractInvars(_node.annotation()))
 		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar: loopInvars)
@@ -1289,8 +1243,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		));
 	}
 
-	std::vector<BoogieContext::DocTagExpr> loopInvars;
-	getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR, loopInvars);
+	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR);
 	if (includeContractInvars(_node.annotation()))
 		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar: loopInvars)
