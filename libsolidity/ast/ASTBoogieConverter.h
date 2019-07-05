@@ -105,6 +105,15 @@ private:
 	bool includeContractInvars(DocumentedAnnotation const& _annot);
 
 	/**
+	 * Helper method to extract the variable to which the modifies specification corresponds.
+	 * For example, in x[1].m, the base variable is x.
+	 */
+	Declaration const* getModifiesBase(Expression const* expr);
+
+	bool isSelector(boogie::Expr::Ref expr);
+	boogie::Expr::Ref replaceBase(boogie::Expr::Ref expr, boogie::Expr::Ref value);
+
+	/**
 	 * Helper method to extract and add modifies specifications to a function
 	 */
 	void addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl);

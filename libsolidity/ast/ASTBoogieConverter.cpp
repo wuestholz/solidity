@@ -426,6 +426,54 @@ bool ASTBoogieConverter::includeContractInvars(DocumentedAnnotation const& _anno
 	return false;
 }
 
+Declaration const* ASTBoogieConverter::getModifiesBase(Expression const* expr)
+{
+	if (auto id = dynamic_cast<Identifier const*>(expr))
+	{
+		return id->annotation().referencedDeclaration;
+	}
+	else if (auto ma = dynamic_cast<MemberAccess const*>(expr))
+	{
+		auto decl = dynamic_cast<VariableDeclaration const*>(ma->annotation().referencedDeclaration);
+		if (decl && decl->isStateVariable())
+			return decl;
+		else return getModifiesBase(&ma->expression());
+	}
+	else if (auto idx = dynamic_cast<IndexAccess const*>(expr))
+	{
+		return getModifiesBase(&idx->baseExpression());
+	}
+	return nullptr;
+}
+
+bool ASTBoogieConverter::isSelector(boogie::Expr::Ref expr)
+{
+	if (auto exprArrSel = dynamic_pointer_cast<boogie::ArrSelExpr const>(expr))
+	{
+		// Base is reached when it is a variable indexed with 'this'
+		auto idxAsId = dynamic_pointer_cast<boogie::VarExpr const>(exprArrSel->getIdxs()[0]);
+		if (dynamic_pointer_cast<boogie::VarExpr const>(exprArrSel->getBase()) &&
+				idxAsId->name() == m_context.boogieThis()->getName())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+boogie::Expr::Ref ASTBoogieConverter::replaceBase(boogie::Expr::Ref expr, boogie::Expr::Ref value)
+{
+	if (!isSelector(expr))
+		return value;
+	if (auto exprArrSel = dynamic_pointer_cast<boogie::ArrSelExpr const>(expr))
+		return boogie::Expr::arrsel(replaceBase(exprArrSel->getBase(), value), exprArrSel->getIdxs());
+	if (auto exprDtSel = dynamic_pointer_cast<boogie::DtSelExpr const>(expr))
+		return boogie::Expr::dtsel(replaceBase(exprDtSel->getBase(), value), exprDtSel->getMember(), exprDtSel->getConstr(), exprDtSel->getDataType());
+
+	solAssert(false, "Base could not be replaced");
+	return expr;
+}
+
 void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
 {
 	// Modifies specifier
@@ -466,40 +514,18 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			BoogieContext::DocTagExpr target;
 			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
 			{
-				Declaration const* varDecl = nullptr;
-				boogie::Expr::Ref indexer = nullptr;
-				if (auto id = dynamic_pointer_cast<Identifier const>(target.exprSol))
-				{
-					varDecl = id->annotation().referencedDeclaration;
-				}
-				else if (auto ma = dynamic_pointer_cast<MemberAccess const>(target.exprSol))
-				{
-					varDecl = ma->annotation().referencedDeclaration;
-				}
-				else if (auto idx = dynamic_pointer_cast<IndexAccess const>(target.exprSol))
-				{
-					if (auto id = dynamic_cast<Identifier const*>(&idx->baseExpression()))
-					{
-						varDecl = id->annotation().referencedDeclaration;
-						if (auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(target.expr))
-							indexer = selExpr->getIdxs()[0];
-						else
-							solAssert(false, "Invalid indexer in modifies");
-					}
-					else
-						m_context.reportError(&_node, "Base of indexer in modifies must be identifier");
-				}
-				else
-					m_context.reportError(&_node, "Target of modifies must be identifier or indexer");
-
+				Declaration const* varDecl = getModifiesBase(target.exprSol.get());
+				// if (varDecl) m_context.reportError(&_node, "BASE: " + varDecl->name());
 				if (varDecl)
-					modSpecs[varDecl].push_back(ModSpec(condExpr, indexer));
+					modSpecs[varDecl].push_back(ModSpec(condExpr, target.expr));
+				else
+					m_context.reportError(&_node, "Invalid target expression for modifies specification");
 			}
 		}
 	}
 
 	if (modAll && !modSpecs.empty())
-		m_context.reportWarning(&_node, "Modifies all was given, other modifies specs are ignored");
+		m_context.reportWarning(&_node, "Modifies all was given, other modifies specifications are ignored");
 
 	if (m_context.modAnalysis() && !_node.isConstructor() && !modAll)
 	{
@@ -515,23 +541,21 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 					auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
 					auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
 
-					if (varDecl->type()->category() == Type::Category::Struct)
-						m_context.reportError(&_node, "Modifies specification is not supported when structures are present.");
-
 					// Build up expression recursively
 					boogie::Expr::Ref expr = boogie::Expr::old(varThis);
 
 					for (auto modSpec: modSpecs[varDecl.get()])
 					{
-						if (modSpec.idx)
+						if (isSelector(modSpec.idx))
 						{
-							auto selExpr = dynamic_pointer_cast<boogie::ArrSelExpr const>(boogie::Expr::arrsel(expr, modSpec.idx));
-							auto writeExpr = ASTBoogieExpressionConverter::selectToUpdate(selExpr,
-									boogie::Expr::arrsel(varThis, modSpec.idx));
-							expr = boogie::Expr::if_then_else(modSpec.cond, writeExpr, expr);
+							auto repl = replaceBase(modSpec.idx, expr);
+							auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.idx);
+							expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
 						}
 						else
+						{
 							expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
+						}
 					}
 
 					expr = boogie::Expr::eq(varThis, expr);

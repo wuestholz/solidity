@@ -13,27 +13,33 @@ contract ModifiesStructs {
 
     S s;
     mapping(address=>S) ss;
-    int x;
 
-    /** @notice modifies x */
-    function modifyStructIncorrect(int value) public {
-        s.t.z = value;
-        x = value;
+    /// @notice modifies s.x
+    /// @notice modifies s.t.z
+    function f1() public {
+        s.x = 1;
+        s.t.z = 5;
     }
 
-    /** @notice modifies s */
-    function modifyStructCorrect(int value) public {
-        s.t.z = value;
+    /// @notice modifies s.x
+    /// @notice modifies s if msg.value > 0
+    function f2() public payable {
+        s.x = 1;
+        if (msg.value > 0) s.t.z = 5;
     }
 
-    /** @notice modifies s[this] if value > 0 */
-    function modifyStructMapIncorrect(int value) public {
-        ss[msg.sender].t.z = value;
+    /// @notice modifies ss[msg.sender].t.z
+    function f3() public {
+        ss[msg.sender].t.z = 5;
     }
 
-    /** @notice modifies ss[address(this)] if value > 0 */
-    function modifyStructMapCorrect(int value) public {
-        require(value > 0);
-        ss[address(this)].t.z = value;
+    /// @notice modifies ss[msg.sender].t
+    function f4() public {
+        ss[msg.sender].t.z = 5;
+    }
+
+    /// @notice modifies ss[msg.sender].t.z
+    function f5() public {
+        ss[msg.sender].x = 7; // ILLEGAL
     }
 }

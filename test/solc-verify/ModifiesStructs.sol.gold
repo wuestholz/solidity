@@ -1,0 +1,8 @@
+Verifying ModifiesStructs::f1: OK
+Verifying ModifiesStructs::f2: OK
+Verifying ModifiesStructs::f3: OK
+Verifying ModifiesStructs::f4: OK
+Verifying ModifiesStructs::f5: ERROR
+ - Source test/solc-verify/ModifiesStructs.sol, line 42, col 5: Function might modify 'ss' illegally
+Verifying ModifiesStructs::[implicit_constructor]: OK
+Errors were found by the verifier.
