@@ -207,6 +207,7 @@ public:
 	SelExpr(Ref base) : base(base) {}
 	Ref getBase() const { return base; }
 	virtual Ref toUpdate(Ref v) const = 0;
+	virtual Ref replaceBase(Ref b) const = 0;
 };
 
 class UpdExpr : public Expr {
@@ -226,6 +227,7 @@ public:
 	std::vector<Ref> const& getIdxs() const { return idxs; }
 	void print(std::ostream& os) const override;
 	Ref toUpdate(Ref v) const override { return Expr::arrupd(base, idxs, v); }
+	Ref replaceBase(Ref b) const override { return Expr::arrsel(b, idxs); }
 };
 
 class ArrUpdExpr : public UpdExpr {
@@ -557,6 +559,7 @@ public:
 	DataTypeDeclRef getDataType() const { return dt; }
 	void print(std::ostream& os) const override;
 	Ref toUpdate(Ref v) const override { return Expr::dtupd(base, member, v, constr, dt); }
+	Ref replaceBase(Ref b) const override { return Expr::dtsel(b, member, constr, dt); }
 };
 
 class DtUpdExpr : public UpdExpr {

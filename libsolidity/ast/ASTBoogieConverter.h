@@ -110,8 +110,12 @@ private:
 	 */
 	Declaration const* getModifiesBase(Expression const* expr);
 
-	bool isSelector(boogie::Expr::Ref expr);
-	boogie::Expr::Ref replaceBase(boogie::Expr::Ref expr, boogie::Expr::Ref value);
+	/*
+	 * Helper method to replace the base variable of an expression, e.g.,
+	 * replacing 'x' in 'x[i].y'.
+	 */
+	boogie::Expr::Ref replaceBaseVar(boogie::Expr::Ref expr, boogie::Expr::Ref value);
+	bool isBaseVar(boogie::Expr::Ref expr);
 
 	/**
 	 * Helper method to extract and add modifies specifications to a function

@@ -446,7 +446,7 @@ Declaration const* ASTBoogieConverter::getModifiesBase(Expression const* expr)
 	return nullptr;
 }
 
-bool ASTBoogieConverter::isSelector(boogie::Expr::Ref expr)
+bool ASTBoogieConverter::isBaseVar(boogie::Expr::Ref expr)
 {
 	if (auto exprArrSel = dynamic_pointer_cast<boogie::ArrSelExpr const>(expr))
 	{
@@ -455,21 +455,18 @@ bool ASTBoogieConverter::isSelector(boogie::Expr::Ref expr)
 		if (dynamic_pointer_cast<boogie::VarExpr const>(exprArrSel->getBase()) &&
 				idxAsId->name() == m_context.boogieThis()->getName())
 		{
-			return false;
+			return true;
 		}
 	}
-	return true;
+	return false;
 }
 
-boogie::Expr::Ref ASTBoogieConverter::replaceBase(boogie::Expr::Ref expr, boogie::Expr::Ref value)
+boogie::Expr::Ref ASTBoogieConverter::replaceBaseVar(boogie::Expr::Ref expr, boogie::Expr::Ref value)
 {
-	if (!isSelector(expr))
+	if (isBaseVar(expr))
 		return value;
-	if (auto exprArrSel = dynamic_pointer_cast<boogie::ArrSelExpr const>(expr))
-		return boogie::Expr::arrsel(replaceBase(exprArrSel->getBase(), value), exprArrSel->getIdxs());
-	if (auto exprDtSel = dynamic_pointer_cast<boogie::DtSelExpr const>(expr))
-		return boogie::Expr::dtsel(replaceBase(exprDtSel->getBase(), value), exprDtSel->getMember(), exprDtSel->getConstr(), exprDtSel->getDataType());
-
+	if (auto exprSel = dynamic_pointer_cast<boogie::SelExpr const>(expr))
+		return exprSel->replaceBase(replaceBaseVar(exprSel->getBase(), value));
 	solAssert(false, "Base could not be replaced");
 	return expr;
 }
@@ -478,16 +475,15 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 {
 	// Modifies specifier
 	struct ModSpec {
-		boogie::Expr::Ref cond; // Condition
-		boogie::Expr::Ref idx;  // Index / selector
+		boogie::Expr::Ref cond;   // Condition
+		boogie::Expr::Ref target; // Target (identifier/selector)
 
 		ModSpec() {}
-		ModSpec(boogie::Expr::Ref cond, boogie::Expr::Ref idx) : cond(cond), idx(idx) {}
+		ModSpec(boogie::Expr::Ref cond, boogie::Expr::Ref target) : cond(cond), target(target) {}
 	};
 
-	// Modifies specifier for each variable
-	map<Declaration const*, list<ModSpec>> modSpecs;
-	bool modAll = false;
+	map<Declaration const*, list<ModSpec>> modSpecs; // Modifies specifier for each variable
+	bool canModifyAll = false;
 
 	for (auto docTag: _node.annotation().docTags)
 	{
@@ -495,8 +491,8 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		{
 			if (boost::algorithm::trim_copy(docTag.second.content) == DOCTAG_MODIFIES_ALL)
 			{
-				modAll = true;
-				continue; // Still parse the rest to catch syntax errors
+				canModifyAll = true;
+				continue; // Continue to parse the rest to catch syntax errors
 			}
 			size_t targetEnd = docTag.second.content.length();
 			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
@@ -510,13 +506,11 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				if (parseExpr(docTag.second.content.substr(condStart + DOCTAG_MODIFIES_COND.length()), _node, &_node, cond))
 					condExpr = cond.expr;
 			}
-			// Parse the target (variable)
+			// Parse the target (identifier/selector)
 			BoogieContext::DocTagExpr target;
 			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
 			{
-				Declaration const* varDecl = getModifiesBase(target.exprSol.get());
-				// if (varDecl) m_context.reportError(&_node, "BASE: " + varDecl->name());
-				if (varDecl)
+				if (Declaration const* varDecl = getModifiesBase(target.exprSol.get()))
 					modSpecs[varDecl].push_back(ModSpec(condExpr, target.expr));
 				else
 					m_context.reportError(&_node, "Invalid target expression for modifies specification");
@@ -524,10 +518,10 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		}
 	}
 
-	if (modAll && !modSpecs.empty())
+	if (canModifyAll && !modSpecs.empty())
 		m_context.reportWarning(&_node, "Modifies all was given, other modifies specifications are ignored");
 
-	if (m_context.modAnalysis() && !_node.isConstructor() && !modAll)
+	if (m_context.modAnalysis() && !_node.isConstructor() && !canModifyAll)
 	{
 		// Linearized base contracts include the current contract as well
 		for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
@@ -546,15 +540,15 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 
 					for (auto modSpec: modSpecs[varDecl.get()])
 					{
-						if (isSelector(modSpec.idx))
+						if (isBaseVar(modSpec.target))
 						{
-							auto repl = replaceBase(modSpec.idx, expr);
-							auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.idx);
-							expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
+							expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
 						}
 						else
 						{
-							expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
+							auto repl = replaceBaseVar(modSpec.target, expr);
+							auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.target);
+							expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
 						}
 					}
 
