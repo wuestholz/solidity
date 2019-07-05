@@ -25,11 +25,9 @@ bg::Expr::Ref ASTBoogieExpressionConverter::getArrayLength(bg::Expr::Ref expr, A
 	// Array is state variable
 	if (auto stateArray = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 		if (auto baseArray = dynamic_pointer_cast<bg::VarExpr const>(stateArray->getBase()))
-		{
 			return bg::Expr::arrsel(
 							bg::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
 							stateArray->getIdxs());
-		}
 
 	m_context.reportError(&associatedNode, "Unsupported access to array length");
 	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
@@ -39,11 +37,9 @@ bg::Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
 {
 	if (auto sumBase = dynamic_cast<Identifier const*>(node))
 		if (auto sumBaseDecl = sumBase->annotation().referencedDeclaration)
-		{
 			return bg::Expr::arrsel(
 					bg::Expr::id(m_context.mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
 					m_context.boogieThis()->getRefTo());
-		}
 
 	m_context.reportError(node, "Unsupported identifier for sum function");
 	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
@@ -58,11 +54,10 @@ void ASTBoogieExpressionConverter::addTCC(bg::Expr::Ref expr, TypePointer tp)
 void ASTBoogieExpressionConverter::addSideEffect(bg::Stmt::Ref stmt)
 {
 	for (auto oc: m_ocs)
-	{
 		m_newStatements.push_back(bg::Stmt::assign(
 			bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
 			bg::Expr::or_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), bg::Expr::not_(oc))));
-	}
+
 	m_ocs.clear();
 	m_newStatements.push_back(stmt);
 }
@@ -185,10 +180,9 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 		auto const& lhsElements = lhsTuple->elements();
 		auto const& rhsElements = rhsTuple->elements();
 		for (unsigned i = 0; i < lhsElements.size(); ++ i)
-		{
 			if (lhsElements[i])
 				createAssignment(originalLhs, lhsElements[i], rhsElements[i]);
-		}
+
 		return;
 	}
 
@@ -402,10 +396,14 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 {
 	// Check if constant propagation could infer the result
-	string tpStr = _node.annotation().type->toString();
-	if (boost::starts_with(tpStr, "int_const"))
+	TypePointer tp = _node.annotation().type;
+	if (auto tpRational = dynamic_cast<RationalNumberType const*>(tp))
 	{
-		m_currentExpr = bg::Expr::lit(bg::bigint(tpStr.substr(10)));
+		auto value = tpRational->literalValue(nullptr);
+		if (tpRational->isNegative())
+			m_currentExpr = bg::Expr::lit(bg::bigint(u2s(value)));
+		else
+			m_currentExpr = bg::Expr::lit(bg::bigint(value));
 		return false;
 	}
 
@@ -482,7 +480,11 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	TypePointer tp = _node.annotation().type;
 	if (auto tpRational = dynamic_cast<RationalNumberType const*>(tp))
 	{
-		m_currentExpr = bg::Expr::lit(bg::bigint(tpRational->literalValue(nullptr)));
+		auto value = tpRational->literalValue(nullptr);
+		if (tpRational->isNegative())
+			m_currentExpr = bg::Expr::lit(bg::bigint(u2s(value)));
+		else
+			m_currentExpr = bg::Expr::lit(bg::bigint(value));
 		return false;
 	}
 
@@ -825,9 +827,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// The call function is special as it indicates failure in a return value and in this case
 	// we must undo reducing our balance
 	if (funcName == ASTBoogieUtils::BOOGIE_CALL && msgValue != defaultMsgValue)
-	{
 		functionCallRevertBalance(msgValue);
-	}
 
 	return false;
 }
@@ -959,17 +959,15 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(bg::Expr::Ref msgVa
 	// balance[this] += msg.value
 	bg::Expr::Ref this_balance = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
-	{
 		revert->addStmts( { bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_balance, tp_uint256)),
 			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msgValue, tp_uint256)) });
-	}
+
 	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 			this_balance, msgValue, 256, false);
 	if (m_context.overflow())
-	{
 		revert->addStmts( { bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
 			bg::Stmt::assume(addResult.cc) });
-	}
+
 	revert->addStmt(
 			bg::Stmt::assign(m_context.boogieBalance()->getRefTo(),
 					bg::Expr::arrupd(m_context.boogieBalance()->getRefTo(),
@@ -1273,8 +1271,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 			{
 				m_currentExpr = bg::Expr::if_then_else(
 						bg::Expr::eq(indexExpr, bg::Expr::lit(i)),
-						slice, m_currentExpr
-				);
+						slice, m_currentExpr);
 			}
 		}
 		return false;
