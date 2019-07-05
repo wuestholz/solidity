@@ -156,6 +156,12 @@ public:
 
 	static
 	bool isStateVar(Declaration const *decl);
+
+	/**
+	 * Recursively translate a select expression to an update
+	 */
+	static
+	boogie::Expr::Ref selectToUpdate(boogie::Expr::Ref sel, boogie::Expr::Ref value);
 };
 
 }

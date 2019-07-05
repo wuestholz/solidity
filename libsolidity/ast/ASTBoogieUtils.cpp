@@ -835,5 +835,19 @@ bool ASTBoogieUtils::isStateVar(Declaration const *decl)
 	return false;
 }
 
+
+Expr::Ref ASTBoogieUtils::selectToUpdate(Expr::Ref sel, Expr::Ref value)
+{
+	if (auto selExpr = dynamic_pointer_cast<SelExpr const>(sel))
+	{
+		if (auto base = dynamic_pointer_cast<SelExpr const>(selExpr->getBase()))
+			return selectToUpdate(base, selExpr->toUpdate(value));
+		else
+			return selExpr->toUpdate(value);
+	}
+	solAssert(false, "Expected datatype/array select");
+	return nullptr;
+}
+
 }
 }

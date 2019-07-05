@@ -18,6 +18,8 @@ using namespace dev;
 using namespace dev::solidity;
 using namespace langutil;
 
+namespace bg = boogie;
+
 namespace dev
 {
 namespace solidity
@@ -32,26 +34,26 @@ string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
 string const ASTBoogieConverter::DOCTAG_MODIFIES_ALL = DOCTAG_MODIFIES + " *";
 string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
 
-boogie::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
+bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(_node);
 
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc: result.tccs)
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assume(tcc));
+		m_currentBlocks.top()->addStmt(bg::Stmt::assume(tcc));
 	for (auto s: result.newStatements)
 		m_currentBlocks.top()->addStmt(s);
 	for (auto oc: result.ocs)
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-			boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
-			boogie::Expr::or_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), boogie::Expr::not_(oc))));
+		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+			bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
+			bg::Expr::or_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), bg::Expr::not_(oc))));
 	for (auto c: result.newConstants)
 		m_context.addConstant(c);
 
 	return result.expr;
 }
 
-boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieContext& context)
+bg::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieContext& context)
 {
 	switch (type->category())
 	{
@@ -60,25 +62,25 @@ boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieConte
 		return context.intLit(0, ASTBoogieUtils::getBits(type));
 	case Type::Category::Bool:
 		// False
-		return boogie::Expr::lit(false);
+		return bg::Expr::lit(false);
 	case Type::Category::Struct:
 	{
 		// default for all members
 		StructType const* structType = dynamic_cast<StructType const*>(type);
 		MemberList const& members = structType->members(0); // No need for scope, just regular struct members
 		// Get the default value for the members
-		std::vector<boogie::Expr::Ref> memberDefaultValues;
+		std::vector<bg::Expr::Ref> memberDefaultValues;
 		for (auto& member: members)
 		{
-			boogie::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
+			bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
 			if (memberDefaultValue == nullptr)
 				return nullptr;
 			memberDefaultValues.push_back(memberDefaultValue);
 		}
 		// Now construct the struct value
 		StructDefinition const& structDefinition = structType->structDefinition();
-		boogie::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
-		return boogie::Expr::fn(decl->getName(), memberDefaultValues);
+		bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
+		return bg::Expr::fn(decl->getName(), memberDefaultValues);
 	}
 	default:
 		// For unhandled, just return null
@@ -88,7 +90,7 @@ boogie::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieConte
 	return nullptr;
 }
 
-void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<boogie::Expr::Ref>& output)
+void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<bg::Expr::Ref>& output)
 {
 	std::string target = _type->toString();
 	DeclarationContainer const* decl_container = m_context.scopes()[&_scope].get();
@@ -102,9 +104,9 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 				if (decl->type()->toString() == target)
 				{
 					if (ASTBoogieUtils::isStateVar(decl))
-						output.push_back(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()));
+						output.push_back(bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()));
 					else
-						output.push_back(boogie::Expr::id(m_context.mapDeclName(*decl)));
+						output.push_back(bg::Expr::id(m_context.mapDeclName(*decl)));
 				}
 				else
 				{
@@ -116,10 +118,10 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 							if (s_member.declaration->type()->toString() == target)
 							{
 								if (ASTBoogieUtils::isStateVar(decl))
-									boogie::Expr::dtsel(boogie::Expr::arrsel(boogie::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()),
+									bg::Expr::dtsel(bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()),
 											m_context.mapDeclName(*s_member.declaration),
 											m_context.getStructConstructor(&s->structDefinition()),
-											dynamic_pointer_cast<boogie::DataTypeDecl>(m_context.getStructType(&s->structDefinition(), DataLocation::Storage)));
+											dynamic_pointer_cast<bg::DataTypeDecl>(m_context.getStructType(&s->structDefinition(), DataLocation::Storage)));
 							}
 					}
 					// Magic
@@ -139,7 +141,7 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 	}
 }
 
-bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl, ASTNode const& _scope, std::vector<boogie::Stmt::Ref>& output)
+bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl, ASTNode const& _scope, std::vector<bg::Stmt::Ref>& output)
 {
 	bool ok = false;
 
@@ -147,13 +149,13 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	TypePointer type = _decl.type();
 
 	// Default value for the given type
-	boogie::Expr::Ref value = defaultValue(type, m_context);
+	bg::Expr::Ref value = defaultValue(type, m_context);
 
 	// If there just assign
 	if (value)
 	{
-		boogie::Stmt::Ref valueAssign = boogie::Stmt::assign(boogie::Expr::id(id), boogie::Expr::arrupd(
-				boogie::Expr::id(id), m_context.boogieThis()->getRefTo(), value));
+		bg::Stmt::Ref valueAssign = bg::Stmt::assign(bg::Expr::id(id), bg::Expr::arrupd(
+				bg::Expr::id(id), m_context.boogieThis()->getRefTo(), value));
 		output.push_back(valueAssign);
 		ok = true;
 	}
@@ -172,7 +174,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 			if (value)
 			{
 				// Get all ids to initialize
-				std::vector<boogie::Expr::Ref> index_ids;
+				std::vector<bg::Expr::Ref> index_ids;
 				getVariablesOfType(key_type, _scope, index_ids);
 				// Initialize all instantiations to default value
 				for (auto index_id: index_ids)
@@ -181,19 +183,19 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 					// a = update(a, this
 					//        update(sel(a, this), i, v)
 					//     )
-					auto map_id = boogie::Expr::id(id);
+					auto map_id = bg::Expr::id(id);
 					auto this_i = m_context.boogieThis()->getRefTo();
-					auto valueAssign = boogie::Stmt::assign(map_id,
-							boogie::Expr::arrupd(map_id, this_i,
-									boogie::Expr::arrupd(boogie::Expr::arrsel(map_id, this_i), index_id, value)));
+					auto valueAssign = bg::Stmt::assign(map_id,
+							bg::Expr::arrupd(map_id, this_i,
+									bg::Expr::arrupd(bg::Expr::arrsel(map_id, this_i), index_id, value)));
 					output.push_back(valueAssign);
 				}
 				// Initialize the sum, if there, to default value
 				if (m_context.currentSumDecls()[&_decl])
 				{
-					boogie::Expr::Ref sum = boogie::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
-					boogie::Stmt::Ref sum_default = boogie::Stmt::assign(sum,
-							boogie::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), value));
+					bg::Expr::Ref sum = bg::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
+					bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
+							bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), value));
 					output.push_back(sum_default);
 				}
 				ok = true;
@@ -216,27 +218,27 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	m_localDecls.clear();
 
 	// Include preamble
-	m_currentBlocks.push(boogie::Block::block());
+	m_currentBlocks.push(bg::Block::block());
 	constructorPreamble(_node);
-	boogie::Block::Ref block = m_currentBlocks.top();
+	bg::Block::Ref block = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
 	string funcName = ASTBoogieUtils::getConstructorName(&_node);
 
 	// Input parameters
-	std::vector<boogie::Binding> params {
+	std::vector<bg::Binding> params {
 		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() }, // this
 		{m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() }, // msg.sender
 		{m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() } // msg.value
 	};
 
 	// Create the procedure
-	auto procDecl = boogie::Decl::procedure(funcName, params, {}, m_localDecls, {block});
+	auto procDecl = bg::Decl::procedure(funcName, params, {}, m_localDecls, {block});
 	for (auto invar: m_context.currentContractInvars())
 	{
 		auto attrs = ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner());
-		procDecl->getEnsures().push_back(boogie::Specification::spec(invar.expr, attrs));
+		procDecl->getEnsures().push_back(bg::Specification::spec(invar.expr, attrs));
 	}
 	auto attrs = ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[implicit_constructor]", *m_context.currentScanner());
 	procDecl->addAttrs(attrs);
@@ -248,9 +250,9 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// this.balance = 0
-	m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
+	m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 			m_context.boogieBalance()->getRefTo(),
-			boogie::Expr::arrupd(
+			bg::Expr::arrupd(
 					m_context.boogieBalance()->getRefTo(),
 					m_context.boogieThis()->getRefTo(),
 					defaultValue(tp_uint256, m_context))));
@@ -280,7 +282,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
 
 		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
 		++m_nextReturnLabelId;
@@ -301,27 +303,27 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		{
 			// Introduce new variable for parameter
 			auto param = baseConstr->parameters()[i];
-			boogie::Decl::Ref constrParam = boogie::Decl::variable(m_context.mapDeclName(*param),
+			bg::Decl::Ref constrParam = bg::Decl::variable(m_context.mapDeclName(*param),
 					m_context.toBoogieType(param->annotation().type, param.get()));
 			m_localDecls.push_back(constrParam);
 			// Assign argument
 			if (argsList && argsList->size() > i)
 			{
-				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-						boogie::Expr::id(constrParam->getName()),
+				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+						bg::Expr::id(constrParam->getName()),
 						convertExpression(*argsList->at(i))));
 			}
 			else // Or default value
 			{
-				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-						boogie::Expr::id(constrParam->getName()),
+				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+						bg::Expr::id(constrParam->getName()),
 						defaultValue(param->annotation().type, m_context)));
 			}
 		}
 
 		baseConstr->body().accept(*this);
-		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
 		m_currentReturnLabel = oldReturnLabel;
 		m_context.popExtraScope();
 	}
@@ -335,19 +337,19 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 
 	if (_node.value()) // If there is an explicit initializer
 	{
-		boogie::Expr::Ref initExpr = convertExpression(*_node.value());
+		bg::Expr::Ref initExpr = convertExpression(*_node.value());
 
 		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
 		{
 			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
 		}
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(m_context.mapDeclName(_node)),
-				boogie::Expr::arrupd(
-						boogie::Expr::id(m_context.mapDeclName(_node)),
+		m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(m_context.mapDeclName(_node)),
+				bg::Expr::arrupd(
+						bg::Expr::id(m_context.mapDeclName(_node)),
 						m_context.boogieThis()->getRefTo(),
 						initExpr)));
 	} else { // Use implicit default value
-		std::vector<boogie::Stmt::Ref> stmts;
+		std::vector<bg::Stmt::Ref> stmts;
 		bool ok = defaultValueAssignment(_node, _scope, stmts);
 		if (!ok)
 			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
@@ -470,13 +472,13 @@ Declaration const* ASTBoogieConverter::getModifiesBase(Expression const* expr)
 	return nullptr;
 }
 
-bool ASTBoogieConverter::isBaseVar(boogie::Expr::Ref expr)
+bool ASTBoogieConverter::isBaseVar(bg::Expr::Ref expr)
 {
-	if (auto exprArrSel = dynamic_pointer_cast<boogie::ArrSelExpr const>(expr))
+	if (auto exprArrSel = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 	{
 		// Base is reached when it is a variable indexed with 'this'
-		auto idxAsId = dynamic_pointer_cast<boogie::VarExpr const>(exprArrSel->getIdxs()[0]);
-		if (dynamic_pointer_cast<boogie::VarExpr const>(exprArrSel->getBase()) &&
+		auto idxAsId = dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getIdxs()[0]);
+		if (dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getBase()) &&
 				idxAsId->name() == m_context.boogieThis()->getName())
 		{
 			return true;
@@ -485,25 +487,25 @@ bool ASTBoogieConverter::isBaseVar(boogie::Expr::Ref expr)
 	return false;
 }
 
-boogie::Expr::Ref ASTBoogieConverter::replaceBaseVar(boogie::Expr::Ref expr, boogie::Expr::Ref value)
+bg::Expr::Ref ASTBoogieConverter::replaceBaseVar(bg::Expr::Ref expr, bg::Expr::Ref value)
 {
 	if (isBaseVar(expr))
 		return value;
-	if (auto exprSel = dynamic_pointer_cast<boogie::SelExpr const>(expr))
+	if (auto exprSel = dynamic_pointer_cast<bg::SelExpr const>(expr))
 		return exprSel->replaceBase(replaceBaseVar(exprSel->getBase(), value));
 	solAssert(false, "Base could not be replaced");
 	return expr;
 }
 
-void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogie::ProcDeclRef procDecl)
+void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::ProcDeclRef procDecl)
 {
 	// Modifies specifier
 	struct ModSpec {
-		boogie::Expr::Ref cond;   // Condition
-		boogie::Expr::Ref target; // Target (identifier/selector)
+		bg::Expr::Ref cond;   // Condition
+		bg::Expr::Ref target; // Target (identifier/selector)
 
 		ModSpec() {}
-		ModSpec(boogie::Expr::Ref cond, boogie::Expr::Ref target) : cond(cond), target(target) {}
+		ModSpec(bg::Expr::Ref cond, bg::Expr::Ref target) : cond(cond), target(target) {}
 	};
 
 	map<Declaration const*, list<ModSpec>> modSpecs; // Modifies specifier for each variable
@@ -519,7 +521,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 				continue; // Continue to parse the rest to catch syntax errors
 			}
 			size_t targetEnd = docTag.second.content.length();
-			boogie::Expr::Ref condExpr = boogie::Expr::lit(true);
+			bg::Expr::Ref condExpr = bg::Expr::lit(true);
 			// Check if there is a condition part
 			size_t condStart = docTag.second.content.find(DOCTAG_MODIFIES_COND);
 			if (condStart != string::npos)
@@ -554,31 +556,31 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 			{
 				if (varDecl->isConstant())
 					continue;
-				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
-				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
+				auto varId = bg::Expr::id(m_context.mapDeclName(*varDecl));
+				auto varThis = bg::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
 
 				// Build up expression recursively
-				boogie::Expr::Ref expr = boogie::Expr::old(varThis);
+				bg::Expr::Ref expr = bg::Expr::old(varThis);
 
 				for (auto modSpec: modSpecs[varDecl])
 				{
 					if (isBaseVar(modSpec.target))
 					{
-						expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
+						expr = bg::Expr::if_then_else(modSpec.cond, varThis, expr);
 					}
 					else
 					{
 						auto repl = replaceBaseVar(modSpec.target, expr);
-						auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.target);
-						expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
+						auto write = ASTBoogieUtils::selectToUpdate(repl, modSpec.target);
+						expr = bg::Expr::if_then_else(modSpec.cond, write, expr);
 					}
 				}
 
-				expr = boogie::Expr::eq(varThis, expr);
+				expr = bg::Expr::eq(varThis, expr);
 				string varName = varDecl->name();
 				if (m_currentContract->annotation().linearizedBaseContracts.size() > 1)
 					varName = contract->name() + "::" + varName;
-				procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+				procDecl->getEnsures().push_back(bg::Specification::spec(expr,
 						ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varName + "' illegally", *m_context.currentScanner())));
 			}
 		}
@@ -599,7 +601,7 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
 			++m_nextReturnLabelId;
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined modifier " + modifierDecl->name() + " starts here"));
 
 			// Introduce and assign local variables for modifier arguments
 			if (modifier->arguments())
@@ -607,16 +609,16 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 				for (unsigned long i = 0; i < modifier->arguments()->size(); ++i)
 				{
 					auto paramDecls = modifierDecl->parameters()[i];
-					boogie::Decl::Ref modifierParam = boogie::Decl::variable(m_context.mapDeclName(*paramDecls),
+					bg::Decl::Ref modifierParam = bg::Decl::variable(m_context.mapDeclName(*paramDecls),
 							m_context.toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get()));
 					m_localDecls.push_back(modifierParam);
-					boogie::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(modifierParam->getName()), modifierArg));
+					bg::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
+					m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(modifierParam->getName()), modifierArg));
 				}
 			}
 			modifierDecl->body().accept(*this);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
+			m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentReturnLabel));
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined modifier " + modifierDecl->name() + " ends here"));
 			m_currentReturnLabel = oldReturnLabel;
 			m_context.popExtraScope();
 		}
@@ -628,10 +630,10 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 		string oldReturnLabel = m_currentReturnLabel;
 		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
 		++m_nextReturnLabelId;
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body starts here"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Function body starts here"));
 		m_currentFunc->body().accept(*this);
-		m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentReturnLabel));
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Function body ends here"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentReturnLabel));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Function body ends here"));
 		m_currentReturnLabel = oldReturnLabel;
 	}
 }
@@ -697,7 +699,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	{
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.addDecl(
-					boogie::Decl::variable(m_context.mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
+					bg::Decl::variable(m_context.mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
 							ASTBoogieUtils::mappingType(m_context.addressType(),
 							m_context.toBoogieType(sumDecl.second, sumDecl.first))));
 	}
@@ -751,11 +753,11 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 
 	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
 	// Define type for memory
-	boogie::TypeDeclRef structMemType = m_context.getStructType(&_node, DataLocation::Memory);
+	bg::TypeDeclRef structMemType = m_context.getStructType(&_node, DataLocation::Memory);
 	// Create mappings for each member (only for memory structs)
 	for (auto member: _node.members())
 	{
-		boogie::TypeDeclRef memberType = nullptr;
+		bg::TypeDeclRef memberType = nullptr;
 		// Nested structures
 		if (member->type()->category() == Type::Category::Struct)
 		{
@@ -767,7 +769,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 		// TODO: array members?
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
-		auto memberDecl = boogie::Decl::variable(m_context.mapDeclName(*member),
+		auto memberDecl = bg::Decl::variable(m_context.mapDeclName(*member),
 				ASTBoogieUtils::mappingType(structMemType, memberType));
 		memberDecl->addAttrs(attrs);
 		m_context.addDecl(memberDecl);
@@ -810,7 +812,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Input parameters
-	vector<boogie::Binding> params {
+	vector<bg::Binding> params {
 		// Globally available stuff
 		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() }, // this
 		{m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() }, // msg.sender
@@ -819,14 +821,14 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Add original parameters of the function
 	for (auto par: _node.parameters())
 	{
-		params.push_back({boogie::Expr::id(m_context.mapDeclName(*par)), m_context.toBoogieType(par->type(), par.get())});
+		params.push_back({bg::Expr::id(m_context.mapDeclName(*par)), m_context.toBoogieType(par->type(), par.get())});
 		if (par->type()->category() == Type::Category::Array) // Array length
-			params.push_back({boogie::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
+			params.push_back({bg::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
 	}
 
 	// Return values
-	vector<boogie::Binding> rets;
-	vector<boogie::Expr::Ref> retIds;
+	vector<bg::Binding> rets;
+	vector<bg::Expr::Ref> retIds;
 	for (auto ret: _node.returnParameters())
 	{
 		if (ret->type()->category() == Type::Category::Array)
@@ -838,8 +840,8 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 				return false;
 			}
 		}
-		boogie::Expr::Ref retId = boogie::Expr::id(m_context.mapDeclName(*ret));
-		boogie::TypeDeclRef retType = m_context.toBoogieType(ret->type(), ret.get());
+		bg::Expr::Ref retId = bg::Expr::id(m_context.mapDeclName(*ret));
+		bg::TypeDeclRef retType = m_context.toBoogieType(ret->type(), ret.get());
 		retIds.push_back(retId);
 		rets.push_back({retId, retType});
 	}
@@ -850,42 +852,42 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else if (_node.returnParameters().size() == 1)
 		m_currentRet = retIds[0];
 	else
-		m_currentRet = boogie::Expr::tuple(retIds);
+		m_currentRet = bg::Expr::tuple(retIds);
 
 	// Convert function body, collect result
 	m_localDecls.clear();
 	// Create new empty block
-	m_currentBlocks.push(boogie::Block::block());
+	m_currentBlocks.push(bg::Block::block());
 	// Include constructor preamble
 	if (_node.isConstructor())
 		constructorPreamble(_node);
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
-		boogie::Expr::Ref this_bal = boogie::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
-		boogie::Expr::Ref msg_val = m_context.boogieMsgValue()->getRefTo();
+		bg::Expr::Ref this_bal = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
+		bg::Expr::Ref msg_val = m_context.boogieMsgValue()->getRefTo();
 		// balance[this] += msg.value
 		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
-			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 		}
 		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, msg_val, 256, false);
 		if (m_context.overflow())
 		{
-			m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Implicit assumption that balances cannot overflow"));
-			m_currentBlocks.top()->addStmt(boogie::Stmt::assume(addResult.cc));
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(addResult.cc));
 		}
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
+		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 				m_context.boogieBalance()->getRefTo(),
-					boogie::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
+					bg::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
 	}
 
 	// Modifiers need to be inlined
 	m_currentModifier = 0;
 	processFuncModifiersAndBody();
 
-	vector<boogie::Block::Ref> blocks;
+	vector<bg::Block::Ref> blocks;
 	if (!m_currentBlocks.top()->getStatements().empty())
 		blocks.push_back(m_currentBlocks.top());
 	m_currentBlocks.pop();
@@ -897,15 +899,15 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_context.mapDeclName(_node);
 
 	// Create the procedure
-	auto procDecl = boogie::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
+	auto procDecl = bg::Decl::procedure(funcName, params, rets, m_localDecls, blocks);
 
 	// Overflow condition for the code comes first because if there are more errors, this one gets reported
 	if (m_context.overflow())
 	{
-		auto noOverflow = boogie::Expr::not_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
-		procDecl->getRequires().push_back(boogie::Specification::spec(noOverflow,
+		auto noOverflow = bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
+		procDecl->getRequires().push_back(bg::Specification::spec(noOverflow,
 				ASTBoogieUtils::createAttrs(_node.location(), "An overflow can occur before calling function", *m_context.currentScanner())));
-		procDecl->getEnsures().push_back(boogie::Specification::spec(noOverflow,
+		procDecl->getEnsures().push_back(bg::Specification::spec(noOverflow,
 				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
 	}
 
@@ -916,54 +918,54 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		{
 			for (auto oc: invar.ocs)
 			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(oc,
+				procDecl->getRequires().push_back(bg::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(oc,
+				procDecl->getEnsures().push_back(bg::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' at end of function.", *m_context.currentScanner())));
 			}
 			for (auto tcc: invar.tccs)
 			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(tcc,
+				procDecl->getRequires().push_back(bg::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + invar.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
-				procDecl->getEnsures().push_back(boogie::Specification::spec(tcc,
+				procDecl->getEnsures().push_back(bg::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + invar.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
 			}
 			if (!_node.isConstructor())
 			{
-				procDecl->getRequires().push_back(boogie::Specification::spec(invar.expr,
+				procDecl->getRequires().push_back(bg::Specification::spec(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 			}
-			procDecl->getEnsures().push_back(boogie::Specification::spec(invar.expr,
+			procDecl->getEnsures().push_back(bg::Specification::spec(invar.expr,
 					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		}
 	}
 
 	if (!_node.isPublic()) // Non-public functions: inline
-		procDecl->addAttr(boogie::Attr::attr("inline", 1));
+		procDecl->addAttr(bg::Attr::attr("inline", 1));
 
 	// Add other pre/postconditions
 	for (auto pre: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
 	{
-		procDecl->getRequires().push_back(boogie::Specification::spec(pre.expr,
+		procDecl->getRequires().push_back(bg::Specification::spec(pre.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
 		for (auto tcc: pre.tccs)
-			procDecl->getRequires().push_back(boogie::Specification::spec(tcc,
+			procDecl->getRequires().push_back(bg::Specification::spec(tcc,
 				ASTBoogieUtils::createAttrs(_node.location(), "Variables in precondition '" + pre.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
 
 		for (auto oc: pre.ocs)
-			procDecl->getRequires().push_back(boogie::Specification::spec(oc,
+			procDecl->getRequires().push_back(bg::Specification::spec(oc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of precondition '" + pre.exprStr + "' when entering function.", *m_context.currentScanner())));
 	}
 	for (auto post: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
 	{
-		procDecl->getEnsures().push_back(boogie::Specification::spec(post.expr,
+		procDecl->getEnsures().push_back(bg::Specification::spec(post.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
 		for (auto tcc: post.tccs)
-			procDecl->getEnsures().push_back(boogie::Specification::spec(tcc,
+			procDecl->getEnsures().push_back(bg::Specification::spec(tcc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Variables in postcondition '" + post.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
 
 		for (auto oc: post.ocs)
-			procDecl->getEnsures().push_back(boogie::Specification::spec(oc,
+			procDecl->getEnsures().push_back(bg::Specification::spec(oc,
 							ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of postcondition '" + post.exprStr + "' at end of function.", *m_context.currentScanner())));
 	}
 	// TODO: check that no new sum variables were introduced
@@ -994,7 +996,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 
 	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
-	auto varDecl = boogie::Decl::variable(m_context.mapDeclName(_node),
+	auto varDecl = bg::Decl::variable(m_context.mapDeclName(_node),
 			ASTBoogieUtils::mappingType(
 					m_context.addressType(),
 					m_context.toBoogieType(_node.type(), &_node)));
@@ -1005,7 +1007,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	if (_node.type()->category() == Type::Category::Array)
 	{
 		m_context.addDecl(
-				boogie::Decl::variable(m_context.mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
+				bg::Decl::variable(m_context.mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
 						ASTBoogieUtils::mappingType(
 								m_context.addressType(),
 								m_context.intType(256))));
@@ -1113,25 +1115,25 @@ bool ASTBoogieConverter::visit(IfStatement const& _node)
 	rememberScope(_node);
 
 	// Get condition recursively
-	boogie::Expr::Ref cond = convertExpression(_node.condition());
+	bg::Expr::Ref cond = convertExpression(_node.condition());
 
 	// Get true branch recursively
-	m_currentBlocks.push(boogie::Block::block());
+	m_currentBlocks.push(bg::Block::block());
 	_node.trueStatement().accept(*this);
-	boogie::Block::ConstRef thenBlock = m_currentBlocks.top();
+	bg::Block::ConstRef thenBlock = m_currentBlocks.top();
 	m_currentBlocks.pop();
 
 	// Get false branch recursively (might not exist)
-	boogie::Block::ConstRef elseBlock = nullptr;
+	bg::Block::ConstRef elseBlock = nullptr;
 	if (_node.falseStatement())
 	{
-		m_currentBlocks.push(boogie::Block::block());
+		m_currentBlocks.push(bg::Block::block());
 		_node.falseStatement()->accept(*this);
 		elseBlock = m_currentBlocks.top();
 		m_currentBlocks.pop();
 	}
 
-	m_currentBlocks.top()->addStmt(boogie::Stmt::ifelse(cond, thenBlock, elseBlock));
+	m_currentBlocks.top()->addStmt(bg::Stmt::ifelse(cond, thenBlock, elseBlock));
 	return false;
 }
 
@@ -1149,23 +1151,23 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	m_currentContinueLabel = "$continue" + toString(_node.id());
 
 	// Get condition recursively
-	boogie::Expr::Ref cond = convertExpression(_node.condition());
+	bg::Expr::Ref cond = convertExpression(_node.condition());
 
 	// Get if branch recursively
-	m_currentBlocks.push(boogie::Block::block());
+	m_currentBlocks.push(bg::Block::block());
 	_node.body().accept(*this);
-	m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentContinueLabel));
-	boogie::Block::ConstRef body = m_currentBlocks.top();
+	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
+	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
 
-	std::vector<boogie::Specification::Ref> invars;
+	std::vector<bg::Specification::Ref> invars;
 
 	// No overflow in code
 	if (m_context.overflow())
 	{
-		invars.push_back(boogie::Specification::spec(
-				boogie::Expr::not_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
+		invars.push_back(bg::Specification::spec(
+				bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
 				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
 		));
 	}
@@ -1176,18 +1178,18 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	for (auto invar: loopInvars)
 	{
 		for (auto tcc: invar.tccs)
-			invars.push_back(boogie::Specification::spec(tcc,
+			invars.push_back(bg::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
 
 		for (auto oc: invar.ocs)
-			invars.push_back(boogie::Specification::spec(oc,
+			invars.push_back(bg::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
 
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+		invars.push_back(bg::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
-	m_currentBlocks.top()->addStmt(boogie::Stmt::while_(cond, body, invars));
+	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, invars));
 
 	return false;
 }
@@ -1207,38 +1209,38 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	m_currentContinueLabel = "$continue" + toString(_node.id());
 
 	// Get initialization recursively (adds statement to current block)
-	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("The following while loop was mapped from a for loop"));
+	m_currentBlocks.top()->addStmt(bg::Stmt::comment("The following while loop was mapped from a for loop"));
 	if (_node.initializationExpression())
 	{
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Initialization"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Initialization"));
 		_node.initializationExpression()->accept(*this);
 	}
 
 	// Get condition recursively
-	boogie::Expr::Ref cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
+	bg::Expr::Ref cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
 
 	// Get body recursively
-	m_currentBlocks.push(boogie::Block::block());
-	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Body"));
+	m_currentBlocks.push(bg::Block::block());
+	m_currentBlocks.top()->addStmt(bg::Stmt::comment("Body"));
 	_node.body().accept(*this);
-	m_currentBlocks.top()->addStmt(boogie::Stmt::label(m_currentContinueLabel));
+	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
 	// Include loop expression at the end of body
 	if (_node.loopExpression())
 	{
-		m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Loop expression"));
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Loop expression"));
 		_node.loopExpression()->accept(*this); // Adds statements to current block
 	}
-	boogie::Block::ConstRef body = m_currentBlocks.top();
+	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
 
-	std::vector<boogie::Specification::Ref> invars;
+	std::vector<bg::Specification::Ref> invars;
 
 	// No overflow in code
 	if (m_context.overflow())
 	{
-		invars.push_back(boogie::Specification::spec(
-				boogie::Expr::not_(boogie::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
+		invars.push_back(bg::Specification::spec(
+				bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
 				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
 		));
 	}
@@ -1249,18 +1251,18 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	for (auto invar: loopInvars)
 	{
 		for (auto tcc: invar.tccs)
-			invars.push_back(boogie::Specification::spec(tcc,
+			invars.push_back(bg::Specification::spec(tcc,
 					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
 
 		for (auto oc: invar.ocs)
-			invars.push_back(boogie::Specification::spec(oc,
+			invars.push_back(bg::Specification::spec(oc,
 					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
 
-		invars.push_back(boogie::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+		invars.push_back(bg::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
-	m_currentBlocks.top()->addStmt(boogie::Stmt::while_(cond, body, invars));
+	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, invars));
 
 	return false;
 }
@@ -1268,7 +1270,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 bool ASTBoogieConverter::visit(Continue const& _node)
 {
 	rememberScope(_node);
-	m_currentBlocks.top()->addStmt(boogie::Stmt::goto_({m_currentContinueLabel}));
+	m_currentBlocks.top()->addStmt(bg::Stmt::goto_({m_currentContinueLabel}));
 	return false;
 }
 
@@ -1276,7 +1278,7 @@ bool ASTBoogieConverter::visit(Break const& _node)
 {
 	rememberScope(_node);
 
-	m_currentBlocks.top()->addStmt(boogie::Stmt::break_());
+	m_currentBlocks.top()->addStmt(bg::Stmt::break_());
 	return false;
 }
 
@@ -1287,7 +1289,7 @@ bool ASTBoogieConverter::visit(Return const& _node)
 	if (_node.expression() != nullptr)
 	{
 		// Get rhs recursively
-		boogie::Expr::Ref rhs = convertExpression(*_node.expression());
+		bg::Expr::Ref rhs = convertExpression(*_node.expression());
 
 		if (m_context.isBvEncoding())
 		{
@@ -1310,12 +1312,12 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		}
 
 		// LHS of assignment should already be known (set by the enclosing FunctionDefinition)
-		boogie::Expr::Ref lhs = m_currentRet;
+		bg::Expr::Ref lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
-		m_currentBlocks.top()->addStmt(boogie::Stmt::assign(lhs, rhs));
+		m_currentBlocks.top()->addStmt(bg::Stmt::assign(lhs, rhs));
 	}
-	m_currentBlocks.top()->addStmt(boogie::Stmt::goto_({m_currentReturnLabel}));
+	m_currentBlocks.top()->addStmt(bg::Stmt::goto_({m_currentReturnLabel}));
 	return false;
 }
 
@@ -1323,7 +1325,7 @@ bool ASTBoogieConverter::visit(Throw const& _node)
 {
 	rememberScope(_node);
 
-	m_currentBlocks.top()->addStmt(boogie::Stmt::assume(boogie::Expr::lit(false)));
+	m_currentBlocks.top()->addStmt(bg::Stmt::assume(bg::Expr::lit(false)));
 	return false;
 }
 
@@ -1350,7 +1352,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			solAssert(decl->isLocalVariable(), "Non-local variable appearing in VariableDeclarationStatement");
 			// Boogie requires local variables to be declared at the beginning of the procedure
-			auto varDecl = boogie::Decl::variable(
+			auto varDecl = bg::Decl::variable(
 					m_context.mapDeclName(*decl),
 					m_context.toBoogieType(decl->type(), decl.get()));
 			varDecl->addAttrs(ASTBoogieUtils::createAttrs(decl->location(), decl->name(), *m_context.currentScanner()));
@@ -1364,7 +1366,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		auto initalValueType = initialValue->annotation().type;
 
 		// Get expression recursively
-		boogie::Expr::Ref rhs = convertExpression(*initialValue);
+		bg::Expr::Ref rhs = convertExpression(*initialValue);
 
 		if (declarations.size() == 1)
 		{
@@ -1373,14 +1375,14 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			auto declType = decl->type();
 			if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
 				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, initalValueType, declType, m_context);
-			m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-					boogie::Expr::id(m_context.mapDeclName(*decl)),
+			m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+					bg::Expr::id(m_context.mapDeclName(*decl)),
 					rhs));
 		}
 		else
 		{
 			auto initTupleType = dynamic_cast<TupleType const*>(initalValueType);
-			auto rhsTuple = dynamic_pointer_cast<boogie::TupleExpr const>(rhs);
+			auto rhsTuple = dynamic_pointer_cast<bg::TupleExpr const>(rhs);
 			for (size_t i = 0; i < declarations.size(); ++ i)
 			{
 				// One return value, simple
@@ -1392,8 +1394,8 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 					auto rhs_i = rhsTuple->elements()[i];
 					if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
 						rhs_i = ASTBoogieUtils::checkImplicitBvConversion(rhs_i, exprType, declType, m_context);
-					m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-							boogie::Expr::id(m_context.mapDeclName(*decl)),
+					m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+							bg::Expr::id(m_context.mapDeclName(*decl)),
 							rhs_i));
 					}
 			}
@@ -1404,11 +1406,11 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	{
 		for (auto declNode: _node.declarations())
 		{
-			boogie::Expr::Ref defaultVal = defaultValue(declNode->type(), m_context);
+			bg::Expr::Ref defaultVal = defaultValue(declNode->type(), m_context);
 			if (defaultVal)
 			{
-				m_currentBlocks.top()->addStmt(boogie::Stmt::assign(
-									boogie::Expr::id(m_context.mapDeclName(*declNode)),
+				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+									bg::Expr::id(m_context.mapDeclName(*declNode)),
 									defaultVal));
 			}
 			else
@@ -1454,12 +1456,12 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	// Other statements are assigned to a temp variable because Boogie
 	// does not allow stand alone expressions
 
-	boogie::Expr::Ref expr = convertExpression(_node.expression());
-	boogie::Decl::Ref tmpVar = boogie::Decl::variable("tmpVar" + to_string(_node.id()),
+	bg::Expr::Ref expr = convertExpression(_node.expression());
+	bg::Decl::Ref tmpVar = bg::Decl::variable("tmpVar" + to_string(_node.id()),
 			m_context.toBoogieType(_node.expression().annotation().type, &_node));
 	m_localDecls.push_back(tmpVar);
-	m_currentBlocks.top()->addStmt(boogie::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
-	m_currentBlocks.top()->addStmt(boogie::Stmt::assign(boogie::Expr::id(tmpVar->getName()), expr));
+	m_currentBlocks.top()->addStmt(bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
+	m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(tmpVar->getName()), expr));
 	return false;
 }
 
