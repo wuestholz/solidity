@@ -278,14 +278,11 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		if (!baseConstr)
 			continue;
 
-		if (!baseConstr->modifiers().empty())
-			m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
+		//if (!baseConstr->modifiers().empty())
+			//m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
 
 		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
-		string oldReturnLabel = m_currentReturnLabel;
-		m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
-		++m_nextReturnLabelId;
 
 		// Try to get the argument list (from either inheritance specifiers or modifiers)
 		std::vector<ASTPointer<Expression>> const* argsList = nullptr;
@@ -320,11 +317,13 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 						defaultValue(param->annotation().type, m_context)));
 			}
 		}
+		auto m_currentFuncOld = m_currentFunc;
+		m_currentFunc = baseConstr.get();
+		m_currentModifier = 0;
+		processFuncModifiersAndBody();
+		m_currentFunc = m_currentFuncOld;
 
-		baseConstr->body().accept(*this);
-		m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentReturnLabel));
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
-		m_currentReturnLabel = oldReturnLabel;
 		m_context.popExtraScope();
 	}
 }
