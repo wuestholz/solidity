@@ -14,9 +14,8 @@ contract BaseConstructorAndModifiers is A {
 
     // Will call A() first, then the two modifiers
     constructor() m A(1) m public {
-    }
-
-    function() external payable {
         assert(x == 3);
     }
+
+    function() external payable { } // Needed for detecting as a truffle test case
 }

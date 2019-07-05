@@ -1,0 +1,5 @@
+Verifying A::[constructor]: OK
+Verifying B::[implicit_constructor]: OK
+Verifying BaseConstructorMulti::[constructor]: OK
+Verifying BaseConstructorMulti::: OK
+No errors found.
