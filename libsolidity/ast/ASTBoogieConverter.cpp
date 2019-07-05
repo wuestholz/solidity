@@ -526,39 +526,36 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, boogi
 		// Linearized base contracts include the current contract as well
 		for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
 		{
-			for (auto sn: contract->subNodes())
+			for (auto varDecl: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
 			{
-				if (auto varDecl = dynamic_pointer_cast<VariableDeclaration const>(sn))
+				if (varDecl->isConstant())
+					continue;
+				auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
+				auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
+
+				// Build up expression recursively
+				boogie::Expr::Ref expr = boogie::Expr::old(varThis);
+
+				for (auto modSpec: modSpecs[varDecl])
 				{
-					if (varDecl->isConstant())
-						continue;
-					auto varId = boogie::Expr::id(m_context.mapDeclName(*varDecl));
-					auto varThis = boogie::Expr::arrsel(varId, m_context.boogieThis()->getRefTo());
-
-					// Build up expression recursively
-					boogie::Expr::Ref expr = boogie::Expr::old(varThis);
-
-					for (auto modSpec: modSpecs[varDecl.get()])
+					if (isBaseVar(modSpec.target))
 					{
-						if (isBaseVar(modSpec.target))
-						{
-							expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
-						}
-						else
-						{
-							auto repl = replaceBaseVar(modSpec.target, expr);
-							auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.target);
-							expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
-						}
+						expr = boogie::Expr::if_then_else(modSpec.cond, varThis, expr);
 					}
-
-					expr = boogie::Expr::eq(varThis, expr);
-					string varName = varDecl->name();
-					if (m_currentContract->annotation().linearizedBaseContracts.size() > 1)
-						varName = contract->name() + "::" + varName;
-					procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
-							ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varName + "' illegally", *m_context.currentScanner())));
+					else
+					{
+						auto repl = replaceBaseVar(modSpec.target, expr);
+						auto write = ASTBoogieExpressionConverter::selectToUpdate(repl, modSpec.target);
+						expr = boogie::Expr::if_then_else(modSpec.cond, write, expr);
+					}
 				}
+
+				expr = boogie::Expr::eq(varThis, expr);
+				string varName = varDecl->name();
+				if (m_currentContract->annotation().linearizedBaseContracts.size() > 1)
+					varName = contract->name() + "::" + varName;
+				procDecl->getEnsures().push_back(boogie::Specification::spec(expr,
+						ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varName + "' illegally", *m_context.currentScanner())));
 			}
 		}
 	}
@@ -692,9 +689,8 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	m_stateVarInitializers.clear();
 	m_stateVarsToInitialize.clear();
 	for (auto contract: _node.annotation().linearizedBaseContracts)
-		for (auto sn: contract->subNodes())
-			if (auto sv = dynamic_pointer_cast<VariableDeclaration const>(sn))
-				checkForInitializer(*sv);
+		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
+			checkForInitializer(*sv);
 
 	// Process subnodes
 	for (auto sn: _node.subNodes())
@@ -702,15 +698,12 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// If no constructor exists, create an implicit one
 	bool hasConstructor = false;
-	for (auto sn: _node.subNodes())
+	for (auto fn: ASTNode::filteredNodes<FunctionDefinition>(_node.subNodes()))
 	{
-		if (auto fn = dynamic_pointer_cast<FunctionDefinition const>(sn))
+		if (fn->isConstructor())
 		{
-			if (fn->isConstructor())
-			{
-				hasConstructor = true;
-				break;
-			}
+			hasConstructor = true;
+			break;
 		}
 	}
 	if (!hasConstructor)
