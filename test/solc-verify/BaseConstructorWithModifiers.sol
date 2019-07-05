@@ -13,8 +13,8 @@ contract A {
 
 contract BaseConstructorWithModifiers is A {
 
-    constructor() A(1) public {
-        assert(x == 2);
+    constructor() A(1) m(2) public {
+        assert(x == 4);
     }
 
     function() external payable { } // Needed for detecting as a truffle test case
