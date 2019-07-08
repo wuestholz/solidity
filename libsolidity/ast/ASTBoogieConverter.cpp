@@ -272,7 +272,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		// Check if base has a constructor
 		FunctionDefinition const* baseConstr = nullptr;
-		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
+		for (auto fndef: ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
 			if (fndef->isConstructor())
 				baseConstr = fndef;
 		if (!baseConstr)
@@ -327,7 +327,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		// Check if base has a constructor
 		FunctionDefinition const* baseConstr = nullptr;
-		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
+		for (auto fndef: ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
 			if (fndef->isConstructor())
 				baseConstr = fndef;
 		if (!baseConstr)
