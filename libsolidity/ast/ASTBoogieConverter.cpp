@@ -271,20 +271,20 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			continue; // Only include base statements, not ours
 
 		// Check if base has a constructor
-		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
+		FunctionDefinition const* baseConstr = nullptr;
 		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
 			if (fndef->isConstructor())
 				baseConstr = fndef;
 		if (!baseConstr)
 			continue;
 
-		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
+		m_context.pushExtraScope(baseConstr, toString(baseConstr->id()));
 		pushedScopes++;
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Arguments for " + base->name()));
 
 		// Try to get the argument list (from either inheritance specifiers or modifiers)
 		std::vector<ASTPointer<Expression>> const* argsList = nullptr;
-		auto constrArgs = m_currentContract->annotation().baseConstructorArguments.find(baseConstr.get());
+		auto constrArgs = m_currentContract->annotation().baseConstructorArguments.find(baseConstr);
 		if (constrArgs != m_currentContract->annotation().baseConstructorArguments.end())
 		{
 			if (auto ispec = dynamic_cast<InheritanceSpecifier const*>(constrArgs->second))
@@ -326,7 +326,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			continue; // Only include base statements, not ours
 
 		// Check if base has a constructor
-		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
+		FunctionDefinition const* baseConstr = nullptr;
 		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
 			if (fndef->isConstructor())
 				baseConstr = fndef;
@@ -335,7 +335,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
 		auto m_currentFuncOld = m_currentFunc;
-		m_currentFunc = baseConstr.get();
+		m_currentFunc = baseConstr;
 		m_currentModifier = 0;
 		processFuncModifiersAndBody();
 		m_currentFunc = m_currentFuncOld;
