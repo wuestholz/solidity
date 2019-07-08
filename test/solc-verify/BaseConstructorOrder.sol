@@ -20,15 +20,10 @@ contract BaseConstructorOrder is B1, B2 {
   modifier m(int _x) {
     _;
     set(_x);
-    assert(x == 0);
+    assert(x == 6);
   }
 
-  modifier m1(A a) {
-    _;
-    a.set(0);
-  }
-
-  constructor() public B1(x+2) B2(x) m(x) {
+  constructor() public B1(x+2) m(x+2) B2(x) {
     assert(x == 4);
   }
 
