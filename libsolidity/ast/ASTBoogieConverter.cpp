@@ -888,10 +888,36 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentBlocks.push(bg::Block::block());
 	// Include constructor preamble
 	if (_node.isConstructor())
+	{
 		constructorPreamble(_node);
+	}
+	else
+	{
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Model that balance might increased between calls"));
+		auto balIncr = bg::Decl::variable("tmp#" + toString(m_context.nextId()), m_context.boogieMsgValue()->getType());
+		m_localDecls.push_back(balIncr);
+		auto gteResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual, balIncr->getRefTo(), m_context.intLit(0, 256), 256, false);
+		m_currentBlocks.top()->addStmt(bg::Stmt::assume(gteResult.expr));
+		bg::Expr::Ref this_bal = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
+		if (m_context.encoding() == BoogieContext::Encoding::MOD)
+		{
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(balIncr->getRefTo(), tp_uint256)));
+		}
+		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, balIncr->getRefTo(), 256, false);
+		if (m_context.overflow())
+		{
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
+			m_currentBlocks.top()->addStmt(bg::Stmt::assume(addResult.cc));
+		}
+		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
+						m_context.boogieBalance()->getRefTo(),
+							bg::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
+	}
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Update balance received by msg.value"));
 		bg::Expr::Ref this_bal = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
 		bg::Expr::Ref msg_val = m_context.boogieMsgValue()->getRefTo();
 		// balance[this] += msg.value
