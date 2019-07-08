@@ -10,15 +10,20 @@ contract NonPayable {
 }
 
 contract ToBeKilled {
-    NonPayable p;
+    NonPayable public p;
+
+    /// @notice postcondition p == np
     constructor(NonPayable np) public {
         p = np;
     }
+
+    /// @notice postcondition address(p).balance >= msg.value
     function() external payable {
         selfdestruct(address(p));
     }
 }
 
+/// @notice invariant p == tbk.p()
 contract SelfDestruct {
 
     NonPayable p;
@@ -30,8 +35,9 @@ contract SelfDestruct {
     }
 
     function() external payable {
+        require(msg.value > 0);
         (bool b,) = address(tbk).call.value(msg.value)("");
-        assert(b);
+        require(b);
         assert(address(p).balance > 0);
     }
 
