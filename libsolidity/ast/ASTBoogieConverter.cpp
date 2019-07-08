@@ -264,7 +264,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			initializeStateVar(*sv, _scope);
 
 	int pushedScopes = 0;
-	// Inline base constructor statements
+	// First initialize the arguments from derived to base
 	for (auto base: m_currentContract->annotation().linearizedBaseContracts)
 	{
 		if (base == m_currentContract)
@@ -272,10 +272,9 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		// Check if base has a constructor
 		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
-		for (auto sn: base->subNodes())
-			if (auto fndef = dynamic_pointer_cast<FunctionDefinition const>(sn))
-				if (fndef->isConstructor())
-					baseConstr = fndef;
+		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
+			if (fndef->isConstructor())
+				baseConstr = fndef;
 		if (!baseConstr)
 			continue;
 
@@ -318,6 +317,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		}
 	}
 
+	// Second, inline the bodies from base to derived
 	for (auto it = m_currentContract->annotation().linearizedBaseContracts.rbegin();
 			it != m_currentContract->annotation().linearizedBaseContracts.rend(); ++it)
 	{
@@ -327,10 +327,9 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		// Check if base has a constructor
 		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
-		for (auto sn: base->subNodes())
-			if (auto fndef = dynamic_pointer_cast<FunctionDefinition const>(sn))
-				if (fndef->isConstructor())
-					baseConstr = fndef;
+		for (auto fndef : ASTNode::filteredNodes<FunctionDefinition>(base->subNodes()))
+			if (fndef->isConstructor())
+				baseConstr = fndef;
 		if (!baseConstr)
 			continue;
 
@@ -344,6 +343,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
 	}
 
+	// Third, pop all the extra scopes introduced
 	for (int i = 0; i < pushedScopes; i++)
 		m_context.popExtraScope();
 }
