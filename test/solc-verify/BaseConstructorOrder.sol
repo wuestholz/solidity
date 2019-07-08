@@ -9,7 +9,7 @@ contract B1 is A {
   constructor(int _x) public A(_x) { x += _x; }
 }
 
-contract B2 is A { 
+contract B2 is A {
   constructor(int _x) public { x = _x; }
 }
 
