@@ -440,7 +440,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							lhs,
 							m_context.intLit(1, bits),
 							bits, isSigned);
-			bg::Decl::Ref tempVar = bg::Decl::variable("inc#" + to_string(_node.id()),
+			bg::Decl::Ref tempVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
 					m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
 			m_newDecls.push_back(tempVar);
 			if (_node.isPrefixOperation()) // ++x (or --x)

@@ -263,6 +263,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
 			initializeStateVar(*sv, _scope);
 
+	int pushedScopes = 0;
 	// Inline base constructor statements
 	for (auto base: m_currentContract->annotation().linearizedBaseContracts)
 	{
@@ -278,11 +279,9 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		if (!baseConstr)
 			continue;
 
-		//if (!baseConstr->modifiers().empty())
-			//m_context.reportError(baseConstr.get(), "Modifiers on base constructors are not supported");
-
 		m_context.pushExtraScope(baseConstr.get(), toString(baseConstr->id()));
-		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
+		pushedScopes++;
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Arguments for " + base->name()));
 
 		// Try to get the argument list (from either inheritance specifiers or modifiers)
 		std::vector<ASTPointer<Expression>> const* argsList = nullptr;
@@ -317,6 +316,25 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 						defaultValue(param->annotation().type, m_context)));
 			}
 		}
+	}
+
+	for (auto it = m_currentContract->annotation().linearizedBaseContracts.rbegin();
+			it != m_currentContract->annotation().linearizedBaseContracts.rend(); ++it)
+	{
+		auto base = *it;
+		if (base == m_currentContract)
+			continue; // Only include base statements, not ours
+
+		// Check if base has a constructor
+		ASTPointer<FunctionDefinition const> baseConstr = nullptr;
+		for (auto sn: base->subNodes())
+			if (auto fndef = dynamic_pointer_cast<FunctionDefinition const>(sn))
+				if (fndef->isConstructor())
+					baseConstr = fndef;
+		if (!baseConstr)
+			continue;
+
+		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " starts here"));
 		auto m_currentFuncOld = m_currentFunc;
 		m_currentFunc = baseConstr.get();
 		m_currentModifier = 0;
@@ -324,8 +342,10 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		m_currentFunc = m_currentFuncOld;
 
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Inlined constructor for " + base->name() + " ends here"));
-		m_context.popExtraScope();
 	}
+
+	for (int i = 0; i < pushedScopes; i++)
+		m_context.popExtraScope();
 }
 
 void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope)
@@ -595,7 +615,7 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 
 		if (modifierDecl)
 		{
-			m_context.pushExtraScope(modifierDecl, toString(modifier->id()));
+			m_context.pushExtraScope(modifierDecl, toString(modifier->id()) + toString(m_currentModifier));
 
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
@@ -621,8 +641,17 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 			m_currentReturnLabel = oldReturnLabel;
 			m_context.popExtraScope();
 		}
-		else if (!dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
+		// Base constructor arguments can skipped, calls to base constructors are inlined
+		else if (dynamic_cast<ContractDefinition const*>(modifier->name()->annotation().referencedDeclaration))
+		{
+			m_currentModifier++;
+			processFuncModifiersAndBody();
+			m_currentModifier--;
+		}
+		else
+		{
 			m_context.reportError(modifier.get(), "Unsupported modifier invocation");
+		}
 	}
 	else if (m_currentFunc->isImplemented()) // We reached the function
 	{

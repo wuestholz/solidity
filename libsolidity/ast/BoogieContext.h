@@ -94,6 +94,8 @@ private:
 
 	std::list<std::pair<ASTNode const*, std::string>> m_extraScopes;
 
+	int m_nextId = 0;
+
 public:
 
 	BoogieContext(Encoding encoding,
@@ -114,7 +116,7 @@ public:
 	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
-
+	int nextId() { return m_nextId++; }
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */
