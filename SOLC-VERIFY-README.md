@@ -119,7 +119,7 @@ Some examples are located under the `test/solc-verify/examples` folder of the re
 
 ### Specifictaion Annotations
 
-This example (`Annotations.sol`) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 10) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Furthermore, loops can be annotated with loop invariants (such as in line 18). This contract is correct and can be verified by the following command:
+This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 10) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Furthermore, loops can be annotated with loop invariants (such as in line 18). This contract is correct and can be verified by the following command:
 ```
 solc-verify.py Annotations.sol
 ```
@@ -131,7 +131,7 @@ However, removing that check and running the verifier with overflow checks will 
 
 ### SimpleBank
 
-This is the simplified version of the DAO hack, illustrating the reentrancy issue. There are two versions of the `withdraw` function (line 13). In the incorrect version (`SimpleBankReentrancy.sol`) we first transfer the money and then reduce the balance of the sender, allowing a reentrancy attack. The operations in the correct version (`SimpleBankCorrect.sol`) are the other way around, preventing the reentrancy attack. The contract is annotated with a contract level invariant (line 4) ensuring that the sum of the individual balances equals to the balance of the contract itself. Using this invariant we can detect the error in the incorrect version (invariant does not hold when the reentrant call is made) and avoid a false alarm in the correct version (invariant holds when the reentrant call is made). The tool can be executed with the following commands:
+This is the simplified version of the DAO hack, illustrating the reentrancy issue. There are two versions of the `withdraw` function (line 13). In the incorrect version ([`SimpleBankReentrancy.sol`](test/solc-verify/examples/SimpleBankReentrancy.sol)) we first transfer the money and then reduce the balance of the sender, allowing a reentrancy attack. The operations in the correct version ([`SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol)) are the other way around, preventing the reentrancy attack. The contract is annotated with a contract level invariant (line 4) ensuring that the sum of the individual balances equals to the balance of the contract itself. Using this invariant we can detect the error in the incorrect version (invariant does not hold when the reentrant call is made) and avoid a false alarm in the correct version (invariant holds when the reentrant call is made). The tool can be executed with the following commands:
 ```
 solc-verify.py SimpleBankReentrancy.sol
 solc-verify.py SimpleBankCorrect.sol
@@ -139,11 +139,11 @@ solc-verify.py SimpleBankCorrect.sol
 
 ### BecToken
 
-This example (`BecTokenSimplifiedOverflow.sol`) presents a part of the BecToken, which had an overflow issue. It uses the `SafeMath` library for most operations to prevent overflows, but there is a multiplication in `batchTransfer` (line 61) that can overflow. The function transfers a given `_value` to a given number of `_receivers`. It first reduces the balance of the sender with the product of the value and the number of receivers and then transfers the value to each receiver in a loop. If the product overflows, a small product will be reduced from the sender, but large values will be transferred to the receivers. Our tool can detect this issue by the following command (using CVC4):
+This example ([`BecTokenSimplifiedOverflow.sol`](test/solc-verify/examples/BecTokenSimplifiedOverflow.sol)) presents a part of the BecToken, which had an overflow issue. It uses the `SafeMath` library for most operations to prevent overflows, but there is a multiplication in `batchTransfer` (line 61) that can overflow. The function transfers a given `_value` to a given number of `_receivers`. It first reduces the balance of the sender with the product of the value and the number of receivers and then transfers the value to each receiver in a loop. If the product overflows, a small product will be reduced from the sender, but large values will be transferred to the receivers. Our tool can detect this issue by the following command (using CVC4):
 ```
 solc-verify.py BecTokenSimplifiedOverflow.sol --boogie-arith mod-overflow --solver cvc4
 ```
-In the correct version (`BecTokenSimplifiedCorrect.sol`), the multiplication in line 61 is replaced by the `mul` operation from `SafeMath`, making the contract safe. Our tool can not only prove the absence of overflows, but also the contract invariant (sum of balances equals to total supply, line 34) and the loop invariant (line 67) including nonlinear arithmetic:
+In the correct version ([`BecTokenSimplifiedCorrect.sol`](test/solc-verify/examples/BecTokenSimplifiedCorrect.sol)), the multiplication in line 61 is replaced by the `mul` operation from `SafeMath`, making the contract safe. Our tool can not only prove the absence of overflows, but also the contract invariant (sum of balances equals to total supply, line 34) and the loop invariant (line 67) including nonlinear arithmetic:
 ```
 solc-verify.py BecTokenSimplifiedCorrect.sol --boogie-arith mod-overflow --solver cvc4
 ```
