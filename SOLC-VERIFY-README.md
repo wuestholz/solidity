@@ -1,6 +1,6 @@
 # solc-verify
 
-This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and not all features of Solidity are supported yet (e.g. structs).
+This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and some features have a limited support.
 
 ## Build and Install
 
@@ -95,7 +95,7 @@ cd ../..
 
 ## Running solc-verify
 
-The entry point of our tool is the script `solc-verify.py`. The script has a single positional argument that describes the path to the input file to be verified. You can type `solc-verify.py --help` to print the optional arguments, but we also list them below.
+The entry point is the script `solc-verify.py`. The script has a single positional argument that describes the path to the input file to be verified. You can type `solc-verify.py --help` to print the optional arguments, but we also list them below.
 
 - `-h`, `--help`: Show help message and exit.
 - `--timeout TIMEOUT`: Timeout for running the Boogie verifier in seconds (default is 10).
@@ -120,13 +120,13 @@ Some examples are located under the `test/solc-verify/examples` folder of the re
 
 ### Specifictaion Annotations
 
-This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 10) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Furthermore, loops can be annotated with loop invariants (such as in line 18). This contract is correct and can be verified by the following command:
+This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 11) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Loops can be annotated with loop invariants (such as in line 21). Furthermore, functions can be annotated with the state variables that they can modify (including conditions). This contract is correct and can be verified by the following command:
 ```
-solc-verify.py --no-modifies-analysis Annotations.sol
+solc-verify.py Annotations.sol
 ```
 Note, that it is also free of overflows, since the programmer included an explicit check in line 12. Our tool can detect this and avoid a false alarm:
 ```
-solc-verify.py --no-modifies-analysis Annotations.sol --arithmetic mod-overflow
+solc-verify.py Annotations.sol --arithmetic mod-overflow
 ```
 However, removing that check and running the verifier with overflow checks will report the error.
 
