@@ -47,7 +47,7 @@ def main(tmpDir):
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
-    parser.add_argument('--boogie-arith', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod', 'mod-overflow'])
+    parser.add_argument('--arithmetic', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod', 'mod-overflow'])
     parser.add_argument('--no-modifies-analysis', action='store_true', help='Do not perform modification analysis')
 
     parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default=@BOOGIE_DEFAULT_SOLVER@, choices=['z3', 'yices2', 'cvc4'])
@@ -62,9 +62,9 @@ def main(tmpDir):
     bplFile = outDir + '/' + os.path.basename(solFile) + '.bpl'
 
     # First convert .sol to .bpl
-    solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, outDir, args.boogie_arith)
+    solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, outDir, args.arithmetic)
     if args.no_modifies_analysis:
-        solcArgs += ' --no-modifies-analysis'
+        solcArgs += ' --boogie-no-mod-analysis'
     convertCommand = args.solc + ' ' + solcArgs
     if args.verbose:
         print("Solc command: " + convertCommand)
@@ -107,7 +107,7 @@ def main(tmpDir):
         boogieArgs += ' /yices2exe:%s /proverOpt:SOLVER=Yices2 /useArrayTheory' % solverPath
     if args.solver == 'cvc4':
         boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % solverPath
-        if args.boogie_arith == 'mod' or args.boogie_arith == 'mod-overflow':
+        if args.arithmetic == 'mod' or args.arithmetic == 'mod-overflow':
             boogieArgs += ' /proverOpt:C:"--incremental --decision=justification --no-arrays-eager-index --arrays-eager-lemmas"'
             boogieArgs += ' /proverOpt:LOGIC=QF_AUFNIA'
 
