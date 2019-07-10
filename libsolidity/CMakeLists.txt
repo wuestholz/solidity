@@ -37,6 +37,7 @@ set(sources
 	ast/ASTAnnotations.h
 	ast/ASTBoogieConverter.cpp
 	ast/ASTBoogieExpressionConverter.cpp
+	ast/ASTBoogieStats.cpp
 	ast/ASTBoogieUtils.cpp
 	ast/ASTEnums.h
 	ast/ASTForward.h

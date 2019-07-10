@@ -1,1 +1,1 @@
---arithmetic mod-overflow --no-modifies-analysis
+--arithmetic mod-overflow

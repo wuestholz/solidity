@@ -56,6 +56,15 @@ string const ASTBoogieUtils::ERR_EXPR = "__ERROR";
 string const ASTBoogieUtils::BOOGIE_STOR = "stor";
 string const ASTBoogieUtils::BOOGIE_MEM = "mem";
 
+string const ASTBoogieUtils::DOCTAG_CONTRACT_INVAR = "invariant";
+string const ASTBoogieUtils::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
+string const ASTBoogieUtils::DOCTAG_LOOP_INVAR = "invariant";
+string const ASTBoogieUtils::DOCTAG_PRECOND = "precondition";
+string const ASTBoogieUtils::DOCTAG_POSTCOND = "postcondition";
+string const ASTBoogieUtils::DOCTAG_MODIFIES = "modifies";
+string const ASTBoogieUtils::DOCTAG_MODIFIES_ALL = DOCTAG_MODIFIES + " *";
+string const ASTBoogieUtils::DOCTAG_MODIFIES_COND = " if ";
+
 ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount

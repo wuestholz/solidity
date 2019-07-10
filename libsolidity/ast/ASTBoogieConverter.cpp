@@ -25,15 +25,6 @@ namespace dev
 namespace solidity
 {
 
-string const ASTBoogieConverter::DOCTAG_CONTRACT_INVAR = "invariant";
-string const ASTBoogieConverter::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
-string const ASTBoogieConverter::DOCTAG_LOOP_INVAR = "invariant";
-string const ASTBoogieConverter::DOCTAG_PRECOND = "precondition";
-string const ASTBoogieConverter::DOCTAG_POSTCOND = "postcondition";
-string const ASTBoogieConverter::DOCTAG_MODIFIES = "modifies";
-string const ASTBoogieConverter::DOCTAG_MODIFIES_ALL = DOCTAG_MODIFIES + " *";
-string const ASTBoogieConverter::DOCTAG_MODIFIES_COND = " if ";
-
 bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
 	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(_node);
@@ -465,7 +456,7 @@ std::vector<BoogieContext::DocTagExpr> ASTBoogieConverter::getExprsFromDocTags(A
 bool ASTBoogieConverter::includeContractInvars(DocumentedAnnotation const& _annot)
 {
 	for (auto docTag: _annot.docTags)
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_CONTRACT_INVARS_INCLUDE))
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, ASTBoogieUtils::DOCTAG_CONTRACT_INVARS_INCLUDE))
 			return true;
 
 	return false;
@@ -532,9 +523,9 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 
 	for (auto docTag: _node.annotation().docTags)
 	{
-		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, DOCTAG_MODIFIES))
+		if (docTag.first == "notice" && boost::starts_with(docTag.second.content, ASTBoogieUtils::DOCTAG_MODIFIES))
 		{
-			if (boost::algorithm::trim_copy(docTag.second.content) == DOCTAG_MODIFIES_ALL)
+			if (boost::algorithm::trim_copy(docTag.second.content) == ASTBoogieUtils::DOCTAG_MODIFIES_ALL)
 			{
 				canModifyAll = true;
 				continue; // Continue to parse the rest to catch syntax errors
@@ -542,18 +533,18 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 			size_t targetEnd = docTag.second.content.length();
 			bg::Expr::Ref condExpr = bg::Expr::lit(true);
 			// Check if there is a condition part
-			size_t condStart = docTag.second.content.find(DOCTAG_MODIFIES_COND);
+			size_t condStart = docTag.second.content.find(ASTBoogieUtils::DOCTAG_MODIFIES_COND);
 			if (condStart != string::npos)
 			{
 				targetEnd = condStart;
 				// Parse the condition
 				BoogieContext::DocTagExpr cond;
-				if (parseExpr(docTag.second.content.substr(condStart + DOCTAG_MODIFIES_COND.length()), _node, &_node, cond))
+				if (parseExpr(docTag.second.content.substr(condStart + ASTBoogieUtils::DOCTAG_MODIFIES_COND.length()), _node, &_node, cond))
 					condExpr = cond.expr;
 			}
 			// Parse the target (identifier/selector)
 			BoogieContext::DocTagExpr target;
-			if (parseExpr(docTag.second.content.substr(DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
+			if (parseExpr(docTag.second.content.substr(ASTBoogieUtils::DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
 			{
 				if (Declaration const* varDecl = getModifiesBase(target.exprSol.get()))
 					modSpecs[varDecl].push_back(ModSpec(condExpr, target.expr));
@@ -716,7 +707,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	m_context.currentContractInvars().clear();
 	m_context.currentSumDecls().clear();
 
-	for (auto invar: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_CONTRACT_INVAR))
+	for (auto invar: getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_CONTRACT_INVAR))
 	{
 		m_context.addGlobalComment("Contract invariant: " + invar.exprStr);
 		m_context.currentContractInvars().push_back(invar);
@@ -998,7 +989,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		procDecl->addAttr(bg::Attr::attr("inline", 1));
 
 	// Add other pre/postconditions
-	for (auto pre: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_PRECOND))
+	for (auto pre: getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_PRECOND))
 	{
 		procDecl->getRequires().push_back(bg::Specification::spec(pre.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Precondition '" + pre.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
@@ -1010,7 +1001,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			procDecl->getRequires().push_back(bg::Specification::spec(oc,
 						ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of precondition '" + pre.exprStr + "' when entering function.", *m_context.currentScanner())));
 	}
-	for (auto post: getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_POSTCOND))
+	for (auto post: getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_POSTCOND))
 	{
 		procDecl->getEnsures().push_back(bg::Specification::spec(post.expr,
 							ASTBoogieUtils::createAttrs(_node.location(), "Postcondition '" + post.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
@@ -1226,7 +1217,7 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 		));
 	}
 
-	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), scope(), DOCTAG_LOOP_INVAR);
+	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), scope(), ASTBoogieUtils::DOCTAG_LOOP_INVAR);
 	if (includeContractInvars(_node.annotation()))
 		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar: loopInvars)
@@ -1299,7 +1290,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		));
 	}
 
-	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), &_node, DOCTAG_LOOP_INVAR);
+	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_LOOP_INVAR);
 	if (includeContractInvars(_node.annotation()))
 		loopInvars.insert(end(loopInvars), begin(m_context.currentContractInvars()), end(m_context.currentContractInvars()));
 	for (auto invar: loopInvars)

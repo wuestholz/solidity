@@ -1,1 +1,1 @@
---solver cvc4 --arithmetic mod-overflow --no-modifies-analysis
+--solver cvc4 --arithmetic mod-overflow

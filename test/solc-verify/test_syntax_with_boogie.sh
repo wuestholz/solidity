@@ -117,10 +117,10 @@ do
         if [ -z "$HAS_ERRORS" ];
         then
             # Run the test
-	        solcverify_check "$filename" "--no-modifies-analysis" ""
+	        solcverify_check "$filename" ""
         fi
     else
-    	solcverify_check "$filename" "--no-modifies-analysis" ""
+    	solcverify_check "$filename" ""
     fi
 done
 

@@ -63,6 +63,16 @@ public:
 	static std::string const BOOGIE_STOR;
 	static std::string const BOOGIE_MEM;
 
+	// Specification annotations
+	static std::string const DOCTAG_CONTRACT_INVAR;
+	static std::string const DOCTAG_LOOP_INVAR;
+	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;
+	static std::string const DOCTAG_PRECOND;
+	static std::string const DOCTAG_POSTCOND;
+	static std::string const DOCTAG_MODIFIES;
+	static std::string const DOCTAG_MODIFIES_ALL;
+	static std::string const DOCTAG_MODIFIES_COND;
+
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */

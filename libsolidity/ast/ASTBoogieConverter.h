@@ -38,15 +38,6 @@ private:
 
 	std::string m_currentContinueLabel;
 
-	static std::string const DOCTAG_CONTRACT_INVAR;
-	static std::string const DOCTAG_LOOP_INVAR;
-	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;
-	static std::string const DOCTAG_PRECOND;
-	static std::string const DOCTAG_POSTCOND;
-	static std::string const DOCTAG_MODIFIES;
-	static std::string const DOCTAG_MODIFIES_ALL;
-	static std::string const DOCTAG_MODIFIES_COND;
-
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,
 	 * it also handles side-effect statements and declarations introduced by the conversion

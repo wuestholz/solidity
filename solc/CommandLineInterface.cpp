@@ -30,6 +30,7 @@
 #include <libsolidity/ast/ASTPrinter.h>
 #include <libsolidity/ast/ASTJsonConverter.h>
 #include <libsolidity/ast/ASTBoogieConverter.h>
+#include <libsolidity/ast/ASTBoogieStats.h>
 #include <libsolidity/ast/BoogieContext.h>
 #include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
@@ -116,7 +117,7 @@ static string const g_strAstBoogieArithInt = "int";
 static string const g_strAstBoogieArithBv = "bv";
 static string const g_strAstBoogieArithMod = "mod";
 static string const g_strAstBoogieArithModOverflow = "mod-overflow";
-static string const g_strAstBoogieNoModAnalysis = "boogie-no-mod-analysis";
+static string const g_strAstBoogieModAnalysis = "boogie-mod-analysis";
 static string const g_strBinary = "bin";
 static string const g_strBinaryRuntime = "bin-runtime";
 static string const g_strCombinedJson = "combined-json";
@@ -177,7 +178,7 @@ static string const g_argCombinedJson = g_strCombinedJson;
 static string const g_argCompactJSON = g_strCompactJSON;
 static string const g_argAstBoogie = g_strAstBoogie;
 static string const g_argAstBoogieArith = g_strAstBoogieArith;
-static string const g_argAstBoogieNoModAnalysis = g_strAstBoogieNoModAnalysis;
+static string const g_argAstBoogieModAnalysis = g_strAstBoogieModAnalysis;
 static string const g_argErrorRecovery = g_strErrorRecovery;
 static string const g_argGas = g_strGas;
 static string const g_argHelp = g_strHelp;
@@ -742,7 +743,7 @@ Allowed options)",
 				po::value<string>()->value_name(boost::join(g_boogieArithArgs, ",")),
 				"Encoding used for arithmetic data types and operations in Boogie."
 		)
-		(g_argAstBoogieNoModAnalysis.c_str(), "Skip modifies analysis in Boogie")
+		(g_argAstBoogieModAnalysis.c_str(), "Enable modifies analysis in Boogie even if there is no spec.")
 		(g_argAsm.c_str(), "EVM assembly of the contracts.")
 		(g_argAsmJson.c_str(), "EVM assembly of the contracts in JSON format.")
 		(g_argOpcodes.c_str(), "Opcodes of the contracts.")
@@ -1208,6 +1209,12 @@ void CommandLineInterface::handleBoogie()
 	sout() << endl << "======= Converting to Boogie IVL =======" << endl;
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
+
+	ASTBoogieStats stats;
+	for (auto const& sourceCode: m_sourceCodes)
+		m_compiler->ast(sourceCode.first).accept(stats);
+
+
 	BoogieContext::Encoding encoding = BoogieContext::Encoding::INT;
 	bool overflow = false;
 	if (m_args.count(g_argAstBoogieArith))
@@ -1238,7 +1245,9 @@ void CommandLineInterface::handleBoogie()
 		}
 	}
 
-	BoogieContext context(encoding, overflow, !m_args.count(g_strAstBoogieNoModAnalysis), &errorReporter, m_compiler->getScopes(), m_evmVersion);
+	BoogieContext context(encoding, overflow,
+			m_args.count(g_strAstBoogieModAnalysis) || stats.hasModifiesSpecs(),
+			&errorReporter, m_compiler->getScopes(), m_evmVersion);
 	ASTBoogieConverter boogieConverter(context);
 
 	SourceReferenceFormatter formatter(serr(false));

@@ -48,7 +48,7 @@ def main(tmpDir):
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
     parser.add_argument('--arithmetic', type=str, help='Encoding used for arithmetic data types and operations in the verifier', default='int', choices=['int', 'bv', 'mod', 'mod-overflow'])
-    parser.add_argument('--no-modifies-analysis', action='store_true', help='Do not perform modification analysis on state variables')
+    parser.add_argument('--modifies-analysis', action='store_true', help='Perform modification analysis on state variables')
 
     parser.add_argument('--solver', type=str, help='SMT solver used by the verifier', default=@BOOGIE_DEFAULT_SOLVER@, choices=['z3', 'yices2', 'cvc4'])
     parser.add_argument('--solver-bin', type=str, help='Binary of the solver to use')
@@ -63,8 +63,8 @@ def main(tmpDir):
 
     # First convert .sol to .bpl
     solcArgs = ' --boogie %s -o %s --overwrite --boogie-arith %s' % (solFile, outDir, args.arithmetic)
-    if args.no_modifies_analysis:
-        solcArgs += ' --boogie-no-mod-analysis'
+    if args.modifies_analysis:
+        solcArgs += ' --boogie-mod-analysis'
     convertCommand = args.solc + ' ' + solcArgs
     if args.verbose:
         print("Solc command: " + convertCommand)
