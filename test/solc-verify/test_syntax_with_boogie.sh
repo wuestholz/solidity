@@ -49,15 +49,17 @@ fi
 TIMEFORMAT="%U"
 
 ## Keep track of failed tests
-UNKN=0
+UNKNOWN_TESTS=0
 FAILED_TESTS=()
+TOTAL_TESTS=0
 
 ## Printout
 function report() {
     test_name="$1"
     elapsed="$2"
     message="$3"
-    echo -n "$test_name "
+    TOTAL_TESTS=$((TOTAL_TESTS+1))
+    echo -n "$TOTAL_TESTS. $test_name "
     if [ ! -z "$message" ]
     then
         echo -n $YELLOW
@@ -66,7 +68,7 @@ function report() {
     else
         echo -n $GREEN
         echo OK [$elapsed s]
-        UNKN=$((UNKN+1))
+        UNKNOWN_TESTS=$((UNKNOWN_TESTS+1))
     fi
     echo -n $BLACK
 }
@@ -79,8 +81,8 @@ TIME_PATH=`mktemp`
 function solcverify_check()
 {
     filename="${1}"
-    solcverify_args="${2}"
-    out_expected="${3}"
+    shift
+    solcverify_args="$@"
 
     # Test id
     test_string="$filename"
@@ -117,10 +119,10 @@ do
         if [ -z "$HAS_ERRORS" ];
         then
             # Run the test
-	        solcverify_check "$filename" ""
+	        solcverify_check "$filename" "$@"
         fi
     else
-    	solcverify_check "$filename" ""
+    	solcverify_check "$filename" "$@"
     fi
 done
 
@@ -135,6 +137,10 @@ do
 done
 
 echo "---------- Summary ----------"
+echo "total: $TOTAL_TESTS"
+echo "failed: ${#FAILED_TESTS[@]}"
+echo 
+echo "failures:"
 printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "solc-verify error:.*" -o | sort | uniq -c
 printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "solc-verify.*exception:.*" -o | sort | uniq -c
 printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e ".bpl\(.*\): Error" | grep -e ": Error:.*" -o | sort | uniq -c
