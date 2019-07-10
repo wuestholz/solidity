@@ -139,7 +139,7 @@ done
 echo "---------- Summary ----------"
 echo "total: $TOTAL_TESTS"
 echo "failed: ${#FAILED_TESTS[@]}"
-echo 
+echo
 echo "failures:"
 printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "solc-verify error:.*" -o | sort | uniq -c
 printf -- '%s\n' "${FAILED_TESTS[@]}" | grep -e "solc-verify.*exception:.*" -o | sort | uniq -c
