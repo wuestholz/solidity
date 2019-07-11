@@ -109,7 +109,7 @@ The entry point is the script `solc-verify.py`. The script has a single position
 - `--solver {z3,yices2,cvc4}`: SMT solver used by the verifier (default is `z3`).
 - `--solver-bin`: Path to the solver to be used, if not given, the solver is searched on the path (not given by default).
 
-For example, the following command runs the tool on the `SimpleBankCorrect.sol` contract with no modification analysis using CVC4 and 60 seconds timeout for the verifier (the contract is actually located under [`test/solc-verify/examples/SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) in this repository).
+For example, the following command runs the tool on the `SimpleBankCorrect.sol` contract with CVC4 and 60 seconds timeout for the verifier (the contract is actually located under [`test/solc-verify/examples/SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) in this repository).
 ```
 solc-verify.py SimpleBankCorrect.sol --solver cvc4 --timeout 60
 ```
@@ -120,7 +120,7 @@ Some examples are located under the `test/solc-verify/examples` folder of the re
 
 ### Specifictaion Annotations
 
-This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Non-public functions (such as `add_to_x` in line 11) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. Loops can be annotated with loop invariants (such as in line 21). Furthermore, functions can be annotated with the state variables that they can modify (including conditions). This contract is correct and can be verified by the following command:
+This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) presents the available specification annotations. A contract-level invariant (line 3) ensures that `x` and `y` are always equal. Contract-level annotations are added as both pre- and postconditions to public functions. Non-public functions (such as `add_to_x`) are not checked against the contract-level invariant, but can be annotated with pre- and post-conditions explicitly. By default, non-public functions are inlined to a depth of 1. Loops can be annotated with loop invariants. Furthermore, functions can be annotated with the state variables that they can modify (including conditions). This contract is correct and can be verified by the following command:
 ```
 solc-verify.py Annotations.sol
 ```
