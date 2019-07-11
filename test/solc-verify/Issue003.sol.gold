@@ -1,4 +1,4 @@
 Verifying A::[implicit_constructor]: OK
 Verifying Issue003::[constructor]: OK
-Verifying Issue003::: OK
+Verifying Issue003::[fallback]: OK
 No errors found.

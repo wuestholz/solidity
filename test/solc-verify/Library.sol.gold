@@ -1,4 +1,4 @@
 Verifying MathLib::[implicit_constructor]: OK
-Verifying Library::: OK
+Verifying Library::[fallback]: OK
 Verifying Library::[implicit_constructor]: OK
 No errors found.

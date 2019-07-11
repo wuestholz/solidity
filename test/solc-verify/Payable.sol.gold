@@ -1,6 +1,6 @@
 Verifying PayableFunctions::receive: OK
 Verifying PayableFunctions::[implicit_constructor]: OK
-Verifying Payable::: OK
+Verifying Payable::[fallback]: OK
 Verifying Payable::[constructor]: OK
 Verifying Payable::transferNested: OK
 No errors found.
