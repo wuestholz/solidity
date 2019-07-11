@@ -1,6 +1,6 @@
-Verifying Overflow::inc: ERROR
+Overflow::inc: ERROR
  - Source test/solc-verify/OverflowSpec.sol, line 10, col 5: Function can terminate with overflow
-Verifying Overflow::set: ERROR
+Overflow::set: ERROR
  - Source test/solc-verify/OverflowSpec.sol, line 15, col 5: Overflow in computation of invariant 'x == y + 1' at end of function.
-Verifying Overflow::[implicit_constructor]: OK
+Overflow::[implicit_constructor]: OK
 Errors were found by the verifier.

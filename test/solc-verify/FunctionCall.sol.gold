@@ -1,9 +1,9 @@
-Verifying FunctionCall::addSome: OK
-Verifying FunctionCall::f: OK
-Verifying FunctionCall::g: OK
-Verifying FunctionCall::h: OK
-Verifying FunctionCall::sequentialCall: OK
-Verifying FunctionCall::compositeCall: OK
-Verifying FunctionCall::[fallback]: OK
-Verifying FunctionCall::[implicit_constructor]: OK
+FunctionCall::addSome: OK
+FunctionCall::f: OK
+FunctionCall::g: OK
+FunctionCall::h: OK
+FunctionCall::sequentialCall: OK
+FunctionCall::compositeCall: OK
+FunctionCall::[fallback]: OK
+FunctionCall::[implicit_constructor]: OK
 No errors found.

@@ -1,4 +1,4 @@
-Verifying A::[constructor]: OK
-Verifying BaseConstructorWithModifiers::[constructor]: OK
-Verifying BaseConstructorWithModifiers::[fallback]: OK
+A::[constructor]: OK
+BaseConstructorWithModifiers::[constructor]: OK
+BaseConstructorWithModifiers::[fallback]: OK
 No errors found.

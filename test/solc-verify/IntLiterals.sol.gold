@@ -1,3 +1,3 @@
-Verifying IntLiterals::[fallback]: OK
-Verifying IntLiterals::[implicit_constructor]: OK
+IntLiterals::[fallback]: OK
+IntLiterals::[implicit_constructor]: OK
 No errors found.

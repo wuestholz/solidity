@@ -1,6 +1,6 @@
-Verifying EnumsBv::ok: OK
-Verifying EnumsBv::ok2: OK
-Verifying EnumsBv::fail: ERROR
+EnumsBv::ok: OK
+EnumsBv::ok2: OK
+EnumsBv::fail: ERROR
  - Source test/solc-verify/EnumsBv.sol, line 19, col 17: Conversion to enum might be out of range
-Verifying EnumsBv::[implicit_constructor]: OK
+EnumsBv::[implicit_constructor]: OK
 Errors were found by the verifier.

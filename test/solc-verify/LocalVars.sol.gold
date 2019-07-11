@@ -1,3 +1,3 @@
-Verifying LocalVars::doSomething: OK
-Verifying LocalVars::[implicit_constructor]: OK
+LocalVars::doSomething: OK
+LocalVars::[implicit_constructor]: OK
 No errors found.

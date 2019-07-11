@@ -1,3 +1,3 @@
-Verifying Enums::f: OK
-Verifying Enums::[implicit_constructor]: OK
+Enums::f: OK
+Enums::[implicit_constructor]: OK
 No errors found.

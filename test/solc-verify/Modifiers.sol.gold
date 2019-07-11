@@ -1,6 +1,6 @@
-Verifying A::someFunc: OK
-Verifying A::someFunc2: OK
-Verifying A::twoModifiers: OK
-Verifying A::costs: OK
-Verifying A::[implicit_constructor]: OK
+A::someFunc: OK
+A::someFunc2: OK
+A::twoModifiers: OK
+A::costs: OK
+A::[implicit_constructor]: OK
 No errors found.

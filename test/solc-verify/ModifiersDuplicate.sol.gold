@@ -1,4 +1,4 @@
-Verifying ModifiersDuplicate::test: OK
-Verifying ModifiersDuplicate::[fallback]: OK
-Verifying ModifiersDuplicate::[implicit_constructor]: OK
+ModifiersDuplicate::test: OK
+ModifiersDuplicate::[fallback]: OK
+ModifiersDuplicate::[implicit_constructor]: OK
 No errors found.

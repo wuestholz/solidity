@@ -1,3 +1,3 @@
-Verifying C::[implicit_constructor]: OK
-Verifying Issue009::[implicit_constructor]: OK
+C::[implicit_constructor]: OK
+Issue009::[implicit_constructor]: OK
 No errors found.

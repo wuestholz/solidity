@@ -1,7 +1,7 @@
-Verifying A::f: OK
-Verifying A::g: OK
-Verifying A::[implicit_constructor]: OK
-Verifying B::g: OK
-Verifying B::h: OK
-Verifying B::[implicit_constructor]: OK
+A::f: OK
+A::g: OK
+A::[implicit_constructor]: OK
+B::g: OK
+B::h: OK
+B::[implicit_constructor]: OK
 No errors found.

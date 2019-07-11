@@ -1,4 +1,4 @@
-Verifying SafeMath::[implicit_constructor]: OK
-Verifying OverflowSideEffeect::f: OK
-Verifying OverflowSideEffeect::[implicit_constructor]: OK
+SafeMath::[implicit_constructor]: OK
+OverflowSideEffeect::f: OK
+OverflowSideEffeect::[implicit_constructor]: OK
 No errors found.

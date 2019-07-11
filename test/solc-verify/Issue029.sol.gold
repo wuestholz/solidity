@@ -1,7 +1,7 @@
-Verifying C::f: OK
-Verifying C::super: OK
-Verifying C::g: OK
-Verifying C::[implicit_constructor]: OK
-Verifying C2::f: OK
-Verifying C2::[implicit_constructor]: OK
+C::f: OK
+C::super: OK
+C::g: OK
+C::[implicit_constructor]: OK
+C2::f: OK
+C2::[implicit_constructor]: OK
 No errors found.

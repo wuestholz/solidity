@@ -1,3 +1,3 @@
-Verifying BitPreciseArith::[fallback]: OK
-Verifying BitPreciseArith::[implicit_constructor]: OK
+BitPreciseArith::[fallback]: OK
+BitPreciseArith::[implicit_constructor]: OK
 No errors found.

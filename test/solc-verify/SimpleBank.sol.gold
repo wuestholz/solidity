@@ -1,7 +1,7 @@
-Verifying SimpleBank::deposit: OK
-Verifying SimpleBank::withdraw_transfer: OK
-Verifying SimpleBank::withdraw_call_incorrect: ERROR
+SimpleBank::deposit: OK
+SimpleBank::withdraw_transfer: OK
+SimpleBank::withdraw_call_incorrect: ERROR
  - Source test/solc-verify/SimpleBank.sol, line 26, col 26: Invariant '__verifier_sum_uint(user_balances) <= address(this).balance' might not hold before external call.
-Verifying SimpleBank::withdraw_call_correct: OK
-Verifying SimpleBank::[implicit_constructor]: OK
+SimpleBank::withdraw_call_correct: OK
+SimpleBank::[implicit_constructor]: OK
 Errors were found by the verifier.

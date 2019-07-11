@@ -1,5 +1,5 @@
-Verifying Continue::whileloop: OK
-Verifying Continue::forloop: OK
-Verifying Continue::nested: OK
-Verifying Continue::[implicit_constructor]: OK
+Continue::whileloop: OK
+Continue::forloop: OK
+Continue::nested: OK
+Continue::[implicit_constructor]: OK
 No errors found.

@@ -173,7 +173,7 @@ def main(tmpDir):
             print(prefix + getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not be maintained by the loop')
         if not args.errors_only and re.search('Verifying .* \.\.\.', outputLine) is not None:
             result = redTxt('ERROR') if 'error' in nextOutputLine else greenTxt('OK')
-            print('Verifying ' + getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
+            print(getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
 
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print(greenTxt('No errors found.'))

@@ -1,7 +1,7 @@
-Verifying Arrays::readStateArr: OK
-Verifying Arrays::writeStateArr: OK
-Verifying Arrays::readParamArr: OK
-Verifying Arrays::callWithLocalArray: OK
-Verifying Arrays::callWithStateArray: OK
-Verifying Arrays::[implicit_constructor]: OK
+Arrays::readStateArr: OK
+Arrays::writeStateArr: OK
+Arrays::readParamArr: OK
+Arrays::callWithLocalArray: OK
+Arrays::callWithStateArray: OK
+Arrays::[implicit_constructor]: OK
 No errors found.

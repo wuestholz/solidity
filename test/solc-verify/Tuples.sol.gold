@@ -1,6 +1,6 @@
-Verifying Tuples::testPartial: OK
-Verifying Tuples::testSideffect: OK
-Verifying Tuples::testCasts: OK
-Verifying Tuples::[fallback]: OK
-Verifying Tuples::[implicit_constructor]: OK
+Tuples::testPartial: OK
+Tuples::testSideffect: OK
+Tuples::testCasts: OK
+Tuples::[fallback]: OK
+Tuples::[implicit_constructor]: OK
 No errors found.

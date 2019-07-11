@@ -1,7 +1,7 @@
-Verifying SpecificationSimple::[constructor]: OK
-Verifying SpecificationSimple::add: OK
-Verifying SpecificationSimple::add_incorrect: ERROR
+SpecificationSimple::[constructor]: OK
+SpecificationSimple::add: OK
+SpecificationSimple::add_incorrect: ERROR
  - Source test/solc-verify/SpecificationSimple.sol, line 20, col 5: Invariant 'x == y' might not hold at end of function.
-Verifying SpecificationSimple::add_incorrect_2: ERROR
+SpecificationSimple::add_incorrect_2: ERROR
  - Source test/solc-verify/SpecificationSimple.sol, line 27, col 9: Invariant 'x == y' might not hold when entering function.
 Errors were found by the verifier.

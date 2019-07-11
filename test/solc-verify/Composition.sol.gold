@@ -1,6 +1,6 @@
-Verifying A::someFunc: OK
-Verifying A::[implicit_constructor]: OK
-Verifying B::callOtherFunc: OK
-Verifying B::accessOtherMember: OK
-Verifying B::[implicit_constructor]: OK
+A::someFunc: OK
+A::[implicit_constructor]: OK
+B::callOtherFunc: OK
+B::accessOtherMember: OK
+B::[implicit_constructor]: OK
 No errors found.
