@@ -1018,7 +1018,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	// Modifies specifications
 	addModifiesSpecs(_node, procDecl);
 
-	dev::solidity::ASTString traceabilityName = m_currentContract->name() + "::" + (_node.isConstructor() ? "[constructor]" : _node.name().c_str());
+	string traceabilityName = _node.name();
+	if (_node.isConstructor())
+		traceabilityName = "[constructor]";
+	else if (_node.isFallback())
+		traceabilityName = "[fallback]";
+	traceabilityName = m_currentContract->name() + "::" + traceabilityName;
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
 	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
