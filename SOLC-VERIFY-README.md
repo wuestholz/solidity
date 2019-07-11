@@ -4,7 +4,7 @@ This is an extended version of the compiler that is able to perform automated fo
 
 ## Build and Install
 
-Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires [Z3 (SMT solver)](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/dddejan/boogie) as a verification backend. Alternatively, [CVC4](http://cvc4.cs.stanford.edu) or [Yices2](https://github.com/SRI-CSL/yices2) can also be used instead of Z3.
+Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires [Z3 (SMT solver)](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/dddejan/boogie) as a verification backend. Alternatively, [CVC4](http://cvc4.cs.stanford.edu) can also be used instead of Z3.
 
 On a standard Ubuntu system, solc-verify can be built and installed as follows.
 
@@ -20,7 +20,6 @@ sudo apt install -y libgmp3-dev
 sudo apt install -y m4
 sudo apt install -y automake
 sudo apt install -y default-jre
-sudo apt install -y gperf
 ```
 
 Create a folder named `solc-verify-tools` for solc-verify and its dependencies:
@@ -55,22 +54,10 @@ sudo make install
 cd ../..
 ```
 
-**[Yices2 SMT solver](https://github.com/SRI-CSL/yices2)** (Optional)
-```
-git clone https://github.com/SRI-CSL/yices2.git
-cd yices2
-autoconf
-./configure
-make
-sudo make install
-cd ..
-```
+**[Boogie verifier](https://github.com/boogie-org/boogie)**
 
-**[Boogie verifier](https://github.com/dddejan/boogie)**
-
-_Note, that this is an extended version of Boogie, that supports Yices2._
 ```
-git clone https://github.com/dddejan/boogie.git
+git clone https://github.com/boogie-org/boogie.git
 cd boogie
 wget https://nuget.org/nuget.exe
 mono ./nuget.exe restore Source/Boogie.sln
@@ -106,7 +93,7 @@ The entry point is the script `solc-verify.py`. The script has a single position
 - `--boogie BOOGIE`: Path to the Boogie verifier binary to use (by default it is the one given during building the tool).
 - `--arithmetic {int,bv,mod,mod-overflow}`: Arithmetic encoding mode to be used: SMT integers (`int`), bitvectors (`bv`), modulo arithmetic (`mod`), modular arithmetic with overflow detection (`mod-overflow`).
 - `--modifies-analysis`: State variables are checked for modifications only if there are modification annotations or if this flag is given.
-- `--solver {z3,yices2,cvc4}`: SMT solver used by the verifier (default is `z3`).
+- `--solver {z3,cvc4}`: SMT solver used by the verifier (default is `z3`).
 - `--solver-bin`: Path to the solver to be used, if not given, the solver is searched on the path (not given by default).
 
 For example, the following command runs the tool on the `SimpleBankCorrect.sol` contract with CVC4 and 60 seconds timeout for the verifier (the contract is actually located under [`test/solc-verify/examples/SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) in this repository).
