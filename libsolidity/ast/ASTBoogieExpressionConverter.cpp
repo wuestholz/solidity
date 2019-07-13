@@ -678,12 +678,6 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		{
 			allArgs.push_back(m_currentExpr);
 			regularArgs.push_back(m_currentExpr);
-			// Array length
-			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)
-			{
-				allArgs.push_back(getArrayLength(m_currentExpr, *arg));
-				regularArgs.push_back(getArrayLength(m_currentExpr, *arg));
-			}
 		}
 	}
 
@@ -1140,7 +1134,13 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	bool isArray = type->category() == Type::Category::Array;
 	if (isArray && _node.memberName() == "length")
 	{
-		m_currentExpr = getArrayLength(expr, _node);
+		auto arrType = dynamic_cast<ArrayType const*>(type);
+		if (type->dataStoredIn(DataLocation::Memory))
+			m_currentExpr = bg::Expr::arrsel(
+					m_context.getMemArrayLength(m_context.toBoogieType(arrType->baseType(), &_node))->getRefTo(),
+					m_currentExpr);
+		else
+			m_currentExpr = getArrayLength(expr, _node);
 		addTCC(m_currentExpr, tp_uint256);
 		return false;
 	}
@@ -1283,10 +1283,21 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, tp_uint256, m_context);
 	}
+
+	// Extra indirection for memory arrays
+	if (baseType->category() == Type::Category::Array && baseType->dataStoredIn(DataLocation::Memory))
+	{
+		auto arrType = dynamic_cast<ArrayType const*>(baseType);
+		auto bgArrType = m_context.toBoogieType(arrType->baseType(), &_node);
+		auto arr = m_context.getMemArray(bgArrType);
+		baseExpr = bg::Expr::arrsel(arr->getRefTo(), baseExpr);
+	}
+
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
 	// that case is handled when converting assignments
 	m_currentExpr = bg::Expr::arrsel(baseExpr, indexExpr);
+
 	addTCC(m_currentExpr, _node.annotation().type);
 
 	return false;

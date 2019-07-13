@@ -839,11 +839,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	};
 	// Add original parameters of the function
 	for (auto par: _node.parameters())
-	{
 		params.push_back({bg::Expr::id(m_context.mapDeclName(*par)), m_context.toBoogieType(par->type(), par.get())});
-		if (par->type()->category() == Type::Category::Array) // Array length
-			params.push_back({bg::Expr::id(m_context.mapDeclName(*par) + ASTBoogieUtils::BOOGIE_LENGTH), m_context.intType(256) });
-	}
 
 	// Return values
 	vector<bg::Binding> rets;

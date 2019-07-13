@@ -69,6 +69,10 @@ private:
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
 
+	std::map<std::string,boogie::TypeDeclRef> m_memArrTypes;
+	std::map<std::string,boogie::VarDeclRef> m_memArrs;
+	std::map<std::string,boogie::VarDeclRef> m_memArrLengths;
+
 	Encoding m_encoding;
 	bool m_overflow;
 	bool m_modAnalysis;
@@ -149,6 +153,9 @@ public:
 
 	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
+
+	boogie::VarDeclRef getMemArray(boogie::TypeDeclRef type) { return m_memArrs[type->getName()]; }
+	boogie::VarDeclRef getMemArrayLength(boogie::TypeDeclRef type) { return m_memArrLengths[type->getName()]; }
 
 	/**
 	 * Map a Solidity type to a Boogie type

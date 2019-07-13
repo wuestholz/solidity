@@ -27,7 +27,8 @@ contract Arrays {
         return readParamArr(paramArr, 123);
     }
 
-    function callWithStateArray() view public returns (uint) {
-        return readParamArr(arr, 456);
-    }
+    // TODO: copy from storage to memory
+    //function callWithStateArray() view public returns (uint) {
+    //    return readParamArr(arr, 456);
+    //}
 }
