@@ -846,15 +846,6 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	vector<bg::Expr::Ref> retIds;
 	for (auto ret: _node.returnParameters())
 	{
-		if (ret->type()->category() == Type::Category::Array)
-		{
-			auto arrType = dynamic_cast<ArrayType const*>(ret->type());
-			if (!arrType->isString())
-			{
-				m_context.reportError(&_node, "Arrays are not supported as return values");
-				return false;
-			}
-		}
 		bg::Expr::Ref retId = bg::Expr::id(m_context.mapDeclName(*ret));
 		bg::TypeDeclRef retType = m_context.toBoogieType(ret->type(), ret.get());
 		retIds.push_back(retId);
