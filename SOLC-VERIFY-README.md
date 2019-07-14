@@ -4,85 +4,24 @@ This is an extended version of the compiler that is able to perform automated fo
 
 ## Build and Install
 
-Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires [Z3 (SMT solver)](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/dddejan/boogie) as a verification backend. Alternatively, [CVC4](http://cvc4.cs.stanford.edu) can also be used instead of Z3.
+Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires Python 3, [Z3 (SMT solver)](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/boogie-org/boogie) as a verification backend. Alternatively, [CVC4](http://cvc4.cs.stanford.edu) can also be used instead of Z3. On a standard Ubuntu system, solc-verify can be built and installed as follows.
 
-On a standard Ubuntu system, solc-verify can be built and installed as follows.
-
-**Common tools**
-```
-sudo apt install -y mono-complete
-sudo apt install -y cmake
-sudo apt install -y libboost-all-dev
-sudo apt install -y python3
-sudo apt install -y python3-pip
-pip3 install psutil
-sudo apt install -y libgmp3-dev
-sudo apt install -y m4
-sudo apt install -y automake
-sudo apt install -y default-jre
-```
-
-Create a folder named `solc-verify-tools` for solc-verify and its dependencies:
-```
-mkdir solc-verify-tools
-cd solc-verify-tools
-```
-
-**[Z3 SMT solver](https://github.com/Z3Prover/z3)**
-```
-git clone https://github.com/Z3Prover/z3.git
-cd z3/
-python scripts/mk_make.py
-cd build
-make
-sudo make install
-cd ../..
-```
-
-**[CVC4 SMT solver](http://cvc4.cs.stanford.edu)** (Optional)
-```
-git clone https://github.com/CVC4/CVC4.git
-cd CVC4
-./contrib/get-antlr-3.4
-./contrib/get-abc
-./contrib/get-glpk-cut-log
-./contrib/get-cadical
-./configure.sh --abc --gpl --glpk --cadical
-cd build
-make
-sudo make install
-cd ../..
-```
-
-**[Boogie verifier](https://github.com/boogie-org/boogie)**
-
-```
-git clone https://github.com/boogie-org/boogie.git
-cd boogie
-wget https://nuget.org/nuget.exe
-mono ./nuget.exe restore Source/Boogie.sln
-xbuild Source/Boogie.sln
-ln -s /usr/bin/z3 Binaries/z3.exe
-cd ..
-```
-
-**[solc-verify](https://github.com/SRI-CSL/solidity)**
 ```
 git clone https://github.com/SRI-CSL/solidity.git
 cd solidity
 git checkout boogie-devel
+pip3 install psutil
 ./scripts/install_deps.sh
 mkdir build
 cd build
-cmake -DBOOGIE_BIN="../../boogie/Binaries" ..
+cmake -DBOOGIE_BIN="<PATH TO BOOGIE BINARY>" ..
 make
 sudo make install
-cd ../..
 ```
 
 ## Running solc-verify
 
-The entry point is the script `solc-verify.py`. The script has a single positional argument that describes the path to the input file to be verified. You can type `solc-verify.py --help` to print the optional arguments, but we also list them below.
+The entry point is the script `solc-verify.py`. The script has a single positional argument that describes the path to the input Solidity file to be verified. You can type `solc-verify.py --help` to print the optional arguments, but we also list them below.
 
 - `-h`, `--help`: Show help message and exit.
 - `--timeout TIMEOUT`: Timeout for running the Boogie verifier in seconds (default is 10).
@@ -96,14 +35,14 @@ The entry point is the script `solc-verify.py`. The script has a single position
 - `--solver {z3,cvc4}`: SMT solver used by the verifier (default is `z3`).
 - `--solver-bin`: Path to the solver to be used, if not given, the solver is searched on the path (not given by default).
 
-For example, the following command runs the tool on the `SimpleBankCorrect.sol` contract with CVC4 and 60 seconds timeout for the verifier (the contract is actually located under [`test/solc-verify/examples/SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) in this repository).
+For example, the following command runs the tool on the [`SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) contract with CVC4 and 60 seconds timeout for the verifier.
 ```
 solc-verify.py SimpleBankCorrect.sol --solver cvc4 --timeout 60
 ```
 
 ## Examples
 
-Some examples are located under the `test/solc-verify/examples` folder of the repository.
+Some examples are located under the `test/solc-verify/examples`.
 
 ### Specifictaion Annotations
 
@@ -111,7 +50,7 @@ This example ([`Annotations.sol`](test/solc-verify/examples/Annotations.sol)) pr
 ```
 solc-verify.py Annotations.sol
 ```
-Note, that it is also free of overflows, since the programmer included an explicit check in line 12. Our tool can detect this and avoid a false alarm:
+Note, that it is also free of overflows, since the programmer included an explicit check in line 13. Our tool can detect this and avoid a false alarm:
 ```
 solc-verify.py Annotations.sol --arithmetic mod-overflow
 ```
@@ -135,3 +74,17 @@ In the correct version ([`BecTokenSimplifiedCorrect.sol`](test/solc-verify/examp
 ```
 solc-verify.py BecTokenSimplifiedCorrect.sol --arithmetic mod-overflow --solver cvc4
 ```
+
+## Specification Annotations
+
+Specification annotations must be included in special documentation comments (`///` or `/** */`) and must start with the special doctag `@notice`.
+They must be side-effect free Solidity expressions and can refer to variables within the scope of the annotated element. Functions cannot be called in the annotations, except for getters. The currently available annotations are listed below. We try to keep the language simple to enable automation, but it is evolving based on user input.
+
+See the contracts under `test/solc-verify/examples` for examples.
+
+- **Function pre/postconditions** (`precondition <EXPRESSION>` / `postcondition <EXPRESSION>`) can be attached to functions. Preconditions are assumed before executing the function and postconditions are asserted in the end. The expression can refer to variables in the scope of the function. The postcondition can also refer to the return value.
+- **Contract level invariants**  (`invariant <EXPRESSION>`) can be attached to contracts. They are added as both a pre- and a postcondition to each _public_ function. The expression can refer to state variables in the contract.
+-**Loop invariants**  (`invariant <EXPRESSION>`) can be attached to _for_ and _while_ loops. The expression can refer ta variables in scope of the loop, including the loop counter.
+- **Modification specifiers** (`modifies <TARGET> [if <CONDITION>]`) can be attached to functions. The target can be a state variable, an index access or a member access. Optionally, a condition can also be given. They will be checked at the end of the function (whether only the specified variables were modified).
+- Specifications can refer to a special **sum function over collections** (`__verifier_sum_int` or `__verifier_sum_uint`). The argument must be an array of integers or a mapping with integer values.
+- Postconditions can refer to the **old value** of a variable (before the transaction) using `__verifier_old_<TYPE>` (e.g., `__verifier_old_uint(...)`).
