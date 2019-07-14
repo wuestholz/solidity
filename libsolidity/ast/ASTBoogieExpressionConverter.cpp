@@ -140,6 +140,31 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		return false;
 	}
 
+	if (lhsType->category() == Type::Category::Array)
+	{
+		solAssert(rhsType->category() == Type::Category::Array, "LHS is array but RHS is not");
+		auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
+		auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
+		if (lhsArrType->location() != rhsArrType->location())
+		{
+			if (lhsArrType->location() == DataLocation::Memory) // TODO: create new ptr?
+			{
+				// Create new
+				auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+						m_context.toBoogieType(lhsType, &_node));
+				m_newDecls.push_back(varDecl);
+				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
+				lhsExpr = bg::Expr::arrsel(
+						m_context.getMemArray(m_context.toBoogieType(lhsArrType->baseType(), &_node))->getRefTo(),
+						lhsExpr);
+			}
+			else if (rhsArrType->location() == DataLocation::Memory)
+				rhsExpr = bg::Expr::arrsel(
+						m_context.getMemArray(m_context.toBoogieType(rhsArrType->baseType(), &_node))->getRefTo(),
+						rhsExpr);
+		}
+	}
+
 	// Bit-precise mode
 	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(lhsType))
 		// Check for implicit conversion
