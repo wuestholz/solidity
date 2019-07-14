@@ -613,6 +613,23 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	m_currentMsgValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
+
+	// Special case for new array
+	if (auto newExpr = dynamic_cast<NewExpression const*>(&_node.expression()))
+	{
+		if (auto arrType = dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
+		{
+			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+					m_context.toBoogieType(_node.annotation().type, &_node));
+			m_newDecls.push_back(varDecl);
+			m_currentExpr = varDecl->getRefTo();
+			return false;
+		}
+
+		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
+			return false; // new array, TODO: initialize to default values
+	}
+
 	// Process expression
 	_node.expression().accept(*this);
 
@@ -1008,9 +1025,9 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 		{
 			// TODO: Make sure that it is a fresh address
 			m_currentExpr = bg::Expr::id(ASTBoogieUtils::getConstructorName(contract));
-			auto varDecl = bg::Decl::variable("new#" + toString(_node.id()), m_context.addressType());
+			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), m_context.addressType());
 			m_newDecls.push_back(varDecl);
-			m_currentAddress = bg::Expr::id(varDecl->getName());
+			m_currentAddress = varDecl->getRefTo();
 			return false;
 		}
 	}
