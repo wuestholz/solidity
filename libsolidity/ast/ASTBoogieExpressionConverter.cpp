@@ -617,17 +617,15 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Special case for new array
 	if (auto newExpr = dynamic_cast<NewExpression const*>(&_node.expression()))
 	{
-		if (auto arrType = dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
+		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
 		{
 			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
 					m_context.toBoogieType(_node.annotation().type, &_node));
 			m_newDecls.push_back(varDecl);
 			m_currentExpr = varDecl->getRefTo();
+			// TODO: initialize to default values
 			return false;
 		}
-
-		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
-			return false; // new array, TODO: initialize to default values
 	}
 
 	// Process expression
