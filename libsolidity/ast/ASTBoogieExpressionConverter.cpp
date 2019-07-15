@@ -641,6 +641,48 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		}
 	}
 
+	if (auto memAccExpr = dynamic_cast<MemberAccess const*>(&_node.expression()))
+	{
+		// array.push
+		auto arrType = dynamic_cast<ArrayType const*>(memAccExpr->expression().annotation().type);
+		if (arrType && memAccExpr->memberName() == "push")
+		{
+			solAssert(arrType->dataStoredIn(DataLocation::Storage), "Push to non-storage array");
+			auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+			memAccExpr->expression().accept(*this);
+			auto arr = m_currentExpr;
+			solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
+			_node.arguments()[0]->accept(*this);
+			auto arg = m_currentExpr;
+			auto len = m_context.getArrayLength(arr, bgType);
+			auto arrUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(
+					bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+			addSideEffect(bg::Stmt::assign(arrUpd->getBase(), arrUpd));
+			auto lenIncr = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
+			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(len, lenIncr.expr));
+			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
+			if (m_context.overflow())
+				addSideEffect(bg::Stmt::assume(lenIncr.cc));
+			return false;
+		}
+		// array.pop
+		if (arrType && memAccExpr->memberName() == "pop")
+		{
+			solAssert(arrType->dataStoredIn(DataLocation::Storage), "Pop from non-storage array");
+			auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+			memAccExpr->expression().accept(*this);
+			auto arr = m_currentExpr;
+			solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
+			auto len = m_context.getArrayLength(arr, bgType);
+			auto lenDecr = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
+			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(len, lenDecr.expr));
+			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
+			if (m_context.overflow())
+				addSideEffect(bg::Stmt::assume(lenDecr.cc));
+			return false;
+		}
+	}
+
 	// Process expression
 	_node.expression().accept(*this);
 
