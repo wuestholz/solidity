@@ -17,22 +17,6 @@ namespace dev
 namespace solidity
 {
 
-bg::Expr::Ref ASTBoogieExpressionConverter::getArrayLength(bg::Expr::Ref expr, ASTNode const& associatedNode)
-{
-	// Array is a local variable
-	if (auto localArray = dynamic_pointer_cast<bg::VarExpr const>(expr))
-		return bg::Expr::id(localArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
-	// Array is state variable
-	if (auto stateArray = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
-		if (auto baseArray = dynamic_pointer_cast<bg::VarExpr const>(stateArray->getBase()))
-			return bg::Expr::arrsel(
-							bg::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
-							stateArray->getIdxs());
-
-	m_context.reportError(&associatedNode, "Unsupported access to array length");
-	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-}
-
 bg::Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
 {
 	if (auto sumBase = dynamic_cast<Identifier const*>(node))
@@ -1172,11 +1156,10 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(type);
 		if (type->dataStoredIn(DataLocation::Memory))
-			m_currentExpr = m_context.getArrayLength(
-					m_context.getMemArray(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node)),
-					m_context.toBoogieType(arrType->baseType(), &_node));
-		else
-			m_currentExpr = getArrayLength(expr, _node);
+		{
+			m_currentExpr = m_context.getMemArray(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node));
+		}
+		m_currentExpr = m_context.getArrayLength(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node));
 		addTCC(m_currentExpr, tp_uint256);
 		return false;
 	}
@@ -1320,12 +1303,17 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, tp_uint256, m_context);
 	}
 
-	// Extra indirection for memory arrays
-	if (baseType->category() == Type::Category::Array && baseType->dataStoredIn(DataLocation::Memory))
+	// Indexing arrays requires accessing the actual array inside the datatype
+	if (baseType->category() == Type::Category::Array)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(baseType);
 		auto bgArrType = m_context.toBoogieType(arrType->baseType(), &_node);
-		baseExpr = m_context.getInnerArray(m_context.getMemArray(baseExpr, bgArrType), bgArrType);
+		// Extra indirection for memory arrays
+		if (baseType->dataStoredIn(DataLocation::Memory))
+		{
+			baseExpr = m_context.getMemArray(baseExpr, bgArrType);
+		}
+		baseExpr = m_context.getInnerArray(baseExpr, bgArrType);
 	}
 
 	// Index access is simply converted to a select in Boogie, which is fine
