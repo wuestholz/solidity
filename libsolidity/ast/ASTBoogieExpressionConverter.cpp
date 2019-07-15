@@ -147,21 +147,17 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
 		if (lhsArrType->location() != rhsArrType->location())
 		{
-			if (lhsArrType->location() == DataLocation::Memory) // TODO: create new ptr?
+			if (lhsArrType->location() == DataLocation::Memory)
 			{
 				// Create new
 				auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
 						m_context.toBoogieType(lhsType, &_node));
 				m_newDecls.push_back(varDecl);
 				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
-				lhsExpr = bg::Expr::arrsel(
-						m_context.getMemArray(m_context.toBoogieType(lhsArrType->baseType(), &_node))->getRefTo(),
-						lhsExpr);
+				lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
 			}
 			else if (rhsArrType->location() == DataLocation::Memory)
-				rhsExpr = bg::Expr::arrsel(
-						m_context.getMemArray(m_context.toBoogieType(rhsArrType->baseType(), &_node))->getRefTo(),
-						rhsExpr);
+				rhsExpr = m_context.getMemArray(rhsExpr, m_context.toBoogieType(rhsArrType->baseType(), &_node));
 		}
 	}
 
@@ -1176,9 +1172,9 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(type);
 		if (type->dataStoredIn(DataLocation::Memory))
-			m_currentExpr = bg::Expr::arrsel(
-					m_context.getMemArrayLength(m_context.toBoogieType(arrType->baseType(), &_node))->getRefTo(),
-					m_currentExpr);
+			m_currentExpr = m_context.getArrayLength(
+					m_context.getMemArray(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node)),
+					m_context.toBoogieType(arrType->baseType(), &_node));
 		else
 			m_currentExpr = getArrayLength(expr, _node);
 		addTCC(m_currentExpr, tp_uint256);
@@ -1329,8 +1325,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(baseType);
 		auto bgArrType = m_context.toBoogieType(arrType->baseType(), &_node);
-		auto arr = m_context.getMemArray(bgArrType);
-		baseExpr = bg::Expr::arrsel(arr->getRefTo(), baseExpr);
+		baseExpr = m_context.getInnerArray(m_context.getMemArray(baseExpr, bgArrType), bgArrType);
 	}
 
 	// Index access is simply converted to a select in Boogie, which is fine

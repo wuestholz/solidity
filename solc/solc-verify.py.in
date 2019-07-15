@@ -115,7 +115,7 @@ def main(tmpDir):
         boogieArgs += ' /cvc4exe:%s /proverOpt:SOLVER=CVC4' % solverPath
         if args.arithmetic == 'mod' or args.arithmetic == 'mod-overflow':
             boogieArgs += ' /proverOpt:C:"--incremental --decision=justification --no-arrays-eager-index --arrays-eager-lemmas"'
-            boogieArgs += ' /proverOpt:LOGIC=QF_AUFNIA'
+            boogieArgs += ' /proverOpt:LOGIC=QF_AUFDTNIA'
 
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
     if args.verbose:

@@ -505,7 +505,7 @@ public:
 
 	static TypeDeclRef typee(std::string name, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
-	static TypeDeclRef datatype(std::string name, std::vector<Binding> members = {}, std::string type = "",
+	static DataTypeDeclRef datatype(std::string name, std::vector<Binding> members = {}, std::string type = "",
 		std::vector<Attr::Ref> const& attrs = {});
 	static Ref axiom(Expr::Ref e, std::string name = "");
 	static FuncDeclRef function(

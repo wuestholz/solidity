@@ -362,7 +362,7 @@ TypeDeclRef Decl::typee(std::string name, std::string type, std::vector<Attr::Re
 	return std::make_shared<TypeDecl>(name,type,attrs);
 }
 
-TypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members,
+DataTypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members,
 		std::string type, std::vector<Attr::Ref> const& attrs)
 {
 	return std::make_shared<DataTypeDecl>(name, type, attrs, members);

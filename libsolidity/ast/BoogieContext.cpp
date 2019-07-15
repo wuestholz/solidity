@@ -312,22 +312,35 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 			Type const* baseType = arrType->baseType();
 			boogie::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
 			// Memory arrays have an extra layer of indirection
-			if (m_memArrTypes.find(baseTypeBoogie->getName()) == m_memArrTypes.end())
+			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
 			{
 				// Pointer type
-				m_memArrTypes[baseTypeBoogie->getName()] = boogie::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
-				addDecl(m_memArrTypes[baseTypeBoogie->getName()]);
+				m_memArrPtrTypes[baseTypeBoogie->getName()] = boogie::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
+				addDecl(m_memArrPtrTypes[baseTypeBoogie->getName()]);
+
+				// Datatype: [int]T + length
+				vector<boogie::Binding> members;
+				members.push_back({boogie::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)});
+				members.push_back({boogie::Expr::id("length"), intType(256)});
+				m_memArrDataTypes[baseTypeBoogie->getName()] = boogie::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
+				addDecl(m_memArrDataTypes[baseTypeBoogie->getName()]);
+
+				// Constructor for datatype
+				vector<boogie::Attr::Ref> attrs;
+				attrs.push_back(boogie::Attr::attr("constructor"));
+				string name = baseTypeBoogie->getName() + "_arr#constr";
+				m_memArrConstrs[baseTypeBoogie->getName()] = boogie::Decl::function(name, members,
+						m_memArrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
+				addDecl(m_memArrConstrs[baseTypeBoogie->getName()]);
+
 				// The actual storage
 				m_memArrs[baseTypeBoogie->getName()] = boogie::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
-						ASTBoogieUtils::mappingType(m_memArrTypes[baseTypeBoogie->getName()],
-								ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)));
+						ASTBoogieUtils::mappingType(
+								m_memArrPtrTypes[baseTypeBoogie->getName()],
+								m_memArrDataTypes[baseTypeBoogie->getName()]));
 				addDecl(m_memArrs[baseTypeBoogie->getName()]);
-				// Lengths
-				m_memArrLengths[baseTypeBoogie->getName()] = boogie::Decl::variable("mem_arr_" + baseTypeBoogie->getName() + "_len",
-						ASTBoogieUtils::mappingType(m_memArrTypes[baseTypeBoogie->getName()],intType(256)));
-				addDecl(m_memArrLengths[baseTypeBoogie->getName()]);
 			}
-			return m_memArrTypes[baseTypeBoogie->getName()];
+			return m_memArrPtrTypes[baseTypeBoogie->getName()];
 		}
 		else
 		{
