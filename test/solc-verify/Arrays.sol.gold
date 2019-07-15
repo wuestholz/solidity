@@ -2,5 +2,6 @@ Arrays::readStateArr: OK
 Arrays::writeStateArr: OK
 Arrays::readParamArr: OK
 Arrays::callWithLocalArray: OK
+Arrays::callWithStateArray: OK
 Arrays::[implicit_constructor]: OK
 No errors found.

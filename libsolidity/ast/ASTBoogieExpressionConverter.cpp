@@ -701,6 +701,19 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
 		}
 
+		if (arg->annotation().type->category() == Type::Category::Array && arg->annotation().type->dataStoredIn(DataLocation::Storage))
+		{
+			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
+			// Create a copy if a storage array is passed to a function
+			auto tmpDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+					m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
+			m_newDecls.push_back(tmpDecl);
+			auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+			auto memArrUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(memArr, m_currentExpr));
+			addSideEffect(bg::Stmt::assign(memArrUpd->getBase(), memArrUpd));
+			m_currentExpr = tmpDecl->getRefTo();
+		}
+
 		// Do not add argument for call
 		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
 		{
