@@ -353,8 +353,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 				// Create new
 				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(_node.id()) + toString(member->id()));
 				// Update member to point to new
-				auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(ASTBoogieUtils::selectToUpdate(lhsSel, bg::Expr::id(varDecl->getName())));
-				addSideEffect(bg::Stmt::assign(lhsUpd->getBase(), lhsUpd));
+				ASTBoogieUtils::selectToUpdateStmt(lhsSel, bg::Expr::id(varDecl->getName()));
 			}
 			// Do the deep copy
 			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
@@ -557,6 +556,51 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	return false;
 }
 
+void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _node)
+{
+	auto arrType = dynamic_cast<const ArrayType*>(_node.annotation().type);
+	auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+	        m_context.toBoogieType(_node.annotation().type, &_node));
+	m_newDecls.push_back(varDecl);
+	auto memArr = m_context.getMemArray(varDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+	auto arrLen = m_context.getArrayLength(memArr, m_context.toBoogieType(arrType->baseType(), &_node));
+	// Set length
+	solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
+	_node.arguments()[0]->accept(*this);
+	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(arrLen, m_currentExpr));
+	// TODO: initialize to default values
+	m_currentExpr = varDecl->getRefTo();
+}
+
+void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node)
+{
+	solAssert(arrType->dataStoredIn(DataLocation::Storage), "Push/pop to non-storage array");
+	auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+	memAccExpr->expression().accept(*this);
+	auto arr = m_currentExpr;
+	auto len = m_context.getArrayLength(arr, bgType);
+	ASTBoogieUtils::ExprWithCC lenUpd;
+	if (memAccExpr->memberName() == "push")
+	{
+		solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
+		_node.arguments()[0]->accept(*this);
+		auto arg = m_currentExpr;
+		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+		                bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len,
+		        m_context.intLit(1, 256), 256, false);
+	}
+	else
+	{
+		solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
+		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len,
+		        m_context.intLit(1, 256), 256, false);
+	}
+	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(len, lenUpd.expr));
+	if (m_context.overflow())
+		addSideEffect(bg::Stmt::assume(lenUpd.cc));
+}
+
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
 	// Check for conversions
@@ -624,19 +668,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
 		{
-			auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
-			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
-					m_context.toBoogieType(_node.annotation().type, &_node));
-			m_newDecls.push_back(varDecl);
-			auto memArr = m_context.getMemArray(varDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-			auto arrLen = m_context.getArrayLength(memArr, m_context.toBoogieType(arrType->baseType(), &_node));
-			// Set length
-			solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
-			_node.arguments()[0]->accept(*this);
-			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(arrLen, m_currentExpr));
-			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
-			// TODO: initialize to default values
-			m_currentExpr = varDecl->getRefTo();
+			functionCallNewArray(_node);
 			return false;
 		}
 	}
@@ -645,40 +677,9 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		// array.push
 		auto arrType = dynamic_cast<ArrayType const*>(memAccExpr->expression().annotation().type);
-		if (arrType && memAccExpr->memberName() == "push")
+		if (arrType && (memAccExpr->memberName() == "push" || memAccExpr->memberName() == "pop"))
 		{
-			solAssert(arrType->dataStoredIn(DataLocation::Storage), "Push to non-storage array");
-			auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
-			memAccExpr->expression().accept(*this);
-			auto arr = m_currentExpr;
-			solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
-			_node.arguments()[0]->accept(*this);
-			auto arg = m_currentExpr;
-			auto len = m_context.getArrayLength(arr, bgType);
-			auto arrUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(
-					bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
-			addSideEffect(bg::Stmt::assign(arrUpd->getBase(), arrUpd));
-			auto lenIncr = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
-			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(len, lenIncr.expr));
-			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
-			if (m_context.overflow())
-				addSideEffect(bg::Stmt::assume(lenIncr.cc));
-			return false;
-		}
-		// array.pop
-		if (arrType && memAccExpr->memberName() == "pop")
-		{
-			solAssert(arrType->dataStoredIn(DataLocation::Storage), "Pop from non-storage array");
-			auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
-			memAccExpr->expression().accept(*this);
-			auto arr = m_currentExpr;
-			solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
-			auto len = m_context.getArrayLength(arr, bgType);
-			auto lenDecr = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
-			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(len, lenDecr.expr));
-			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
-			if (m_context.overflow())
-				addSideEffect(bg::Stmt::assume(lenDecr.cc));
+			functionCallPushPop(memAccExpr, arrType, _node);
 			return false;
 		}
 	}
@@ -751,8 +752,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 					m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
 			m_newDecls.push_back(tmpDecl);
 			auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-			auto memArrUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(memArr, m_currentExpr));
-			addSideEffect(bg::Stmt::assign(memArrUpd->getBase(), memArrUpd));
+			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
 			m_currentExpr = tmpDecl->getRefTo();
 		}
 

@@ -67,6 +67,9 @@ private:
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 	void functionCallSum(FunctionCall const& _node);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
+	void functionCallNewArray(const FunctionCall& _node);
+	void functionCallPushPop(const dev::solidity::MemberAccess* memAccExpr,
+	        const dev::solidity::ArrayType* arrType, const FunctionCall& _node);
 
 public:
 

@@ -858,5 +858,13 @@ Expr::Ref ASTBoogieUtils::selectToUpdate(Expr::Ref sel, Expr::Ref value)
 	return nullptr;
 }
 
+
+Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value)
+{
+	auto upd = dynamic_pointer_cast<UpdExpr const>(selectToUpdate(sel, value));
+	solAssert(upd, "Update expression expected");
+	return Stmt::assign(upd->getBase(), upd);
+}
+
 }
 }
