@@ -3,6 +3,7 @@ pragma solidity >=0.5.0;
 contract ArraysMem {
 
     /// @notice postcondition x[0] == 5
+    /// @notice postcondition x.length == 1
     function returnArray() public pure returns (int[] memory x) {
         int[] memory a = new int[](1);
         a[0] = 5;

@@ -309,27 +309,27 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 		boogie::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
 
 		// Declare datatype and constructor if needed
-		if (m_memArrDataTypes.find(baseTypeBoogie->getName()) == m_memArrDataTypes.end())
+		if (m_arrDataTypes.find(baseTypeBoogie->getName()) == m_arrDataTypes.end())
 		{
 			// Datatype: [int]T + length
-			vector<boogie::Binding> members;
-			members.push_back({boogie::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)});
-			members.push_back({boogie::Expr::id("length"), intType(256)});
-			m_memArrDataTypes[baseTypeBoogie->getName()] = boogie::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
-			addDecl(m_memArrDataTypes[baseTypeBoogie->getName()]);
+			vector<boogie::Binding> members = {
+					{boogie::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)},
+				{boogie::Expr::id("length"), intType(256)}};
+			m_arrDataTypes[baseTypeBoogie->getName()] = boogie::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
+			addDecl(m_arrDataTypes[baseTypeBoogie->getName()]);
 
 			// Constructor for datatype
 			vector<boogie::Attr::Ref> attrs;
 			attrs.push_back(boogie::Attr::attr("constructor"));
 			string name = baseTypeBoogie->getName() + "_arr#constr";
-			m_memArrConstrs[baseTypeBoogie->getName()] = boogie::Decl::function(name, members,
-					m_memArrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
-			addDecl(m_memArrConstrs[baseTypeBoogie->getName()]);
+			m_arrConstrs[baseTypeBoogie->getName()] = boogie::Decl::function(name, members,
+					m_arrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
+			addDecl(m_arrConstrs[baseTypeBoogie->getName()]);
 		}
 
 		// Storage arrays are simply the data structures
 		if (arrType->location() == DataLocation::Storage)
-			return m_memArrDataTypes[baseTypeBoogie->getName()];
+			return m_arrDataTypes[baseTypeBoogie->getName()];
 		// Memory arrays have an extra layer of indirection
 		else if (arrType->location() == DataLocation::Memory)
 		{
@@ -343,7 +343,7 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 				m_memArrs[baseTypeBoogie->getName()] = boogie::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
 						ASTBoogieUtils::mappingType(
 								m_memArrPtrTypes[baseTypeBoogie->getName()],
-								m_memArrDataTypes[baseTypeBoogie->getName()]));
+								m_arrDataTypes[baseTypeBoogie->getName()]));
 				addDecl(m_memArrs[baseTypeBoogie->getName()]);
 			}
 			return m_memArrPtrTypes[baseTypeBoogie->getName()];

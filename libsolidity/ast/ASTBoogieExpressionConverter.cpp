@@ -624,11 +624,19 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
 		{
+			auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
 			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
 					m_context.toBoogieType(_node.annotation().type, &_node));
 			m_newDecls.push_back(varDecl);
-			m_currentExpr = varDecl->getRefTo();
+			auto memArr = m_context.getMemArray(varDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+			auto arrLen = m_context.getArrayLength(memArr, m_context.toBoogieType(arrType->baseType(), &_node));
+			// Set length
+			solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
+			_node.arguments()[0]->accept(*this);
+			auto lenUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(arrLen, m_currentExpr));
+			addSideEffect(bg::Stmt::assign(lenUpd->getBase(), lenUpd));
 			// TODO: initialize to default values
+			m_currentExpr = varDecl->getRefTo();
 			return false;
 		}
 	}
