@@ -260,7 +260,7 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 		else if (rhsStructType->location() == DataLocation::Storage)
 		{
 			// Create new
-			auto varDecl = newStruct(&lhsStructType->structDefinition(), toString(_node.id()));
+			auto varDecl = newStruct(&lhsStructType->structDefinition(), toString(m_context.nextId()));
 			addSideEffect(bg::Stmt::assign(lhsExpr, bg::Expr::id(varDecl->getName())));
 
 			// Make deep copy
@@ -351,7 +351,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 			if (lhsLoc == DataLocation::Memory)
 			{
 				// Create new
-				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(_node.id()) + toString(member->id()));
+				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(m_context.nextId()));
 				// Update member to point to new
 				ASTBoogieUtils::selectToUpdateStmt(lhsSel, bg::Expr::id(varDecl->getName()));
 			}
@@ -833,7 +833,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		if (auto structDef = dynamic_cast<StructDefinition const *>(exprId->annotation().referencedDeclaration))
 		{
-			functionCallNewStruct(_node, structDef, regularArgs);
+			functionCallNewStruct(structDef, regularArgs);
 			return false;
 		}
 	}
@@ -868,7 +868,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		solAssert(returnTypes.size() != 1, "");
 		for (size_t i = 0; i < returnTypes.size(); ++ i)
 		{
-			auto varName = funcName + "#" + to_string(i) + "#" + to_string(_node.id());
+			auto varName = funcName + "_ret#" + to_string(i) + "#" + to_string(m_context.nextId());
 			auto varType = m_context.toBoogieType(returnTypes[i], &_node);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
@@ -881,7 +881,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// New expressions already create the fresh variable
 		if (!dynamic_cast<NewExpression const*>(&_node.expression()))
 		{
-			auto varName = funcName + "#" + to_string(_node.id());
+			auto varName = funcName + "_ret#" + to_string(m_context.nextId());
 			auto varType = m_context.toBoogieType(returnType, &_node);
 			auto varDecl = bg::Decl::variable(varName, varType);
 			m_newDecls.push_back(varDecl);
@@ -1005,10 +1005,9 @@ bg::Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* st
 	return varDecl;
 }
 
-void ASTBoogieExpressionConverter::functionCallNewStruct(FunctionCall const& _node,
-		StructDefinition const* structDef, vector<bg::Expr::Ref> const& args)
+void ASTBoogieExpressionConverter::functionCallNewStruct(StructDefinition const* structDef, vector<bg::Expr::Ref> const& args)
 {
-	auto varDecl = newStruct(structDef, toString(_node.id()));
+	auto varDecl = newStruct(structDef, toString(m_context.nextId()));
 	// Initialize each member
 	for (size_t i = 0; i < structDef->members().size(); ++i)
 	{
@@ -1484,7 +1483,7 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 	}
 	case Type::Category::StringLiteral:
 	{
-		string name = "literal_string#" + to_string(_node.id());
+		string name = "literal_string#" + to_string(m_context.nextId());
 		m_newConstants.push_back(bg::Decl::constant(name, m_context.stringType(), true));
 		m_currentExpr = bg::Expr::id(name);
 		return false;

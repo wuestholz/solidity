@@ -269,7 +269,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		if (!baseConstr)
 			continue;
 
-		m_context.pushExtraScope(baseConstr, toString(baseConstr->id()));
+		m_context.pushExtraScope(baseConstr, toString(m_context.nextId()));
 		pushedScopes++;
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Arguments for " + base->name()));
 
@@ -606,7 +606,7 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 
 		if (modifierDecl)
 		{
-			m_context.pushExtraScope(modifierDecl, toString(modifier->id()) + toString(m_currentModifier));
+			m_context.pushExtraScope(modifierDecl, toString(m_context.nextId()) + toString(m_currentModifier));
 
 			string oldReturnLabel = m_currentReturnLabel;
 			m_currentReturnLabel = "$return" + to_string(m_nextReturnLabelId);
@@ -1185,7 +1185,7 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	}
 
 	string oldContinueLabel = m_currentContinueLabel;
-	m_currentContinueLabel = "$continue" + toString(_node.id());
+	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
 
 	// Get condition recursively
 	bg::Expr::Ref cond = convertExpression(_node.condition());
@@ -1243,7 +1243,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// initExpr; while (cond) { body; loopExpr }
 
 	string oldContinueLabel = m_currentContinueLabel;
-	m_currentContinueLabel = "$continue" + toString(_node.id());
+	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
 
 	// Get initialization recursively (adds statement to current block)
 	m_currentBlocks.top()->addStmt(bg::Stmt::comment("The following while loop was mapped from a for loop"));
@@ -1494,7 +1494,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	// does not allow stand alone expressions
 
 	bg::Expr::Ref expr = convertExpression(_node.expression());
-	bg::Decl::Ref tmpVar = bg::Decl::variable("tmpVar" + to_string(_node.id()),
+	bg::Decl::Ref tmpVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
 			m_context.toBoogieType(_node.expression().annotation().type, &_node));
 	m_localDecls.push_back(tmpVar);
 	m_currentBlocks.top()->addStmt(bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
