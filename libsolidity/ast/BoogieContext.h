@@ -69,6 +69,11 @@ private:
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
 
+	std::map<std::string,boogie::DataTypeDeclRef> m_arrDataTypes;
+	std::map<std::string,boogie::FuncDeclRef> m_arrConstrs;
+	std::map<std::string,boogie::TypeDeclRef> m_memArrPtrTypes;
+	std::map<std::string,boogie::VarDeclRef> m_memArrs;
+
 	Encoding m_encoding;
 	bool m_overflow;
 	bool m_modAnalysis;
@@ -149,6 +154,11 @@ public:
 
 	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
+
+	boogie::Expr::Ref getMemArray(boogie::Expr::Ref arrPtrExpr, boogie::TypeDeclRef type) { return boogie::Expr::arrsel(m_memArrs[type->getName()]->getRefTo(), arrPtrExpr); }
+	boogie::Expr::Ref getArrayLength(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "length", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }
+	boogie::Expr::Ref getInnerArray(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "arr", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }
+
 
 	/**
 	 * Map a Solidity type to a Boogie type

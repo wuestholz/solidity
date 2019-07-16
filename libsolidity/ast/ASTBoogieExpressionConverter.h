@@ -37,9 +37,6 @@ private:
 	// Overflow conditions
 	std::list<boogie::Expr::Ref> m_ocs;
 
-	// Helper method to get the length of an array (currently only works for 1D arrays)
-	boogie::Expr::Ref getArrayLength(boogie::Expr::Ref expr, ASTNode const& associatedNode);
-
 	// Helper method to create an assignment
 	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
 
@@ -70,6 +67,8 @@ private:
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 	void functionCallSum(FunctionCall const& _node);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
+	void functionCallNewArray(FunctionCall const& _node);
+	void functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node);
 
 public:
 

@@ -304,8 +304,56 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 		auto arrType = dynamic_cast<ArrayType const*>(tp);
 		if (arrType->isString())
 			return stringType();
+
+		Type const* baseType = arrType->baseType();
+		boogie::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
+
+		// Declare datatype and constructor if needed
+		if (m_arrDataTypes.find(baseTypeBoogie->getName()) == m_arrDataTypes.end())
+		{
+			// Datatype: [int]T + length
+			vector<boogie::Binding> members = {
+					{boogie::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)},
+				{boogie::Expr::id("length"), intType(256)}};
+			m_arrDataTypes[baseTypeBoogie->getName()] = boogie::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
+			addDecl(m_arrDataTypes[baseTypeBoogie->getName()]);
+
+			// Constructor for datatype
+			vector<boogie::Attr::Ref> attrs;
+			attrs.push_back(boogie::Attr::attr("constructor"));
+			string name = baseTypeBoogie->getName() + "_arr#constr";
+			m_arrConstrs[baseTypeBoogie->getName()] = boogie::Decl::function(name, members,
+					m_arrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
+			addDecl(m_arrConstrs[baseTypeBoogie->getName()]);
+		}
+
+		// Storage arrays are simply the data structures
+		if (arrType->location() == DataLocation::Storage)
+			return m_arrDataTypes[baseTypeBoogie->getName()];
+		// Memory arrays have an extra layer of indirection
+		else if (arrType->location() == DataLocation::Memory)
+		{
+			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
+			{
+				// Pointer type
+				m_memArrPtrTypes[baseTypeBoogie->getName()] = boogie::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
+				addDecl(m_memArrPtrTypes[baseTypeBoogie->getName()]);
+
+				// The actual storage
+				m_memArrs[baseTypeBoogie->getName()] = boogie::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
+						ASTBoogieUtils::mappingType(
+								m_memArrPtrTypes[baseTypeBoogie->getName()],
+								m_arrDataTypes[baseTypeBoogie->getName()]));
+				addDecl(m_memArrs[baseTypeBoogie->getName()]);
+			}
+			return m_memArrPtrTypes[baseTypeBoogie->getName()];
+		}
 		else
-			return ASTBoogieUtils::mappingType(intType(256), toBoogieType(arrType->baseType(), _associatedNode));
+		{
+			reportError(_associatedNode, "Unsupported location for array type");
+			return boogie::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+		}
+		break;
 	}
 	case Type::Category::Mapping:
 	{

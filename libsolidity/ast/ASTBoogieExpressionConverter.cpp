@@ -17,22 +17,6 @@ namespace dev
 namespace solidity
 {
 
-bg::Expr::Ref ASTBoogieExpressionConverter::getArrayLength(bg::Expr::Ref expr, ASTNode const& associatedNode)
-{
-	// Array is a local variable
-	if (auto localArray = dynamic_pointer_cast<bg::VarExpr const>(expr))
-		return bg::Expr::id(localArray->name() + ASTBoogieUtils::BOOGIE_LENGTH);
-	// Array is state variable
-	if (auto stateArray = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
-		if (auto baseArray = dynamic_pointer_cast<bg::VarExpr const>(stateArray->getBase()))
-			return bg::Expr::arrsel(
-							bg::Expr::id(baseArray->name() + ASTBoogieUtils::BOOGIE_LENGTH),
-							stateArray->getIdxs());
-
-	m_context.reportError(&associatedNode, "Unsupported access to array length");
-	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-}
-
 bg::Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
 {
 	if (auto sumBase = dynamic_cast<Identifier const*>(node))
@@ -138,6 +122,27 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		solAssert(rhsType->category() == Type::Category::Struct, "LHS is struct but RHS is not");
 		createStructAssignment(_node, lhsExpr, rhsExpr);
 		return false;
+	}
+
+	if (lhsType->category() == Type::Category::Array)
+	{
+		solAssert(rhsType->category() == Type::Category::Array, "LHS is array but RHS is not");
+		auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
+		auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
+		if (lhsArrType->location() != rhsArrType->location())
+		{
+			if (lhsArrType->location() == DataLocation::Memory)
+			{
+				// Create new
+				auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+						m_context.toBoogieType(lhsType, &_node));
+				m_newDecls.push_back(varDecl);
+				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
+				lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
+			}
+			else if (rhsArrType->location() == DataLocation::Memory)
+				rhsExpr = m_context.getMemArray(rhsExpr, m_context.toBoogieType(rhsArrType->baseType(), &_node));
+		}
 	}
 
 	// Bit-precise mode
@@ -348,8 +353,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 				// Create new
 				auto varDecl = newStruct(&memberStructType->structDefinition(), toString(_node.id()) + toString(member->id()));
 				// Update member to point to new
-				auto lhsUpd = dynamic_pointer_cast<bg::ArrUpdExpr const>(ASTBoogieUtils::selectToUpdate(lhsSel, bg::Expr::id(varDecl->getName())));
-				addSideEffect(bg::Stmt::assign(lhsUpd->getBase(), lhsUpd));
+				ASTBoogieUtils::selectToUpdateStmt(lhsSel, bg::Expr::id(varDecl->getName()));
 			}
 			// Do the deep copy
 			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
@@ -371,6 +375,30 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 {
+	if (_node.isInlineArray())
+	{
+		auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
+		auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+		// Create new
+		auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), m_context.toBoogieType(_node.annotation().type, &_node));
+		m_newDecls.push_back(varDecl);
+		auto arrExpr = m_context.getMemArray(varDecl->getRefTo(), bgType);
+		for (size_t i = 0; i < _node.components().size(); i++)
+		{
+			_node.components()[i]->accept(*this);
+			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+					bg::Expr::arrsel(
+							m_context.getInnerArray(arrExpr, bgType),
+							m_context.intLit(i, 256)),
+					m_currentExpr));
+		}
+		m_currentExpr = varDecl->getRefTo();
+		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+				m_context.getArrayLength(arrExpr, bgType),
+				m_context.intLit(_node.components().size(), 256)));
+		return false;
+	}
+
 	// Get the elements
 	vector<bg::Expr::Ref> elements;
 	for (auto element: _node.components())
@@ -552,6 +580,48 @@ bool ASTBoogieExpressionConverter::visit(BinaryOperation const& _node)
 	return false;
 }
 
+void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _node)
+{
+	auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
+	auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+			m_context.toBoogieType(_node.annotation().type, &_node));
+	m_newDecls.push_back(varDecl);
+	auto memArr = m_context.getMemArray(varDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+	auto arrLen = m_context.getArrayLength(memArr, m_context.toBoogieType(arrType->baseType(), &_node));
+	// Set length
+	solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
+	_node.arguments()[0]->accept(*this);
+	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(arrLen, m_currentExpr));
+	// TODO: initialize to default values
+	m_currentExpr = varDecl->getRefTo();
+}
+
+void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node)
+{
+	solAssert(arrType->dataStoredIn(DataLocation::Storage), "Push/pop to non-storage array");
+	auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+	memAccExpr->expression().accept(*this);
+	auto arr = m_currentExpr;
+	auto len = m_context.getArrayLength(arr, bgType);
+	ASTBoogieUtils::ExprWithCC lenUpd;
+	if (memAccExpr->memberName() == "push")
+	{
+		solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
+		_node.arguments()[0]->accept(*this);
+		auto arg = m_currentExpr;
+		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
+	}
+	else
+	{
+		solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
+		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
+	}
+	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(len, lenUpd.expr));
+	if (m_context.overflow())
+		addSideEffect(bg::Stmt::assume(lenUpd.cc));
+}
+
 bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 {
 	// Check for conversions
@@ -613,6 +683,28 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	m_currentMsgValue = nullptr;
 	m_isGetter = false;
 	m_isLibraryCall = false;
+
+	// Special case for new array
+	if (auto newExpr = dynamic_cast<NewExpression const*>(&_node.expression()))
+	{
+		if (dynamic_cast<ArrayTypeName const*>(&newExpr->typeName()))
+		{
+			functionCallNewArray(_node);
+			return false;
+		}
+	}
+
+	if (auto memAccExpr = dynamic_cast<MemberAccess const*>(&_node.expression()))
+	{
+		// array.push
+		auto arrType = dynamic_cast<ArrayType const*>(memAccExpr->expression().annotation().type);
+		if (arrType && (memAccExpr->memberName() == "push" || memAccExpr->memberName() == "pop"))
+		{
+			functionCallPushPop(memAccExpr, arrType, _node);
+			return false;
+		}
+	}
+
 	// Process expression
 	_node.expression().accept(*this);
 
@@ -673,17 +765,23 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
 		}
 
+		if (arg->annotation().type->category() == Type::Category::Array && arg->annotation().type->dataStoredIn(DataLocation::Storage))
+		{
+			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
+			// Create a copy if a storage array is passed to a function
+			auto tmpDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
+					m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
+			m_newDecls.push_back(tmpDecl);
+			auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
+			m_currentExpr = tmpDecl->getRefTo();
+		}
+
 		// Do not add argument for call
 		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
 		{
 			allArgs.push_back(m_currentExpr);
 			regularArgs.push_back(m_currentExpr);
-			// Array length
-			if (arg->annotation().type && arg->annotation().type->category() == Type::Category::Array)
-			{
-				allArgs.push_back(getArrayLength(m_currentExpr, *arg));
-				regularArgs.push_back(getArrayLength(m_currentExpr, *arg));
-			}
 		}
 	}
 
@@ -1014,9 +1112,9 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 		{
 			// TODO: Make sure that it is a fresh address
 			m_currentExpr = bg::Expr::id(ASTBoogieUtils::getConstructorName(contract));
-			auto varDecl = bg::Decl::variable("new#" + toString(_node.id()), m_context.addressType());
+			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), m_context.addressType());
 			m_newDecls.push_back(varDecl);
-			m_currentAddress = bg::Expr::id(varDecl->getName());
+			m_currentAddress = varDecl->getRefTo();
 			return false;
 		}
 	}
@@ -1140,7 +1238,12 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	bool isArray = type->category() == Type::Category::Array;
 	if (isArray && _node.memberName() == "length")
 	{
-		m_currentExpr = getArrayLength(expr, _node);
+		auto arrType = dynamic_cast<ArrayType const*>(type);
+		if (type->dataStoredIn(DataLocation::Memory))
+		{
+			m_currentExpr = m_context.getMemArray(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node));
+		}
+		m_currentExpr = m_context.getArrayLength(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node));
 		addTCC(m_currentExpr, tp_uint256);
 		return false;
 	}
@@ -1283,10 +1386,25 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, tp_uint256, m_context);
 	}
+
+	// Indexing arrays requires accessing the actual array inside the datatype
+	if (baseType->category() == Type::Category::Array)
+	{
+		auto arrType = dynamic_cast<ArrayType const*>(baseType);
+		auto bgArrType = m_context.toBoogieType(arrType->baseType(), &_node);
+		// Extra indirection for memory arrays
+		if (baseType->dataStoredIn(DataLocation::Memory))
+		{
+			baseExpr = m_context.getMemArray(baseExpr, bgArrType);
+		}
+		baseExpr = m_context.getInnerArray(baseExpr, bgArrType);
+	}
+
 	// Index access is simply converted to a select in Boogie, which is fine
 	// as long as it is not an LHS of an assignment (e.g., x[i] = v), but
 	// that case is handled when converting assignments
 	m_currentExpr = bg::Expr::arrsel(baseExpr, indexExpr);
+
 	addTCC(m_currentExpr, _node.annotation().type);
 
 	return false;
