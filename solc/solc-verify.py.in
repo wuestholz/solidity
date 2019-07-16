@@ -169,11 +169,12 @@ def main(tmpDir):
             errLine = getRelatedLineFromBpl(outputLine, 0) # Info is in the current line
             print(prefix + getSourceLineAndCol(errLine) + ': Invariant \'' + getMessage(errLine) + '\' might not be maintained by the loop')
         if not args.errors_only and re.search('Verifying .* \.\.\.', outputLine) is not None:
-            result = redTxt('ERROR') if 'error' in nextOutputLine else greenTxt('OK')
+            result = redTxt('ERROR') if 'error' in nextOutputLine else (yellowTxt('INCONCLUSIVE') if 'inconclusive' in nextOutputLine else greenTxt('OK'))
             print(getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
 
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print(greenTxt('No errors found.'))
+        if 'inconclusive' in outputLines[-1]: print(yellowTxt('Inconclusive results.'))
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))
