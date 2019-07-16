@@ -32,5 +32,12 @@ contract ArraysMem {
 
         // Array returned by function
         assert(returnArray()[0] == 5);
+
+        // Inline declaration
+        uint8[3] memory init = [1, 2, 3];
+        assert(init.length == 3);
+        assert(init[0] == 1);
+        assert(init[1] == 2);
+        assert(init[2] == 3);
     }
 }

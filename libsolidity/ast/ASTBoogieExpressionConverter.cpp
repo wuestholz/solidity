@@ -375,6 +375,30 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 {
+	if (_node.isInlineArray())
+	{
+		auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
+		auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+		// Create new
+		auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), m_context.toBoogieType(_node.annotation().type, &_node));
+		m_newDecls.push_back(varDecl);
+		auto arrExpr = m_context.getMemArray(varDecl->getRefTo(), bgType);
+		for (size_t i = 0; i < _node.components().size(); i++)
+		{
+			_node.components()[i]->accept(*this);
+			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+					bg::Expr::arrsel(
+							m_context.getInnerArray(arrExpr, bgType),
+							m_context.intLit(i, 256)),
+					m_currentExpr));
+		}
+		m_currentExpr = varDecl->getRefTo();
+		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+				m_context.getArrayLength(arrExpr, bgType),
+				m_context.intLit(_node.components().size(), 256)));
+		return false;
+	}
+
 	// Get the elements
 	vector<bg::Expr::Ref> elements;
 	for (auto element: _node.components())
