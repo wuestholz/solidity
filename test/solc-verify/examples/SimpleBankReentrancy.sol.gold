@@ -1,0 +1,6 @@
+SimpleBank::deposit: OK
+SimpleBank::withdraw: ERROR
+ - Source test/solc-verify/examples/SimpleBankReentrancy.sol, line 16, col 18: Invariant '__verifier_sum_uint(balances) <= address(this).balance' might not hold before external call.
+ - Source test/solc-verify/examples/SimpleBankReentrancy.sol, line 13, col 5: Invariant '__verifier_sum_uint(balances) <= address(this).balance' might not hold at end of function.
+SimpleBank::[implicit_constructor]: OK
+Errors were found by the verifier.

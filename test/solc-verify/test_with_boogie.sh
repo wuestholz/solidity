@@ -120,7 +120,7 @@ function solcverify_check()
 
 # Run the tests
 cd $REPO_ROOT
-for filename in $SOLCVERIFY_TESTS/*.sol; do
+for filename in $(find $SOLCVERIFY_TESTS -name '*.sol' | sort); do
     # Flags to use
     flags=""
     if [ -f "$filename.flags" ]; then

@@ -1,0 +1,6 @@
+SafeMath::[implicit_constructor]: OK
+BecTokenSimplified::[constructor]: OK
+BecTokenSimplified::balanceOf: OK
+BecTokenSimplified::transfer: OK
+BecTokenSimplified::batchTransfer: OK
+No errors found.
