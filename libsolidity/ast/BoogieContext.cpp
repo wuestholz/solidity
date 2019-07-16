@@ -11,6 +11,8 @@ using namespace dev;
 using namespace dev::solidity;
 using namespace langutil;
 
+namespace bg = boogie;
+
 namespace dev
 {
 namespace solidity
@@ -58,21 +60,21 @@ BoogieContext::BoogieContext(Encoding encoding,
 	// address type
 	addDecl(addressType());
 	// address.balance
-	m_boogieBalance = boogie::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
+	m_boogieBalance = bg::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
 	addDecl(m_boogieBalance);
 	// This, sender, value
-	m_boogieThis = boogie::Decl::variable("__this", addressType());
-	m_boogieMsgSender = boogie::Decl::variable("__msg_sender", addressType());
-	m_boogieMsgValue = boogie::Decl::variable("__msg_value", intType(256));
+	m_boogieThis = bg::Decl::variable("__this", addressType());
+	m_boogieMsgSender = bg::Decl::variable("__msg_sender", addressType());
+	m_boogieMsgValue = bg::Decl::variable("__msg_value", intType(256));
 	// Uninterpreted type for strings
 	addDecl(stringType());
 	// now
-	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, intType(256)));
+	addDecl(bg::Decl::variable(ASTBoogieUtils::BOOGIE_NOW, intType(256)));
 	// block number
-	addDecl(boogie::Decl::variable(ASTBoogieUtils::BOOGIE_BLOCKNO, intType(256)));
+	addDecl(bg::Decl::variable(ASTBoogieUtils::BOOGIE_BLOCKNO, intType(256)));
 	// overflow
 	if (m_overflow)
-		addDecl(boogie::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
+		addDecl(bg::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)
@@ -111,7 +113,7 @@ string BoogieContext::mapDeclName(Declaration const& decl)
 	return name;
 }
 
-void BoogieContext::addBuiltinFunction(boogie::FuncDeclRef fnDecl)
+void BoogieContext::addBuiltinFunction(bg::FuncDeclRef fnDecl)
 {
 	m_builtinFunctions[fnDecl->getName()] = fnDecl;
 	m_program.getDeclarations().push_back(fnDecl);
@@ -152,15 +154,15 @@ void BoogieContext::reportWarning(ASTNode const* associatedNode, string message)
 
 void BoogieContext::addGlobalComment(string str)
 {
-	addDecl(boogie::Decl::comment("", str));
+	addDecl(bg::Decl::comment("", str));
 }
 
-void BoogieContext::addDecl(boogie::Decl::Ref decl)
+void BoogieContext::addDecl(bg::Decl::Ref decl)
 {
 	m_program.getDeclarations().push_back(decl);
 }
 
-void BoogieContext::addConstant(boogie::Decl::Ref decl)
+void BoogieContext::addConstant(bg::Decl::Ref decl)
 {
 	bool alreadyDefined = false;
 	for (auto d: m_constants)
@@ -179,35 +181,35 @@ void BoogieContext::addConstant(boogie::Decl::Ref decl)
 	}
 }
 
-boogie::TypeDeclRef BoogieContext::addressType() const
+bg::TypeDeclRef BoogieContext::addressType() const
 {
-	boogie::TypeDeclRef it = intType(256);
-	return boogie::Decl::typee("address_t", it->getName());
+	bg::TypeDeclRef it = intType(256);
+	return bg::Decl::typee("address_t", it->getName());
 }
 
-boogie::TypeDeclRef BoogieContext::boolType() const
+bg::TypeDeclRef BoogieContext::boolType() const
 {
-	return boogie::Decl::typee("bool");
+	return bg::Decl::typee("bool");
 }
 
-boogie::TypeDeclRef BoogieContext::stringType() const
+bg::TypeDeclRef BoogieContext::stringType() const
 {
-	return boogie::Decl::typee("string_t");
+	return bg::Decl::typee("string_t");
 }
 
-boogie::TypeDeclRef BoogieContext::intType(unsigned size) const
+bg::TypeDeclRef BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
-		return boogie::Decl::typee("bv" + toString(size));
+		return bg::Decl::typee("bv" + toString(size));
 	else
-		return boogie::Decl::typee("int");
+		return bg::Decl::typee("int");
 }
 
-boogie::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
+bg::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
 {
 	if (m_storStructConstrs.find(structDef) == m_storStructConstrs.end())
 	{
-		vector<boogie::Binding> params;
+		vector<bg::Binding> params;
 
 		for (auto member: structDef->members())
 		{
@@ -217,21 +219,21 @@ boogie::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* 
 			// TODO: can we do better?
 			TypePointer memberType = TypeProvider::withLocationIfReference(DataLocation::Storage, member->type());
 			params.push_back({
-				boogie::Expr::id(mapDeclName(*member)),
+				bg::Expr::id(mapDeclName(*member)),
 				toBoogieType(memberType, structDef)});
 		}
 
-		vector<boogie::Attr::Ref> attrs;
-		attrs.push_back(boogie::Attr::attr("constructor"));
+		vector<bg::Attr::Ref> attrs;
+		attrs.push_back(bg::Attr::attr("constructor"));
 		string name = structDef->name() + "#" + toString(structDef->id()) + "#constr";
-		m_storStructConstrs[structDef] = boogie::Decl::function(name, params,
+		m_storStructConstrs[structDef] = bg::Decl::function(name, params,
 				getStructType(structDef, DataLocation::Storage), nullptr, attrs);
 		addDecl(m_storStructConstrs[structDef]);
 	}
 	return m_storStructConstrs[structDef];
 }
 
-boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, DataLocation loc)
+bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, DataLocation loc)
 {
 	string typeName = "struct_" + ASTBoogieUtils::dataLocToStr(loc) +
 			"_" + structDef->name() + "#" + toString(structDef->id());
@@ -240,7 +242,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 	{
 		if (m_storStructTypes.find(structDef) == m_storStructTypes.end())
 		{
-			vector<boogie::Binding> members;
+			vector<bg::Binding> members;
 			for (auto member: structDef->members())
 			{
 				// Make sure that the location of the member is storage (this is
@@ -248,10 +250,10 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 				// definition, which is storage pointer by default).
 				// TODO: can we do better?
 				TypePointer memberType = TypeProvider::withLocationIfReference(loc, member->type());
-				members.push_back({boogie::Expr::id(mapDeclName(*member)),
+				members.push_back({bg::Expr::id(mapDeclName(*member)),
 					toBoogieType(memberType, structDef)});
 			}
-			m_storStructTypes[structDef] = boogie::Decl::datatype(typeName, members);
+			m_storStructTypes[structDef] = bg::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
 			getStructConstructor(structDef);
 		}
@@ -261,7 +263,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 	{
 		if (m_memStructTypes.find(structDef) == m_memStructTypes.end())
 		{
-			m_memStructTypes[structDef] = boogie::Decl::typee("address_" + typeName);
+			m_memStructTypes[structDef] = bg::Decl::typee("address_" + typeName);
 			addDecl(m_memStructTypes[structDef]);
 		}
 		return m_memStructTypes[structDef];
@@ -271,7 +273,7 @@ boogie::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structD
 	return nullptr;
 }
 
-boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)
+bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)
 {
 	Type::Category tpCategory = tp->category();
 
@@ -287,7 +289,7 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 	{
 		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
 		if (!tpRational->isFractional())
-			return boogie::Decl::typee(ASTBoogieUtils::BOOGIE_INT_CONST_TYPE);
+			return bg::Decl::typee(ASTBoogieUtils::BOOGIE_INT_CONST_TYPE);
 		else
 			reportError(_associatedNode, "Fractional numbers are not supported");
 		break;
@@ -306,23 +308,23 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 			return stringType();
 
 		Type const* baseType = arrType->baseType();
-		boogie::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
+		bg::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
 
 		// Declare datatype and constructor if needed
 		if (m_arrDataTypes.find(baseTypeBoogie->getName()) == m_arrDataTypes.end())
 		{
 			// Datatype: [int]T + length
-			vector<boogie::Binding> members = {
-					{boogie::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)},
-				{boogie::Expr::id("length"), intType(256)}};
-			m_arrDataTypes[baseTypeBoogie->getName()] = boogie::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
+			vector<bg::Binding> members = {
+					{bg::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)},
+				{bg::Expr::id("length"), intType(256)}};
+			m_arrDataTypes[baseTypeBoogie->getName()] = bg::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
 			addDecl(m_arrDataTypes[baseTypeBoogie->getName()]);
 
 			// Constructor for datatype
-			vector<boogie::Attr::Ref> attrs;
-			attrs.push_back(boogie::Attr::attr("constructor"));
+			vector<bg::Attr::Ref> attrs;
+			attrs.push_back(bg::Attr::attr("constructor"));
 			string name = baseTypeBoogie->getName() + "_arr#constr";
-			m_arrConstrs[baseTypeBoogie->getName()] = boogie::Decl::function(name, members,
+			m_arrConstrs[baseTypeBoogie->getName()] = bg::Decl::function(name, members,
 					m_arrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
 			addDecl(m_arrConstrs[baseTypeBoogie->getName()]);
 		}
@@ -336,11 +338,11 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
 			{
 				// Pointer type
-				m_memArrPtrTypes[baseTypeBoogie->getName()] = boogie::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
+				m_memArrPtrTypes[baseTypeBoogie->getName()] = bg::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
 				addDecl(m_memArrPtrTypes[baseTypeBoogie->getName()]);
 
 				// The actual storage
-				m_memArrs[baseTypeBoogie->getName()] = boogie::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
+				m_memArrs[baseTypeBoogie->getName()] = bg::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
 						ASTBoogieUtils::mappingType(
 								m_memArrPtrTypes[baseTypeBoogie->getName()],
 								m_arrDataTypes[baseTypeBoogie->getName()]));
@@ -351,7 +353,7 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 		else
 		{
 			reportError(_associatedNode, "Unsupported location for array type");
-			return boogie::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+			return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
 		}
 		break;
 	}
@@ -384,18 +386,18 @@ boogie::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _
 		reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
 
-	return boogie::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+	return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
 }
 
-boogie::Expr::Ref BoogieContext::intLit(boogie::bigint lit, int bits) const
+bg::Expr::Ref BoogieContext::intLit(bg::bigint lit, int bits) const
 {
 	if (isBvEncoding())
-		return boogie::Expr::lit(lit, bits);
+		return bg::Expr::lit(lit, bits);
 	else
-		return boogie::Expr::lit(lit);
+		return bg::Expr::lit(lit);
 }
 
-boogie::Expr::Ref BoogieContext::intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low)
+bg::Expr::Ref BoogieContext::intSlice(bg::Expr::Ref base, unsigned size, unsigned high, unsigned low)
 {
 	solAssert(high < size, "");
 	solAssert(low < high, "");
@@ -403,22 +405,22 @@ boogie::Expr::Ref BoogieContext::intSlice(boogie::Expr::Ref base, unsigned size,
 		return bvExtract(base, size, high, low);
 	else
 	{
-		boogie::Expr::Ref result = base;
+		bg::Expr::Ref result = base;
 		if (low > 0)
 		{
-			boogie::Expr::Ref c1 = boogie::Expr::lit(boogie::bigint(2) << (low - 1));
-			result = boogie::Expr::intdiv(result, c1);
+			bg::Expr::Ref c1 = bg::Expr::lit(bg::bigint(2) << (low - 1));
+			result = bg::Expr::intdiv(result, c1);
 		}
 		if (high < size - 1)
 		{
-			boogie::Expr::Ref c2 = boogie::Expr::lit(boogie::bigint(2) << (high - low));
-			result = boogie::Expr::mod(result, c2);
+			bg::Expr::Ref c2 = bg::Expr::lit(bg::bigint(2) << (high - low));
+			result = bg::Expr::mod(result, c2);
 		}
 		return result;
 	}
 }
 
-boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned exprSize, unsigned high, unsigned low)
+bg::Expr::Ref BoogieContext::bvExtract(bg::Expr::Ref expr, unsigned exprSize, unsigned high, unsigned low)
 {
 	// Function name
 	std::stringstream fnNameSS;
@@ -434,26 +436,26 @@ boogie::Expr::Ref BoogieContext::bvExtract(boogie::Expr::Ref expr, unsigned expr
 
 		// Appropriate types
 		unsigned resultSize = high - low + 1;
-		boogie::TypeDeclRef resultType = intType(resultSize);
-		boogie::TypeDeclRef exprType = intType(exprSize);
+		bg::TypeDeclRef resultType = intType(resultSize);
+		bg::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
-		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
+		bg::FuncDeclRef fnDecl = bg::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { boogie::Expr::id(""), exprType} }, // Arguments
+				{ { bg::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
-				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
+				{ bg::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
 
 		// Add it
 		addBuiltinFunction(fnDecl);
 	}
 
-	return boogie::Expr::fn(fnName, expr);
+	return bg::Expr::fn(fnName, expr);
 }
 
-boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize)
+bg::Expr::Ref BoogieContext::bvZeroExt(bg::Expr::Ref expr, unsigned exprSize, unsigned resultSize)
 {
 	// Function name
 	std::stringstream fnNameSS;
@@ -468,26 +470,26 @@ boogie::Expr::Ref BoogieContext::bvZeroExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ zero_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		boogie::TypeDeclRef resultType = intType(resultSize);
-		boogie::TypeDeclRef exprType = intType(exprSize);
+		bg::TypeDeclRef resultType = intType(resultSize);
+		bg::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
-		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
+		bg::FuncDeclRef fnDecl = bg::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { boogie::Expr::id(""), exprType} }, // Arguments
+				{ { bg::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
-				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
+				{ bg::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
 
 		// Add it
 		addBuiltinFunction(fnDecl);
 	}
 
-	return boogie::Expr::fn(fnName, expr);
+	return bg::Expr::fn(fnName, expr);
 }
 
-boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize)
+bg::Expr::Ref BoogieContext::bvSignExt(bg::Expr::Ref expr, unsigned exprSize, unsigned resultSize)
 {
 	// Function name
 	std::stringstream fnNameSS;
@@ -502,132 +504,132 @@ boogie::Expr::Ref BoogieContext::bvSignExt(boogie::Expr::Ref expr, unsigned expr
 		fnSmtSS << "(_ sign_extend " << resultSize - exprSize << ")";
 
 		// Appropriate types
-		boogie::TypeDeclRef resultType = intType(resultSize);
-		boogie::TypeDeclRef exprType = intType(exprSize);
+		bg::TypeDeclRef resultType = intType(resultSize);
+		bg::TypeDeclRef exprType = intType(exprSize);
 
 		// Boogie declaration
-		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
+		bg::FuncDeclRef fnDecl = bg::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { boogie::Expr::id(""), exprType} }, // Arguments
+				{ { bg::Expr::id(""), exprType} }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
-				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
+				{ bg::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
 
 		// Add it
 		addBuiltinFunction(fnDecl);
 	}
 
-	return boogie::Expr::fn(fnName, expr);
+	return bg::Expr::fn(fnName, expr);
 }
 
-boogie::Expr::Ref BoogieContext::bvNeg(unsigned bits, boogie::Expr::Ref expr)
+bg::Expr::Ref BoogieContext::bvNeg(unsigned bits, bg::Expr::Ref expr)
 {
 	return bvUnaryOp("neg", bits, expr);
 }
 
-boogie::Expr::Ref BoogieContext::bvNot(unsigned bits, boogie::Expr::Ref expr)
+bg::Expr::Ref BoogieContext::bvNot(unsigned bits, bg::Expr::Ref expr)
 {
 	return bvUnaryOp("not", bits, expr);
 }
 
 
-boogie::Expr::Ref BoogieContext::bvAdd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvAdd(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("add", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvSub(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSub(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("sub", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvMul(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvMul(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("mul", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvSDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSDiv(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("sdiv", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvUDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvUDiv(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("udiv", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvAnd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvAnd(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("and", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvOr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvOr(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("or", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvXor(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvXor(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("xor", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvAShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvAShr(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("ashr", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvLShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvLShr(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("lshr", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvShl(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvShl(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("shl", bits, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvSlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSlt(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("slt", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvUlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvUlt(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("ult", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvSgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSgt(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("sgt", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvUgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvUgt(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("ugt", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvSle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSle(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("sle", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvUle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvUle(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("ule", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvSge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvSge(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("sge", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvUge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs)
+bg::Expr::Ref BoogieContext::bvUge(unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
 {
 	return bvBinaryOp("uge", bits, lhs, rhs, boolType());
 }
 
-boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, boogie::TypeDeclRef resultType)
+bg::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, bg::Expr::Ref lhs, bg::Expr::Ref rhs, bg::TypeDeclRef resultType)
 {
 	// Function name
 	std::stringstream fnNameSS;
@@ -644,25 +646,25 @@ boogie::Expr::Ref BoogieContext::bvBinaryOp(std::string name, unsigned bits, boo
 		// Appropriate types
 		if (resultType == nullptr)
 			resultType = intType(bits);
-		boogie::TypeDeclRef exprType = intType(bits);
+		bg::TypeDeclRef exprType = intType(bits);
 
 		// Boogie declaration
-		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
+		bg::FuncDeclRef fnDecl = bg::Decl::function(
 				fnNameSS.str(),     // Name
-				{ { boogie::Expr::id(""), exprType }, { boogie::Expr::id(""), exprType } }, // Arguments
+				{ { bg::Expr::id(""), exprType }, { bg::Expr::id(""), exprType } }, // Arguments
 				resultType,         // Type
 				nullptr,            // Body = null
-				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
+				{ bg::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
 
 		// Add it
 		addBuiltinFunction(fnDecl);
 	}
 
-	return boogie::Expr::fn(fnName, lhs, rhs);
+	return bg::Expr::fn(fnName, lhs, rhs);
 }
 
-boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boogie::Expr::Ref expr)
+bg::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, bg::Expr::Ref expr)
 {
 	// Function name
 	std::stringstream fnNameSS;
@@ -677,22 +679,22 @@ boogie::Expr::Ref BoogieContext::bvUnaryOp(std::string name, unsigned bits, boog
 		fnSmtSS << "bv" << name;
 
 		// Appropriate types
-		boogie::TypeDeclRef exprType = intType(bits);
+		bg::TypeDeclRef exprType = intType(bits);
 
 		// Boogie declaration
-		boogie::FuncDeclRef fnDecl = boogie::Decl::function(
+		bg::FuncDeclRef fnDecl = bg::Decl::function(
 				fnNameSS.str(),       // Name
-				{ { boogie::Expr::id(""), exprType } }, // Arguments
+				{ { bg::Expr::id(""), exprType } }, // Arguments
 				exprType,  // Type
 				nullptr,              // Body = null
-				{ boogie::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
+				{ bg::Attr::attr("bvbuiltin", fnSmtSS.str()) } // Attributes
 		);
 
 		// Add it
 		addBuiltinFunction(fnDecl);
 	}
 
-	return boogie::Expr::fn(fnName, expr);
+	return bg::Expr::fn(fnName, expr);
 }
 
 }

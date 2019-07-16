@@ -15,8 +15,6 @@ using namespace langutil;
 
 namespace bg = boogie;
 
-using namespace boogie;
-
 namespace dev
 {
 namespace solidity
@@ -65,14 +63,14 @@ string const ASTBoogieUtils::DOCTAG_MODIFIES = "modifies";
 string const ASTBoogieUtils::DOCTAG_MODIFIES_ALL = DOCTAG_MODIFIES + " *";
 string const ASTBoogieUtils::DOCTAG_MODIFIES_COND = " if ";
 
-ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
+bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 {
 	// Parameters: this, msg.sender, msg.value, amount
-	vector<Binding> transferParams{
+	vector<bg::Binding> transferParams{
 		{context.boogieThis()->getRefTo(), context.boogieThis()->getType() },
 		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType() },
 		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType() },
-		{Expr::id("amount"), context.intType(256) }
+		{bg::Expr::id("amount"), context.intType(256) }
 	};
 
 	// Type to pass around
@@ -80,63 +78,63 @@ ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 
 	// Body
 	bg::Block::Ref transferImpl = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
-	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
-	Expr::Ref amount = Expr::id("amount");
+	bg::Expr::Ref this_bal = bg::Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	bg::Expr::Ref sender_bal = bg::Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
+	bg::Expr::Ref amount = bg::Expr::id("amount");
 
 	// Precondition: there is enough ether to transfer
 	auto geqResult = encodeArithBinaryOp(context, nullptr, langutil::Token::GreaterThanOrEqual, sender_bal, amount, 256, false);
-	transferImpl->addStmt(Stmt::assume(geqResult.expr));
+	transferImpl->addStmt(bg::Stmt::assume(geqResult.expr));
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		transferImpl->addStmts({
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		transferImpl->addStmts({
-			Stmt::comment("Implicit assumption that balances cannot overflow"),
-			Stmt::assume(addBalance.cc)
+			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
+			bg::Stmt::assume(addBalance.cc)
 		});
 	}
-	transferImpl->addStmt(Stmt::assign(
+	transferImpl->addStmt(bg::Stmt::assign(
 			context.boogieBalance()->getRefTo(),
-			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
+			bg::Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
-		transferImpl->addStmt(Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
-		transferImpl->addStmt(Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
+		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)));
+		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
 	if (context.overflow())
 	{
-		transferImpl->addStmt(Stmt::comment("Implicit assumption that balances cannot overflow"));
-		transferImpl->addStmt(Stmt::assume(subSenderBalance.cc));
+		transferImpl->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		transferImpl->addStmt(bg::Stmt::assume(subSenderBalance.cc));
 	}
-	transferImpl->addStmt(Stmt::assign(
+	transferImpl->addStmt(bg::Stmt::assign(
 			context.boogieBalance()->getRefTo(),
-			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
-	transferImpl->addStmt(Stmt::comment("TODO: call fallback, exception handling"));
+			bg::Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
+	transferImpl->addStmt(bg::Stmt::comment("TODO: call fallback, exception handling"));
 
-	ProcDeclRef transfer = Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
+	bg::ProcDeclRef transfer = bg::Decl::procedure(BOOGIE_TRANSFER, transferParams, {}, {}, {transferImpl});
 
 	transfer->addAttrs({
-		Attr::attr("inline", 1),
-		Attr::attr("message", "transfer")
+		bg::Attr::attr("inline", 1),
+		bg::Attr::attr("message", "transfer")
 	});
 	return transfer;
 }
 
-ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
+bg::ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 {
 
 	// Parameters: this, msg.sender, msg.value
-	vector<Binding> callParams {
+	vector<bg::Binding> callParams {
 		{context.boogieThis()->getRefTo(), context.boogieThis()->getType() },
 		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType() },
 		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType() }
@@ -153,58 +151,58 @@ ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 	solAssert(callFunctionType->returnParameterTypes().size() == 2, "");
 
 	// Return value
-	vector<Binding> callReturns{
-		{Expr::id("__result"), context.toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr)},
-		{Expr::id("__calldata"), context.toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr)}
+	vector<bg::Binding> callReturns{
+		{bg::Expr::id("__result"), context.toBoogieType(callFunctionType->returnParameterTypes()[0], nullptr)},
+		{bg::Expr::id("__calldata"), context.toBoogieType(callFunctionType->returnParameterTypes()[1], nullptr)}
 	};
 
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
-	Expr::Ref msg_val = context.boogieMsgValue()->getRefTo();
-	Expr::Ref result = Expr::id("__result");
+	bg::Expr::Ref this_bal = bg::Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	bg::Expr::Ref msg_val = context.boogieMsgValue()->getRefTo();
+	bg::Expr::Ref result = bg::Expr::id("__result");
 
 	// balance[this] += msg.value
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256))
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256))
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, msg_val, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmts({
-			Stmt::comment("Implicit assumption that balances cannot overflow"),
-			Stmt::assume(addBalance.cc)
+			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
+			bg::Stmt::assume(addBalance.cc)
 		});
 	}
-	thenBlock->addStmt(Stmt::assign(
+	thenBlock->addStmt(bg::Stmt::assign(
 			context.boogieBalance()->getRefTo(),
-			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
-	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
+			bg::Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
+	thenBlock->addStmt(bg::Stmt::assign(result, bg::Expr::lit(true)));
 	// Unsuccessful transfer
 	bg::Block::Ref elseBlock = bg::Block::block();
-	elseBlock->addStmt(Stmt::assign(result, Expr::lit(false)));
+	elseBlock->addStmt(bg::Stmt::assign(result, bg::Expr::lit(false)));
 	// Nondeterministic choice between success and failure
 	bg::Block::Ref callBlock = bg::Block::block();
-	callBlock->addStmt(Stmt::comment("TODO: call fallback"));
-	callBlock->addStmt(Stmt::ifelse(Expr::id("*"), thenBlock, elseBlock));
+	callBlock->addStmt(bg::Stmt::comment("TODO: call fallback"));
+	callBlock->addStmt(bg::Stmt::ifelse(bg::Expr::id("*"), thenBlock, elseBlock));
 
-	ProcDeclRef callProc = Decl::procedure(BOOGIE_CALL, callParams, callReturns, {}, {callBlock});
-	callProc->addAttr(Attr::attr("inline", 1));
-	callProc->addAttr(Attr::attr("message", "call"));
+	bg::ProcDeclRef callProc = bg::Decl::procedure(BOOGIE_CALL, callParams, callReturns, {}, {callBlock});
+	callProc->addAttr(bg::Attr::attr("inline", 1));
+	callProc->addAttr(bg::Attr::attr("message", "call"));
 	return callProc;
 }
 
-ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
+bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 {
-	Expr::Ref amount = Expr::id("amount");
-	Expr::Ref result = Expr::id("__result");
+	bg::Expr::Ref amount = bg::Expr::id("amount");
+	bg::Expr::Ref result = bg::Expr::id("__result");
 	// Parameters: this, msg.sender, msg.value, amount
-	vector<Binding> sendParams {
+	vector<bg::Binding> sendParams {
 		{context.boogieThis()->getRefTo(), context.boogieThis()->getType()},
 		{context.boogieMsgSender()->getRefTo(), context.boogieMsgSender()->getType()},
 		{context.boogieMsgValue()->getRefTo(), context.boogieMsgValue()->getType()},
@@ -215,74 +213,74 @@ ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Return value
-	vector<Binding> sendReturns{ {result, context.boolType()} };
+	vector<bg::Binding> sendReturns{ {result, context.boolType()} };
 
 	// Body
 	// Successful transfer
 	bg::Block::Ref thenBlock = bg::Block::block();
-	Expr::Ref this_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
-	Expr::Ref sender_bal = Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
+	bg::Expr::Ref this_bal = bg::Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo());
+	bg::Expr::Ref sender_bal = bg::Expr::arrsel(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo());
 
 	// balance[this] += amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)),
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmts({
-			Stmt::comment("Implicit assumption that balances cannot overflow"),
-			Stmt::assume(addBalance.cc)
+			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
+			bg::Stmt::assume(addBalance.cc)
 		});
 	}
-	thenBlock->addStmt(Stmt::assign(
+	thenBlock->addStmt(bg::Stmt::assign(
 			context.boogieBalance()->getRefTo(),
-			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
+			bg::Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieThis()->getRefTo(), addBalance.expr)));
 	// balance[msg.sender] -= amount
 	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)),
-			Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(sender_bal, tp_uint256)),
+			bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256))
 		});
 	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
 	if (context.overflow())
 	{
 		thenBlock->addStmts({
-			Stmt::comment("Implicit assumption that balances cannot overflow"),
-			Stmt::assume(subSenderBalance.cc)
+			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
+			bg::Stmt::assume(subSenderBalance.cc)
 		});
 	}
-	thenBlock->addStmt(Stmt::assign(
+	thenBlock->addStmt(bg::Stmt::assign(
 			context.boogieBalance()->getRefTo(),
-			Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
-	thenBlock->addStmt(Stmt::assign(result, Expr::lit(true)));
+			bg::Expr::arrupd(context.boogieBalance()->getRefTo(), context.boogieMsgSender()->getRefTo(), subSenderBalance.expr)));
+	thenBlock->addStmt(bg::Stmt::assign(result, bg::Expr::lit(true)));
 
 	// Unsuccessful transfer
 	bg::Block::Ref elseBlock = bg::Block::block();
-	elseBlock->addStmt(Stmt::assign(result, Expr::lit(false)));
+	elseBlock->addStmt(bg::Stmt::assign(result, bg::Expr::lit(false)));
 
 	bg::Block::Ref transferBlock = bg::Block::block();
 	// Precondition: there is enough ether to transfer
 	auto senderBalanceGEQ = encodeArithBinaryOp(context, nullptr, langutil::Token::GreaterThanOrEqual, sender_bal, amount, 256, false);
-	transferBlock->addStmt(Stmt::assume(senderBalanceGEQ.expr));
+	transferBlock->addStmt(bg::Stmt::assume(senderBalanceGEQ.expr));
 
 	// Nondeterministic choice between success and failure
 	transferBlock->addStmts({
-		Stmt::comment("TODO: call fallback"),
-		Stmt::ifelse(Expr::id("*"), thenBlock, elseBlock)
+		bg::Stmt::comment("TODO: call fallback"),
+		bg::Stmt::ifelse(bg::Expr::id("*"), thenBlock, elseBlock)
 	});
 
-	ProcDeclRef sendProc = Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
+	bg::ProcDeclRef sendProc = bg::Decl::procedure(BOOGIE_SEND, sendParams, sendReturns, {}, {transferBlock});
 
 	sendProc->addAttrs({
-		Attr::attr("inline", 1),
-		Attr::attr("message", "send")
+		bg::Attr::attr("inline", 1),
+		bg::Attr::attr("message", "send")
 	});
 
 	return sendProc;
@@ -308,26 +306,26 @@ string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
 }
 
-TypeDeclRef ASTBoogieUtils::mappingType(TypeDeclRef keyType, TypeDeclRef valueType)
+bg::TypeDeclRef ASTBoogieUtils::mappingType(bg::TypeDeclRef keyType, bg::TypeDeclRef valueType)
 {
-	return Decl::typee("[" + keyType->getName() + "]" + valueType->getName());
+	return bg::Decl::typee("[" + keyType->getName() + "]" + valueType->getName());
 }
 
-std::vector<Attr::Ref> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
+std::vector<bg::Attr::Ref> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
 {
 	int srcLine, srcCol;
 	tie(srcLine, srcCol) = scanner.translatePositionToLineColumn(loc.start);
 	return {
-		Attr::attr("sourceloc", loc.source->name(), srcLine + 1, srcCol + 1),
-		Attr::attr("message", message)
+		bg::Attr::attr("sourceloc", loc.source->name(), srcLine + 1, srcCol + 1),
+		bg::Attr::attr("message", message)
 	};
 }
 
 ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op,
-		Expr::Ref lhs, Expr::Ref rhs, unsigned bits, bool isSigned)
+		bg::Expr::Ref lhs, bg::Expr::Ref rhs, unsigned bits, bool isSigned)
 {
-	Expr::Ref result = nullptr;
-	Expr::Ref ecc = nullptr;
+	bg::Expr::Ref result = nullptr;
+	bg::Expr::Ref ecc = nullptr;
 
 	switch(context.encoding())
 	{
@@ -336,42 +334,42 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 		{
 		case Token::Add:
 		case Token::AssignAdd:
-			result = Expr::plus(lhs, rhs); break;
+			result = bg::Expr::plus(lhs, rhs); break;
 		case Token::Sub:
 		case Token::AssignSub:
-			result = Expr::minus(lhs, rhs); break;
+			result = bg::Expr::minus(lhs, rhs); break;
 		case Token::Mul:
 		case Token::AssignMul:
-			result = Expr::times(lhs, rhs); break;
+			result = bg::Expr::times(lhs, rhs); break;
 		// TODO: returning integer division is fine, because Solidity does not support floats
 		case Token::Div:
 		case Token::AssignDiv:
-			result = Expr::intdiv(lhs, rhs); break;
+			result = bg::Expr::intdiv(lhs, rhs); break;
 		case Token::Mod:
 		case Token::AssignMod:
-			result = Expr::mod(lhs, rhs); break;
+			result = bg::Expr::mod(lhs, rhs); break;
 
-		case Token::LessThan: result = Expr::lt(lhs, rhs); break;
-		case Token::GreaterThan: result = Expr::gt(lhs, rhs); break;
-		case Token::LessThanOrEqual: result = Expr::lte(lhs, rhs); break;
-		case Token::GreaterThanOrEqual: result = Expr::gte(lhs, rhs); break;
+		case Token::LessThan: result = bg::Expr::lt(lhs, rhs); break;
+		case Token::GreaterThan: result = bg::Expr::gt(lhs, rhs); break;
+		case Token::LessThanOrEqual: result = bg::Expr::lte(lhs, rhs); break;
+		case Token::GreaterThanOrEqual: result = bg::Expr::gte(lhs, rhs); break;
 
 		case Token::Exp:
 		{
-			auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs);
-			auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs);
+			auto lhsLit = dynamic_pointer_cast<bg::IntLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<bg::IntLit const>(rhs);
 			if (lhsLit && rhsLit)
-				result = Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
+				result = bg::Expr::lit(boost::multiprecision::pow(lhsLit->getVal(), rhsLit->getVal().convert_to<unsigned>()));
 			else
 			{
 				context.reportError(associatedNode, "Exponentiation is not supported in 'int' encoding");
-				result = Expr::id(ERR_EXPR);
+				result = bg::Expr::id(ERR_EXPR);
 			}
 			break;
 		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'int' encoding ") + TokenTraits::toString(op));
-			result = Expr::id(ERR_EXPR);
+			result = bg::Expr::id(ERR_EXPR);
 		}
 		break;
 	case BoogieContext::Encoding::BV:
@@ -444,124 +442,124 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 			break;
 		case Token::Exp:
 		{
-			auto lhsLit = dynamic_pointer_cast<BvLit const>(lhs);
-			auto rhsLit = dynamic_pointer_cast<BvLit const>(rhs);
+			auto lhsLit = dynamic_pointer_cast<bg::BvLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<bg::BvLit const>(rhs);
 			if (lhsLit && rhsLit)
 			{
-				auto power = boost::multiprecision::pow(boogie::bigint(lhsLit->getVal()),
-						boogie::bigint(rhsLit->getVal()).convert_to<unsigned>());
-				result = context.intLit(power % boost::multiprecision::pow(boogie::bigint(2), bits), bits);
+				auto power = boost::multiprecision::pow(bg::bigint(lhsLit->getVal()),
+						bg::bigint(rhsLit->getVal()).convert_to<unsigned>());
+				result = context.intLit(power % boost::multiprecision::pow(bg::bigint(2), bits), bits);
 			}
 			else
 			{
 				context.reportError(associatedNode, "Exponentiation is not supported in 'bv' encoding");
-				result = Expr::id(ERR_EXPR);
+				result = bg::Expr::id(ERR_EXPR);
 			}
 			break;
 		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'bv' encoding ") + TokenTraits::toString(op));
-			result = Expr::id(ERR_EXPR);
+			result = bg::Expr::id(ERR_EXPR);
 		}
 		break;
 	}
 	case BoogieContext::Encoding::MOD:
 	{
-		auto modulo = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
-		auto largestSigned = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
-		auto smallestSigned = Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
+		auto modulo = bg::Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
+		auto largestSigned = bg::Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
+		auto smallestSigned = bg::Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
 		switch(op)
 		{
 		case Token::Add:
 		case Token::AssignAdd:
 		{
-			auto sum = Expr::plus(lhs, rhs);
+			auto sum = bg::Expr::plus(lhs, rhs);
 			if (isSigned)
-				result = Expr::cond(Expr::gt(sum, largestSigned),
-					Expr::minus(sum, modulo),
-					Expr::cond(Expr::lt(sum, smallestSigned), Expr::plus(sum, modulo), sum));
+				result = bg::Expr::cond(bg::Expr::gt(sum, largestSigned),
+					bg::Expr::minus(sum, modulo),
+					bg::Expr::cond(bg::Expr::lt(sum, smallestSigned), bg::Expr::plus(sum, modulo), sum));
 			else
-				result = Expr::cond(Expr::gte(sum, modulo), Expr::minus(sum, modulo), sum);
-			ecc = Expr::eq(sum, result);
+				result = bg::Expr::cond(bg::Expr::gte(sum, modulo), bg::Expr::minus(sum, modulo), sum);
+			ecc = bg::Expr::eq(sum, result);
 			break;
 		}
 		case Token::Sub:
 		case Token::AssignSub:
 		{
-			auto diff = Expr::minus(lhs, rhs);
+			auto diff = bg::Expr::minus(lhs, rhs);
 			if (isSigned)
-				result = Expr::cond(Expr::gt(diff, largestSigned),
-					Expr::minus(diff, modulo),
-					Expr::cond(Expr::lt(diff, smallestSigned), Expr::plus(diff, modulo), diff));
+				result = bg::Expr::cond(bg::Expr::gt(diff, largestSigned),
+					bg::Expr::minus(diff, modulo),
+					bg::Expr::cond(bg::Expr::lt(diff, smallestSigned), bg::Expr::plus(diff, modulo), diff));
 			else
-				result = Expr::cond(Expr::gte(lhs, rhs), diff, Expr::plus(diff, modulo));
-			ecc = Expr::eq(diff, result);
+				result = bg::Expr::cond(bg::Expr::gte(lhs, rhs), diff, bg::Expr::plus(diff, modulo));
+			ecc = bg::Expr::eq(diff, result);
 			break;
 		}
 		case Token::Mul:
 		case Token::AssignMul:
 		{
-			auto prod = Expr::times(lhs, rhs);
+			auto prod = bg::Expr::times(lhs, rhs);
 			if (isSigned)
 			{
-				auto lhs1 = Expr::cond(Expr::gte(lhs, Expr::lit((long)0)), lhs, Expr::plus(modulo, lhs));
-				auto rhs1 = Expr::cond(Expr::gte(rhs, Expr::lit((long)0)), rhs, Expr::plus(modulo, rhs));
-				auto prod = Expr::mod(Expr::times(lhs1, rhs1), modulo);
-				result = Expr::cond(Expr::gt(prod, largestSigned), Expr::minus(prod, modulo), prod);
+				auto lhs1 = bg::Expr::cond(bg::Expr::gte(lhs, bg::Expr::lit((long)0)), lhs, bg::Expr::plus(modulo, lhs));
+				auto rhs1 = bg::Expr::cond(bg::Expr::gte(rhs, bg::Expr::lit((long)0)), rhs, bg::Expr::plus(modulo, rhs));
+				auto prod = bg::Expr::mod(bg::Expr::times(lhs1, rhs1), modulo);
+				result = bg::Expr::cond(bg::Expr::gt(prod, largestSigned), bg::Expr::minus(prod, modulo), prod);
 			}
 			else
 			{
-				result = Expr::cond(Expr::gte(prod, modulo), Expr::mod(prod, modulo), prod);
+				result = bg::Expr::cond(bg::Expr::gte(prod, modulo), bg::Expr::mod(prod, modulo), prod);
 			}
-			ecc = Expr::eq(prod, result);
+			ecc = bg::Expr::eq(prod, result);
 			break;
 		}
 		case Token::Div:
 		case Token::AssignDiv:
 		{
-			auto div = Expr::intdiv(lhs, rhs);
+			auto div = bg::Expr::intdiv(lhs, rhs);
 			if (isSigned)
-				result = Expr::cond(Expr::gt(div, largestSigned),
-					Expr::minus(div, modulo),
-					Expr::cond(Expr::lt(div, smallestSigned), Expr::plus(div, modulo), div));
+				result = bg::Expr::cond(bg::Expr::gt(div, largestSigned),
+					bg::Expr::minus(div, modulo),
+					bg::Expr::cond(bg::Expr::lt(div, smallestSigned), bg::Expr::plus(div, modulo), div));
 			else
 				result = div;
-			ecc = Expr::eq(div, result);
+			ecc = bg::Expr::eq(div, result);
 			break;
 		}
 
 		case Token::LessThan:
-			result = Expr::lt(lhs, rhs);
+			result = bg::Expr::lt(lhs, rhs);
 			break;
 		case Token::GreaterThan:
-			result = Expr::gt(lhs, rhs);
+			result = bg::Expr::gt(lhs, rhs);
 			break;
 		case Token::LessThanOrEqual:
-			result = Expr::lte(lhs, rhs);
+			result = bg::Expr::lte(lhs, rhs);
 			break;
 		case Token::GreaterThanOrEqual:
-			result = Expr::gte(lhs, rhs);
+			result = bg::Expr::gte(lhs, rhs);
 			break;
 		case Token::Exp:
 		{
-			auto lhsLit = dynamic_pointer_cast<IntLit const>(lhs);
-			auto rhsLit = dynamic_pointer_cast<IntLit const>(rhs);
+			auto lhsLit = dynamic_pointer_cast<bg::IntLit const>(lhs);
+			auto rhsLit = dynamic_pointer_cast<bg::IntLit const>(rhs);
 			if (lhsLit && rhsLit)
 			{
 				auto power = boost::multiprecision::pow(lhsLit->getVal(),rhsLit->getVal().convert_to<unsigned>());
-				result = context.intLit(power % boost::multiprecision::pow(boogie::bigint(2), isSigned ? bits - 1 : bits), bits);
-				ecc = Expr::eq(context.intLit(power, bits), result);
+				result = context.intLit(power % boost::multiprecision::pow(bg::bigint(2), isSigned ? bits - 1 : bits), bits);
+				ecc = bg::Expr::eq(context.intLit(power, bits), result);
 			}
 			else
 			{
 				context.reportError(associatedNode, "Exponentiation is not supported in 'mod' encoding");
-				result = Expr::id(ERR_EXPR);
+				result = bg::Expr::id(ERR_EXPR);
 			}
 			break;
 		}
 		default:
 			context.reportError(associatedNode, string("Unsupported binary operator in 'mod' encoding ") + TokenTraits::toString(op));
-			result = Expr::id(ERR_EXPR);
+			result = bg::Expr::id(ERR_EXPR);
 		}
 		break;
 	}
@@ -574,20 +572,20 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithBinaryOp(BoogieContext& co
 }
 
 ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token op,
-		Expr::Ref subExpr, unsigned bits, bool isSigned)
+		bg::Expr::Ref subExpr, unsigned bits, bool isSigned)
 {
-	Expr::Ref result = nullptr;
-	Expr::Ref ecc = nullptr;
+	bg::Expr::Ref result = nullptr;
+	bg::Expr::Ref ecc = nullptr;
 
 	switch(context.encoding())
 	{
 	case BoogieContext::Encoding::INT:
 		switch(op)
 		{
-		case Token::Sub: result = Expr::neg(subExpr); break;
+		case Token::Sub: result = bg::Expr::neg(subExpr); break;
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'int' encoding ") + TokenTraits::toString(op));
-			result = Expr::id(ERR_EXPR);
+			result = bg::Expr::id(ERR_EXPR);
 			break;
 		}
 		break;
@@ -601,7 +599,7 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 			case Token::BitNot: result = context.bvNot(bits, subExpr); break;
 			default:
 				context.reportError(associatedNode, string("Unsupported unary operator in 'bv' encoding ") + TokenTraits::toString(op));
-				result = Expr::id(ERR_EXPR);
+				result = bg::Expr::id(ERR_EXPR);
 				break;
 			}
 		}
@@ -612,27 +610,27 @@ ASTBoogieUtils::ExprWithCC ASTBoogieUtils::encodeArithUnaryOp(BoogieContext& con
 		{
 		case Token::Sub:
 		{
-			auto sub = Expr::neg(subExpr);
+			auto sub = bg::Expr::neg(subExpr);
 			if (isSigned)
 			{
-				auto smallestSigned = Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
-				result = Expr::cond(Expr::eq(subExpr, smallestSigned),
+				auto smallestSigned = bg::Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
+				result = bg::Expr::cond(bg::Expr::eq(subExpr, smallestSigned),
 						smallestSigned,
 						sub);
 			}
 			else
 			{
-				auto modulo = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
-				result = Expr::cond(Expr::eq(subExpr, Expr::lit((long)0)),
-						Expr::lit((long)0),
-						Expr::minus(modulo, subExpr));
+				auto modulo = bg::Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits));
+				result = bg::Expr::cond(bg::Expr::eq(subExpr, bg::Expr::lit((long)0)),
+						bg::Expr::lit((long)0),
+						bg::Expr::minus(modulo, subExpr));
 			}
-			ecc = Expr::eq(sub, result);
+			ecc = bg::Expr::eq(sub, result);
 			break;
 		}
 		default:
 			context.reportError(associatedNode, string("Unsupported unary operator in 'mod' encoding ") + TokenTraits::toString(op));
-			result = Expr::id(ERR_EXPR);
+			result = bg::Expr::id(ERR_EXPR);
 			break;
 		}
 		break;
@@ -688,7 +686,7 @@ bool ASTBoogieUtils::isSigned(TypePointer type)
 	return false;
 }
 
-Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
+bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
 	solAssert(exprType, "");
 	solAssert(targetType, "");
@@ -696,11 +694,11 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 	// If tuples, do it element-wise
 	if (targetType->category() == Type::Category::Tuple)
 	{
-		std::vector<Expr::Ref> elements;
+		vector<bg::Expr::Ref> elements;
 
 		auto targetTupleType = dynamic_cast<TupleType const*>(targetType);
 		auto exprTypleType = dynamic_cast<TupleType const*>(exprType);
-		auto exprTuple = std::dynamic_pointer_cast<TupleExpr const>(expr);
+		auto exprTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(expr);
 
 		for (size_t i = 0; i < targetTupleType->components().size(); i ++)
 		{
@@ -712,19 +710,19 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 			elements.push_back(result_i);
 		}
 
-		return Expr::tuple(elements);
+		return bg::Expr::tuple(elements);
 	}
 
 	if (isBitPreciseType(targetType))
 	{
 		unsigned targetBits = getBits(targetType);
 		// Create bitvector from literals
-		if (auto exprLit = dynamic_pointer_cast<IntLit const>(expr))
+		if (auto exprLit = dynamic_pointer_cast<bg::IntLit const>(expr))
 		{
 			if (exprLit->getVal() < 0) // Negative literals are tricky
-				return context.bvNeg(targetBits, Expr::lit(-exprLit->getVal(), targetBits));
+				return context.bvNeg(targetBits, bg::Expr::lit(-exprLit->getVal(), targetBits));
 			else
-				return Expr::lit(exprLit->getVal(), targetBits);
+				return bg::Expr::lit(exprLit->getVal(), targetBits);
 		}
 		else if (isBitPreciseType(exprType))
 		{
@@ -753,7 +751,7 @@ Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(Expr::Ref expr, TypePointer 
 	return expr;
 }
 
-Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
+bg::Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(bg::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context)
 {
 	// Do nothing if any of the types is unknown
 	if (!targetType || !exprType)
@@ -763,7 +761,7 @@ Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer 
 	{
 		unsigned targetBits = getBits(targetType);
 		// Literals can be handled by implicit conversion
-		if (dynamic_pointer_cast<IntLit const>(expr))
+		if (dynamic_pointer_cast<bg::IntLit const>(expr))
 		{
 			return checkImplicitBvConversion(expr, exprType, targetType, context);
 		}
@@ -800,16 +798,16 @@ Expr::Ref ASTBoogieUtils::checkExplicitBvConversion(Expr::Ref expr, TypePointer 
 	return expr;
 }
 
-Expr::Ref ASTBoogieUtils::getTCCforExpr(Expr::Ref expr, TypePointer tp)
+bg::Expr::Ref ASTBoogieUtils::getTCCforExpr(bg::Expr::Ref expr, TypePointer tp)
 {
 	// For enums we know the number of members
 	if (tp->category() == Type::Category::Enum)
 	{
 		auto enumTp = dynamic_cast<EnumType const *>(tp);
 		solAssert(enumTp, "");
-		return Expr::and_(
-				Expr::lte(Expr::lit((long)0), expr),
-				Expr::lt(expr, Expr::lit(enumTp->enumDefinition().members().size())));
+		return bg::Expr::and_(
+				bg::Expr::lte(bg::Expr::lit((long)0), expr),
+				bg::Expr::lt(expr, bg::Expr::lit(enumTp->enumDefinition().members().size())));
 
 	}
 	// Otherwise get smallest and largest
@@ -818,22 +816,22 @@ Expr::Ref ASTBoogieUtils::getTCCforExpr(Expr::Ref expr, TypePointer tp)
 		unsigned bits = getBits(tp);
 		if (isSigned(tp))
 		{
-			auto largestSigned = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
-			auto smallestSigned = Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
-			return Expr::and_(
-					Expr::lte(smallestSigned, expr),
-					Expr::lte(expr, largestSigned));
+			auto largestSigned = bg::Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits - 1) - 1);
+			auto smallestSigned = bg::Expr::lit(-boost::multiprecision::pow(bg::bigint(2), bits - 1));
+			return bg::Expr::and_(
+					bg::Expr::lte(smallestSigned, expr),
+					bg::Expr::lte(expr, largestSigned));
 		}
 		else
 		{
-			auto largestUnsigned = Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits) - 1);
-			auto smallestUnsigned = Expr::lit(long(0));
-			return Expr::and_(
-					Expr::lte(smallestUnsigned, expr),
-					Expr::lte(expr, largestUnsigned));
+			auto largestUnsigned = bg::Expr::lit(boost::multiprecision::pow(bg::bigint(2), bits) - 1);
+			auto smallestUnsigned = bg::Expr::lit(long(0));
+			return bg::Expr::and_(
+					bg::Expr::lte(smallestUnsigned, expr),
+					bg::Expr::lte(expr, largestUnsigned));
 		}
 	}
-	return Expr::lit(true);
+	return bg::Expr::lit(true);
 }
 
 bool ASTBoogieUtils::isStateVar(Declaration const *decl)
@@ -845,11 +843,11 @@ bool ASTBoogieUtils::isStateVar(Declaration const *decl)
 }
 
 
-Expr::Ref ASTBoogieUtils::selectToUpdate(Expr::Ref sel, Expr::Ref value)
+bg::Expr::Ref ASTBoogieUtils::selectToUpdate(bg::Expr::Ref sel, bg::Expr::Ref value)
 {
-	if (auto selExpr = dynamic_pointer_cast<SelExpr const>(sel))
+	if (auto selExpr = dynamic_pointer_cast<bg::SelExpr const>(sel))
 	{
-		if (auto base = dynamic_pointer_cast<SelExpr const>(selExpr->getBase()))
+		if (auto base = dynamic_pointer_cast<bg::SelExpr const>(selExpr->getBase()))
 			return selectToUpdate(base, selExpr->toUpdate(value));
 		else
 			return selExpr->toUpdate(value);
@@ -859,11 +857,11 @@ Expr::Ref ASTBoogieUtils::selectToUpdate(Expr::Ref sel, Expr::Ref value)
 }
 
 
-Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value)
+bg::Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(bg::Expr::Ref sel, bg::Expr::Ref value)
 {
-	auto upd = dynamic_pointer_cast<UpdExpr const>(selectToUpdate(sel, value));
+	auto upd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(sel, value));
 	solAssert(upd, "Update expression expected");
-	return Stmt::assign(upd->getBase(), upd);
+	return bg::Stmt::assign(upd->getBase(), upd);
 }
 
 }
