@@ -1459,7 +1459,8 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	bg::Expr::Ref expr = convertExpression(_node.expression());
 	// Handle simple tuples separately
 	auto exprTuple = dynamic_pointer_cast<bg::TupleExpr const>(expr);
-	if (exprTuple) {
+	if (exprTuple)
+	{
 		auto const& exprTupleElements = exprTuple->elements();
 		auto const& nodeTuple = dynamic_cast<TupleExpression const&>(_node.expression());
 		auto const& nodeTypleElements = nodeTuple.components();
