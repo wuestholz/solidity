@@ -1428,42 +1428,49 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	rememberScope(_node);
 
 	// Some expressions have specific statements in Boogie
+	Expression const* nodeExpression = &_node.expression();
 
 	// Assignment
-	if (dynamic_cast<Assignment const*>(&_node.expression()))
+	if (dynamic_cast<Assignment const*>(nodeExpression))
 	{
 		convertExpression(_node.expression());
 		return false;
 	}
 
 	// Function call
-	if (dynamic_cast<FunctionCall const*>(&_node.expression()))
+	if (dynamic_cast<FunctionCall const*>(nodeExpression))
 	{
 		convertExpression(_node.expression());
 		return false;
 	}
 
-	// Increment, decrement
-	if (auto unaryExpr = dynamic_cast<UnaryOperation const*>(&_node.expression()))
+	// Increment, decrement, delete
+	if (auto unaryExpr = dynamic_cast<UnaryOperation const*>(nodeExpression))
 	{
-		if (unaryExpr->getOperator() == Token::Inc || unaryExpr->getOperator() == Token::Dec)
+		Token token = unaryExpr->getOperator();
+		switch (token)
 		{
+		case Token::Inc:
+		case Token::Dec:
+		case Token::Delete:
 			convertExpression(_node.expression());
 			return false;
+		default:
+			assert(false);
 		}
 	}
 
 	// Other statements are assigned to a temp variable because Boogie
 	// does not allow stand alone expressions
 
-	bg::Expr::Ref expr = convertExpression(_node.expression());
+	bg::Expr::Ref expr = convertExpression(*nodeExpression);
 	// Handle simple tuples separately
 	auto exprTuple = dynamic_pointer_cast<bg::TupleExpr const>(expr);
 	if (exprTuple)
 	{
 		auto const& exprTupleElements = exprTuple->elements();
-		auto const& nodeTuple = dynamic_cast<TupleExpression const&>(_node.expression());
-		auto const& nodeTypleElements = nodeTuple.components();
+		auto nodeTuple = dynamic_cast<TupleExpression const*>(nodeExpression);
+		auto const& nodeTypleElements = nodeTuple->components();
 		std::vector<bg::Expr::Ref> tmpVars;
 		for (unsigned i = 0; i < exprTupleElements.size(); ++ i)
 		{
@@ -1482,7 +1489,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	else
 	{
 		bg::Decl::Ref tmpVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
-			m_context.toBoogieType(_node.expression().annotation().type, &_node));
+			m_context.toBoogieType(nodeExpression->annotation().type, &_node));
 		m_localDecls.push_back(tmpVar);
 		m_currentBlocks.top()->addStmts({
 			bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"),
