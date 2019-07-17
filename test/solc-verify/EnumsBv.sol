@@ -17,5 +17,6 @@ contract EnumsBv {
     function fail() public pure {
         int8 x = 5;
         Dir d = Dir(x);
+        assert(d == d); // Silence unused variable warning
     }
 }

@@ -148,9 +148,11 @@ def main(tmpDir):
         print('---------------------------')
 
     # Print warnings if requested
-    if args.show_warnings:
-        for line in compilerOutputStr.split('\n'):
-            if ': Warning: ' in line:
+    warnings = 0
+    for line in compilerOutputStr.split('\n'):
+        if ': Warning: ' in line:
+            warnings += 1
+            if args.show_warnings:
                 print(line.replace(': Warning: ', ': ' + yellowTxt('Warning') + ': '))
 
     # Map results back to .sol file
@@ -186,6 +188,8 @@ def main(tmpDir):
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))
+        if warnings > 0 and not args.show_warnings:
+            print(yellowTxt('Use --show-warnings to see the warnings for potential false alarms.'))
         return ERRORS_VERIFICATION
 
 # Gets the line related to an error in the output
