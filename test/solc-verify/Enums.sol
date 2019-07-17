@@ -10,7 +10,7 @@ contract Enums {
     Dir dir;
 
     constructor() public {
-        dir = Dir.Up;
+        assert(dir == Dir.Up); // Check default value
     }
 
     /** @notice postcondition dir == d */
@@ -30,5 +30,8 @@ contract Enums {
 
     function conversion2(I.Other other) public {
         dir = Dir(int(other)); // Conversion might fail
+    }
+
+    function() external payable {
     }
 }

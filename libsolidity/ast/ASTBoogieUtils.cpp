@@ -870,6 +870,9 @@ bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& cont
 	case Type::Category::Integer:
 		// 0
 		return context.intLit(0, ASTBoogieUtils::getBits(type));
+	case Type::Category::Enum:
+		// 0
+		return context.intLit(0, 256);
 	case Type::Category::Bool:
 		// False
 		return bg::Expr::lit(false);
