@@ -52,6 +52,7 @@ def main(tmpDir):
     parser.add_argument('--verbose', action='store_true', help='Print all output of the compiler and the verifier')
     parser.add_argument('--smt-log', type=str, help='Log input for the SMT solver')
     parser.add_argument('--errors-only', action='store_true', help='Only display error messages')
+    parser.add_argument('--show-warnings', action='store_true', help='Display warnings')
 
     parser.add_argument('--solc', type=str, help='Solidity compiler to use (with boogie translator)', default=os.path.dirname(os.path.realpath(__file__)) + '/solc')
     parser.add_argument('--boogie', type=str, help='Boogie verifier binary to use', default='@BOOGIE_EXE@')
@@ -76,10 +77,11 @@ def main(tmpDir):
     convertCommand = args.solc + ' ' + solcArgs
     if args.verbose:
         print("Solc command: " + convertCommand)
+    compilerOutputStr = ''
     try:
         compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
+        compilerOutputStr = compilerOutput.decode('utf-8')
         if args.verbose:
-            compilerOutputStr = compilerOutput.decode('utf-8')
             print('----- Compiler output -----')
             print(compilerOutputStr)
             print('---------------------------')
@@ -144,6 +146,12 @@ def main(tmpDir):
         print('----- Verifier output -----')
         print(verifierOutputStr)
         print('---------------------------')
+
+    # Print warnings if requested
+    if args.show_warnings:
+        for line in compilerOutputStr.split('\n'):
+            if ': Warning: ' in line:
+                print(line.replace(': Warning: ', ': ' + yellowTxt('Warning') + ': '))
 
     # Map results back to .sol file
     prefix = '' if args.errors_only else ' - '

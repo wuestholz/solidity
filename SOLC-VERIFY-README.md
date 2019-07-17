@@ -28,6 +28,7 @@ The entry point is the script `solc-verify.py`. The script has a single position
 - `--output OUTPUT`: Output directory where the intermediate (e.g., Boogie) files are created (default is `.`).
 - `--smtlog SMTLOG`: Log the inputs given by Boogie to the SMT solver into a file (not given by default).
 - `--errors-only`: Only display error messages and omit displaying names of correct functions (not given by default).
+- `--show-warnings`: Display warning messages (not given by default).
 - `--solc SOLC`: Path to the Solidity compiler to use (which must include our Boogie translator extension) (by default it is the one that includes the Python script).
 - `--boogie BOOGIE`: Path to the Boogie verifier binary to use (by default it is the one given during building the tool).
 - `--arithmetic {int,bv,mod,mod-overflow}`: Arithmetic encoding mode to be used: SMT integers (`int`), bitvectors (`bv`), modulo arithmetic (`mod`), modular arithmetic with overflow detection (`mod-overflow`).
