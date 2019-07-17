@@ -43,7 +43,8 @@ SemanticTest::SemanticTest(string const& _filename, string const& _ipcPath, lang
 	soltestAssert(file, "Cannot open test contract: \"" + _filename + "\".");
 	file.exceptions(ios::badbit);
 
-	m_source = parseSourceAndSettings(file);
+	std::tie(m_source, m_lineOffset) = parseSourceAndSettingsWithLineNumbers(file);
+
 	if (m_settings.count("compileViaYul"))
 	{
 		if (m_settings["compileViaYul"] == "also")
@@ -80,7 +81,7 @@ TestCase::TestResult SemanticTest::run(ostream& _stream, string const& _linePref
 		{
 			if (&test == &m_tests.front())
 				if (test.call().isConstructor)
-					deploy("", 0, test.call().arguments.rawBytes());
+					deploy("", test.call().value, test.call().arguments.rawBytes());
 				else
 					soltestAssert(deploy("", 0, bytes()), "Failed to deploy contract.");
 			else
@@ -163,7 +164,7 @@ void SemanticTest::printUpdatedExpectations(ostream& _stream, string const&) con
 void SemanticTest::parseExpectations(istream& _stream)
 {
 	TestFileParser parser{_stream};
-	auto functionCalls = parser.parseFunctionCalls();
+	auto functionCalls = parser.parseFunctionCalls(m_lineOffset);
 	std::move(functionCalls.begin(), functionCalls.end(), back_inserter(m_tests));
 }
 
