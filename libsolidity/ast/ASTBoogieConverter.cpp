@@ -296,13 +296,13 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			if (argsList && argsList->size() > i)
 			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-						bg::Expr::id(constrParam->getName()),
+						constrParam->getRefTo(),
 						convertExpression(*argsList->at(i))));
 			}
 			else // Or default value
 			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-						bg::Expr::id(constrParam->getName()),
+						constrParam->getRefTo(),
 						defaultValue(param->annotation().type, m_context)));
 			}
 		}
@@ -623,7 +623,7 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 							m_context.toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get()));
 					m_localDecls.push_back(modifierParam);
 					bg::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(modifierParam->getName()), modifierArg));
+					m_currentBlocks.top()->addStmt(bg::Stmt::assign(modifierParam->getRefTo(), modifierArg));
 				}
 			}
 			modifierDecl->body().accept(*this);
@@ -1498,7 +1498,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 			m_context.toBoogieType(_node.expression().annotation().type, &_node));
 	m_localDecls.push_back(tmpVar);
 	m_currentBlocks.top()->addStmt(bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
-	m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(tmpVar->getName()), expr));
+	m_currentBlocks.top()->addStmt(bg::Stmt::assign(tmpVar->getRefTo(), expr));
 	return false;
 }
 
