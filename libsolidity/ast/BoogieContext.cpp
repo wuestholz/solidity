@@ -289,7 +289,7 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 	{
 		auto tpRational = dynamic_cast<RationalNumberType const*>(tp);
 		if (!tpRational->isFractional())
-			return bg::Decl::typee(ASTBoogieUtils::BOOGIE_INT_CONST_TYPE);
+			return toBoogieType(tpRational->integerType(), _associatedNode);
 		else
 			reportError(_associatedNode, "Fractional numbers are not supported");
 		break;

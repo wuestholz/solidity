@@ -41,7 +41,6 @@ string const ASTBoogieUtils::VERIFIER_OLD = "__verifier_old";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 string const ASTBoogieUtils::BOOGIE_LENGTH = "#length";
 string const ASTBoogieUtils::BOOGIE_SUM = "#sum";
-string const ASTBoogieUtils::BOOGIE_INT_CONST_TYPE = "int_const";
 string const ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 string const ASTBoogieUtils::SOLIDITY_NOW = "now";
 string const ASTBoogieUtils::BOOGIE_NOW = "__now";

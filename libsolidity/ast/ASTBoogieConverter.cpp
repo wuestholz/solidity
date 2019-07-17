@@ -1494,11 +1494,38 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 	// does not allow stand alone expressions
 
 	bg::Expr::Ref expr = convertExpression(_node.expression());
-	bg::Decl::Ref tmpVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
+	// Handle simple tuples separately
+	auto exprTuple = dynamic_pointer_cast<bg::TupleExpr const>(expr);
+	if (exprTuple) {
+		auto const& exprTupleElements = exprTuple->elements();
+		auto const& nodeTuple = dynamic_cast<TupleExpression const&>(_node.expression());
+		auto const& nodeTypleElements = nodeTuple.components();
+		std::vector<bg::Expr::Ref> tmpVars;
+		for (unsigned i = 0; i < exprTupleElements.size(); ++ i)
+		{
+			std::string tmpVarId = "tmp#" + to_string(m_context.nextId());
+			bg::TypeDeclRef tmpVarType = m_context.toBoogieType(nodeTypleElements[i]->annotation().type, &_node);
+			bg::Decl::Ref tmpVar = bg::Decl::variable(tmpVarId, tmpVarType);
+			m_localDecls.push_back(tmpVar);
+			tmpVars.push_back(bg::Expr::id(tmpVarId));
+		}
+		auto tmpVarsTuple = bg::Expr::tuple(tmpVars);
+		m_currentBlocks.top()->addStmts({
+			bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"),
+			bg::Stmt::assign(tmpVarsTuple, expr)
+		});
+	}
+	else
+	{
+		bg::Decl::Ref tmpVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
 			m_context.toBoogieType(_node.expression().annotation().type, &_node));
-	m_localDecls.push_back(tmpVar);
-	m_currentBlocks.top()->addStmt(bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"));
-	m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(tmpVar->getName()), expr));
+		m_localDecls.push_back(tmpVar);
+		m_currentBlocks.top()->addStmts({
+			bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"),
+			bg::Stmt::assign(bg::Expr::id(tmpVar->getName()), expr)
+		});
+	}
+
 	return false;
 }
 
