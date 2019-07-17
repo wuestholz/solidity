@@ -25,16 +25,17 @@ The entry point is the script `solc-verify.py`. The script has a single position
 
 - `-h`, `--help`: Show help message and exit.
 - `--timeout TIMEOUT`: Timeout for running the Boogie verifier in seconds (default is 10).
-- `--output OUTPUT`: Output directory where the intermediate (e.g., Boogie) files are created (default is `.`).
+- `--arithmetic {int,bv,mod,mod-overflow}`: Arithmetic encoding mode to be used: SMT integers (`int`), bitvectors (`bv`), modulo arithmetic (`mod`), modular arithmetic with overflow detection (`mod-overflow`).
+- `--modifies-analysis`: State variables are checked for modifications only if there are modification annotations or if this flag is given.
+- `--output OUTPUT`: Output directory where the intermediate (e.g., Boogie) files are created (tmp directory by default).
+- `--verbose`: Print all output of the compiler and the verifier.
 - `--smtlog SMTLOG`: Log the inputs given by Boogie to the SMT solver into a file (not given by default).
 - `--errors-only`: Only display error messages and omit displaying names of correct functions (not given by default).
 - `--show-warnings`: Display warning messages (not given by default).
 - `--solc SOLC`: Path to the Solidity compiler to use (which must include our Boogie translator extension) (by default it is the one that includes the Python script).
 - `--boogie BOOGIE`: Path to the Boogie verifier binary to use (by default it is the one given during building the tool).
-- `--arithmetic {int,bv,mod,mod-overflow}`: Arithmetic encoding mode to be used: SMT integers (`int`), bitvectors (`bv`), modulo arithmetic (`mod`), modular arithmetic with overflow detection (`mod-overflow`).
-- `--modifies-analysis`: State variables are checked for modifications only if there are modification annotations or if this flag is given.
-- `--solver {z3,cvc4}`: SMT solver used by the verifier (default is `z3`).
-- `--solver-bin`: Path to the solver to be used, if not given, the solver is searched on the path (not given by default).
+- `--solver {z3,cvc4}`: SMT solver used by the verifier (default is detected during compile time).
+- `--solver-bin`: Path to the solver to be used, if not given, the solver is searched on the system path (not given by default).
 
 For example, the following command runs the tool on the [`SimpleBankCorrect.sol`](test/solc-verify/examples/SimpleBankCorrect.sol) contract with CVC4 and 60 seconds timeout for the verifier.
 ```
