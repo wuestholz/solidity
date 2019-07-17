@@ -1,0 +1,5 @@
+test/solc-verify/ArraysMemWarning.sol:6:27: Warning: Array size not known at compile time, elements could not be set to default value
+ArraysMemWarning::f: ERROR
+ - test/solc-verify/ArraysMemWarning.sol:8:9: Assertion might not hold.
+ArraysMemWarning::[implicit_constructor]: OK
+Errors were found by the verifier.
