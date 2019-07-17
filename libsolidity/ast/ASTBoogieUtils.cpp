@@ -876,6 +876,14 @@ bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& cont
 	case Type::Category::Bool:
 		// False
 		return bg::Expr::lit(false);
+	case Type::Category::Address:
+	case Type::Category::Contract:
+		return context.intLit(0, 256);
+	case Type::Category::FixedBytes:
+	{
+		auto fbType = dynamic_cast<FixedBytesType const*>(type);
+		return context.intLit(0, fbType->numBytes() * 8);
+	}
 	case Type::Category::Struct:
 	{
 		// default for all members
