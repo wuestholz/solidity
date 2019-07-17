@@ -1,21 +1,21 @@
 OverflowSimple::inc_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 11, col 5: Function can terminate with overflow
+ - test/solc-verify/OverflowSimple.sol:11:5: Function can terminate with overflow
 OverflowSimple::inc_no_overflow: OK
 OverflowSimple::inc_assignadd_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 23, col 5: Function can terminate with overflow
+ - test/solc-verify/OverflowSimple.sol:23:5: Function can terminate with overflow
 OverflowSimple::inc_assignadd_no_overflow: OK
 OverflowSimple::sideeffect_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 35, col 5: Function can terminate with overflow
+ - test/solc-verify/OverflowSimple.sol:35:5: Function can terminate with overflow
 OverflowSimple::sideeffect_no_overflow: OK
 OverflowSimple::inc_call_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 47, col 9: An overflow can occur before calling function
+ - test/solc-verify/OverflowSimple.sol:47:9: An overflow can occur before calling function
 OverflowSimple::inc_call_no_overflow: OK
 OverflowSimple::loop_no_overflow: OK
 OverflowSimple::loop_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 75, col 9: Invariant 'No overflow' might not be maintained by the loop
+ - test/solc-verify/OverflowSimple.sol:75:9: Invariant 'No overflow' might not be maintained by the loop
 OverflowSimple::whileloop_no_overflow: OK
 OverflowSimple::whileloop_overflow: ERROR
- - Source test/solc-verify/OverflowSimple.sol, line 99, col 9: Invariant 'No overflow' might not be maintained by the loop
+ - test/solc-verify/OverflowSimple.sol:99:9: Invariant 'No overflow' might not be maintained by the loop
 OverflowSimple::arrayLength: OK
 OverflowSimple::[implicit_constructor]: OK
 Errors were found by the verifier.

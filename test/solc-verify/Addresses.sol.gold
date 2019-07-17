@@ -2,12 +2,12 @@ Addresses::thisBalance: OK
 Addresses::testTransfer: OK
 Addresses::testTransfer2: OK
 Addresses::testTransferError: ERROR
- - Source test/solc-verify/Addresses.sol, line 37, col 9: Assertion might not hold.
+ - test/solc-verify/Addresses.sol:37:9: Assertion might not hold.
 Addresses::testSend: OK
 Addresses::testSend2: OK
 Addresses::testSend3: OK
 Addresses::testSendError: ERROR
- - Source test/solc-verify/Addresses.sol, line 91, col 9: Assertion might not hold.
+ - test/solc-verify/Addresses.sol:91:9: Assertion might not hold.
 Addresses::testCall: OK
 Addresses::literals: OK
 Addresses::[implicit_constructor]: OK

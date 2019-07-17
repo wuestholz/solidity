@@ -1,5 +1,5 @@
 BitPrecise::add128: ERROR
- - Source test/solc-verify/BitPrecise.sol, line 6, col 9: Assertion might not hold.
+ - test/solc-verify/BitPrecise.sol:6:9: Assertion might not hold.
 BitPrecise::add8: OK
 BitPrecise::[implicit_constructor]: OK
 Errors were found by the verifier.

@@ -1,10 +1,10 @@
 SpecificationLoopInvar::correct: OK
 SpecificationLoopInvar::cannotProveWithoutInvariant: ERROR
- - Source test/solc-verify/SpecificationLoopInvar.sol, line 21, col 9: Assertion might not hold.
+ - test/solc-verify/SpecificationLoopInvar.sol:21:9: Assertion might not hold.
 SpecificationLoopInvar::doesNotHoldOnEntry: ERROR
- - Source test/solc-verify/SpecificationLoopInvar.sol, line 28, col 13: Invariant 'i == x ' might not hold on loop entry
+ - test/solc-verify/SpecificationLoopInvar.sol:28:13: Invariant 'i == x ' might not hold on loop entry
 SpecificationLoopInvar::isNotMaintainedByLoop: ERROR
- - Source test/solc-verify/SpecificationLoopInvar.sol, line 39, col 9: Invariant 'i == x ' might not be maintained by the loop
+ - test/solc-verify/SpecificationLoopInvar.sol:39:9: Invariant 'i == x ' might not be maintained by the loop
 SpecificationLoopInvar::forLoop: OK
 SpecificationLoopInvar::[implicit_constructor]: OK
 ContractInvarOnLoop::increase: OK

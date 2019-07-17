@@ -202,7 +202,7 @@ def getSourceLineAndCol(line):
     if match is None:
         return '[Could not trace back error location]'
     else:
-        return  'Source %s, line %s, col %s' % (match.group(1), match.group(2), match.group(3))
+        return  '%s:%s:%s' % (match.group(1), match.group(2), match.group(3))
 
 # Gets the message from an annotated line in the .bpl
 def getMessage(line):

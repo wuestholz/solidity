@@ -1,4 +1,4 @@
 SpecificationDefaultConstructor::add: OK
 SpecificationDefaultConstructor::[implicit_constructor]: ERROR
- - Source test/solc-verify/SpecificationDefaultConstructor.sol, line 6, col 1: State variable initializers might violate invariant 'x == y'.
+ - test/solc-verify/SpecificationDefaultConstructor.sol:6:1: State variable initializers might violate invariant 'x == y'.
 Errors were found by the verifier.

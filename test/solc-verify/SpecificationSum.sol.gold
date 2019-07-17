@@ -1,6 +1,6 @@
 SomeContract::deposit: OK
 SomeContract::withdraw: OK
 SomeContract::withdraw_incorrect: ERROR
- - Source test/solc-verify/SpecificationSum.sol, line 20, col 5: Invariant '__verifier_sum_uint(user_balances) == total_supply' might not hold at end of function.
+ - test/solc-verify/SpecificationSum.sol:20:5: Invariant '__verifier_sum_uint(user_balances) == total_supply' might not hold at end of function.
 SomeContract::[implicit_constructor]: OK
 Errors were found by the verifier.

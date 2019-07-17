@@ -3,6 +3,6 @@ ModifiesStructs::f2: OK
 ModifiesStructs::f3: OK
 ModifiesStructs::f4: OK
 ModifiesStructs::f5: ERROR
- - Source test/solc-verify/ModifiesStructs.sol, line 42, col 5: Function might modify 'ss' illegally
+ - test/solc-verify/ModifiesStructs.sol:42:5: Function might modify 'ss' illegally
 ModifiesStructs::[implicit_constructor]: OK
 Errors were found by the verifier.

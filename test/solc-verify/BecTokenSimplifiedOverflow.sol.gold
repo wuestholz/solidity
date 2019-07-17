@@ -3,5 +3,5 @@ BecTokenSimplified::[constructor]: OK
 BecTokenSimplified::balanceOf: OK
 BecTokenSimplified::transfer: OK
 BecTokenSimplified::batchTransfer: ERROR
- - Source test/solc-verify/BecTokenSimplifiedOverflow.sol, line 66, col 32: An overflow can occur before calling function
+ - test/solc-verify/BecTokenSimplifiedOverflow.sol:66:32: An overflow can occur before calling function
 Errors were found by the verifier.
