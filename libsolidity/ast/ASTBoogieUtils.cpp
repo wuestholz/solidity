@@ -864,5 +864,42 @@ bg::Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(bg::Expr::Ref sel, bg::Expr::Re
 	return bg::Stmt::assign(upd->getBase(), upd);
 }
 
+bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& context)
+{
+	switch (type->category())
+	{
+	case Type::Category::Integer:
+		// 0
+		return context.intLit(0, ASTBoogieUtils::getBits(type));
+	case Type::Category::Bool:
+		// False
+		return bg::Expr::lit(false);
+	case Type::Category::Struct:
+	{
+		// default for all members
+		StructType const* structType = dynamic_cast<StructType const*>(type);
+		MemberList const& members = structType->members(0); // No need for scope, just regular struct members
+		// Get the default value for the members
+		std::vector<bg::Expr::Ref> memberDefaultValues;
+		for (auto& member: members)
+		{
+			bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
+			if (memberDefaultValue == nullptr)
+				return nullptr;
+			memberDefaultValues.push_back(memberDefaultValue);
+		}
+		// Now construct the struct value
+		StructDefinition const& structDefinition = structType->structDefinition();
+		bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
+		return bg::Expr::fn(decl->getName(), memberDefaultValues);
+	}
+	default:
+		// For unhandled, just return null
+		break;
+	}
+
+	return nullptr;
+}
+
 }
 }

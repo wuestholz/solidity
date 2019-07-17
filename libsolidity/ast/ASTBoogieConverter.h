@@ -45,11 +45,6 @@ private:
 	boogie::Expr::Ref convertExpression(Expression const& _node);
 
 	/**
-	 * Helper method to give a default value for a type.
-	 */
-	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
-
-	/**
 	 * Helper method to get all Boogie IDs of a given type in the current scope.
 	 */
 	void getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<boogie::Expr::Ref>& output);

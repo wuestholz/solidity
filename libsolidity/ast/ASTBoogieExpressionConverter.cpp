@@ -1078,13 +1078,34 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 {
 	auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
 	auto varDecl = newArray(m_context.toBoogieType(_node.annotation().type, &_node));
-	auto memArr = m_context.getMemArray(varDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-	auto arrLen = m_context.getArrayLength(memArr, m_context.toBoogieType(arrType->baseType(), &_node));
+	auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
+	auto memArr = m_context.getMemArray(varDecl->getRefTo(), bgType);
+	auto arrLen = m_context.getArrayLength(memArr, bgType);
 	// Set length
 	solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
 	_node.arguments()[0]->accept(*this);
 	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(arrLen, m_currentExpr));
-	// TODO: initialize to default values
+
+	if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
+	{
+		for (size_t i = 0; i < lit->getVal(); i++)
+		{
+			auto defaultVal = ASTBoogieUtils::defaultValue(arrType->baseType(), m_context);
+			if (defaultVal)
+			{
+				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+						bg::Expr::arrsel(
+								m_context.getInnerArray(memArr, bgType),
+								m_context.intLit(i, 256)),
+						defaultVal));
+			}
+			else
+				m_context.reportWarning(&_node, "Could not set default value for array element");
+		}
+	}
+	else
+		m_context.reportWarning(&_node, "Array size not known at compile time, elements could not be set to default value");
+
 	m_currentExpr = varDecl->getRefTo();
 }
 

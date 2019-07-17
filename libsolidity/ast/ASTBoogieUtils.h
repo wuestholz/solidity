@@ -179,6 +179,12 @@ public:
 	 */
 	static
 	boogie::Stmt::Ref selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value);
+
+	/**
+	 * Helper method to give a default value for a type.
+	 */
+	static
+	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
 };
 
 }
