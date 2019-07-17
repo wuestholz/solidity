@@ -44,43 +44,6 @@ bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 	return result.expr;
 }
 
-bg::Expr::Ref ASTBoogieConverter::defaultValue(TypePointer type, BoogieContext& context)
-{
-	switch (type->category())
-	{
-	case Type::Category::Integer:
-		// 0
-		return context.intLit(0, ASTBoogieUtils::getBits(type));
-	case Type::Category::Bool:
-		// False
-		return bg::Expr::lit(false);
-	case Type::Category::Struct:
-	{
-		// default for all members
-		StructType const* structType = dynamic_cast<StructType const*>(type);
-		MemberList const& members = structType->members(0); // No need for scope, just regular struct members
-		// Get the default value for the members
-		std::vector<bg::Expr::Ref> memberDefaultValues;
-		for (auto& member: members)
-		{
-			bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
-			if (memberDefaultValue == nullptr)
-				return nullptr;
-			memberDefaultValues.push_back(memberDefaultValue);
-		}
-		// Now construct the struct value
-		StructDefinition const& structDefinition = structType->structDefinition();
-		bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
-		return bg::Expr::fn(decl->getName(), memberDefaultValues);
-	}
-	default:
-		// For unhandled, just return null
-		break;
-	}
-
-	return nullptr;
-}
-
 void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<bg::Expr::Ref>& output)
 {
 	std::string target = _type->toString();
@@ -140,7 +103,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 	TypePointer type = _decl.type();
 
 	// Default value for the given type
-	bg::Expr::Ref value = defaultValue(type, m_context);
+	bg::Expr::Ref value = ASTBoogieUtils::defaultValue(type, m_context);
 
 	// If there just assign
 	if (value)
@@ -161,7 +124,7 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 			TypePointer key_type = dynamic_cast<MappingType const&>(*type).keyType();
 			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
 			// Default value for elements
-			value = defaultValue(element_type, m_context);
+			value = ASTBoogieUtils::defaultValue(element_type, m_context);
 			if (value)
 			{
 				// Get all ids to initialize
@@ -246,7 +209,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			bg::Expr::arrupd(
 					m_context.boogieBalance()->getRefTo(),
 					m_context.boogieThis()->getRefTo(),
-					defaultValue(tp_uint256, m_context))));
+					ASTBoogieUtils::defaultValue(tp_uint256, m_context))));
 
 	// Initialize state variables first, must be done for
 	// base class members as well
@@ -296,14 +259,14 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 			if (argsList && argsList->size() > i)
 			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-						bg::Expr::id(constrParam->getName()),
+						constrParam->getRefTo(),
 						convertExpression(*argsList->at(i))));
 			}
 			else // Or default value
 			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-						bg::Expr::id(constrParam->getName()),
-						defaultValue(param->annotation().type, m_context)));
+						constrParam->getRefTo(),
+						ASTBoogieUtils::defaultValue(param->annotation().type, m_context)));
 			}
 		}
 	}
@@ -623,7 +586,7 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 							m_context.toBoogieType(modifierDecl->parameters()[i]->annotation().type, paramDecls.get()));
 					m_localDecls.push_back(modifierParam);
 					bg::Expr::Ref modifierArg = convertExpression(*modifier->arguments()->at(i));
-					m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(modifierParam->getName()), modifierArg));
+					m_currentBlocks.top()->addStmt(bg::Stmt::assign(modifierParam->getRefTo(), modifierArg));
 				}
 			}
 			modifierDecl->body().accept(*this);
@@ -1443,7 +1406,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	{
 		for (auto declNode: _node.declarations())
 		{
-			bg::Expr::Ref defaultVal = defaultValue(declNode->type(), m_context);
+			bg::Expr::Ref defaultVal = ASTBoogieUtils::defaultValue(declNode->type(), m_context);
 			if (defaultVal)
 			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
@@ -1507,7 +1470,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 			bg::TypeDeclRef tmpVarType = m_context.toBoogieType(nodeTypleElements[i]->annotation().type, &_node);
 			bg::Decl::Ref tmpVar = bg::Decl::variable(tmpVarId, tmpVarType);
 			m_localDecls.push_back(tmpVar);
-			tmpVars.push_back(bg::Expr::id(tmpVarId));
+			tmpVars.push_back(tmpVar->getRefTo());
 		}
 		auto tmpVarsTuple = bg::Expr::tuple(tmpVars);
 		m_currentBlocks.top()->addStmts({
@@ -1522,7 +1485,7 @@ bool ASTBoogieConverter::visit(ExpressionStatement const& _node)
 		m_localDecls.push_back(tmpVar);
 		m_currentBlocks.top()->addStmts({
 			bg::Stmt::comment("Assignment to temp variable introduced because Boogie does not support stand alone expressions"),
-			bg::Stmt::assign(bg::Expr::id(tmpVar->getName()), expr)
+			bg::Stmt::assign(tmpVar->getRefTo(), expr)
 		});
 	}
 

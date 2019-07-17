@@ -61,12 +61,13 @@ private:
 
 	// Helper methods for the different scenarios for function calls
 	void functionCallConversion(FunctionCall const& _node);
-	boogie::Decl::Ref newStruct(StructDefinition const* structDef, std::string id);
+	boogie::Decl::Ref newStruct(StructDefinition const* structDef);
 	void functionCallNewStruct(StructDefinition const* structDef, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 	void functionCallSum(FunctionCall const& _node);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
+	boogie::Decl::Ref newArray(boogie::TypeDeclRef type);
 	void functionCallNewArray(FunctionCall const& _node);
 	void functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node);
 

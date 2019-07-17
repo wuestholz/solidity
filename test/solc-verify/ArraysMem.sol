@@ -12,7 +12,10 @@ contract ArraysMem {
 
     function() external payable {
         int[] memory a1 = new int[](2);
-        a1[0] = 1;
+        assert(a1[0] == 0); // Check default values
+        assert(a1[1] == 0);
+
+        a1[0] = 1; // Check assignments
         a1[1] = 2;
         assert(a1[0] == 1);
         assert(a1[1] == 2);
