@@ -1,0 +1,14 @@
+Addresses::thisBalance: OK
+Addresses::testTransfer: OK
+Addresses::testTransfer2: OK
+Addresses::testTransferError: ERROR
+ - test/solc-verify/Addresses.sol:37:9: Assertion might not hold.
+Addresses::testSend: OK
+Addresses::testSend2: OK
+Addresses::testSend3: OK
+Addresses::testSendError: ERROR
+ - test/solc-verify/Addresses.sol:91:9: Assertion might not hold.
+Addresses::testCall: OK
+Addresses::literals: OK
+Addresses::[implicit_constructor]: OK
+Errors were found by the verifier.

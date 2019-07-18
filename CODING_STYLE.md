@@ -46,6 +46,8 @@ foo->bar(someLongVariableName,
 cout << "some very long string that contains completely irrelevant text that talks about this and that and contains the words \"lorem\" and \"ipsum\"" << endl;
 ```
 
+To set indentation and tab width settings uniformly, the repository contains an [EditorConfig](https://editorconfig.org/) [`.editorconfig`](https://github.com/ethereum/solidity/blob/develop/.editorconfig) file, which describes some of the styles used and which is recognized by many IDE's and editors.
+
 ## 1. Namespaces
 
 1. No `using namespace` declarations in header files.
@@ -146,7 +148,7 @@ for (auto i = x->begin(); i != x->end(); ++i) {}
 ```
 
 No:
-```cp
+```cpp
 const double d = 0;
 int i, j;
 char *s;
@@ -193,7 +195,7 @@ for (map<ComplexTypeOne, ComplexTypeTwo>::iterator i = l.begin(); i != l.end(); 
 2. Generally avoid shortening a standard form that already includes all important information:
    - e.g. stick to `shared_ptr<X>` rather than shortening to `ptr<X>`.
 3. Where there are exceptions to this (due to excessive use and clear meaning), note the change prominently and use it consistently:
-   - e.g. `using Guard = std::lock_guard<std::mutex>;` ///< Guard is used throughout the codebase since it is clear in meaning and used commonly. 
+   - e.g. `using Guard = std::lock_guard<std::mutex>;` ///< Guard is used throughout the codebase since it is clear in meaning and used commonly.
 4. In general expressions should be roughly as important/semantically meaningful as the space they occupy.
 5. Avoid introducing aliases for types unless they are very complicated. Consider the number of items a brain can keep track of at the same time.
 

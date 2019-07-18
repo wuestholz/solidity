@@ -1,0 +1,7 @@
+Mappings::getMyBalance: OK
+Mappings::setMyBalance: OK
+Mappings::[implicit_constructor]: OK
+Nested::getSomething: OK
+Nested::setSomething: OK
+Nested::[implicit_constructor]: OK
+No errors found.

@@ -1,6 +1,6 @@
 if (BOOGIE_BIN)
   find_file(BOOGIE_EXE Boogie.exe "${BOOGIE_BIN}")
-else() 
+else()
   find_file(BOOGIE_EXE Boogie.exe)
 endif()
 

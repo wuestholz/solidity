@@ -1,0 +1,5 @@
+Continue::whileloop: OK
+Continue::forloop: OK
+Continue::nested: OK
+Continue::[implicit_constructor]: OK
+No errors found.

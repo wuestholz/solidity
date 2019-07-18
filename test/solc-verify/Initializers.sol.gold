@@ -1,0 +1,4 @@
+Initializers::[constructor]: OK
+NoConstructorButNeeded1::[implicit_constructor]: OK
+NoConstructorButNeeded2::[implicit_constructor]: OK
+No errors found.

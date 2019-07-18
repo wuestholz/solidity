@@ -55,7 +55,7 @@ detect_linux_distro() {
         DISTRO=$(lsb_release -is)
     elif [ -f /etc/os-release ]; then
         # extract 'foo' from NAME=foo, only on the line with NAME=foo
-        DISTRO=$(sed -n -e 's/^NAME="\(.*\)\"/\1/p' /etc/os-release)
+        DISTRO=$(sed -n -e 's/^NAME="\?\([^"]*\)"\?$/\1/p' /etc/os-release)
     elif [ -f /etc/centos-release ]; then
         DISTRO=CentOS
     else
@@ -87,9 +87,12 @@ case $(uname -s) in
             10.13)
                 echo "Installing solidity dependencies on macOS 10.13 High Sierra."
                 ;;
+            10.14)
+                echo "Installing solidity dependencies on macOS 10.14 Mojave."
+                ;;
             *)
                 echo "Unsupported macOS version."
-                echo "We only support Mavericks, Yosemite, El Capitan, Sierra and High Sierra."
+                echo "We only support Mavericks, Yosemite, El Capitan, Sierra, High Sierra and Mojave."
                 exit 1
                 ;;
         esac
@@ -159,7 +162,7 @@ case $(uname -s) in
                 # See https://pkgs.alpinelinux.org/
 
                 apk update
-                apk add boost-dev build-base cmake git
+                apk add boost-dev boost-static build-base cmake git
 
                 ;;
 
@@ -349,7 +352,8 @@ case $(uname -s) in
 # CentOS needs some more testing. This is the general idea of packages
 # needed, but some tweaking/improvements can definitely happen
 #------------------------------------------------------------------------------
-            CentOS)
+            CentOS*)
+                echo "Attention: CentOS 7 is currently not supported!";
                 read -p "This script will heavily modify your system in order to allow for compilation of Solidity. Are you sure? [Y/N]" -n 1 -r
                 if [[ $REPLY =~ ^[Yy]$ ]]; then
                     # Make Sure we have the EPEL repos
@@ -373,7 +377,7 @@ case $(uname -s) in
 
                     # Get latest boost thanks to this guy: http://vicendominguez.blogspot.de/2014/04/boost-c-library-rpm-packages-for-centos.html
                     sudo yum -y remove boost-devel
-                    sudo wget http://repo.enetres.net/enetres.repo -O /etc/yum.repos.d/enetres.repo
+                    sudo wget https://bintray.com/vicendominguez/CentOS6/rpm -O /etc/yum.repos.d/bintray-vicendominguez-CentOS6.repo
                     sudo yum install boost-devel
                 else
                     echo "Aborted CentOS Solidity Dependency Installation";

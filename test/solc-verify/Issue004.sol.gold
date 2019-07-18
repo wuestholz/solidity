@@ -1,0 +1,4 @@
+Issue004::f: ERROR
+ - test/solc-verify/Issue004.sol:6:9: Index may be out of bounds
+Issue004::[implicit_constructor]: OK
+Errors were found by the verifier.

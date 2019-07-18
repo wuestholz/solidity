@@ -2,7 +2,7 @@
 
 #include <libsolidity/ast/BoogieAst.h>
 #include <libsolidity/ast/BoogieContext.h>
-#include <libsolidity/parsing/Scanner.h>
+#include <liblangutil/Scanner.h>
 #include <string>
 
 namespace dev
@@ -16,86 +16,118 @@ namespace solidity
 class ASTBoogieUtils
 {
 public:
+
 	// Identifiers related to the 'address' type
-	static const std::string SOLIDITY_ADDRESS_TYPE;
-	static const std::string BOOGIE_ADDRESS_TYPE;
-	static const std::string SOLIDITY_BALANCE;
-	static const std::string BOOGIE_BALANCE;
-	static const std::string SOLIDITY_TRANSFER;
-	static const std::string BOOGIE_TRANSFER;
-	static const std::string SOLIDITY_SEND;
-	static const std::string BOOGIE_SEND;
-	static const std::string SOLIDITY_CALL;
-	static const std::string BOOGIE_CALL;
-	static const std::string SOLIDITY_SUPER;
+	static std::string const SOLIDITY_BALANCE;
+	static std::string const SOLIDITY_TRANSFER;
+	static std::string const BOOGIE_TRANSFER;
+	static std::string const SOLIDITY_SEND;
+	static std::string const BOOGIE_SEND;
+	static std::string const SOLIDITY_CALL;
+	static std::string const BOOGIE_CALL;
+
+	// Contract related identifiers
+	static std::string const SOLIDITY_SUPER;
+	static std::string const SOLIDITY_THIS;
 
 	// Identifiers related to 'msg'
-	static const std::string SOLIDITY_MSG;
-	static const std::string SOLIDITY_SENDER;
-	static const std::string SOLIDITY_VALUE;
-	static const std::string BOOGIE_MSG_SENDER;
-	static const std::string BOOGIE_MSG_VALUE;
+	static std::string const SOLIDITY_SENDER;
+	static std::string const SOLIDITY_VALUE;
 
 	// Error handling
-	static const std::string SOLIDITY_ASSERT;
-	static const std::string SOLIDITY_REQUIRE;
-	static const std::string SOLIDITY_REVERT;
+	static std::string const SOLIDITY_ASSERT;
+	static std::string const SOLIDITY_REQUIRE;
+	static std::string const SOLIDITY_REVERT;
 	// no constant required for 'throw' because it is a separate statement
 
+	// Boogie types
+	static std::string const BOOGIE_INT_CONST_TYPE;
+	static std::string const ERR_TYPE;
+
 	// Other identifiers
-	static const std::string SOLIDITY_THIS;
-	static const std::string BOOGIE_THIS;
-	static const std::string VERIFIER_MAIN;
-	static const std::string VERIFIER_SUM;
-	static const std::string BOOGIE_CONSTRUCTOR;
-	static const std::string BOOGIE_LENGTH;
-	static const std::string BOOGIE_SUM;
-	static const std::string BOOGIE_STRING_TYPE;
-	static const std::string ERR_TYPE;
-	static const std::string BOOGIE_ZERO_ADDRESS;
-	static const std::string SOLIDITY_NOW;
-	static const std::string BOOGIE_NOW;
-	static const std::string VERIFIER_OVERFLOW;
+	static std::string const VERIFIER_SUM;
+	static std::string const VERIFIER_OLD;
+	static std::string const BOOGIE_CONSTRUCTOR;
+	static std::string const BOOGIE_LENGTH;
+	static std::string const BOOGIE_SUM;
+	static std::string const BOOGIE_ZERO_ADDRESS;
+	static std::string const SOLIDITY_NOW;
+	static std::string const BOOGIE_NOW;
+	static std::string const SOLIDITY_NUMBER;
+	static std::string const BOOGIE_BLOCKNO;
+	static std::string const VERIFIER_OVERFLOW;
 
 	// Return this expression as an identifier when something cannot be evaluated
-	static const std::string ERR_EXPR;
+	static std::string const ERR_EXPR;
+
+	static std::string const BOOGIE_STOR;
+	static std::string const BOOGIE_MEM;
+
+	// Specification annotations
+	static std::string const DOCTAG_CONTRACT_INVAR;
+	static std::string const DOCTAG_LOOP_INVAR;
+	static std::string const DOCTAG_CONTRACT_INVARS_INCLUDE;
+	static std::string const DOCTAG_PRECOND;
+	static std::string const DOCTAG_POSTCOND;
+	static std::string const DOCTAG_MODIFIES;
+	static std::string const DOCTAG_MODIFIES_ALL;
+	static std::string const DOCTAG_MODIFIES_COND;
 
 	/**
 	 * Create the procedure corresponding to address.transfer()
 	 */
-	static smack::ProcDecl* createTransferProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createTransferProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.call()
 	 */
-	static smack::ProcDecl* createCallProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createCallProc(BoogieContext& context);
 
 	/**
 	 * Create the procedure corresponding to address.send()
 	 */
-	static smack::ProcDecl* createSendProc(BoogieContext& context);
+	static
+	boogie::ProcDeclRef createSendProc(BoogieContext& context);
 
 	/**
-	 * Map a declaration name to a name in Boogie
+	 * Data locations as strings
 	 */
-	static std::string mapDeclName(Declaration const& decl);
+	static
+	std::string dataLocToStr(DataLocation loc);
 
-	/**
-	 * Map a Solidity type to a Boogie type
-	 */
-	static std::string mapType(TypePointer tp, ASTNode const& _associatedNode, BoogieContext& context);
+	static
+	std::string getConstructorName(ContractDefinition const* contract);
+
+	static
+	boogie::TypeDeclRef mappingType(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType);
 
 	/**
 	 * Create attributes for original source location and message
 	 */
-	static std::list<const smack::Attr*> createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner);
+	static
+	std::vector<boogie::Attr::Ref> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
 
-	/** Pair of expressions: first = result, second = correctness condition */
-	typedef std::pair<smack::Expr const*, smack::Expr const*> expr_pair;
+	/** An expression with the associated correctness condition. */
+	struct ExprWithCC {
+		boogie::Expr::Ref expr;
+		boogie::Expr::Ref cc;
+	};
 
-	static expr_pair encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* lhs, smack::Expr const* rhs, unsigned bits, bool isSigned);
+	/**
+	 * Convert an arithmetic operation (including ops like +=) to an expression (with CC).
+	 * The associatedNode is only used for error reporting.
+	 */
+	static
+	ExprWithCC encodeArithBinaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, unsigned bits, bool isSigned);
 
-	static expr_pair encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, Token::Value op, smack::Expr const* subExpr, unsigned bits, bool isSigned);
+	/**
+	 * Convert an arithmetic operation to an expression (with CC).
+	 * The associatedNode is only used for error reporting.
+	 */
+	static
+	ExprWithCC encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref subExpr, unsigned bits, bool isSigned);
 
 	/**
 	 * Check if a type can be represented with bitvectors
@@ -118,16 +150,41 @@ public:
 	 * returned unchanged. For example, if exprType is uint32 and targetType is uint40,
 	 * then we return an extension of 8 bits to expr.
 	 */
-	static smack::Expr const* checkImplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+	static
+	boogie::Expr::Ref checkImplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
 
-	static smack::Expr const* checkExplicitBvConversion(smack::Expr const* expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
+	static
+	boogie::Expr::Ref checkExplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
 	/**
 	 * Get the type checking condition for an expression with a given type.
 	 * Depending on the context, the returned TCC can be assumed or asserted.
 	 */
-	static smack::Expr const* getTCCforExpr(smack::Expr const* expr, TypePointer tp);
+	static
+	boogie::Expr::Ref getTCCforExpr(boogie::Expr::Ref expr, TypePointer tp);
+
+	static
+	bool isStateVar(Declaration const *decl);
+
+	/**
+	 * Recursively translate a select expression to an update
+	 */
+	static
+	boogie::Expr::Ref selectToUpdate(boogie::Expr::Ref sel, boogie::Expr::Ref value);
+
+	/**
+	 * Recursively translate a select expression to an update and assign
+	 * it to the base expression
+	 */
+	static
+	boogie::Stmt::Ref selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value);
+
+	/**
+	 * Helper method to give a default value for a type.
+	 */
+	static
+	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
 };
 
 }

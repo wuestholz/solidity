@@ -1,0 +1,6 @@
+A::someFunc: OK
+A::someFunc2: OK
+A::twoModifiers: OK
+A::costs: OK
+A::[implicit_constructor]: OK
+No errors found.

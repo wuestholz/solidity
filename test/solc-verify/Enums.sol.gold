@@ -1,0 +1,9 @@
+I::[implicit_constructor]: OK
+Enums::[constructor]: OK
+Enums::setDir: OK
+Enums::goUp: OK
+Enums::conversion: OK
+Enums::conversion2: ERROR
+ - test/solc-verify/Enums.sol:32:15: Conversion to enum might be out of range
+Enums::[fallback]: OK
+Errors were found by the verifier.

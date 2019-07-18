@@ -26,13 +26,14 @@
 
 #include <libsolidity/ast/AST.h>
 
-#include <libdevcore/SHA3.h>
+#include <libdevcore/Keccak256.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include <string>
 
 using namespace std;
+using namespace langutil;
 
 namespace dev
 {
@@ -63,7 +64,7 @@ BOOST_AUTO_TEST_CASE(abstract_contract)
 {
 	SourceUnit const* sourceUnit = nullptr;
 	char const* text = R"(
-		contract base { function foo(); }
+		contract base { function foo() public; }
 		contract derived is base { function foo() public {} }
 	)";
 	sourceUnit = parseAndAnalyse(text);
@@ -82,7 +83,7 @@ BOOST_AUTO_TEST_CASE(abstract_contract_with_overload)
 {
 	SourceUnit const* sourceUnit = nullptr;
 	char const* text = R"(
-		contract base { function foo(bool); }
+		contract base { function foo(bool) public; }
 		contract derived is base { function foo(uint) public {} }
 	)";
 	sourceUnit = parseAndAnalyse(text);
@@ -99,7 +100,7 @@ BOOST_AUTO_TEST_CASE(implement_abstract_via_constructor)
 {
 	SourceUnit const* sourceUnit = nullptr;
 	char const* text = R"(
-		contract base { function foo(); }
+		contract base { function foo() public; }
 		contract foo is base { constructor() public {} }
 	)";
 	sourceUnit = parseAndAnalyse(text);
@@ -158,7 +159,7 @@ BOOST_AUTO_TEST_CASE(function_external_types)
 			uint a;
 		}
 		contract Test {
-			function boo(uint, bool, bytes8, bool[2], uint[], C, address[]) external returns (uint ret) {
+			function boo(uint, bool, bytes8, bool[2] calldata, uint[] calldata, C, address[] calldata) external returns (uint ret) {
 				ret = 5;
 			}
 		}
@@ -197,7 +198,7 @@ BOOST_AUTO_TEST_CASE(enum_external_type)
 		}
 }
 
-BOOST_AUTO_TEST_CASE(external_structs)
+BOOST_AUTO_TEST_CASE(external_struct_signatures)
 {
 	char const* text = R"(
 		pragma experimental ABIEncoderV2;
@@ -206,13 +207,16 @@ BOOST_AUTO_TEST_CASE(external_structs)
 			struct Simple { uint i; }
 			struct Nested { X[2][] a; uint y; }
 			struct X { bytes32 x; Test t; Simple[] s; }
-			function f(ActionChoices, uint, Simple) external {}
-			function g(Test, Nested) external {}
-			function h(function(Nested) external returns (uint)[]) external {}
-			function i(Nested[]) external {}
+			function f(ActionChoices, uint, Simple calldata) external {}
+			function g(Test, Nested calldata) external {}
+			function h(function(Nested memory) external returns (uint)[] calldata) external {}
+			function i(Nested[] calldata) external {}
 		}
 	)";
-	SourceUnit const* sourceUnit = parseAndAnalyse(text);
+	// Ignore analysis errors. This test only checks that correct signatures
+	// are generated for external structs, but they are not yet supported
+	// in code generation and therefore cause an error in the TypeChecker.
+	SourceUnit const* sourceUnit = parseAnalyseAndReturnError(text, false, true, true).first;
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
 		if (ContractDefinition* contract = dynamic_cast<ContractDefinition*>(node.get()))
 		{
@@ -225,7 +229,7 @@ BOOST_AUTO_TEST_CASE(external_structs)
 		}
 }
 
-BOOST_AUTO_TEST_CASE(external_structs_in_libraries)
+BOOST_AUTO_TEST_CASE(external_struct_signatures_in_libraries)
 {
 	char const* text = R"(
 		pragma experimental ABIEncoderV2;
@@ -234,13 +238,16 @@ BOOST_AUTO_TEST_CASE(external_structs_in_libraries)
 			struct Simple { uint i; }
 			struct Nested { X[2][] a; uint y; }
 			struct X { bytes32 x; Test t; Simple[] s; }
-			function f(ActionChoices, uint, Simple) external {}
-			function g(Test, Nested) external {}
-			function h(function(Nested) external returns (uint)[]) external {}
-			function i(Nested[]) external {}
+			function f(ActionChoices, uint, Simple calldata) external {}
+			function g(Test, Nested calldata) external {}
+			function h(function(Nested memory) external returns (uint)[] calldata) external {}
+			function i(Nested[] calldata) external {}
 		}
 	)";
-	SourceUnit const* sourceUnit = parseAndAnalyse(text);
+	// Ignore analysis errors. This test only checks that correct signatures
+	// are generated for external structs, but calldata structs are not yet supported
+	// in code generation and therefore cause an error in the TypeChecker.
+	SourceUnit const* sourceUnit = parseAnalyseAndReturnError(text, false, true, true).first;
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
 		if (ContractDefinition* contract = dynamic_cast<ContractDefinition*>(node.get()))
 		{
@@ -340,7 +347,7 @@ BOOST_AUTO_TEST_CASE(string)
 	char const* sourceCode = R"(
 		contract C {
 			string s;
-			function f(string x) external { s = x; }
+			function f(string calldata x) external { s = x; }
 		}
 	)";
 	BOOST_CHECK_NO_THROW(parseAndAnalyse(sourceCode));
@@ -350,18 +357,18 @@ BOOST_AUTO_TEST_CASE(dynamic_return_types_not_possible)
 {
 	char const* sourceCode = R"(
 		contract C {
-			function f(uint) public returns (string);
+			function f(uint) public returns (string memory);
 			function g() public {
-				var x = this.f(2);
+				string memory x = this.f(2);
 				// we can assign to x but it is not usable.
 				bytes(x).length;
 			}
 		}
 	)";
 	if (dev::test::Options::get().evmVersion() == EVMVersion::homestead())
-		CHECK_ERROR(sourceCode, TypeError, "Explicit type conversion not allowed from \"inaccessible dynamic type\" to \"bytes storage pointer\".");
+		CHECK_ERROR(sourceCode, TypeError, "Type inaccessible dynamic type is not implicitly convertible to expected type string memory.");
 	else
-		CHECK_WARNING(sourceCode, "Use of the \"var\" keyword is deprecated");
+		CHECK_SUCCESS_NO_WARNINGS(sourceCode);
 }
 
 BOOST_AUTO_TEST_CASE(warn_nonpresent_pragma)
@@ -375,46 +382,47 @@ BOOST_AUTO_TEST_CASE(warn_nonpresent_pragma)
 	BOOST_CHECK(searchErrorMessage(*sourceAndError.second.front(), "Source file does not specify required compiler version!"));
 }
 
-BOOST_AUTO_TEST_CASE(unsatisfied_version)
-{
-	char const* text = R"(
-		pragma solidity ^99.99.0;
-	)";
-	auto sourceAndError = parseAnalyseAndReturnError(text, false, false, false);
-	BOOST_REQUIRE(!sourceAndError.second.empty());
-	BOOST_REQUIRE(!!sourceAndError.first);
-	BOOST_CHECK(sourceAndError.second.front()->type() == Error::Type::SyntaxError);
-	BOOST_CHECK(searchErrorMessage(*sourceAndError.second.front(), "Source file requires different compiler version"));
-}
-
 BOOST_AUTO_TEST_CASE(returndatasize_as_variable)
 {
 	char const* text = R"(
-		contract c { function f() public { uint returndatasize; assembly { returndatasize }}}
+		contract C { function f() public pure { uint returndatasize; returndatasize; assembly { pop(returndatasize()) }}}
 	)";
 	vector<pair<Error::Type, std::string>> expectations(vector<pair<Error::Type, std::string>>{
-		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"},
-		{Error::Type::Warning, "The use of non-functional instructions is deprecated."},
-		{Error::Type::DeclarationError, "Unbalanced stack"}
+		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
 	});
 	if (!dev::test::Options::get().evmVersion().supportsReturndata())
-		expectations.emplace_back(make_pair(Error::Type::Warning, std::string("\"returndatasize\" instruction is only available for Byzantium-compatible")));
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"returndatasize\" instruction is only available for Byzantium-compatible VMs")));
 	CHECK_ALLOW_MULTI(text, expectations);
 }
 
 BOOST_AUTO_TEST_CASE(create2_as_variable)
 {
 	char const* text = R"(
-		contract c { function f() public { uint create2; assembly { create2(0, 0, 0, 0) } }}
+		contract c { function f() public { uint create2; create2; assembly { pop(create2(0, 0, 0, 0)) } }}
 	)";
 	// This needs special treatment, because the message mentions the EVM version,
 	// so cannot be run via isoltest.
-	CHECK_ALLOW_MULTI(text, (std::vector<std::pair<Error::Type, std::string>>{
-		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"},
-		{Error::Type::Warning, "The \"create2\" instruction is not supported by the VM version"},
-		{Error::Type::DeclarationError, "Unbalanced stack"},
-		{Error::Type::Warning, "not supposed to return values"}
-	}));
+	vector<pair<Error::Type, std::string>> expectations(vector<pair<Error::Type, std::string>>{
+		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
+	});
+	if (!dev::test::Options::get().evmVersion().hasCreate2())
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"create2\" instruction is only available for Constantinople-compatible VMs")));
+	CHECK_ALLOW_MULTI(text, expectations);
+}
+
+BOOST_AUTO_TEST_CASE(extcodehash_as_variable)
+{
+	char const* text = R"(
+		contract c { function f() public view { uint extcodehash; extcodehash; assembly { pop(extcodehash(0)) } }}
+	)";
+	// This needs special treatment, because the message mentions the EVM version,
+	// so cannot be run via isoltest.
+	vector<pair<Error::Type, std::string>> expectations(vector<pair<Error::Type, std::string>>{
+		{Error::Type::Warning, "Variable is shadowed in inline assembly by an instruction of the same name"}
+	});
+	if (!dev::test::Options::get().evmVersion().hasExtCodeHash())
+		expectations.emplace_back(make_pair(Error::Type::TypeError, std::string("\"extcodehash\" instruction is only available for Constantinople-compatible VMs")));
+	CHECK_ALLOW_MULTI(text, expectations);
 }
 
 BOOST_AUTO_TEST_CASE(getter_is_memory_type)
@@ -428,12 +436,96 @@ BOOST_AUTO_TEST_CASE(getter_is_memory_type)
 	)";
 	CHECK_SUCCESS_NO_WARNINGS(text);
 	// Check that the getters return a memory strings, not a storage strings.
-	ContractDefinition const& c = dynamic_cast<ContractDefinition const&>(*m_compiler.ast("").nodes().at(1));
+	ContractDefinition const& c = dynamic_cast<ContractDefinition const&>(*compiler().ast("").nodes().at(1));
 	BOOST_CHECK(c.interfaceFunctions().size() == 2);
 	for (auto const& f: c.interfaceFunctions())
 	{
 		auto const& retType = f.second->returnParameterTypes().at(0);
 		BOOST_CHECK(retType->dataStoredIn(DataLocation::Memory));
+	}
+}
+
+BOOST_AUTO_TEST_CASE(address_staticcall)
+{
+	char const* sourceCode = R"(
+		contract C {
+			function f() public view returns(bool) {
+				(bool success,) = address(0x4242).staticcall("");
+				return success;
+			}
+		}
+	)";
+
+	if (dev::test::Options::get().evmVersion().hasStaticCall())
+		CHECK_SUCCESS_NO_WARNINGS(sourceCode);
+	else
+		CHECK_ERROR(sourceCode, TypeError, "\"staticcall\" is not supported by the VM version.");
+}
+
+BOOST_AUTO_TEST_CASE(address_staticcall_value)
+{
+	if (dev::test::Options::get().evmVersion().hasStaticCall())
+	{
+		char const* sourceCode = R"(
+			contract C {
+				function f() public view {
+					address(0x4242).staticcall.value;
+				}
+			}
+		)";
+		CHECK_ERROR(sourceCode, TypeError, "Member \"value\" is only available for payable functions.");
+	}
+}
+
+BOOST_AUTO_TEST_CASE(address_call_full_return_type)
+{
+	char const* sourceCode = R"(
+		contract C {
+			function f() public {
+				(bool success, bytes memory m) = address(0x4242).call("");
+				success; m;
+			}
+		}
+	)";
+
+	if (dev::test::Options::get().evmVersion().supportsReturndata())
+		CHECK_SUCCESS_NO_WARNINGS(sourceCode);
+	else
+		CHECK_ERROR(sourceCode, TypeError, "Type inaccessible dynamic type is not implicitly convertible to expected type bytes memory.");
+}
+
+BOOST_AUTO_TEST_CASE(address_delegatecall_full_return_type)
+{
+	char const* sourceCode = R"(
+		contract C {
+			function f() public {
+				(bool success, bytes memory m) = address(0x4242).delegatecall("");
+				success; m;
+			}
+		}
+	)";
+
+	if (dev::test::Options::get().evmVersion().supportsReturndata())
+		CHECK_SUCCESS_NO_WARNINGS(sourceCode);
+	else
+		CHECK_ERROR(sourceCode, TypeError, "Type inaccessible dynamic type is not implicitly convertible to expected type bytes memory.");
+}
+
+
+BOOST_AUTO_TEST_CASE(address_staticcall_full_return_type)
+{
+	if (dev::test::Options::get().evmVersion().hasStaticCall())
+	{
+		char const* sourceCode = R"(
+			contract C {
+				function f() public view {
+					(bool success, bytes memory m) = address(0x4242).staticcall("");
+					success; m;
+				}
+			}
+		)";
+
+		CHECK_SUCCESS_NO_WARNINGS(sourceCode);
 	}
 }
 

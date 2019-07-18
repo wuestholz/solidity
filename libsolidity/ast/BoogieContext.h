@@ -1,11 +1,12 @@
 #pragma once
 
-#include <libsolidity/interface/ErrorReporter.h>
+#include <liblangutil/ErrorReporter.h>
+#include <liblangutil/EVMVersion.h>
+#include <liblangutil/Scanner.h>
 #include <libsolidity/ast/AST.h>
+#include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/DeclarationContainer.h>
-#include <libsolidity/interface/EVMVersion.h>
 #include <libsolidity/ast/BoogieAst.h>
-#include <libsolidity/parsing/Scanner.h>
 #include <set>
 
 namespace dev
@@ -19,6 +20,7 @@ namespace solidity
  */
 class BoogieContext {
 public:
+
 	/**
 	 * Encoding for arithmetic types and operations.
 	 */
@@ -30,62 +32,183 @@ public:
 	};
 
 	struct DocTagExpr {
-		smack::Expr const* expr; // Expression converted to Boogie
+		boogie::Expr::Ref expr; // Expression converted to Boogie
 		std::string exprStr; // Expression in original format
-		std::list<smack::Expr const*> tccs; // TCCs for the expression
-		std::list<smack::Expr const*> ocs; // OCs for the expression
+		ASTPointer<Expression> exprSol; // Expression in Solidity AST format
+		std::list<boogie::Expr::Ref> tccs; // TCCs for the expression
+		std::list<boogie::Expr::Ref> ocs; // OCs for the expression
 
-		DocTagExpr(smack::Expr const* expr, std::string exprStr, std::list<smack::Expr const*> tccs,
-				std::list<smack::Expr const*> ocs) :
-			expr(expr), exprStr(exprStr), tccs(tccs), ocs(ocs) {}
+		DocTagExpr() {}
+
+		DocTagExpr(boogie::Expr::Ref expr, std::string exprStr,
+				ASTPointer<Expression> exprSol,
+				std::list<boogie::Expr::Ref> const& tccs,
+				std::list<boogie::Expr::Ref> const& ocs) :
+			expr(expr), exprStr(exprStr), exprSol(exprSol), tccs(tccs), ocs(ocs) {}
+	};
+
+	/**
+	 * Global context with magic variables for verification-specific functions such as sum. We
+	 * use this in the name resolver, so all other stuff is already in the scope of the resolver.
+	 */
+	class BoogieGlobalContext : public GlobalContext
+	{
+	public:
+		BoogieGlobalContext();
 	};
 
 private:
-	smack::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
+
+	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
+	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
+	boogie::VarDeclRef m_boogieBalance;
+	boogie::VarDeclRef m_boogieThis;
+	boogie::VarDeclRef m_boogieMsgSender;
+	boogie::VarDeclRef m_boogieMsgValue;
+	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
+	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
+	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
+
+	std::map<std::string,boogie::DataTypeDeclRef> m_arrDataTypes;
+	std::map<std::string,boogie::FuncDeclRef> m_arrConstrs;
+	std::map<std::string,boogie::TypeDeclRef> m_memArrPtrTypes;
+	std::map<std::string,boogie::VarDeclRef> m_memArrs;
 
 	Encoding m_encoding;
 	bool m_overflow;
-	ErrorReporter* m_errorReporter; // Report errors with this member
-	Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
+	bool m_modAnalysis;
+	langutil::ErrorReporter* m_errorReporter; // Report errors with this member
+	langutil::Scanner const* m_currentScanner; // Scanner used to resolve locations in the original source
 
-	// Some members required to parse invariants. (Invariants can be found
-	// in comments, so they are not parsed when the contract is parsed.)
-	std::vector<Declaration const*> m_globalDecls;
-	std::vector<MagicVariableDeclaration*> m_verifierSum;
+	// Some members required to parse expressions from comments
+	BoogieGlobalContext m_globalContext;
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
-	EVMVersion m_evmVersion;
+	langutil::EVMVersion m_evmVersion;
 
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
-	std::set<std::string> m_builtinFunctions;
+	typedef std::map<std::string, boogie::Decl::ConstRef> builtin_cache;
+	builtin_cache m_builtinFunctions;
+
+	void addBuiltinFunction(boogie::FuncDeclRef fnDecl);
+
 	bool m_transferIncluded;
 	bool m_callIncluded;
 	bool m_sendIncluded;
 
-public:
-	BoogieContext(Encoding encoding, bool overflow, ErrorReporter* errorReporter, std::vector<Declaration const*> globalDecls,
-			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes, EVMVersion evmVersion);
+	std::list<std::pair<ASTNode const*, std::string>> m_extraScopes;
 
-	smack::Program& program() { return m_program; }
-	Encoding encoding() { return m_encoding; }
-	bool isBvEncoding() { return m_encoding == Encoding::BV; }
-	bool overflow() { return m_overflow; }
-	ErrorReporter*& errorReporter() { return m_errorReporter; }
-	Scanner const*& currentScanner() { return m_currentScanner; }
-	std::vector<Declaration const*>& globalDecls() { return m_globalDecls; }
+	int m_nextId = 0;
+
+public:
+
+	BoogieContext(Encoding encoding,
+			bool overflow,
+			bool modAnalysis,
+			langutil::ErrorReporter* errorReporter,
+			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
+			langutil::EVMVersion evmVersion);
+
+	Encoding encoding() const { return m_encoding; }
+	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
+	bool overflow() const { return m_overflow; }
+	bool modAnalysis() const { return m_modAnalysis; }
+	langutil::ErrorReporter*& errorReporter() { return m_errorReporter; }
+	langutil::Scanner const*& currentScanner() { return m_currentScanner; }
+	GlobalContext* globalContext() { return &m_globalContext; }
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
-	EVMVersion& evmVersion() { return m_evmVersion; }
+	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
+	int nextId() { return m_nextId++; }
+	/**
+	 * Map a declaration name to a name in Boogie
+	 */
+	std::string mapDeclName(Declaration const& decl);
 
-	void includeBuiltInFunction(std::string name, smack::FuncDecl* decl);
+	/**
+	 * Print the actual Boogie program to an output stream
+	 */
+	void print(std::ostream& _stream) { m_program.print(_stream); }
+
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
 
+	void pushExtraScope(ASTNode const* node, std::string id) { m_extraScopes.push_back(std::make_pair(node, id)); }
+	void popExtraScope() { m_extraScopes.pop_back(); }
+
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
+
+	void addGlobalComment(std::string str);
+	void addDecl(boogie::Decl::Ref decl);
+	void addConstant(boogie::Decl::Ref decl);
+
+	boogie::TypeDeclRef addressType() const;
+	boogie::TypeDeclRef boolType() const;
+	boogie::TypeDeclRef stringType() const;
+	/** Returns the integer type corresponding to the encoding */
+	boogie::TypeDeclRef intType(unsigned size) const;
+
+	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
+	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
+
+	boogie::Expr::Ref getMemArray(boogie::Expr::Ref arrPtrExpr, boogie::TypeDeclRef type) { return boogie::Expr::arrsel(m_memArrs[type->getName()]->getRefTo(), arrPtrExpr); }
+	boogie::Expr::Ref getArrayLength(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "length", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }
+	boogie::Expr::Ref getInnerArray(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "arr", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }
+
+
+	/**
+	 * Map a Solidity type to a Boogie type
+	 */
+	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode);
+
+	boogie::VarDeclRef boogieBalance() const { return m_boogieBalance; }
+	boogie::VarDeclRef boogieThis() const { return m_boogieThis; }
+	boogie::VarDeclRef boogieMsgSender() const { return m_boogieMsgSender; }
+	boogie::VarDeclRef boogieMsgValue() const { return m_boogieMsgValue; }
+
+	boogie::Expr::Ref intLit(boogie::bigint lit, int bits) const;
+
+	/** Slice of an integer corresponding to the encoding */
+	boogie::Expr::Ref intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low);
+
+	// Parametrized BV operations
+	boogie::Expr::Ref bvExtract(boogie::Expr::Ref expr, unsigned size, unsigned high, unsigned low);
+	boogie::Expr::Ref bvZeroExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize);
+	boogie::Expr::Ref bvSignExt(boogie::Expr::Ref expr, unsigned exprSize, unsigned resultSize);
+
+	// Binary BV operations
+	boogie::Expr::Ref bvAdd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSub(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvMul(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUDiv(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvAnd(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvOr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvXor(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvAShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvLShr(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvShl(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUlt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUgt(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUle(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvSge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+	boogie::Expr::Ref bvUge(unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
+
+	// Unary BV operation
+	boogie::Expr::Ref bvNeg(unsigned bits, boogie::Expr::Ref expr);
+	boogie::Expr::Ref bvNot(unsigned bits, boogie::Expr::Ref expr);
+
+	// Low lever interface
+	boogie::Expr::Ref bvBinaryOp(std::string name, unsigned bits, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, boogie::TypeDeclRef resultType = nullptr);
+	boogie::Expr::Ref bvUnaryOp(std::string name, unsigned bits, boogie::Expr::Ref expr);
+
 };
 
 }

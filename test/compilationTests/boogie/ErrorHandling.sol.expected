@@ -1,7 +1,0 @@
-Verifying ErrorHandling::abs_sound: OK
-Verifying ErrorHandling::abs_unsound: ERROR
- - Source ErrorHandling.sol, line 17, col 9: Assertion might not hold.
-Verifying ErrorHandling::add: OK
-Verifying ErrorHandling::add2: OK
-Verifying ErrorHandling::[implicit_constructor]: OK
-Errors were found by the verifier.

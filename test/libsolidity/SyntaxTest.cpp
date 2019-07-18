@@ -20,15 +20,15 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/throw_exception.hpp>
-#include <cctype>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
 
-using namespace dev;
-using namespace solidity;
+using namespace langutil;
+using namespace dev::solidity;
 using namespace dev::solidity::test;
-using namespace dev::solidity::test::formatting;
+using namespace dev::formatting;
+using namespace dev;
 using namespace std;
 namespace fs = boost::filesystem;
 using namespace boost::unit_test;
@@ -52,28 +52,40 @@ int parseUnsignedInteger(string::iterator& _it, string::iterator _end)
 
 }
 
-SyntaxTest::SyntaxTest(string const& _filename)
+SyntaxTest::SyntaxTest(string const& _filename, langutil::EVMVersion _evmVersion, bool _parserErrorRecovery): m_evmVersion(_evmVersion)
 {
 	ifstream file(_filename);
 	if (!file)
 		BOOST_THROW_EXCEPTION(runtime_error("Cannot open test contract: \"" + _filename + "\"."));
 	file.exceptions(ios::badbit);
 
-	m_source = parseSource(file);
+	m_source = parseSourceAndSettings(file);
+	if (m_settings.count("optimize-yul"))
+	{
+		m_optimiseYul = true;
+		m_validatedSettings["optimize-yul"] = "true";
+		m_settings.erase("optimize-yul");
+	}
 	m_expectations = parseExpectations(file);
+	m_parserErrorRecovery = _parserErrorRecovery;
 }
 
-bool SyntaxTest::run(ostream& _stream, string const& _linePrefix, bool const _formatted)
+TestCase::TestResult SyntaxTest::run(ostream& _stream, string const& _linePrefix, bool _formatted)
 {
 	string const versionPragma = "pragma solidity >=0.0;\n";
-	m_compiler.reset();
-	m_compiler.addSource("", versionPragma + m_source);
-	m_compiler.setEVMVersion(dev::test::Options::get().evmVersion());
+	compiler().reset();
+	compiler().setSources({{"", versionPragma + m_source}});
+	compiler().setEVMVersion(m_evmVersion);
+	compiler().setParserErrorRecovery(m_parserErrorRecovery);
+	compiler().setOptimiserSettings(
+		m_optimiseYul ?
+		OptimiserSettings::full() :
+		OptimiserSettings::minimal()
+	);
+	if (compiler().parse())
+		compiler().analyze();
 
-	if (m_compiler.parse())
-		m_compiler.analyze();
-
-	for (auto const& currentError: filterErrors(m_compiler.errors(), true))
+	for (auto const& currentError: filterErrors(compiler().errors(), true))
 	{
 		int locationStart = -1, locationEnd = -1;
 		if (auto location = boost::get_error_info<errinfo_sourceLocation>(*currentError))
@@ -92,19 +104,24 @@ bool SyntaxTest::run(ostream& _stream, string const& _linePrefix, bool const _fo
 		});
 	}
 
+	return printExpectationAndError(_stream, _linePrefix, _formatted) ? TestResult::Success : TestResult::Failure;
+}
+
+bool SyntaxTest::printExpectationAndError(ostream& _stream, string const& _linePrefix, bool _formatted)
+{
 	if (m_expectations != m_errorList)
 	{
 		string nextIndentLevel = _linePrefix + "  ";
-		FormattedScope(_stream, _formatted, {BOLD, CYAN}) << _linePrefix << "Expected result:" << endl;
+		AnsiColorized(_stream, _formatted, {BOLD, CYAN}) << _linePrefix << "Expected result:" << endl;
 		printErrorList(_stream, m_expectations, nextIndentLevel, _formatted);
-		FormattedScope(_stream, _formatted, {BOLD, CYAN}) << _linePrefix << "Obtained result:" << endl;
+		AnsiColorized(_stream, _formatted, {BOLD, CYAN}) << _linePrefix << "Obtained result:" << endl;
 		printErrorList(_stream, m_errorList, nextIndentLevel, _formatted);
 		return false;
 	}
 	return true;
 }
 
-void SyntaxTest::printSource(ostream& _stream, string const& _linePrefix, bool const _formatted) const
+void SyntaxTest::printSource(ostream& _stream, string const& _linePrefix, bool _formatted) const
 {
 	if (_formatted)
 	{
@@ -122,7 +139,7 @@ void SyntaxTest::printSource(ostream& _stream, string const& _linePrefix, bool c
 					if (isWarning)
 					{
 						if (sourceFormatting[i] == formatting::RESET)
-							sourceFormatting[i] = formatting::ORANGE_BACKGROUND;
+							sourceFormatting[i] = formatting::ORANGE_BACKGROUND_256;
 					}
 					else
 						sourceFormatting[i] = formatting::RED_BACKGROUND;
@@ -157,16 +174,16 @@ void SyntaxTest::printErrorList(
 	ostream& _stream,
 	vector<SyntaxTestError> const& _errorList,
 	string const& _linePrefix,
-	bool const _formatted
+	bool _formatted
 )
 {
 	if (_errorList.empty())
-		FormattedScope(_stream, _formatted, {BOLD, GREEN}) << _linePrefix << "Success" << endl;
+		AnsiColorized(_stream, _formatted, {BOLD, GREEN}) << _linePrefix << "Success" << endl;
 	else
 		for (auto const& error: _errorList)
 		{
 			{
-				FormattedScope scope(_stream, _formatted, {BOLD, (error.type == "Warning") ? YELLOW : RED});
+				AnsiColorized scope(_stream, _formatted, {BOLD, (error.type == "Warning") ? YELLOW : RED});
 				_stream << _linePrefix;
 				_stream << error.type << ": ";
 			}

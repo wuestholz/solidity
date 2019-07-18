@@ -17,42 +17,59 @@ class ASTBoogieExpressionConverter : private ASTConstVisitor
 private:
 
 	BoogieContext& m_context;
+	ContractDefinition const* m_currentContract;
 
 	// Helper variables to pass information between the visit methods
-	const smack::Expr* m_currentExpr;
-	const smack::Expr* m_currentAddress;
-	const smack::Expr* m_currentMsgValue;
+	boogie::Expr::Ref m_currentExpr;
+	boogie::Expr::Ref m_currentAddress;
+	boogie::Expr::Ref m_currentMsgValue;
 	bool m_isGetter;
 	bool m_isLibraryCall;
 	bool m_isLibraryCallStatic;
 
 	// Converting expressions might result in new statements and declarations
 	// due to differences between Solidity and Boogie
-	std::vector<smack::Stmt const*> m_newStatements;
-	std::list<smack::Decl*> m_newDecls;
-	std::list<smack::Decl*> m_newConstants;
+	std::vector<boogie::Stmt::Ref> m_newStatements;
+	std::list<boogie::Decl::Ref> m_newDecls;
+	std::list<boogie::Decl::Ref> m_newConstants;
 	// Type checking conditions
-	std::list<smack::Expr const*> m_tccs;
+	std::list<boogie::Expr::Ref> m_tccs;
 	// Overflow conditions
-	std::list<smack::Expr const*> m_ocs;
-
-	// Helper method to get the length of an array (currently only works for 1D arrays)
-	const smack::Expr* getArrayLength(const smack::Expr* expr, ASTNode const& associatedNode);
+	std::list<boogie::Expr::Ref> m_ocs;
 
 	// Helper method to create an assignment
-	void createAssignment(Expression const& originalLhs, smack::Expr const *lhs, smack::Expr const* rhs);
+	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
 
-	// Helper method to transform a select to an update
-	smack::Expr const* selectToUpdate(smack::SelExpr const* sel, smack::Expr const* value);
+	// Helper method to create struct assignment
+	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
+
+	// Helper method for recursive deep copy between structures
+	void deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
+			boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
 
 	// Helper method to get the length of an array
-	const smack::Expr* getSumShadowVar(ASTNode const* node);
+	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
 
 	// Helper method to add a type checking condition for an expression with a given type
-	void addTCC(smack::Expr const* expr, TypePointer tp);
+	void addTCC(boogie::Expr::Ref expr, TypePointer tp);
 
 	// Helper method to add a side effect (statement)
-	void addSideEffect(smack::Stmt const* stmt);
+	void addSideEffect(boogie::Stmt::Ref stmt);
+
+	// Helper method to add a side effects (statement)
+	void addSideEffects(std::vector<boogie::Stmt::Ref> const& stmts) { for (auto stmt: stmts) addSideEffect(stmt); }
+
+	// Helper methods for the different scenarios for function calls
+	void functionCallConversion(FunctionCall const& _node);
+	boogie::Decl::Ref newStruct(StructDefinition const* structDef);
+	void functionCallNewStruct(StructDefinition const* structDef, std::vector<boogie::Expr::Ref> const& args);
+	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
+	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
+	void functionCallSum(FunctionCall const& _node);
+	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
+	boogie::Decl::Ref newArray(boogie::TypeDeclRef type);
+	void functionCallNewArray(FunctionCall const& _node);
+	void functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node);
 
 public:
 
@@ -63,24 +80,27 @@ public:
 	 */
 	struct Result
 	{
-		const smack::Expr* expr;
-		std::vector<smack::Stmt const*> newStatements;
-		std::list<smack::Decl*> newDecls;
-		std::list<smack::Decl*> newConstants;
-		std::list<smack::Expr const*> tccs; // Type checking conditions
-		std::list<smack::Expr const*> ocs;  // Overflow conditions
+		boogie::Expr::Ref expr;
+		std::vector<boogie::Stmt::Ref> newStatements;
+		std::list<boogie::Decl::Ref> newDecls;
+		std::list<boogie::Decl::Ref> newConstants;
+		std::list<boogie::Expr::Ref> tccs; // Type checking conditions
+		std::list<boogie::Expr::Ref> ocs;  // Overflow conditions
 
-		Result(const smack::Expr* expr, std::vector<smack::Stmt const*> newStatements,
-				std::list<smack::Decl*> newDecls, std::list<smack::Decl*> newConstants,
-				std::list<smack::Expr const*> tccs, std::list<smack::Expr const*> ocs)
+		Result(boogie::Expr::Ref expr,
+				std::vector<boogie::Stmt::Ref> const& newStatements,
+				std::list<boogie::Decl::Ref> const& newDecls,
+				std::list<boogie::Decl::Ref> const& newConstants,
+				std::list<boogie::Expr::Ref> const& tccs,
+				std::list<boogie::Expr::Ref> const& ocs)
 			:expr(expr), newStatements(newStatements), newDecls(newDecls),
-			 newConstants(newConstants), tccs(tccs), ocs(ocs) {}
+				newConstants(newConstants), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**
 	 * Create a new instance with a given context and an optional location used for reporting errors.
 	 */
-	ASTBoogieExpressionConverter(BoogieContext& context);
+	ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side effect, the conversion might

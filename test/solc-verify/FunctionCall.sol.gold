@@ -1,0 +1,9 @@
+FunctionCall::addSome: OK
+FunctionCall::f: OK
+FunctionCall::g: OK
+FunctionCall::h: OK
+FunctionCall::sequentialCall: OK
+FunctionCall::compositeCall: OK
+FunctionCall::[fallback]: OK
+FunctionCall::[implicit_constructor]: OK
+No errors found.

@@ -1,0 +1,5 @@
+A::[constructor]: OK
+B::[implicit_constructor]: OK
+BaseConstructorMulti::[constructor]: OK
+BaseConstructorMulti::[fallback]: OK
+No errors found.

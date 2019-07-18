@@ -1,0 +1,7 @@
+C::f: OK
+C::super: OK
+C::g: OK
+C::[implicit_constructor]: OK
+C2::f: OK
+C2::[implicit_constructor]: OK
+No errors found.

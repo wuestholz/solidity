@@ -1,0 +1,6 @@
+PayableFunctions::receive: OK
+PayableFunctions::[implicit_constructor]: OK
+Payable::[fallback]: OK
+Payable::[constructor]: OK
+Payable::transferNested: OK
+No errors found.

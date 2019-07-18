@@ -1,0 +1,12 @@
+C::f: OK
+C::[implicit_constructor]: OK
+D::correct1: OK
+D::correct2: OK
+D::incorrect1: ERROR
+ - test/solc-verify/ModifiesInheritance.sol:18:5: Function might modify 'C::x' illegally
+D::incorrect2: ERROR
+ - test/solc-verify/ModifiesInheritance.sol:20:5: Function might modify 'D::x' illegally
+D::incorrect3: ERROR
+ - test/solc-verify/ModifiesInheritance.sol:23:5: Function might modify 'C::x' illegally
+D::[implicit_constructor]: OK
+Errors were found by the verifier.

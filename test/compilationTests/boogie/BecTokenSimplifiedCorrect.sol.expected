@@ -1,5 +1,0 @@
-Verifying BecTokenSimplified::[constructor]: OK
-Verifying BecTokenSimplified::balanceOf: OK
-Verifying BecTokenSimplified::transfer: OK
-Verifying BecTokenSimplified::batchTransfer: OK
-No errors found.

@@ -57,7 +57,10 @@ class IPCSocket: public boost::noncopyable
 public:
 	explicit IPCSocket(std::string const& _path);
 	std::string sendRequest(std::string const& _req);
-	~IPCSocket() { close(m_socket); }
+	~IPCSocket() {
+		shutdown(m_socket, SHUT_RDWR);
+		close(m_socket);
+	}
 
 	std::string const& path() const { return m_path; }
 
@@ -99,6 +102,8 @@ public:
 		std::string contractAddress;
 		std::vector<LogEntry> logEntries;
 		std::string blockNumber;
+		/// note: pre-byzantium the status field will be empty
+		std::string status;
 	};
 
 	static RPCSession& instance(std::string const& _path);
@@ -111,6 +116,7 @@ public:
 	std::string eth_sendTransaction(std::string const& _transaction);
 	std::string eth_getBalance(std::string const& _address, std::string const& _blockNumber);
 	std::string eth_getStorageRoot(std::string const& _address, std::string const& _blockNumber);
+	std::string eth_gasPrice();
 	std::string personal_newAccount(std::string const& _password);
 	void personal_unlockAccount(std::string const& _address, std::string const& _password, int _duration);
 	void test_setChainParams(std::vector<std::string> const& _accounts);
@@ -133,9 +139,7 @@ private:
 
 	IPCSocket m_ipcSocket;
 	size_t m_rpcSequence = 1;
-	unsigned m_maxMiningTime = 6000000; // 600 seconds
-	unsigned m_sleepTime = 10; // 10 milliseconds
-	unsigned m_successfulMineRuns = 0;
+	bool m_receiptHasStatusField = false;
 
 	std::vector<std::string> m_accounts;
 };

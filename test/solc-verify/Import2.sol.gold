@@ -1,0 +1,5 @@
+A::f: OK
+A::[implicit_constructor]: OK
+B::g: OK
+B::[implicit_constructor]: OK
+No errors found.

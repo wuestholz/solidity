@@ -22,12 +22,12 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <libsolidity/ast/ASTForward.h>
+#include <boost/noncopyable.hpp>
 #include <map>
 #include <memory>
-#include <boost/noncopyable.hpp>
-#include <libsolidity/ast/ASTForward.h>
+#include <string>
+#include <vector>
 
 namespace dev
 {
@@ -53,7 +53,7 @@ public:
 	/// @returns a vector of all implicit global declarations excluding "this".
 	std::vector<Declaration const*> declarations() const;
 
-private:
+protected:
 	std::vector<std::shared_ptr<MagicVariableDeclaration const>> m_magicVariables;
 	ContractDefinition const* m_currentContract = nullptr;
 	std::map<ContractDefinition const*, std::shared_ptr<MagicVariableDeclaration const>> mutable m_thisPointer;

@@ -1,0 +1,4 @@
+ModifiesSimple::f: OK
+ModifiesSimple::g: OK
+ModifiesSimple::[implicit_constructor]: OK
+No errors found.

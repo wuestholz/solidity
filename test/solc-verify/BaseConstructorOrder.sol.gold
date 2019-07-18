@@ -1,0 +1,7 @@
+A::set: OK
+A::[constructor]: OK
+B1::[constructor]: OK
+B2::[constructor]: OK
+BaseConstructorOrder::[constructor]: OK
+BaseConstructorOrder::[fallback]: OK
+No errors found.

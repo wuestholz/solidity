@@ -27,6 +27,8 @@ def setup(sphinx):
     from pygments_lexer_solidity import SolidityLexer
     sphinx.add_lexer('Solidity', SolidityLexer())
 
+    sphinx.add_stylesheet('css/custom.css')
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -51,7 +53,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Solidity'
-copyright = '2016-2018, Ethereum'
+copyright = '2016-2019, Ethereum'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -79,7 +81,7 @@ else:
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', 'contracts', 'types', 'examples']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -142,15 +144,6 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
-# A dictionary of values to pass into the template engine’s context for
-# all pages. Single values can also be put in
-# this dictionary using the -A command-line option of sphinx-build.
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in sphinx_rtd_theme
-        ],
-     }
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

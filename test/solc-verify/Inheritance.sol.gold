@@ -1,0 +1,7 @@
+Base::f: OK
+Base::g: OK
+Base::[implicit_constructor]: OK
+Inheritance::f: OK
+Inheritance::h: OK
+Inheritance::[implicit_constructor]: OK
+No errors found.

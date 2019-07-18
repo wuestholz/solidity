@@ -1,0 +1,7 @@
+SafeMath::[implicit_constructor]: OK
+BecTokenSimplified::[constructor]: OK
+BecTokenSimplified::balanceOf: OK
+BecTokenSimplified::transfer: OK
+BecTokenSimplified::batchTransfer: ERROR
+ - test/solc-verify/examples/BecTokenSimplifiedOverflow.sol:65:32: An overflow can occur before calling function
+Errors were found by the verifier.

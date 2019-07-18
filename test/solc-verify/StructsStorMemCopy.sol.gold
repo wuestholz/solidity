@@ -1,0 +1,5 @@
+StructsStorMemCopy::storToMem: OK
+StructsStorMemCopy::memToStor: OK
+StructsStorMemCopy::[fallback]: OK
+StructsStorMemCopy::[implicit_constructor]: OK
+No errors found.

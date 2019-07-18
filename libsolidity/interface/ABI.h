@@ -20,9 +20,9 @@
 
 #pragma once
 
-#include <string>
-#include <memory>
 #include <json/json.h>
+#include <memory>
+#include <string>
 
 namespace dev
 {
@@ -32,7 +32,7 @@ namespace solidity
 // Forward declarations
 class ContractDefinition;
 class Type;
-using TypePointer = std::shared_ptr<Type const>;
+using TypePointer = Type const*;
 
 class ABI
 {

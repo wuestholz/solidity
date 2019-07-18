@@ -1,0 +1,4 @@
+SimpleBank::deposit: OK
+SimpleBank::withdraw: OK
+SimpleBank::[implicit_constructor]: OK
+No errors found.

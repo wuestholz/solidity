@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity >=0.0;
 import "../Tokens/Token.sol";
 import "../Tokens/OutcomeToken.sol";
 import "../Oracles/Oracle.sol";
@@ -54,7 +54,7 @@ contract Event {
         public
     {
         // Transfer collateral tokens to events contract
-        require(collateralToken.transferFrom(msg.sender, this, collateralTokenCount));
+        require(collateralToken.transferFrom(msg.sender, address(this), collateralTokenCount));
         // Issue new outcome tokens to sender
         for (uint8 i = 0; i < outcomeTokens.length; i++)
             outcomeTokens[i].issue(msg.sender, collateralTokenCount);
@@ -90,7 +90,7 @@ contract Event {
     /// @return Outcome count
     function getOutcomeCount()
         public
-        constant
+        view
         returns (uint8)
     {
         return uint8(outcomeTokens.length);
@@ -100,8 +100,8 @@ contract Event {
     /// @return Outcome tokens
     function getOutcomeTokens()
         public
-        constant
-        returns (OutcomeToken[])
+        view
+        returns (OutcomeToken[] memory)
     {
         return outcomeTokens;
     }
@@ -110,8 +110,8 @@ contract Event {
     /// @return Outcome token distribution
     function getOutcomeTokenDistribution(address owner)
         public
-        constant
-        returns (uint[] outcomeTokenDistribution)
+        view
+        returns (uint[] memory outcomeTokenDistribution)
     {
         outcomeTokenDistribution = new uint[](outcomeTokens.length);
         for (uint8 i = 0; i < outcomeTokenDistribution.length; i++)
@@ -120,7 +120,7 @@ contract Event {
 
     /// @dev Calculates and returns event hash
     /// @return Event hash
-    function getEventHash() public constant returns (bytes32);
+    function getEventHash() public view returns (bytes32);
 
     /// @dev Exchanges sender's winning outcome tokens for collateral tokens
     /// @return Sender's winnings
