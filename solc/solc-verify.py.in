@@ -105,7 +105,7 @@ def main(tmpDir):
     else:
         solverPath = findSolver(args.solver)
     if solverPath is None:
-        print('Error: cannot find %s' % args.solver)
+        print(yellowTxt('Error: cannot find %s' % args.solver))
         return ERROR_SOLVER_NOT_FOUND
     if args.verbose:
        print('Using %s at %s' % (args.solver, solverPath))
@@ -139,7 +139,7 @@ def main(tmpDir):
 
     verifierOutputStr = verifierOutput.decode('utf-8')
     if re.search('Boogie program verifier finished with', verifierOutputStr) == None:
-        print('Error while running verifier, details:')
+        print(yellowTxt('Error while running verifier, details:'))
         print(verifierOutputStr)
         return ERROR_BOOGIE_ERROR
     elif args.verbose:
