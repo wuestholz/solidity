@@ -9,7 +9,6 @@ Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires Pytho
 ```
 git clone https://github.com/SRI-CSL/solidity.git
 cd solidity
-git checkout boogie-devel
 pip3 install psutil
 ./scripts/install_deps.sh
 mkdir build
