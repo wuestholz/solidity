@@ -1385,7 +1385,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			auto rhsTuple = dynamic_pointer_cast<bg::TupleExpr const>(rhs);
 			if (rhsTuple == nullptr)
 			{
-				m_context.reportError(initialValue, "Initialization of tuples with non-tuples to tuples is not supported.");
+				m_context.reportError(initialValue, "Initialization of tuples with non-tuples is not supported.");
 				return false;
 			}
 			for (size_t i = 0; i < declarations.size(); ++ i)
