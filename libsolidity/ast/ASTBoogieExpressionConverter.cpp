@@ -132,8 +132,10 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		case Type::Category::Array: {
 			auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
 			auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
-			if (lhsArrType->location() != rhsArrType->location()) {
-				if (lhsArrType->location() == DataLocation::Memory) {
+			if (lhsArrType->location() != rhsArrType->location())
+			{
+				if (lhsArrType->location() == DataLocation::Memory)
+				{
 					// Create new
 					auto varDecl = newArray(m_context.toBoogieType(lhsType, &_node));
 					addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
