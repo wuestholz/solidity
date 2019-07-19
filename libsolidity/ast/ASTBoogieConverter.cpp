@@ -747,8 +747,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 			memberType = m_context.getStructType(&structTp->structDefinition(), DataLocation::Memory);
 		}
 		else // Other types
-			memberType = m_context.toBoogieType(member->type(), member.get());
-		// TODO: array members?
+			memberType = m_context.toBoogieType(TypeProvider::withLocationIfReference(DataLocation::Memory, member->type()), member.get());
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
 		auto memberDecl = bg::Decl::variable(m_context.mapDeclName(*member),

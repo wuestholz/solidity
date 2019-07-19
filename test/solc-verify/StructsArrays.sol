@@ -11,6 +11,12 @@ contract StructsArrays {
   A a2;
 
   function() external payable {
+    // Conditions established by constructor
+    require(a1.x == 0);
+    require(a2.x == 0);
+    require(a1.m.length == 0);
+    require(a2.m.length == 0);
+
     A memory ma = A(1, new int[](2));
     ma.m[0] = -1; ma.m[1] = -2;
     assert(a1.x == 0);

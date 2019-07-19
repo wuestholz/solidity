@@ -240,10 +240,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
 	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs))
 	{
-		auto upd = ASTBoogieUtils::selectToUpdate(lhsSel, rhs);
-		auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(upd);
-		solAssert(lhsUpd, "Update expression expected");
-		addSideEffect(bg::Stmt::assign(lhsUpd->getBase(), lhsUpd));
+		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhs));
 		return;
 	}
 
@@ -366,24 +363,36 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 			// Do the deep copy
 			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
 		}
-		// Unsupported stuff
 		else if (memberTypeCat == Type::Category::Mapping)
 		{
-			m_context.reportError(&_node, "Deep copy assignment between structs with mappings is not supported");
+			// Mappings are simply skipped
 		}
 		else if (memberTypeCat == Type::Category::Array)
 		{
 			auto arrType = dynamic_cast<ArrayType const*>(member->annotation().type);
-			if (!arrType->isString())
-				m_context.reportError(&_node, "Deep copy assignment between structs with arrays is not supported");
+			if (arrType->isString())
+				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
+			else
+			{
+				if (lhsLoc == DataLocation::Memory)
+				{
+					// Create new
+					auto varDecl = newArray(m_context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &_node));
+					// Update member to point to new
+					ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo());
+					lhsSel = m_context.getMemArray(lhsSel, m_context.toBoogieType(arrType->baseType(), &_node));
+				}
+				else if (rhsLoc == DataLocation::Memory)
+					rhsSel = m_context.getMemArray(rhsSel, m_context.toBoogieType(arrType->baseType(), &_node));
+
+				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
+			}
 		}
 
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			auto lhsUpd = dynamic_pointer_cast<bg::UpdExpr const>(ASTBoogieUtils::selectToUpdate(lhsSel, rhsSel));
-			solAssert(lhsUpd, "Selector expression expected");
-			addSideEffect(bg::Stmt::assign(lhsUpd->getBase(), lhsUpd));
+			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
 		}
 	}
 }
@@ -983,12 +992,13 @@ void ASTBoogieExpressionConverter::functionCallNewStruct(StructDefinition const*
 {
 	auto varDecl = newStruct(structDef);
 	// Initialize each member
-	for (size_t i = 0; i < structDef->members().size(); ++i)
+	for (size_t i = 0; i < structDef->members().size() && i < args.size(); ++i)
 	{
 		auto member = bg::Expr::id(m_context.mapDeclName(*structDef->members()[i]));
 		auto init = bg::Expr::arrupd(member, varDecl->getRefTo(), args[i]);
 		m_newStatements.push_back(bg::Stmt::assign(member, init));
 	}
+	// TODO: members not provided?
 	// Return the address
 	m_currentExpr = varDecl->getRefTo();
 }
