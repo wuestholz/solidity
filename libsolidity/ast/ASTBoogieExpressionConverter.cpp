@@ -358,7 +358,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 				// Create new
 				auto varDecl = newStruct(&memberStructType->structDefinition());
 				// Update member to point to new
-				ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo());
+				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 			}
 			// Do the deep copy
 			deepCopyStruct(_node, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc);
@@ -379,7 +379,7 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 					// Create new
 					auto varDecl = newArray(m_context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &_node));
 					// Update member to point to new
-					ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo());
+					addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 					lhsSel = m_context.getMemArray(lhsSel, m_context.toBoogieType(arrType->baseType(), &_node));
 				}
 				else if (rhsLoc == DataLocation::Memory)
