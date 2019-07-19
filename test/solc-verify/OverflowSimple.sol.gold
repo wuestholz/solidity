@@ -18,4 +18,5 @@ OverflowSimple::whileloop_overflow: ERROR
  - test/solc-verify/OverflowSimple.sol:99:9: Invariant 'No overflow' might not be maintained by the loop
 OverflowSimple::arrayLength: OK
 OverflowSimple::[implicit_constructor]: OK
+OverflowSimple::[receive_ether_selfdestruct]: OK
 Errors were found by the verifier.

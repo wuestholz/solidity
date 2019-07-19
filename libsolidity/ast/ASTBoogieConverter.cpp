@@ -302,6 +302,62 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 		m_context.popExtraScope();
 }
 
+void ASTBoogieConverter::createEtherReceiveFunc(ContractDefinition const& _node)
+{
+	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
+
+	vector<bg::Binding> balIncrParams {
+		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() },
+		{m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() }
+	};
+
+	bg::Block::Ref balIncrBlock = bg::Block::block();
+	auto gteResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual, m_context.boogieMsgValue()->getRefTo(), m_context.intLit(0, 256), 256, false);
+	balIncrBlock->addStmt(bg::Stmt::assume(gteResult.expr));
+	bg::Expr::Ref this_bal = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		balIncrBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
+		balIncrBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(m_context.boogieMsgValue()->getRefTo(), tp_uint256)));
+	}
+	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, m_context.boogieMsgValue()->getRefTo(), 256, false);
+	if (m_context.overflow())
+	{
+		balIncrBlock->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
+		balIncrBlock->addStmt(bg::Stmt::assume(addResult.cc));
+	}
+	balIncrBlock->addStmt(bg::Stmt::assign(
+					m_context.boogieBalance()->getRefTo(),
+					bg::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
+
+	bg::ProcDeclRef balIncrProc = bg::Decl::procedure(_node.name() + "_eth_receive", balIncrParams, {}, {}, {balIncrBlock});
+	for (auto invar: m_context.currentContractInvars())
+	{
+		for (auto oc: invar.ocs)
+		{
+			balIncrProc->getRequires().push_back(bg::Specification::spec(oc,
+				ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' when entering function.", *m_context.currentScanner())));
+			balIncrProc->getEnsures().push_back(bg::Specification::spec(oc,
+				ASTBoogieUtils::createAttrs(_node.location(), "Overflow in computation of invariant '" + invar.exprStr + "' at end of function.", *m_context.currentScanner())));
+		}
+		for (auto tcc: invar.tccs)
+		{
+			balIncrProc->getRequires().push_back(bg::Specification::spec(tcc,
+				ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + invar.exprStr + "' might be out of range when entering function.", *m_context.currentScanner())));
+			balIncrProc->getEnsures().push_back(bg::Specification::spec(tcc,
+				ASTBoogieUtils::createAttrs(_node.location(), "Variables in invariant '" + invar.exprStr + "' might be out of range at end of function.", *m_context.currentScanner())));
+		}
+		balIncrProc->getRequires().push_back(bg::Specification::spec(invar.expr,
+				ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold when entering function.", *m_context.currentScanner())));
+		balIncrProc->getEnsures().push_back(bg::Specification::spec(invar.expr,
+				ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + invar.exprStr + "' might not hold at end of function.", *m_context.currentScanner())));
+	}
+
+	balIncrProc->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name() + "::[receive_ether_selfdestruct]", *m_context.currentScanner()));
+
+	m_context.addDecl(balIncrProc);
+}
+
 void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope)
 {
 	// Constants are inlined
@@ -707,6 +763,10 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 	if (!hasConstructor)
 		createImplicitConstructor(_node);
 
+	// Create Ether receiving function (selfdestruct)
+	if (!m_context.currentContractInvars().empty())
+		createEtherReceiveFunc(_node);
+
 	return false;
 }
 
@@ -828,32 +888,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentBlocks.push(bg::Block::block());
 	// Include constructor preamble
 	if (_node.isConstructor())
-	{
 		constructorPreamble(_node);
-	}
-	else
-	{
-		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Model that balance might increased between calls"));
-		auto balIncr = bg::Decl::variable("tmp#" + toString(m_context.nextId()), m_context.boogieMsgValue()->getType());
-		m_localDecls.push_back(balIncr);
-		auto gteResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual, balIncr->getRefTo(), m_context.intLit(0, 256), 256, false);
-		m_currentBlocks.top()->addStmt(bg::Stmt::assume(gteResult.expr));
-		bg::Expr::Ref this_bal = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
-		if (m_context.encoding() == BoogieContext::Encoding::MOD)
-		{
-			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(this_bal, tp_uint256)));
-			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(balIncr->getRefTo(), tp_uint256)));
-		}
-		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, balIncr->getRefTo(), 256, false);
-		if (m_context.overflow())
-		{
-			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
-			m_currentBlocks.top()->addStmt(bg::Stmt::assume(addResult.cc));
-		}
-		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-						m_context.boogieBalance()->getRefTo(),
-							bg::Expr::arrupd(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo(), addResult.expr)));
-	}
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{

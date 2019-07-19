@@ -3,4 +3,5 @@ Overflow::inc: ERROR
 Overflow::set: ERROR
  - test/solc-verify/OverflowSpec.sol:15:5: Overflow in computation of invariant 'x == y + 1' at end of function.
 Overflow::[implicit_constructor]: OK
+Overflow::[receive_ether_selfdestruct]: OK
 Errors were found by the verifier.

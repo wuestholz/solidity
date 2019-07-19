@@ -1,4 +1,5 @@
 SimpleBank::deposit: OK
 SimpleBank::withdraw: OK
 SimpleBank::[implicit_constructor]: OK
+SimpleBank::[receive_ether_selfdestruct]: OK
 No errors found.

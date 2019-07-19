@@ -1,4 +1,6 @@
 Initializers::[constructor]: OK
 NoConstructorButNeeded1::[implicit_constructor]: OK
+NoConstructorButNeeded1::[receive_ether_selfdestruct]: OK
 NoConstructorButNeeded2::[implicit_constructor]: OK
+NoConstructorButNeeded2::[receive_ether_selfdestruct]: OK
 No errors found.

@@ -66,6 +66,8 @@ private:
 	 */
 	void constructorPreamble(ASTNode const& _scope);
 
+	void createEtherReceiveFunc(ContractDefinition const& _node);
+
 	/**
 	 * Helper method to initialize a state variable based on an explicit expression or
 	 * a default value

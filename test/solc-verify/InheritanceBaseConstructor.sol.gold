@@ -1,4 +1,7 @@
 C::[constructor]: OK
+C::[receive_ether_selfdestruct]: OK
 D::[implicit_constructor]: OK
+D::[receive_ether_selfdestruct]: OK
 E::[constructor]: OK
+E::[receive_ether_selfdestruct]: OK
 No errors found.

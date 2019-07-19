@@ -9,4 +9,5 @@ SpecificationLoopInvar::forLoop: OK
 SpecificationLoopInvar::[implicit_constructor]: OK
 ContractInvarOnLoop::increase: OK
 ContractInvarOnLoop::[implicit_constructor]: OK
+ContractInvarOnLoop::[receive_ether_selfdestruct]: OK
 Errors were found by the verifier.
