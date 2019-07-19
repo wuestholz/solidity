@@ -8,6 +8,7 @@ Language Features:
 
 
 Compiler Features:
+ * ABI: Additional internal type info in the field ``internalType``.
  * eWasm: Highly experimental eWasm output using ``--ewasm`` in the commandline interface or output selection of ``ewasm.wast`` in standard-json.
  * Metadata: Update the swarm hash, changes ``bzzr0`` to ``bzzr1`` and urls to use ``bzz-raw://``.
  * Standard JSON Interface: Compile only selected sources and contracts.
@@ -19,6 +20,7 @@ Compiler Features:
 Bugfixes:
  * View/Pure Checker: Properly detect state variable access through base class.
  * Yul analyzer: Check availability of data objects already in analysis phase.
+ * Yul Optimizer: Fix an issue where memory-accessing code was removed even though ``msize`` was used in the program.
 
 
 

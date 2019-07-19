@@ -14,18 +14,10 @@
  *  pragma solidity >=0.0;
  *  pragma experimental ABIEncoderV2;
  *
- *  contract Factory {
- *      // Factory test function. Called by EVM client
- *      function test() external returns (uint) {
- *          C c = new C();
- *          return c.test();
- *      }
- *  }
- *
  * contract C {
  *      // State variable
  *      string x_0;
- *      // Test function. Called by Factory test function
+ *      // Test function that is called by the VM.
  *      function test() public returns (uint) {
  *          // Local variable
  *          bytes x_1 = "1";
@@ -45,7 +37,7 @@
  *
  *      // Public function that is called by test() function. Accepts one or more arguments and returns
  *      // a uint value (zero if abi en/decoding was successful, non-zero otherwise)
- *      function coder_public(string memory c_0, bytes memory c_1) public view returns (uint) {
+ *      function coder_public(string memory c_0, bytes memory c_1) public pure returns (uint) {
  *              if (!bytesCompare(bytes(c_0), "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"))
  *	    	        return 1;
  *              if (!bytesCompare(c_1, "1"))
@@ -55,7 +47,7 @@
  *
  *      // External function that is called by test() function. Accepts one or more arguments and returns
  *      // a uint value (zero if abi en/decoding was successful, non-zero otherwise)
- *      function coder_external(string calldata c_0, bytes calldata c_1) external view returns (uint) {
+ *      function coder_external(string calldata c_0, bytes calldata c_1) external pure returns (uint) {
  *              if (!stringCompare(c_0, "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"))
  *  		        return 1;
  *              if (!bytesCompare(c_1, "1"))
@@ -109,6 +101,8 @@ private:
 		ARRAY
 	};
 
+	void visit(BoolType const&);
+
 	void visit(IntegerType const&);
 
 	void visit(FixedByteType const&);
@@ -134,6 +128,8 @@ private:
 	void visit(Contract const&);
 
 	std::string getValueByBaseType(ArrayType const&);
+
+	DataType getDataTypeByBaseType(ArrayType const& _x);
 
 	void resizeInitArray(
 		ArrayType const& _x,
@@ -243,9 +239,9 @@ private:
 
 	// String and bytes literals are derived by hashing a monotonically increasing
 	// counter and enclosing the said hash inside double quotes.
-	std::string bytesArrayValueAsString()
+	std::string bytesArrayValueAsString(unsigned _counter)
 	{
-		return "\"" + toHex(hashUnsignedInt(getNextCounter()), HexPrefix::DontAdd) + "\"";
+		return "\"" + toHex(hashUnsignedInt(_counter), HexPrefix::DontAdd) + "\"";
 	}
 
 	std::string getQualifier(DataType _dataType)
@@ -255,6 +251,7 @@ private:
 
 	// Static declarations
 	static std::string structTypeAsString(StructType const& _x);
+	static std::string boolValueAsString(unsigned _counter);
 	static std::string intValueAsString(unsigned _width, unsigned _counter);
 	static std::string uintValueAsString(unsigned _width, unsigned _counter);
 	static std::string integerValueAsString(bool _sign, unsigned _width, unsigned _counter);
@@ -286,6 +283,11 @@ private:
 		return _x.is_signed();
 	}
 
+	static std::string getBoolTypeAsString()
+	{
+		return "bool";
+	}
+
 	static std::string getIntTypeAsString(IntegerType const& _x)
 	{
 		return ((isIntSigned(_x) ? "int" : "uint") + std::to_string(getIntWidth(_x)));
@@ -304,6 +306,14 @@ private:
 	static std::string getAddressTypeAsString(AddressType const& _x)
 	{
 		return (_x.payable() ? "address payable": "address");
+	}
+
+	static DataType getDataTypeOfDynBytesType(DynamicByteArrayType const& _x)
+	{
+		if (_x.type() == DynamicByteArrayType::STRING)
+			return DataType::STRING;
+		else
+			return DataType::BYTES;
 	}
 
 	// Convert _counter to string and return its keccak256 hash

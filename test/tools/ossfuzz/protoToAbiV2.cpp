@@ -158,6 +158,11 @@ void ProtoConverter::checkResizeOp(std::string const& _paramName, unsigned _len)
 	appendChecks(DataType::VALUE, _paramName + ".length", std::to_string(_len));
 }
 
+std::string ProtoConverter::boolValueAsString(unsigned _counter)
+{
+	return ((_counter % 2) ? "true" : "false");
+}
+
 /* Input(s)
  *   - Unsigned integer to be hashed
  *   - Width of desired uint value
@@ -250,6 +255,15 @@ std::string ProtoConverter::structTypeAsString(StructType const&)
 	return {};
 }
 
+void ProtoConverter::visit(BoolType const&)
+{
+	visitType(
+		DataType::VALUE,
+		getBoolTypeAsString(),
+		boolValueAsString(getNextCounter())
+	);
+}
+
 void ProtoConverter::visit(IntegerType const& _x)
 {
 	visitType(
@@ -290,6 +304,9 @@ void ProtoConverter::visit(ValueType const& _x)
 		case ValueType::kAdty:
 			visit(_x.adty());
 			break;
+		case ValueType::kBoolty:
+			visit(_x.boolty());
+			break;
 		case ValueType::VALUE_TYPE_ONEOF_NOT_SET:
 			break;
 	}
@@ -300,7 +317,7 @@ void ProtoConverter::visit(DynamicByteArrayType const& _x)
 	visitType(
 		(_x.type() == DynamicByteArrayType::BYTES) ? DataType::BYTES : DataType::STRING,
 		bytesArrayTypeAsString(_x),
-		bytesArrayValueAsString()
+		bytesArrayValueAsString(getNextCounter())
 	);
 }
 
@@ -350,10 +367,31 @@ std::string ProtoConverter::getValueByBaseType(ArrayType const& _x)
 		return fixedByteValueAsString(getFixedByteWidth(_x.byty()), getNextCounter());
 	case ArrayType::kAdty:
 		return addressValueAsString(getNextCounter());
+	case ArrayType::kBoolty:
+		return boolValueAsString(getNextCounter());
+	case ArrayType::kDynbytesty:
+		return bytesArrayValueAsString(getNextCounter());
 	// TODO: Implement structs.
 	case ArrayType::kStty:
 	case ArrayType::BASE_TYPE_ONEOF_NOT_SET:
 		solAssert(false, "Proto ABIv2 fuzzer: Invalid array base type");
+	}
+}
+
+ProtoConverter::DataType ProtoConverter::getDataTypeByBaseType(ArrayType const& _x)
+{
+	switch (_x.base_type_oneof_case())
+	{
+	case ArrayType::kInty:
+	case ArrayType::kByty:
+	case ArrayType::kAdty:
+	case ArrayType::kBoolty:
+		return DataType::VALUE;
+	case ArrayType::kDynbytesty:
+		return getDataTypeOfDynBytesType(_x.dynbytesty());
+	case ArrayType::kStty:
+	case ArrayType::BASE_TYPE_ONEOF_NOT_SET:
+		solUnimplemented("Proto ABIv2 fuzzer: Invalid array base type");
 	}
 }
 
@@ -421,7 +459,8 @@ void ProtoConverter::resizeHelper(
 		// value is a value of base type
 		std::string value = getValueByBaseType(_x);
 		// add assignment and check
-		addCheckedVarDef(DataType::VALUE, _varName, _paramName, value);
+		DataType dataType = getDataTypeByBaseType(_x);
+		addCheckedVarDef(dataType, _varName, _paramName, value);
 	}
 	else
 	{
@@ -493,6 +532,12 @@ void ProtoConverter::visit(ArrayType const& _x)
 		break;
 	case ArrayType::kAdty:
 		baseType = getAddressTypeAsString(_x.adty());
+		break;
+	case ArrayType::kBoolty:
+		baseType = getBoolTypeAsString();
+		break;
+	case ArrayType::kDynbytesty:
+		baseType = bytesArrayTypeAsString(_x.dynbytesty());
 		break;
 	case ArrayType::kStty:
 	case ArrayType::BASE_TYPE_ONEOF_NOT_SET:
@@ -630,7 +675,7 @@ std::string ProtoConverter::typedParametersAsString(CalleeType _calleeType)
 	}
 }
 
-// Function that is called by the factory contract
+/// Test function to be called externally.
 void ProtoConverter::visit(TestFunction const& _x)
 {
 	m_output << R"(
@@ -672,12 +717,12 @@ void ProtoConverter::writeHelperFunctions()
 	// memory/calldata and check if decoded value matches storage value
 	// return true on successful match, false otherwise
 	m_output << Whiskers(R"(
-	function coder_public(<parameters_memory>) public view returns (uint) {
+	function coder_public(<parameters_memory>) public pure returns (uint) {
 		<equality_checks>
 		return 0;
 	}
 
-	function coder_external(<parameters_calldata>) external view returns (uint) {
+	function coder_external(<parameters_calldata>) external pure returns (uint) {
 		<equality_checks>
 		return 0;
 	}
@@ -692,13 +737,6 @@ void ProtoConverter::visit(Contract const& _x)
 {
 	m_output << R"(pragma solidity >=0.0;
 pragma experimental ABIEncoderV2;
-
-contract Factory {
-	function test() external returns (uint) {
-		C c = new C();
-		return c.test();
-	}
-}
 
 contract C {
 )";
