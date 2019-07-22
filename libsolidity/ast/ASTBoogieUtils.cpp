@@ -910,5 +910,20 @@ bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& cont
 	return nullptr;
 }
 
+bg::Decl::Ref ASTBoogieUtils::newStruct(StructDefinition const* structDef, BoogieContext& context)
+{
+	// Address of the new struct
+	// TODO: make sure that it is a new address
+	string varName = "new_struct_" + structDef->name() + "#" + toString(context.nextId());
+	bg::TypeDeclRef varType = context.getStructType(structDef, DataLocation::Memory);
+	return bg::Decl::variable(varName, varType);
+}
+
+bg::Decl::Ref ASTBoogieUtils::newArray(bg::TypeDeclRef type, BoogieContext& context)
+{
+	// TODO: make sure that it is a new address
+	return bg::Decl::variable("new_array#" + toString(context.nextId()), type);
+}
+
 }
 }

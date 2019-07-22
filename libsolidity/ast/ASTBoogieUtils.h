@@ -182,6 +182,12 @@ public:
 	 */
 	static
 	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
+
+	static
+	boogie::Decl::Ref newStruct(StructDefinition const* structDef, BoogieContext& context);
+
+	static
+	boogie::Decl::Ref newArray(boogie::TypeDeclRef type, BoogieContext& context);
 };
 
 }

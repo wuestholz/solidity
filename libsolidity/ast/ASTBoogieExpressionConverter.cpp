@@ -141,7 +141,8 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			if (lhsArrType->location() == DataLocation::Memory)
 			{
 				// Create new
-				auto varDecl = newArray(m_context.toBoogieType(lhsType, &_node));
+				auto varDecl = ASTBoogieUtils::newArray(m_context.toBoogieType(lhsType, &_node), m_context);
+				m_newDecls.push_back(varDecl);
 				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
 				lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
 			}
@@ -262,7 +263,8 @@ void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _nod
 		else if (rhsStructType->location() == DataLocation::Storage)
 		{
 			// Create new
-			auto varDecl = newStruct(&lhsStructType->structDefinition());
+			auto varDecl = ASTBoogieUtils::newStruct(&lhsStructType->structDefinition(), m_context);
+			m_newDecls.push_back(varDecl);
 			addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
 
 			// Make deep copy
@@ -353,7 +355,8 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 			if (lhsLoc == DataLocation::Memory)
 			{
 				// Create new
-				auto varDecl = newStruct(&memberStructType->structDefinition());
+				auto varDecl = ASTBoogieUtils::newStruct(&memberStructType->structDefinition(), m_context);
+				m_newDecls.push_back(varDecl);
 				// Update member to point to new
 				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 			}
@@ -374,7 +377,10 @@ void ASTBoogieExpressionConverter::deepCopyStruct(Assignment const& _node, Struc
 				if (lhsLoc == DataLocation::Memory)
 				{
 					// Create new
-					auto varDecl = newArray(m_context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &_node));
+					auto varDecl = ASTBoogieUtils::newArray(
+							m_context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &_node),
+							m_context);
+					m_newDecls.push_back(varDecl);
 					// Update member to point to new
 					addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 					lhsSel = m_context.getMemArray(lhsSel, m_context.toBoogieType(arrType->baseType(), &_node));
@@ -401,7 +407,8 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 		auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
 		auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
 		// Create new
-		auto varDecl = newArray(m_context.toBoogieType(_node.annotation().type, &_node));
+		auto varDecl = ASTBoogieUtils::newArray(m_context.toBoogieType(_node.annotation().type, &_node), m_context);
+		m_newDecls.push_back(varDecl);
 		auto arrExpr = m_context.getMemArray(varDecl->getRefTo(), bgType);
 		// Set each element
 		for (size_t i = 0; i < _node.components().size(); i++)
@@ -974,20 +981,10 @@ void ASTBoogieExpressionConverter::functionCallConversion(FunctionCall const& _n
 	}
 }
 
-bg::Decl::Ref ASTBoogieExpressionConverter::newStruct(StructDefinition const* structDef)
-{
-	// Address of the new struct
-	// TODO: make sure that it is a new address
-	string varName = "new_struct_" + structDef->name() + "#" + toString(m_context.nextId());
-	bg::TypeDeclRef varType = m_context.getStructType(structDef, DataLocation::Memory);
-	auto varDecl = bg::Decl::variable(varName, varType);
-	m_newDecls.push_back(varDecl);
-	return varDecl;
-}
-
 void ASTBoogieExpressionConverter::functionCallNewStruct(StructDefinition const* structDef, vector<bg::Expr::Ref> const& args)
 {
-	auto varDecl = newStruct(structDef);
+	auto varDecl = ASTBoogieUtils::newStruct(structDef, m_context);
+	m_newDecls.push_back(varDecl);
 	// Initialize each member
 	for (size_t i = 0; i < structDef->members().size() && i < args.size(); ++i)
 	{
@@ -1083,18 +1080,11 @@ void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, ve
 	addTCC(m_currentExpr, _node.annotation().type);
 }
 
-bg::Decl::Ref ASTBoogieExpressionConverter::newArray(bg::TypeDeclRef type)
-{
-	// TODO: make sure that it is a new address
-	auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), type);
-	m_newDecls.push_back(varDecl);
-	return varDecl;
-}
-
 void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _node)
 {
 	auto arrType = dynamic_cast<ArrayType const*>(_node.annotation().type);
-	auto varDecl = newArray(m_context.toBoogieType(_node.annotation().type, &_node));
+	auto varDecl = ASTBoogieUtils::newArray(m_context.toBoogieType(_node.annotation().type, &_node), m_context);
+	m_newDecls.push_back(varDecl);
 	auto bgType = m_context.toBoogieType(arrType->baseType(), &_node);
 	auto memArr = m_context.getMemArray(varDecl->getRefTo(), bgType);
 	auto arrLen = m_context.getArrayLength(memArr, bgType);
