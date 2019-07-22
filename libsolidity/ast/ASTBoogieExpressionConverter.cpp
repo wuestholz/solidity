@@ -1504,9 +1504,10 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	return false;
 }
 
-bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const&)
+bool ASTBoogieExpressionConverter::visit(ElementaryTypeNameExpression const& _node)
 {
-	solAssert(false, "Unhandled node: ElementaryTypeNameExpression");
+	m_context.reportError(&_node, "Unhandled node: ElementaryTypeNameExpression");
+	m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
 	return false;
 }
 
