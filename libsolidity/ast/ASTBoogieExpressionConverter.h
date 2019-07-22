@@ -43,10 +43,6 @@ private:
 	// Helper method to create struct assignment
 	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
 
-	// Helper method for recursive deep copy between structures
-	void deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
-			boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
-
 	// Helper method to get the length of an array
 	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
 

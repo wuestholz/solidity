@@ -188,6 +188,16 @@ public:
 
 	static
 	boogie::Decl::Ref newArray(boogie::TypeDeclRef type, BoogieContext& context);
+
+	struct AssignResult {
+		std::list<boogie::Decl::Ref> newDecls;
+		std::list<boogie::Stmt::Ref> newStmts;
+	};
+
+	static
+	void deepCopyStruct(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
+				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
+				AssignResult& assignResult);
 };
 
 }
