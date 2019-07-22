@@ -93,7 +93,7 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
-	if (context.overflow())
+	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		transferImpl->addStmts({
 			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
@@ -110,7 +110,7 @@ bg::ProcDeclRef ASTBoogieUtils::createTransferProc(BoogieContext& context)
 		transferImpl->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(amount, tp_uint256)));
 	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
-	if (context.overflow())
+	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		transferImpl->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
 		transferImpl->addStmt(bg::Stmt::assume(subSenderBalance.cc));
@@ -171,7 +171,7 @@ bg::ProcDeclRef ASTBoogieUtils::createCallProc(BoogieContext& context)
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, msg_val, 256, false);
-	if (context.overflow())
+	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
 			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
@@ -229,7 +229,7 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	auto addBalance = encodeArithBinaryOp(context, nullptr, Token::Add, this_bal, amount, 256, false);
-	if (context.overflow())
+	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
 			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
@@ -248,7 +248,7 @@ bg::ProcDeclRef ASTBoogieUtils::createSendProc(BoogieContext& context)
 		});
 	}
 	auto subSenderBalance = encodeArithBinaryOp(context, nullptr, Token::Sub, sender_bal, amount, 256, false);
-	if (context.overflow())
+	if (context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		thenBlock->addStmts({
 			bg::Stmt::comment("Implicit assumption that balances cannot overflow"),

@@ -321,7 +321,7 @@ void ASTBoogieConverter::createEtherReceiveFunc(ContractDefinition const& _node)
 		balIncrBlock->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(m_context.boogieMsgValue()->getRefTo(), tp_uint256)));
 	}
 	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, m_context.boogieMsgValue()->getRefTo(), 256, false);
-	if (m_context.overflow())
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		balIncrBlock->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
 		balIncrBlock->addStmt(bg::Stmt::assume(addResult.cc));
@@ -902,7 +902,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 			m_currentBlocks.top()->addStmt(bg::Stmt::assume(ASTBoogieUtils::getTCCforExpr(msg_val, tp_uint256)));
 		}
 		auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, this_bal, msg_val, 256, false);
-		if (m_context.overflow())
+		if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		{
 			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
 			m_currentBlocks.top()->addStmt(bg::Stmt::assume(addResult.cc));

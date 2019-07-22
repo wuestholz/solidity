@@ -215,7 +215,7 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 				auto selExpr = bg::Expr::arrsel(sumId, m_context.boogieThis()->getRefTo());
 				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub, selExpr, lhs, bits, isSigned);
 				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, subResult.expr, rhs, bits, isSigned);
-				if (m_context.overflow())
+				if (m_context.encoding() == BoogieContext::Encoding::MOD && !isSigned)
 				{
 					addSideEffect(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
 					addSideEffect(bg::Stmt::assume(subResult.cc));
@@ -1022,7 +1022,7 @@ void ASTBoogieExpressionConverter::functionCallReduceBalance(bg::Expr::Ref msgVa
 	}
 	auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub,
 			this_balance, msgValue, 256, false);
-	if (m_context.overflow())
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		addSideEffect(bg::Stmt::comment("Implicit assumption that balances cannot overflow"));
 		addSideEffect(bg::Stmt::assume(subResult.cc));
@@ -1045,7 +1045,7 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(bg::Expr::Ref msgVa
 
 	auto addResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add,
 			this_balance, msgValue, 256, false);
-	if (m_context.overflow())
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 		revert->addStmts( { bg::Stmt::comment("Implicit assumption that balances cannot overflow"),
 			bg::Stmt::assume(addResult.cc) });
 
@@ -1151,8 +1151,11 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
 	}
 	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(len, lenUpd.expr));
-	if (m_context.overflow())
+	if (m_context.encoding() == BoogieContext::Encoding::MOD)
+	{
+		addSideEffect(bg::Stmt::comment("Implicit assumption that length cannot overflow"));
 		addSideEffect(bg::Stmt::assume(lenUpd.cc));
+	}
 }
 
 bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
