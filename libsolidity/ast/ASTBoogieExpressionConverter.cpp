@@ -1226,23 +1226,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 
 	// address.balance / this.balance
 	bool isAddress = typeCategory == Type::Category::Address;
-	if (_node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
+	if (isAddress && _node.memberName() == ASTBoogieUtils::SOLIDITY_BALANCE)
 	{
-		if (isAddress)
-		{
-			m_currentExpr = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), expr);
-			addTCC(m_currentExpr, tp_uint256);
-			return false;
-		}
-		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-		{
-			if (exprId->name() == ASTBoogieUtils::SOLIDITY_THIS)
-			{
-				m_currentExpr = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo());
-				addTCC(m_currentExpr, tp_uint256);
-				return false;
-			}
-		}
+		m_currentExpr = bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), expr);
+		addTCC(m_currentExpr, tp_uint256);
+		return false;
 	}
 	// address.transfer()
 	if (isAddress && _node.memberName() == ASTBoogieUtils::SOLIDITY_TRANSFER)
