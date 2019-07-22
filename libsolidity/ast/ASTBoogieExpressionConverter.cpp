@@ -126,30 +126,27 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 
 	if (lhsType->category() == Type::Category::Array)
 	{
-		Type::Category rhsTypeCategory = rhsType->category();
-		switch (rhsTypeCategory)
+		auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
+		if (lhsArrType->isString())
 		{
-		case Type::Category::Array: {
-			auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
-			auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
-			if (lhsArrType->location() != rhsArrType->location())
-			{
-				if (lhsArrType->location() == DataLocation::Memory)
-				{
-					// Create new
-					auto varDecl = newArray(m_context.toBoogieType(lhsType, &_node));
-					addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
-					lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
-				}
-				else if (rhsArrType->location() == DataLocation::Memory)
-					rhsExpr = m_context.getMemArray(rhsExpr, m_context.toBoogieType(rhsArrType->baseType(), &_node));
-			}
-			break;
-		}
-		default:
-			m_context.reportError(&_node, "Unsupported assignment to array.");
-			m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
+			createAssignment(lhsNode, lhsExpr, rhsExpr);
+			m_currentExpr = lhsExpr;
 			return false;
+		}
+
+		solAssert(rhsType->category() == Type::Category::Array, "LHS is array but RHS is not");
+		auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
+		if (lhsArrType->location() != rhsArrType->location())
+		{
+			if (lhsArrType->location() == DataLocation::Memory)
+			{
+				// Create new
+				auto varDecl = newArray(m_context.toBoogieType(lhsType, &_node));
+				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
+				lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
+			}
+			else if (rhsArrType->location() == DataLocation::Memory)
+				rhsExpr = m_context.getMemArray(rhsExpr, m_context.toBoogieType(rhsArrType->baseType(), &_node));
 		}
 	}
 
