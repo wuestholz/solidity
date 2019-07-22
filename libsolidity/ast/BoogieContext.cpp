@@ -259,7 +259,7 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 		}
 		return m_storStructTypes[structDef];
 	}
-	if (loc == DataLocation::Memory)
+	else if (loc == DataLocation::Memory)
 	{
 		if (m_memStructTypes.find(structDef) == m_memStructTypes.end())
 		{
@@ -268,9 +268,8 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 		}
 		return m_memStructTypes[structDef];
 	}
-
-	solAssert(false, "Unsupported data location for structs");
-	return nullptr;
+	reportError(structDef, "Unsupported data location (" + ASTBoogieUtils::dataLocToStr(loc) + ") for struct.");
+	return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
 }
 
 bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)

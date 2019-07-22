@@ -60,9 +60,6 @@ public:
 	// Return this expression as an identifier when something cannot be evaluated
 	static std::string const ERR_EXPR;
 
-	static std::string const BOOGIE_STOR;
-	static std::string const BOOGIE_MEM;
-
 	// Specification annotations
 	static std::string const DOCTAG_CONTRACT_INVAR;
 	static std::string const DOCTAG_LOOP_INVAR;

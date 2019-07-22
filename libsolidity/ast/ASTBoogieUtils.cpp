@@ -50,9 +50,6 @@ string const ASTBoogieUtils::VERIFIER_OVERFLOW = "__verifier_overflow";
 
 string const ASTBoogieUtils::ERR_EXPR = "__ERROR";
 
-string const ASTBoogieUtils::BOOGIE_STOR = "stor";
-string const ASTBoogieUtils::BOOGIE_MEM = "mem";
-
 string const ASTBoogieUtils::DOCTAG_CONTRACT_INVAR = "invariant";
 string const ASTBoogieUtils::DOCTAG_CONTRACT_INVARS_INCLUDE = "{contractInvariants}";
 string const ASTBoogieUtils::DOCTAG_LOOP_INVAR = "invariant";
@@ -289,11 +286,9 @@ string ASTBoogieUtils::dataLocToStr(DataLocation loc)
 {
 	switch(loc)
 	{
-	case DataLocation::Storage: return BOOGIE_STOR;
-	case DataLocation::Memory: return BOOGIE_MEM;
-	case DataLocation::CallData:
-		solAssert(false, "CallData storage location is not supported.");
-		break;
+	case DataLocation::Storage: return "storage";
+	case DataLocation::Memory: return "memory";
+	case DataLocation::CallData: return "calldata";
 	default:
 		solAssert(false, "Unknown storage location.");
 	}
