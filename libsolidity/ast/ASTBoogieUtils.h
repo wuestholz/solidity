@@ -219,7 +219,7 @@ public:
 			AssignResult& result);
 
 	static
-	void deepCopyStructOld(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
+	void deepCopyStruct(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
 				AssignResult& assignResult);
 };

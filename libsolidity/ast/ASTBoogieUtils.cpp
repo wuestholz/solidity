@@ -1017,7 +1017,7 @@ void ASTBoogieUtils::makeStructAssign(StructType const* lhsType, StructType cons
 			result.newStmts.push_back(bg::Stmt::assign(lhsBg, varDecl->getRefTo()));
 
 			// Make deep copy
-			deepCopyStructOld(context, *assocNode, &lhsType->structDefinition(), lhsBg, rhsBg,
+			deepCopyStruct(context, *assocNode, &lhsType->structDefinition(), lhsBg, rhsBg,
 					lhsType->location(), rhsType->location(), result);
 			return;
 		}
@@ -1049,7 +1049,7 @@ void ASTBoogieUtils::makeStructAssign(StructType const* lhsType, StructType cons
 		// RHS is memory --> deep copy
 		else if (rhsType->location() == DataLocation::Memory)
 		{
-			deepCopyStructOld(context, *assocNode, &lhsType->structDefinition(), lhsBg, rhsBg,
+			deepCopyStruct(context, *assocNode, &lhsType->structDefinition(), lhsBg, rhsBg,
 					lhsType->location(), rhsType->location(), result);
 			return;
 		}
@@ -1154,11 +1154,11 @@ void ASTBoogieUtils::makeBasicAssign(TypePointer lhsType, TypePointer rhsType, b
 	context.reportError(assocNode, "Unsupported assignment (LHS must be identifier/indexer)");
 }
 
-void ASTBoogieUtils::deepCopyStructOld(BoogieContext& context, ASTNode const& _associatedNode,
+void ASTBoogieUtils::deepCopyStruct(BoogieContext& context, ASTNode const& assocNode,
 		StructDefinition const* structDef, bg::Expr::Ref lhsBase, bg::Expr::Ref rhsBase,
-		DataLocation lhsLoc, DataLocation rhsLoc, AssignResult& assignResult)
+		DataLocation lhsLoc, DataLocation rhsLoc, AssignResult& result)
 {
-	assignResult.newStmts.push_back(bg::Stmt::comment("Deep copy struct " + structDef->name()));
+	result.newStmts.push_back(bg::Stmt::comment("Deep copy struct " + structDef->name()));
 	// Loop through each member
 	for (auto member: structDef->members())
 	{
@@ -1179,23 +1179,25 @@ void ASTBoogieUtils::deepCopyStructOld(BoogieContext& context, ASTNode const& _a
 		else
 			rhsSel = bg::Expr::arrsel(bg::Expr::id(context.mapDeclName(*member)), rhsBase);
 
-
-		auto memberTypeCat = member->annotation().type->category();
+		auto memberType = member->annotation().type;
+		auto memberTypeCat = memberType->category();
 		// For nested structs do recursion
 		if (memberTypeCat == Type::Category::Struct)
 		{
-			auto memberStructType = dynamic_cast<StructType const*>(member->annotation().type);
+			auto memberStructType = dynamic_cast<StructType const*>(memberType);
 			// Deep copy into memory creates new
 			if (lhsLoc == DataLocation::Memory)
 			{
 				// Create new
 				auto varDecl = ASTBoogieUtils::newStruct(&memberStructType->structDefinition(), context);
-				assignResult.newDecls.push_back(varDecl);
+				result.newDecls.push_back(varDecl);
 				// Update member to point to new
-				assignResult.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
+				makeBasicAssign(memberType, memberType, lhsSel, varDecl->getRefTo(),
+						nullptr, Token::Assign, &assocNode, context, result);
+				result.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 			}
 			// Do the deep copy
-			deepCopyStructOld(context, _associatedNode, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc, assignResult);
+			deepCopyStruct(context, assocNode, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc, result);
 		}
 		else if (memberTypeCat == Type::Category::Mapping)
 		{
@@ -1203,32 +1205,36 @@ void ASTBoogieUtils::deepCopyStructOld(BoogieContext& context, ASTNode const& _a
 		}
 		else if (memberTypeCat == Type::Category::Array)
 		{
-			auto arrType = dynamic_cast<ArrayType const*>(member->annotation().type);
+			auto arrType = dynamic_cast<ArrayType const*>(memberType);
 			if (arrType->isString())
-				assignResult.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
+				makeBasicAssign(arrType, arrType, lhsSel, rhsSel, nullptr, Token::Assign,
+						&assocNode, context, result);
 			else
 			{
 				if (lhsLoc == DataLocation::Memory)
 				{
 					// Create new
 					auto varDecl = ASTBoogieUtils::newArray(
-							context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &_associatedNode),
+							context.toBoogieType(TypeProvider::withLocation(arrType, DataLocation::Memory, false), &assocNode),
 							context);
-					assignResult.newDecls.push_back(varDecl);
+					result.newDecls.push_back(varDecl);
 					// Update member to point to new
-					assignResult.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
-					lhsSel = context.getMemArray(lhsSel, context.toBoogieType(arrType->baseType(), &_associatedNode));
+					makeBasicAssign(memberType, memberType, lhsSel, varDecl->getRefTo(),
+							nullptr, Token::Assign, &assocNode, context, result);
+					lhsSel = context.getMemArray(lhsSel, context.toBoogieType(arrType->baseType(), &assocNode));
 				}
 				else if (rhsLoc == DataLocation::Memory)
-					rhsSel = context.getMemArray(rhsSel, context.toBoogieType(arrType->baseType(), &_associatedNode));
+					rhsSel = context.getMemArray(rhsSel, context.toBoogieType(arrType->baseType(), &assocNode));
 
-				assignResult.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
+				makeBasicAssign(memberType, memberType, lhsSel, rhsSel,
+						nullptr, Token::Assign, &assocNode, context, result);
 			}
 		}
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			assignResult.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsSel));
+			makeBasicAssign(memberType, memberType, lhsSel, rhsSel,
+					nullptr, Token::Assign, &assocNode, context, result);
 		}
 	}
 }
