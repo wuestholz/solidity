@@ -187,11 +187,28 @@ void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLh
 	if (auto lhsTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(lhs))
 	{
 		auto rhsTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(rhs);
+		auto tupleType = dynamic_cast<TupleType const*>(originalLhs.annotation().type);
 		auto const& lhsElements = lhsTuple->elements();
 		auto const& rhsElements = rhsTuple->elements();
+		vector<bg::VarDeclRef> tmpVars;
 		for (unsigned i = 0; i < lhsElements.size(); ++ i)
+		{
 			if (lhsElements[i])
-				createAssignment(originalLhs, lhsElements[i], rhsElements[i]);
+			{
+				// Introduce temp variables due to expressions like (a, b) = (b, a)
+				auto tmp = bg::Decl::variable("tmp#" + toString(m_context.nextId()),
+						m_context.toBoogieType(tupleType->components().at(i), &originalLhs));
+				m_newDecls.push_back(tmp);
+				tmpVars.push_back(tmp);
+				createAssignment(originalLhs, tmp->getRefTo(), rhsElements[i]);
+			}
+			else
+				tmpVars.push_back(nullptr);
+		}
+
+		for (unsigned i = 0; i < lhsElements.size(); ++i)
+			if (lhsElements[i])
+				createAssignment(originalLhs, lhsElements[i], tmpVars[i]->getRefTo());
 
 		return;
 	}
