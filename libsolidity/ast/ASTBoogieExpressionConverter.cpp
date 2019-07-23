@@ -116,232 +116,17 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	bg::Expr::Ref rhsExpr = m_currentExpr;
 
-	// Structs
-	if (lhsType->category() == Type::Category::Struct)
-	{
-		solAssert(rhsType->category() == Type::Category::Struct, "LHS is struct but RHS is not");
-		createStructAssignment(_node, lhsExpr, rhsExpr);
-		return false;
-	}
-
-	if (lhsType->category() == Type::Category::Array)
-	{
-		auto lhsArrType = dynamic_cast<ArrayType const*>(lhsType);
-		if (lhsArrType->isString())
-		{
-			createAssignment(lhsNode, lhsExpr, rhsExpr);
-			m_currentExpr = lhsExpr;
-			return false;
-		}
-
-		solAssert(rhsType->category() == Type::Category::Array, "LHS is array but RHS is not");
-		auto rhsArrType = dynamic_cast<ArrayType const*>(rhsType);
-		if (lhsArrType->location() != rhsArrType->location())
-		{
-			if (lhsArrType->location() == DataLocation::Memory)
-			{
-				// Create new
-				auto varDecl = ASTBoogieUtils::newArray(m_context.toBoogieType(lhsType, &_node), m_context);
-				m_newDecls.push_back(varDecl);
-				addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
-				lhsExpr = m_context.getMemArray(lhsExpr, m_context.toBoogieType(lhsArrType->baseType(), &_node));
-			}
-			else if (rhsArrType->location() == DataLocation::Memory)
-				rhsExpr = m_context.getMemArray(rhsExpr, m_context.toBoogieType(rhsArrType->baseType(), &_node));
-		}
-	}
-
-	// Bit-precise mode
-	if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(lhsType))
-		// Check for implicit conversion
-		rhsExpr = ASTBoogieUtils::checkImplicitBvConversion(rhsExpr, rhsType, lhsType, m_context);
-
-	// Check for additional arithmetic needed
-	if (assignType == Token::Assign)
-	{
-		// rhs already contains the result
-		result.expr = rhsExpr;
-	}
-	else
-	{
-		// Transform rhs based on the operator, e.g., a += b becomes a := bvadd(a, b)
-		unsigned bits = ASTBoogieUtils::getBits(lhsType);
-		bool isSigned = ASTBoogieUtils::isSigned(lhsType);
-		result = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, assignType, lhsExpr, rhsExpr, bits, isSigned);
-	}
-
-	if (m_context.overflow() && result.cc)
-		m_ocs.push_back(result.cc);
-
-	// Create the assignment with the helper method
-	createAssignment(_node.leftHandSide(), lhsExpr, result.expr);
+	ASTBoogieUtils::AssignResult res;
+	ASTBoogieUtils::makeAssign(lhsType, rhsType, lhsExpr, rhsExpr, &lhsNode, assignType, &_node, m_context, res);
+	m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
+	m_ocs.insert(m_ocs.end(), res.ocs.begin(), res.ocs.end());
+	for (auto stmt: res.newStmts)
+		addSideEffect(stmt);
 
 	// Result will be the LHS (for chained assignments like x = y = 5)
 	m_currentExpr = lhsExpr;
 
 	return false;
-}
-
-void ASTBoogieExpressionConverter::createAssignment(Expression const& originalLhs, bg::Expr::Ref lhs, bg::Expr::Ref rhs)
-{
-	// If tuple, do element-wise
-	if (auto lhsTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(lhs))
-	{
-		auto rhsTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(rhs);
-		auto tupleType = dynamic_cast<TupleType const*>(originalLhs.annotation().type);
-		auto const& lhsElements = lhsTuple->elements();
-		auto const& rhsElements = rhsTuple->elements();
-		vector<bg::VarDeclRef> tmpVars;
-		for (unsigned i = 0; i < lhsElements.size(); ++ i)
-		{
-			if (lhsElements[i])
-			{
-				// Introduce temp variables due to expressions like (a, b) = (b, a)
-				auto tmp = bg::Decl::variable("tmp#" + toString(m_context.nextId()),
-						m_context.toBoogieType(tupleType->components().at(i), &originalLhs));
-				m_newDecls.push_back(tmp);
-				tmpVars.push_back(tmp);
-				createAssignment(originalLhs, tmp->getRefTo(), rhsElements[i]);
-			}
-			else
-				tmpVars.push_back(nullptr);
-		}
-
-		for (unsigned i = 0; i < lhsElements.size(); ++i)
-			if (lhsElements[i])
-				createAssignment(originalLhs, lhsElements[i], tmpVars[i]->getRefTo());
-
-		return;
-	}
-
-	// Check if ghost variables need to be updated
-	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(&originalLhs))
-	{
-		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
-		{
-			if (m_context.currentSumDecls()[lhsId->annotation().referencedDeclaration])
-			{
-				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
-				auto sumId = bg::Expr::id(m_context.mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
-
-				unsigned bits = ASTBoogieUtils::getBits(originalLhs.annotation().type);
-				bool isSigned = ASTBoogieUtils::isSigned(originalLhs.annotation().type);
-
-				auto selExpr = bg::Expr::arrsel(sumId, m_context.boogieThis()->getRefTo());
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Sub, selExpr, lhs, bits, isSigned);
-				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::Add, subResult.expr, rhs, bits, isSigned);
-				if (m_context.encoding() == BoogieContext::Encoding::MOD && !isSigned)
-				{
-					addSideEffect(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
-					addSideEffect(bg::Stmt::assume(subResult.cc));
-				}
-				addSideEffect(bg::Stmt::assign(
-						sumId,
-						bg::Expr::arrupd(sumId, m_context.boogieThis()->getRefTo(), updResult.expr)));
-
-			}
-		}
-	}
-
-
-	// If LHS is simply an identifier, we can assign to it
-	if (dynamic_pointer_cast<bg::VarExpr const>(lhs))
-	{
-		solAssert(dynamic_pointer_cast<bg::TupleExpr const>(rhs) == nullptr, "");
-		addSideEffect(bg::Stmt::assign(lhs, rhs));
-		return;
-	}
-
-	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs))
-	{
-		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhs));
-		return;
-	}
-
-	m_context.reportError(&originalLhs, "Unsupported assignment (LHS must be identifier/indexer)");
-}
-
-void ASTBoogieExpressionConverter::createStructAssignment(Assignment const& _node, bg::Expr::Ref lhsExpr, bg::Expr::Ref rhsExpr)
-{
-	auto lhsStructType = dynamic_cast<StructType const*>(_node.leftHandSide().annotation().type);
-	auto rhsStructType = dynamic_cast<StructType const*>(_node.rightHandSide().annotation().type);
-	// LHS is memory
-	if (lhsStructType->location() == DataLocation::Memory)
-	{
-		// RHS is memory --> reference copy
-		if (rhsStructType->location() == DataLocation::Memory)
-		{
-			createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
-			m_currentExpr = lhsExpr;
-			return;
-		}
-		// RHS is storage --> create new, deep copy
-		else if (rhsStructType->location() == DataLocation::Storage)
-		{
-			// Create new
-			auto varDecl = ASTBoogieUtils::newStruct(&lhsStructType->structDefinition(), m_context);
-			m_newDecls.push_back(varDecl);
-			addSideEffect(bg::Stmt::assign(lhsExpr, varDecl->getRefTo()));
-
-			// Make deep copy
-			ASTBoogieUtils::AssignResult res;
-			ASTBoogieUtils::deepCopyStruct(m_context, _node, &lhsStructType->structDefinition(),
-					lhsExpr, rhsExpr, lhsStructType->location(), rhsStructType->location(), res);
-			m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
-			m_newStatements.insert(m_newStatements.end(), res.newStmts.begin(), res.newStmts.end());
-			m_currentExpr = lhsExpr;
-			return;
-		}
-		else
-		{
-			m_context.reportError(&_node, "Unsupported assignment to memory struct");
-			m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-			return;
-		}
-	}
-	// LHS is storage
-	else if (lhsStructType->location() == DataLocation::Storage)
-	{
-		// RHS is storage
-		if (rhsStructType->location() == DataLocation::Storage)
-		{
-			// LHS is local storage --> reference copy
-			if (lhsStructType->isPointer())
-			{
-				m_context.reportError(&_node, "Local storage pointers are not supported");
-				m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-				return;
-			}
-			// LHS is storage --> deep copy by data types
-			else
-			{
-				createAssignment(_node.leftHandSide(), lhsExpr, rhsExpr);
-				m_currentExpr = lhsExpr;
-				return;
-			}
-		}
-		// RHS is memory --> deep copy
-		else if (rhsStructType->location() == DataLocation::Memory)
-		{
-			ASTBoogieUtils::AssignResult res;
-			ASTBoogieUtils::deepCopyStruct(m_context, _node, &lhsStructType->structDefinition(),
-					lhsExpr, rhsExpr, lhsStructType->location(), rhsStructType->location(), res);
-			m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
-			m_newStatements.insert(m_newStatements.end(), res.newStmts.begin(), res.newStmts.end());
-			m_currentExpr = lhsExpr;
-			return;
-		}
-		else
-		{
-			m_context.reportError(&_node, "Unsupported assignment to storage struct");
-			m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-			return;
-		}
-	}
-
-	m_context.reportError(&_node, "Unsupported kind of struct as LHS");
-	m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
 }
 
 bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
@@ -444,12 +229,15 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 			bg::Decl::Ref tempVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
 					m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
 			m_newDecls.push_back(tempVar);
+			ASTBoogieUtils::AssignResult res;
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
 				// First do the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				createAssignment(_node.subExpression(), lhs, rhsResult.expr);
+				ASTBoogieUtils::makeBasicAssign(_node.annotation().type, _node.annotation().type, lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context, res);
+				for (auto stmt: res.newStmts)
+					addSideEffect(stmt);
 				// Then the assignment tmp := x
 				addSideEffect(bg::Stmt::assign(tempVar->getRefTo(), lhs));
 			}
@@ -460,7 +248,9 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 				// Then the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				createAssignment(_node.subExpression(), lhs, rhsResult.expr);
+				ASTBoogieUtils::makeBasicAssign(_node.annotation().type, _node.annotation().type, lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context, res);
+				for (auto stmt: res.newStmts)
+					addSideEffect(stmt);
 			}
 			// Result is the tmp variable (if the assignment is part of an expression)
 			m_currentExpr = tempVar->getRefTo();

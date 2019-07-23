@@ -37,12 +37,6 @@ private:
 	// Overflow conditions
 	std::list<boogie::Expr::Ref> m_ocs;
 
-	// Helper method to create an assignment
-	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
-
-	// Helper method to create struct assignment
-	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
-
 	// Helper method to get the length of an array
 	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
 

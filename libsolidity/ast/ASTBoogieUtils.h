@@ -192,10 +192,34 @@ public:
 	struct AssignResult {
 		std::list<boogie::Decl::Ref> newDecls;
 		std::list<boogie::Stmt::Ref> newStmts;
+		std::list<boogie::Expr::Ref> ocs;
 	};
 
 	static
-	void deepCopyStruct(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
+	void makeAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeTupleAssign(TupleType const* lhsType, TupleType const* rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
+	static
+	void makeStructAssign(StructType const* lhsType, StructType const* rhsType, boogie::Expr::Ref lhsBg,
+			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeArrayAssign(ArrayType const* lhsType, ArrayType const* rhsType, boogie::Expr::Ref lhsBg,
+			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeBasicAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void deepCopyStructOld(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
 				AssignResult& assignResult);
 };
