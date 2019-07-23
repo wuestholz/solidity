@@ -10,6 +10,13 @@ contract StructsSwap {
   A a2;
   A a3;
 
+  struct B {
+    A x;
+    A y;
+  }
+
+  B b;
+
   function() external payable {
     a1.x = 1;
     a2.x = 2;
@@ -38,6 +45,12 @@ contract StructsSwap {
     assert(a1.x == 3);
     assert(a2.x == 1);
     assert(a3.x == 1);
+
+    b.x.x = 1;
+    b.y.x = 2;
+    (b.x, b.y) = (b.y, b.x);
+    assert(b.x.x == 1);
+    assert(b.y.x == 1);
   }
 
 }
