@@ -22,7 +22,7 @@ contract StructsSwap {
     assert(a1.x == 1);
     assert(a2.x == 1);
     assert(a3.x == 1);
- 
+
     a1.x = 1;
     a2.x = 2;
     a3.x = 3;
