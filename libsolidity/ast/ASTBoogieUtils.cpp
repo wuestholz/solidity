@@ -887,20 +887,24 @@ bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& cont
 	{
 		// default for all members
 		StructType const* structType = dynamic_cast<StructType const*>(type);
-		MemberList const& members = structType->members(0); // No need for scope, just regular struct members
-		// Get the default value for the members
-		std::vector<bg::Expr::Ref> memberDefaultValues;
-		for (auto& member: members)
+		if (structType->dataStoredIn(DataLocation::Storage))
 		{
-			bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
-			if (memberDefaultValue == nullptr)
-				return nullptr;
-			memberDefaultValues.push_back(memberDefaultValue);
+			MemberList const& members = structType->members(0); // No need for scope, just regular struct members
+			// Get the default value for the members
+			std::vector<bg::Expr::Ref> memberDefaultValues;
+			for (auto& member: members)
+			{
+				bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
+				if (memberDefaultValue == nullptr)
+					return nullptr;
+				memberDefaultValues.push_back(memberDefaultValue);
+			}
+			// Now construct the struct value
+			StructDefinition const& structDefinition = structType->structDefinition();
+			bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
+			return bg::Expr::fn(decl->getName(), memberDefaultValues);
 		}
-		// Now construct the struct value
-		StructDefinition const& structDefinition = structType->structDefinition();
-		bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
-		return bg::Expr::fn(decl->getName(), memberDefaultValues);
+		break;
 	}
 	default:
 		// For unhandled, just return null
@@ -1194,7 +1198,6 @@ void ASTBoogieUtils::deepCopyStruct(BoogieContext& context, ASTNode const& assoc
 				// Update member to point to new
 				makeBasicAssign(memberType, memberType, lhsSel, varDecl->getRefTo(),
 						nullptr, Token::Assign, &assocNode, context, result);
-				result.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, varDecl->getRefTo()));
 			}
 			// Do the deep copy
 			deepCopyStruct(context, assocNode, &memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc, result);
