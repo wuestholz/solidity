@@ -1325,31 +1325,30 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		// Get rhs recursively
 		bg::Expr::Ref rhs = convertExpression(*_node.expression());
 
-		if (m_context.isBvEncoding())
+		// Return type
+		TypePointer returnType = nullptr;
+		auto const& returnParams = m_currentFunc->returnParameters();
+		if (returnParams.size() > 1)
 		{
-			auto rhsType = _node.expression()->annotation().type;
-
-			// Return type
-			TypePointer returnType = nullptr;
-			auto const& returnParams = m_currentFunc->returnParameters();
-			if (returnParams.size() > 1)
-			{
-				std::vector<TypePointer> elems;
-				for (auto p: returnParams)
-					elems.push_back(p->annotation().type);
-				returnType = TypeProvider::tuple(elems);
-			}
-			else
-				returnType = returnParams[0]->annotation().type;
-
-			rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, rhsType, returnType, m_context);
+			std::vector<TypePointer> elems;
+			for (auto p: returnParams)
+				elems.push_back(p->annotation().type);
+			returnType = TypeProvider::tuple(elems);
 		}
+		else
+			returnType = returnParams[0]->annotation().type;
+
+		auto rhsType = _node.expression()->annotation().type;
 
 		// LHS of assignment should already be known (set by the enclosing FunctionDefinition)
 		bg::Expr::Ref lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
-		m_currentBlocks.top()->addStmt(bg::Stmt::assign(lhs, rhs));
+		ASTBoogieUtils::AssignResult ar;
+		ASTBoogieUtils::makeAssign(returnType, rhsType, lhs, rhs, nullptr, Token::Assign, &_node, m_context, ar);
+		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+		for (auto stmt: ar.newStmts)
+			m_currentBlocks.top()->addStmt(stmt);
 	}
 	m_currentBlocks.top()->addStmt(bg::Stmt::goto_({m_currentReturnLabel}));
 	return false;

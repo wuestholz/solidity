@@ -959,7 +959,8 @@ void ASTBoogieUtils::makeTupleAssign(TupleType const* lhsType, TupleType const* 
 		Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
 	auto lhsTuple = dynamic_cast<bg::TupleExpr const*>(lhsBg.get());
-	rhsBg = checkImplicitBvConversion(rhsBg, rhsType, lhsType, context);
+	if (context.isBvEncoding())
+		rhsBg = checkImplicitBvConversion(rhsBg, rhsType, lhsType, context);
 	auto rhsTuple = dynamic_cast<bg::TupleExpr const*>(rhsBg.get());
 	solAssert(lhsTuple, "Expected tuple expression");
 	solAssert(rhsTuple, "Expected tuple expression");

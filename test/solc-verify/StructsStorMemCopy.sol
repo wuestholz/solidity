@@ -70,9 +70,21 @@ contract StructsStorMemCopy {
         assert(st.t.z == 2);
     }
 
+    function returnMem() internal view returns (S memory s) {
+        return st;
+    }
+
+    function checkReturnMem() public {
+        st.x = 1;
+        S memory sm = returnMem();
+        st.x = 2;
+        assert(sm.x == 1);
+    }
+
     function() external payable {
         storToMem();
         memToStor();
+        checkReturnMem();
     }
 
 }
