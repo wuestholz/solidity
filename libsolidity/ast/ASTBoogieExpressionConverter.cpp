@@ -487,12 +487,15 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		if (arg->annotation().type->category() == Type::Category::Array && arg->annotation().type->dataStoredIn(DataLocation::Storage))
 		{
 			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
-			// Create a copy if a storage array is passed to a function
-			auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
-			m_newDecls.push_back(tmpDecl);
-			auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
-			m_currentExpr = tmpDecl->getRefTo();
+			if (!arrType->isString())
+			{
+				// Create a copy if a storage array is passed to a function
+				auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
+				m_newDecls.push_back(tmpDecl);
+				auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
+				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
+				m_currentExpr = tmpDecl->getRefTo();
+			}
 		}
 
 		// Do not add argument for call
