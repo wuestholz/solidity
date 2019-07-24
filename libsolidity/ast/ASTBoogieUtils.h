@@ -195,14 +195,24 @@ public:
 		std::list<boogie::Expr::Ref> ocs;
 	};
 
+	/**
+	 * Helper function to make an assignment, handling all conversions and side effects.
+	 * The original lhs pointer is optional, it is checked against the sum function.
+	 */
 	static
-	void makeAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+	AssignResult makeAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context);
+
+private:
+	static
+	void makeAssignInternal(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
 			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
 			AssignResult& result);
 
 	static
 	void makeTupleAssign(TupleType const* lhsType, TupleType const* rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
 			Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
+
 	static
 	void makeStructAssign(StructType const* lhsType, StructType const* rhsType, boogie::Expr::Ref lhsBg,
 			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
@@ -219,9 +229,9 @@ public:
 			AssignResult& result);
 
 	static
-	void deepCopyStruct(BoogieContext& context, ASTNode const& _associatedNode, StructDefinition const* structDef,
+	void deepCopyStruct(StructDefinition const* structDef,
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
-				AssignResult& assignResult);
+				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
 };
 
 }

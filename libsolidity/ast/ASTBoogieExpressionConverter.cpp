@@ -115,8 +115,7 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	bg::Expr::Ref rhsExpr = m_currentExpr;
 
-	ASTBoogieUtils::AssignResult res;
-	ASTBoogieUtils::makeAssign(lhsType, rhsType, lhsExpr, rhsExpr, &lhsNode, assignType, &_node, m_context, res);
+	auto res = ASTBoogieUtils::makeAssign(lhsType, rhsType, lhsExpr, rhsExpr, &lhsNode, assignType, &_node, m_context);
 	m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
 	m_ocs.insert(m_ocs.end(), res.ocs.begin(), res.ocs.end());
 	for (auto stmt: res.newStmts)
@@ -227,13 +226,13 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							bits, isSigned);
 			bg::Decl::Ref tempVar = m_context.tmpVar(m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
 			m_newDecls.push_back(tempVar);
-			ASTBoogieUtils::AssignResult res;
 			if (_node.isPrefixOperation()) // ++x (or --x)
 			{
 				// First do the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				ASTBoogieUtils::makeBasicAssign(_node.annotation().type, _node.annotation().type, lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context, res);
+				auto res = ASTBoogieUtils::makeAssign(_node.annotation().type, _node.annotation().type,
+						lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context);
 				for (auto stmt: res.newStmts)
 					addSideEffect(stmt);
 				// Then the assignment tmp := x
@@ -246,7 +245,8 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 				// Then the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				ASTBoogieUtils::makeBasicAssign(_node.annotation().type, _node.annotation().type, lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context, res);
+				auto res = ASTBoogieUtils::makeAssign(_node.annotation().type, _node.annotation().type,
+						lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context);
 				for (auto stmt: res.newStmts)
 					addSideEffect(stmt);
 			}
