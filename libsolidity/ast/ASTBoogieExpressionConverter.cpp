@@ -226,8 +226,7 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 							lhs,
 							m_context.intLit(1, bits),
 							bits, isSigned);
-			bg::Decl::Ref tempVar = bg::Decl::variable("tmp#" + to_string(m_context.nextId()),
-					m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
+			bg::Decl::Ref tempVar = m_context.tmpVar(m_context.toBoogieType(_node.subExpression().annotation().type, &_node));
 			m_newDecls.push_back(tempVar);
 			ASTBoogieUtils::AssignResult res;
 			if (_node.isPrefixOperation()) // ++x (or --x)
@@ -490,8 +489,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		{
 			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
 			// Create a copy if a storage array is passed to a function
-			auto tmpDecl = bg::Decl::variable("new#" + toString(m_context.nextId()),
-					m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
+			auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
 			m_newDecls.push_back(tmpDecl);
 			auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
 			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
@@ -589,12 +587,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		solAssert(returnTypes.size() != 1, "");
 		for (size_t i = 0; i < returnTypes.size(); ++ i)
 		{
-			auto varName = funcName + "_ret#" + to_string(i) + "#" + to_string(m_context.nextId());
-			auto varType = m_context.toBoogieType(returnTypes[i], &_node);
-			auto varDecl = bg::Decl::variable(varName, varType);
+			auto varDecl = m_context.tmpVar(m_context.toBoogieType(returnTypes[i], &_node), funcName + "_ret");
 			m_newDecls.push_back(varDecl);
-			returnVarNames.push_back(varName);
-			returnVars.push_back(bg::Expr::id(varName));
+			returnVarNames.push_back(varDecl->getName());
+			returnVars.push_back(varDecl->getRefTo());
 		}
 	}
 	else
@@ -602,12 +598,10 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		// New expressions already create the fresh variable
 		if (!dynamic_cast<NewExpression const*>(&_node.expression()))
 		{
-			auto varName = funcName + "_ret#" + to_string(m_context.nextId());
-			auto varType = m_context.toBoogieType(returnType, &_node);
-			auto varDecl = bg::Decl::variable(varName, varType);
+			auto varDecl = m_context.tmpVar(m_context.toBoogieType(returnType, &_node), funcName + "_ret");
 			m_newDecls.push_back(varDecl);
-			returnVarNames.push_back(varName);
-			returnVars.push_back(bg::Expr::id(varName));
+			returnVarNames.push_back(varDecl->getName());
+			returnVars.push_back(varDecl->getRefTo());
 		}
 	}
 	// Assign call to the fresh variable
@@ -888,7 +882,7 @@ bool ASTBoogieExpressionConverter::visit(NewExpression const& _node)
 		{
 			// TODO: Make sure that it is a fresh address
 			m_currentExpr = bg::Expr::id(ASTBoogieUtils::getConstructorName(contract));
-			auto varDecl = bg::Decl::variable("new#" + toString(m_context.nextId()), m_context.addressType());
+			auto varDecl = m_context.tmpVar(m_context.addressType(), "new");
 			m_newDecls.push_back(varDecl);
 			m_currentAddress = varDecl->getRefTo();
 			return false;

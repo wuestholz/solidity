@@ -914,15 +914,15 @@ bg::Decl::Ref ASTBoogieUtils::newStruct(StructDefinition const* structDef, Boogi
 {
 	// Address of the new struct
 	// TODO: make sure that it is a new address
-	string varName = "new_struct_" + structDef->name() + "#" + toString(context.nextId());
+	string prefix = "new_struct_" + structDef->name();
 	bg::TypeDeclRef varType = context.getStructType(structDef, DataLocation::Memory);
-	return bg::Decl::variable(varName, varType);
+	return context.tmpVar(varType, prefix);
 }
 
 bg::Decl::Ref ASTBoogieUtils::newArray(bg::TypeDeclRef type, BoogieContext& context)
 {
 	// TODO: make sure that it is a new address
-	return bg::Decl::variable("new_array#" + toString(context.nextId()), type);
+	return context.tmpVar(type, "new_array");
 }
 
 void ASTBoogieUtils::makeAssign(TypePointer lhsType, TypePointer rhsType, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg,
@@ -973,8 +973,7 @@ void ASTBoogieUtils::makeTupleAssign(TupleType const* lhsType, TupleType const* 
 		{
 			// Introduce temp variables due to expressions like (a, b) = (b, a)
 			auto elemType = lhsType->components().at(i);
-			auto tmp = bg::Decl::variable("tmp#" + toString(context.nextId()),
-					context.toBoogieType(elemType, assocNode));
+			auto tmp = context.tmpVar(context.toBoogieType(elemType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
 			makeAssign(elemType, elemType, tmp->getRefTo(), rhsElements[i], nullptr, Token::Assign, assocNode, context, result);

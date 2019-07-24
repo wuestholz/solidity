@@ -77,6 +77,11 @@ BoogieContext::BoogieContext(Encoding encoding,
 		addDecl(bg::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
 }
 
+bg::VarDeclRef BoogieContext::tmpVar(bg::TypeDeclRef type, string prefix)
+{
+	return bg::Decl::variable(prefix + "#" + toString(nextId()), type);
+}
+
 string BoogieContext::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
