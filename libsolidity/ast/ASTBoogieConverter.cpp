@@ -1406,11 +1406,12 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// One return value, simple
 			auto decl = declarations[0];
 			auto declType = decl->type();
-			if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
-				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, initalValueType, declType, m_context);
-			m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-					bg::Expr::id(m_context.mapDeclName(*decl)),
-					rhs));
+			ASTBoogieUtils::AssignResult ar;
+			ASTBoogieUtils::makeAssign(declType, initalValueType, bg::Expr::id(m_context.mapDeclName(*decl)), rhs, nullptr, Token::Assign, &_node, m_context, ar);
+			m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+			for (auto stmt: ar.newStmts)
+				m_currentBlocks.top()->addStmt(stmt);
+
 		}
 		else
 		{
@@ -1421,21 +1422,21 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				m_context.reportError(initialValue, "Initialization of tuples with non-tuples is not supported.");
 				return false;
 			}
+
 			for (size_t i = 0; i < declarations.size(); ++ i)
 			{
-				// One return value, simple
 				auto decl = declarations[i];
 				if (decl != nullptr)
 				{
 					auto declType = decl->type();
 					auto exprType = initTupleType->components()[i];
 					auto rhs_i = rhsTuple->elements()[i];
-					if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
-						rhs_i = ASTBoogieUtils::checkImplicitBvConversion(rhs_i, exprType, declType, m_context);
-					m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-							bg::Expr::id(m_context.mapDeclName(*decl)),
-							rhs_i));
-					}
+					ASTBoogieUtils::AssignResult ar;
+					ASTBoogieUtils::makeAssign(declType, exprType, bg::Expr::id(m_context.mapDeclName(*decl)), rhs_i, nullptr, Token::Assign, &_node, m_context, ar);
+					m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+					for (auto stmt: ar.newStmts)
+						m_currentBlocks.top()->addStmt(stmt);
+				}
 			}
 		}
 	}
@@ -1446,16 +1447,10 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			bg::Expr::Ref defaultVal = ASTBoogieUtils::defaultValue(declNode->type(), m_context);
 			if (defaultVal)
-			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-									bg::Expr::id(m_context.mapDeclName(*declNode)),
-									defaultVal));
-			}
+									bg::Expr::id(m_context.mapDeclName(*declNode)), defaultVal));
 			else
-			{
-				// TODO: maybe this should be an error
 				m_context.reportWarning(declNode.get(), "Boogie: Unhandled default value, verification might fail.");
-			}
 		}
 	}
 	return false;

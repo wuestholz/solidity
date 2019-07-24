@@ -39,6 +39,12 @@ contract StructsStorMemCopy {
         assert(sm.t.z == 4);
         assert(st.x == 1);
         assert(st.t.z == 2);
+
+        // Test initializer conversion
+        S memory sm2 = st;
+        assert(sm2.x == 1);
+        assert(sm2.t.z == 2);
+
     }
 
     function memToStor() public {
