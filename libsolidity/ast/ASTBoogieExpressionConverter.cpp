@@ -1043,7 +1043,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	// declaration corresponding to 'memberName'
 	if (_node.annotation().referencedDeclaration == nullptr)
 	{
-		m_context.reportError(&_node, "Member without corresponding declaration (probably an unsupported special member)");
+		m_context.reportError(&_node, "Member without corresponding declaration: " + _node.memberName());
 		m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		return false;
 	}

@@ -359,7 +359,8 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		}
 		else
 		{
-			reportError(_associatedNode, "Unsupported location for array type");
+			reportError(_associatedNode, "Unsupported location (" +
+					ASTBoogieUtils::dataLocToStr(arrType->location()) + ") for array type");
 			return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
 		}
 		break;
