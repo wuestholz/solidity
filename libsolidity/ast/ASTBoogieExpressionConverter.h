@@ -31,21 +31,10 @@ private:
 	// due to differences between Solidity and Boogie
 	std::vector<boogie::Stmt::Ref> m_newStatements;
 	std::list<boogie::Decl::Ref> m_newDecls;
-	std::list<boogie::Decl::Ref> m_newConstants;
 	// Type checking conditions
 	std::list<boogie::Expr::Ref> m_tccs;
 	// Overflow conditions
 	std::list<boogie::Expr::Ref> m_ocs;
-
-	// Helper method to create an assignment
-	void createAssignment(Expression const& originalLhs, boogie::Expr::Ref lhs, boogie::Expr::Ref rhs);
-
-	// Helper method to create struct assignment
-	void createStructAssignment(Assignment const& _node, boogie::Expr::Ref lhsExpr, boogie::Expr::Ref rhsExpr);
-
-	// Helper method for recursive deep copy between structures
-	void deepCopyStruct(Assignment const& _node, StructDefinition const* structDef,
-			boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, DataLocation lhsLoc, DataLocation rhsLoc);
 
 	// Helper method to get the length of an array
 	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
@@ -61,13 +50,11 @@ private:
 
 	// Helper methods for the different scenarios for function calls
 	void functionCallConversion(FunctionCall const& _node);
-	boogie::Decl::Ref newStruct(StructDefinition const* structDef);
 	void functionCallNewStruct(StructDefinition const* structDef, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 	void functionCallSum(FunctionCall const& _node);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
-	boogie::Decl::Ref newArray(boogie::TypeDeclRef type);
 	void functionCallNewArray(FunctionCall const& _node);
 	void functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node);
 
@@ -83,18 +70,15 @@ public:
 		boogie::Expr::Ref expr;
 		std::vector<boogie::Stmt::Ref> newStatements;
 		std::list<boogie::Decl::Ref> newDecls;
-		std::list<boogie::Decl::Ref> newConstants;
 		std::list<boogie::Expr::Ref> tccs; // Type checking conditions
 		std::list<boogie::Expr::Ref> ocs;  // Overflow conditions
 
 		Result(boogie::Expr::Ref expr,
 				std::vector<boogie::Stmt::Ref> const& newStatements,
 				std::list<boogie::Decl::Ref> const& newDecls,
-				std::list<boogie::Decl::Ref> const& newConstants,
 				std::list<boogie::Expr::Ref> const& tccs,
 				std::list<boogie::Expr::Ref> const& ocs)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls),
-				newConstants(newConstants), tccs(tccs), ocs(ocs) {}
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**

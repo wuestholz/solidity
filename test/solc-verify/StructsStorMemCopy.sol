@@ -10,7 +10,12 @@ contract StructsStorMemCopy {
         int z;
     }
 
-    S st;
+    S st = S(1, T(2));
+
+    constructor() public {
+        assert(st.x == 1);
+        assert(st.t.z == 2);
+    }
 
     function storToMem() public {
         // Initialize a storage and a memory struct
@@ -39,6 +44,12 @@ contract StructsStorMemCopy {
         assert(sm.t.z == 4);
         assert(st.x == 1);
         assert(st.t.z == 2);
+
+        // Test initializer conversion
+        S memory sm2 = st;
+        assert(sm2.x == 1);
+        assert(sm2.t.z == 2);
+
     }
 
     function memToStor() public {
@@ -70,9 +81,21 @@ contract StructsStorMemCopy {
         assert(st.t.z == 2);
     }
 
+    function returnMem() internal view returns (S memory s) {
+        return st;
+    }
+
+    function checkReturnMem() public {
+        st.x = 1;
+        S memory sm = returnMem();
+        st.x = 2;
+        assert(sm.x == 1);
+    }
+
     function() external payable {
         storToMem();
         memToStor();
+        checkReturnMem();
     }
 
 }

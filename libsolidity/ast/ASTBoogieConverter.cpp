@@ -38,8 +38,6 @@ bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 			bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
 			bg::Expr::or_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), bg::Expr::not_(oc))));
-	for (auto c: result.newConstants)
-		m_context.addConstant(c);
 
 	return result.expr;
 }
@@ -366,17 +364,15 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 
 	if (_node.value()) // If there is an explicit initializer
 	{
-		bg::Expr::Ref initExpr = convertExpression(*_node.value());
+		bg::Expr::Ref rhs = convertExpression(*_node.value());
+		bg::Expr::Ref lhs = bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(_node)), m_context.boogieThis()->getRefTo());
+		auto ar = ASTBoogieUtils::makeAssign(_node.type(), _node.value()->annotation().type,
+				lhs, rhs, nullptr, Token::Assign, &_node, m_context);
+		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+		for (auto stmt: ar.newStmts)
+			m_currentBlocks.top()->addStmt(stmt);
 
-		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
-		{
-			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
-		}
-		m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(m_context.mapDeclName(_node)),
-				bg::Expr::arrupd(
-						bg::Expr::id(m_context.mapDeclName(_node)),
-						m_context.boogieThis()->getRefTo(),
-						initExpr)));
+
 	} else { // Use implicit default value
 		std::vector<bg::Stmt::Ref> stmts;
 		bool ok = defaultValueAssignment(_node, _scope, stmts);
@@ -428,8 +424,6 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
 				if (!convResult.newDecls.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-				if (!convResult.newConstants.empty())
-					m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
 
 			}
 		}
@@ -1325,31 +1319,29 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		// Get rhs recursively
 		bg::Expr::Ref rhs = convertExpression(*_node.expression());
 
-		if (m_context.isBvEncoding())
+		// Return type
+		TypePointer returnType = nullptr;
+		auto const& returnParams = m_currentFunc->returnParameters();
+		if (returnParams.size() > 1)
 		{
-			auto rhsType = _node.expression()->annotation().type;
-
-			// Return type
-			TypePointer returnType = nullptr;
-			auto const& returnParams = m_currentFunc->returnParameters();
-			if (returnParams.size() > 1)
-			{
-				std::vector<TypePointer> elems;
-				for (auto p: returnParams)
-					elems.push_back(p->annotation().type);
-				returnType = TypeProvider::tuple(elems);
-			}
-			else
-				returnType = returnParams[0]->annotation().type;
-
-			rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, rhsType, returnType, m_context);
+			std::vector<TypePointer> elems;
+			for (auto p: returnParams)
+				elems.push_back(p->annotation().type);
+			returnType = TypeProvider::tuple(elems);
 		}
+		else
+			returnType = returnParams[0]->annotation().type;
+
+		auto rhsType = _node.expression()->annotation().type;
 
 		// LHS of assignment should already be known (set by the enclosing FunctionDefinition)
 		bg::Expr::Ref lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
-		m_currentBlocks.top()->addStmt(bg::Stmt::assign(lhs, rhs));
+		auto ar = ASTBoogieUtils::makeAssign(returnType, rhsType, lhs, rhs, nullptr, Token::Assign, &_node, m_context);
+		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+		for (auto stmt: ar.newStmts)
+			m_currentBlocks.top()->addStmt(stmt);
 	}
 	m_currentBlocks.top()->addStmt(bg::Stmt::goto_({m_currentReturnLabel}));
 	return false;
@@ -1407,11 +1399,12 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// One return value, simple
 			auto decl = declarations[0];
 			auto declType = decl->type();
-			if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
-				rhs = ASTBoogieUtils::checkImplicitBvConversion(rhs, initalValueType, declType, m_context);
-			m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-					bg::Expr::id(m_context.mapDeclName(*decl)),
-					rhs));
+			auto ar = ASTBoogieUtils::makeAssign(declType, initalValueType,
+					bg::Expr::id(m_context.mapDeclName(*decl)), rhs, nullptr, Token::Assign, &_node, m_context);
+			m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+			for (auto stmt: ar.newStmts)
+				m_currentBlocks.top()->addStmt(stmt);
+
 		}
 		else
 		{
@@ -1422,21 +1415,21 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				m_context.reportError(initialValue, "Initialization of tuples with non-tuples is not supported.");
 				return false;
 			}
+
 			for (size_t i = 0; i < declarations.size(); ++ i)
 			{
-				// One return value, simple
 				auto decl = declarations[i];
 				if (decl != nullptr)
 				{
 					auto declType = decl->type();
 					auto exprType = initTupleType->components()[i];
 					auto rhs_i = rhsTuple->elements()[i];
-					if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(declType))
-						rhs_i = ASTBoogieUtils::checkImplicitBvConversion(rhs_i, exprType, declType, m_context);
-					m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-							bg::Expr::id(m_context.mapDeclName(*decl)),
-							rhs_i));
-					}
+					auto ar = ASTBoogieUtils::makeAssign(declType, exprType,
+							bg::Expr::id(m_context.mapDeclName(*decl)), rhs_i, nullptr, Token::Assign, &_node, m_context);
+					m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+					for (auto stmt: ar.newStmts)
+						m_currentBlocks.top()->addStmt(stmt);
+				}
 			}
 		}
 	}
@@ -1447,16 +1440,10 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			bg::Expr::Ref defaultVal = ASTBoogieUtils::defaultValue(declNode->type(), m_context);
 			if (defaultVal)
-			{
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-									bg::Expr::id(m_context.mapDeclName(*declNode)),
-									defaultVal));
-			}
+									bg::Expr::id(m_context.mapDeclName(*declNode)), defaultVal));
 			else
-			{
-				// TODO: maybe this should be an error
 				m_context.reportWarning(declNode.get(), "Boogie: Unhandled default value, verification might fail.");
-			}
 		}
 	}
 	return false;

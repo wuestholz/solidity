@@ -182,6 +182,56 @@ public:
 	 */
 	static
 	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
+
+	static
+	boogie::Decl::Ref newStruct(StructDefinition const* structDef, BoogieContext& context);
+
+	static
+	boogie::Decl::Ref newArray(boogie::TypeDeclRef type, BoogieContext& context);
+
+	struct AssignResult {
+		std::list<boogie::Decl::Ref> newDecls;
+		std::list<boogie::Stmt::Ref> newStmts;
+		std::list<boogie::Expr::Ref> ocs;
+	};
+
+	/**
+	 * Helper function to make an assignment, handling all conversions and side effects.
+	 * The original lhs pointer is optional, it is checked against the sum function.
+	 */
+	static
+	AssignResult makeAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context);
+
+private:
+	static
+	void makeAssignInternal(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeTupleAssign(TupleType const* lhsType, TupleType const* rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
+
+	static
+	void makeStructAssign(StructType const* lhsType, StructType const* rhsType, boogie::Expr::Ref lhsBg,
+			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeArrayAssign(ArrayType const* lhsType, ArrayType const* rhsType, boogie::Expr::Ref lhsBg,
+			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void makeBasicAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
+			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
+			AssignResult& result);
+
+	static
+	void deepCopyStruct(StructDefinition const* structDef,
+				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
+				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
 };
 
 }

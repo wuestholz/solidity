@@ -77,6 +77,11 @@ BoogieContext::BoogieContext(Encoding encoding,
 		addDecl(bg::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
 }
 
+bg::VarDeclRef BoogieContext::tmpVar(bg::TypeDeclRef type, string prefix)
+{
+	return bg::Decl::variable(prefix + "#" + toString(nextId()), type);
+}
+
 string BoogieContext::mapDeclName(Declaration const& decl)
 {
 	// Check for special names
@@ -111,6 +116,28 @@ string BoogieContext::mapDeclName(Declaration const& decl)
 	}
 
 	return name;
+}
+
+bg::Expr::Ref BoogieContext::getStringLiteral(string str)
+{
+	if (m_stringLiterals.find(str) == m_stringLiterals.end())
+	{
+		auto strConst = bg::Decl::constant("str" + toString(nextId()), stringType(), true);
+		m_stringLiterals[str] = strConst;
+		addDecl(strConst);
+	}
+	return m_stringLiterals[str]->getRefTo();
+}
+
+bg::Expr::Ref BoogieContext::getAddressLiteral(string addr)
+{
+	if (m_addressLiterals.find(addr) == m_addressLiterals.end())
+	{
+		auto addrConst = bg::Decl::constant("address_" + addr, addressType(), true);
+		m_addressLiterals[addr] = addrConst;
+		addDecl(addrConst);
+	}
+	return m_addressLiterals[addr]->getRefTo();
 }
 
 void BoogieContext::addBuiltinFunction(bg::FuncDeclRef fnDecl)
@@ -160,25 +187,6 @@ void BoogieContext::addGlobalComment(string str)
 void BoogieContext::addDecl(bg::Decl::Ref decl)
 {
 	m_program.getDeclarations().push_back(decl);
-}
-
-void BoogieContext::addConstant(bg::Decl::Ref decl)
-{
-	bool alreadyDefined = false;
-	for (auto d: m_constants)
-	{
-		if (d->getName() == decl->getName())
-		{
-			// TODO: check that other fields are equal
-			alreadyDefined = true;
-			break;
-		}
-	}
-	if (!alreadyDefined)
-	{
-		addDecl(decl);
-		m_constants.push_back(decl);
-	}
 }
 
 bg::TypeDeclRef BoogieContext::addressType() const
