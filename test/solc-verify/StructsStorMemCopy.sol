@@ -68,6 +68,24 @@ contract StructsStorMemCopy {
         assert(sm.t.z == 4);
         assert(st.x == 1);
         assert(st.t.z == 2);
+
+        // Deep copy from storage to memory
+        S memory sm2;
+        sm2 = st;
+
+        assert(sm2.x == 1);
+        assert(sm2.t.z == 2);
+        assert(st.x == 1);
+        assert(st.t.z == 2);
+
+        // Change storage, memory should not change
+        st.x = 3;
+        st.t.z = 4;
+
+        assert(sm2.x == 1);
+        assert(sm2.t.z == 2);
+        assert(st.x == 3);
+        assert(st.t.z == 4);
     }
 
     function returnMem() internal view returns (S memory s) {
