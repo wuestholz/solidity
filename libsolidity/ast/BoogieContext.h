@@ -60,7 +60,8 @@ public:
 private:
 
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
-	std::list<boogie::Decl::Ref> m_constants; // Constants declared (e.g., address/string literals)
+	std::map<std::string, boogie::Decl::Ref> m_stringLiterals;
+	std::map<std::string, boogie::Decl::Ref> m_addressLiterals;
 	boogie::VarDeclRef m_boogieBalance;
 	boogie::VarDeclRef m_boogieThis;
 	boogie::VarDeclRef m_boogieMsgSender;
@@ -128,6 +129,9 @@ public:
 	 */
 	std::string mapDeclName(Declaration const& decl);
 
+	boogie::Expr::Ref getStringLiteral(std::string str);
+	boogie::Expr::Ref getAddressLiteral(std::string addr);
+
 	/**
 	 * Print the actual Boogie program to an output stream
 	 */
@@ -145,7 +149,6 @@ public:
 
 	void addGlobalComment(std::string str);
 	void addDecl(boogie::Decl::Ref decl);
-	void addConstant(boogie::Decl::Ref decl);
 
 	boogie::TypeDeclRef addressType() const;
 	boogie::TypeDeclRef boolType() const;

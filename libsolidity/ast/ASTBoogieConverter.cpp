@@ -38,8 +38,6 @@ bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 		m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 			bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW),
 			bg::Expr::or_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW), bg::Expr::not_(oc))));
-	for (auto c: result.newConstants)
-		m_context.addConstant(c);
 
 	return result.expr;
 }
@@ -426,8 +424,6 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 					m_context.reportError(&_node, "Annotation expression introduces intermediate statements");
 				if (!convResult.newDecls.empty())
 					m_context.reportError(&_node, "Annotation expression introduces intermediate declarations");
-				if (!convResult.newConstants.empty())
-					m_context.reportError(&_node, "Annotation expression introduces intermediate constants");
 
 			}
 		}

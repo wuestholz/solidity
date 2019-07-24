@@ -31,7 +31,6 @@ private:
 	// due to differences between Solidity and Boogie
 	std::vector<boogie::Stmt::Ref> m_newStatements;
 	std::list<boogie::Decl::Ref> m_newDecls;
-	std::list<boogie::Decl::Ref> m_newConstants;
 	// Type checking conditions
 	std::list<boogie::Expr::Ref> m_tccs;
 	// Overflow conditions
@@ -71,18 +70,15 @@ public:
 		boogie::Expr::Ref expr;
 		std::vector<boogie::Stmt::Ref> newStatements;
 		std::list<boogie::Decl::Ref> newDecls;
-		std::list<boogie::Decl::Ref> newConstants;
 		std::list<boogie::Expr::Ref> tccs; // Type checking conditions
 		std::list<boogie::Expr::Ref> ocs;  // Overflow conditions
 
 		Result(boogie::Expr::Ref expr,
 				std::vector<boogie::Stmt::Ref> const& newStatements,
 				std::list<boogie::Decl::Ref> const& newDecls,
-				std::list<boogie::Decl::Ref> const& newConstants,
 				std::list<boogie::Expr::Ref> const& tccs,
 				std::list<boogie::Expr::Ref> const& ocs)
-			:expr(expr), newStatements(newStatements), newDecls(newDecls),
-				newConstants(newConstants), tccs(tccs), ocs(ocs) {}
+			:expr(expr), newStatements(newStatements), newDecls(newDecls), tccs(tccs), ocs(ocs) {}
 	};
 
 	/**

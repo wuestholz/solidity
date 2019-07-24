@@ -66,13 +66,12 @@ ASTBoogieExpressionConverter::Result ASTBoogieExpressionConverter::convert(Expre
 	m_isLibraryCallStatic = false;
 	m_newStatements.clear();
 	m_newDecls.clear();
-	m_newConstants.clear();
 	m_tccs.clear();
 	m_ocs.clear();
 
 	_node.accept(*this);
 
-	return Result(m_currentExpr, m_newStatements, m_newDecls, m_newConstants, m_tccs, m_ocs);
+	return Result(m_currentExpr, m_newStatements, m_newDecls, m_tccs, m_ocs);
 }
 
 bool ASTBoogieExpressionConverter::visit(Conditional const& _node)
@@ -1236,16 +1235,12 @@ bool ASTBoogieExpressionConverter::visit(Literal const& _node)
 		return false;
 	case Type::Category::Address:
 	{
-		string name = "address_" + _node.value();
-		m_newConstants.push_back(bg::Decl::constant(name, m_context.addressType(), true));
-		m_currentExpr = bg::Expr::id(name);
+		m_currentExpr = m_context.getAddressLiteral(_node.value());
 		return false;
 	}
 	case Type::Category::StringLiteral:
 	{
-		string name = "literal_string#" + to_string(m_context.nextId());
-		m_newConstants.push_back(bg::Decl::constant(name, m_context.stringType(), true));
-		m_currentExpr = bg::Expr::id(name);
+		m_currentExpr = m_context.getStringLiteral(_node.value());
 		return false;
 	}
 	default:
