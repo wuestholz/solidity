@@ -10,7 +10,12 @@ contract StructsStorMemCopy {
         int z;
     }
 
-    S st;
+    S st = S(1, T(2));
+
+    constructor() public {
+        assert(st.x == 1);
+        assert(st.t.z == 2);
+    }
 
     function storToMem() public {
         // Initialize a storage and a memory struct

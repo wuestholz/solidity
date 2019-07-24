@@ -950,6 +950,11 @@ void ASTBoogieUtils::makeAssign(TypePointer lhsType, TypePointer rhsType, bg::Ex
 
 	if (auto lhsArrayType = dynamic_cast<ArrayType const*>(lhsType))
 	{
+		if (lhsArrayType->isString())
+		{
+			makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, op, assocNode, context, result);
+			return;
+		}
 		auto rhsArrayType = dynamic_cast<ArrayType const*>(rhsType);
 		solAssert(rhsArrayType, "LHS is array but RHS is not.");
 		makeArrayAssign(lhsArrayType, rhsArrayType, lhsBg, rhsBg, lhs, assocNode, context, result);

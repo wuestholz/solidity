@@ -366,17 +366,15 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 
 	if (_node.value()) // If there is an explicit initializer
 	{
-		bg::Expr::Ref initExpr = convertExpression(*_node.value());
+		bg::Expr::Ref rhs = convertExpression(*_node.value());
+		bg::Expr::Ref lhs = bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(_node)), m_context.boogieThis()->getRefTo());
+		ASTBoogieUtils::AssignResult ar;
+		ASTBoogieUtils::makeAssign(_node.type(), _node.value()->annotation().type, lhs, rhs, nullptr, Token::Assign, &_node, m_context, ar);
+		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+		for (auto stmt: ar.newStmts)
+			m_currentBlocks.top()->addStmt(stmt);
 
-		if (m_context.isBvEncoding() && ASTBoogieUtils::isBitPreciseType(_node.annotation().type))
-		{
-			initExpr = ASTBoogieUtils::checkImplicitBvConversion(initExpr, _node.value()->annotation().type, _node.annotation().type, m_context);
-		}
-		m_currentBlocks.top()->addStmt(bg::Stmt::assign(bg::Expr::id(m_context.mapDeclName(_node)),
-				bg::Expr::arrupd(
-						bg::Expr::id(m_context.mapDeclName(_node)),
-						m_context.boogieThis()->getRefTo(),
-						initExpr)));
+
 	} else { // Use implicit default value
 		std::vector<bg::Stmt::Ref> stmts;
 		bool ok = defaultValueAssignment(_node, _scope, stmts);
