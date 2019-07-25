@@ -109,6 +109,30 @@ contract StructsLocalStorage {
         assert(s_arr[1].t.z == 4);
     }
 
+    T[2] t_arr;
+
+    function testReassign() public {
+        t_arr[0].z = 1;
+        t_arr[1].z = 2;
+        assert(t_arr[0].z == 1);
+        assert(t_arr[1].z == 2);
+
+        uint i = 0;
+        T storage tl = t_arr[i];
+        i++;
+        tl.z = 3;
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 2);
+
+        tl = t_arr[i]; // Reassign
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 2);
+
+        tl.z = 4;
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 4);
+    }
+
     function() external payable {
         testSimple();
         testMember();
@@ -116,5 +140,6 @@ contract StructsLocalStorage {
         testMappingMember();
         testArray();
         testArrayMember();
+        testReassign();
     }
 }

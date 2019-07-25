@@ -27,7 +27,7 @@ namespace solidity
 
 bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract, scope()).convert(_node);
 
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc: result.tccs)
@@ -366,8 +366,10 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 	{
 		bg::Expr::Ref rhs = convertExpression(*_node.value());
 		bg::Expr::Ref lhs = bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(_node)), m_context.boogieThis()->getRefTo());
-		auto ar = ASTBoogieUtils::makeAssign(_node.type(), _node.value()->annotation().type,
-				lhs, rhs, nullptr, Token::Assign, &_node, m_context);
+		auto ar = ASTBoogieUtils::makeAssign(
+				ASTBoogieUtils::AssignParam{lhs, _node.type(), nullptr},
+				ASTBoogieUtils::AssignParam{rhs, _node.value()->annotation().type, _node.value().get()},
+				Token::Assign, &_node, m_context);
 		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
 		for (auto stmt: ar.newStmts)
 			m_currentBlocks.top()->addStmt(stmt);
@@ -412,7 +414,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 			if (typeChecker.checkTypeRequirements(*expr))
 			{
 				// Convert expression to Boogie representation
-				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(*expr);
+				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract, _scope).convert(*expr);
 				result.expr = convResult.expr;
 				result.exprStr = exprStr;
 				result.exprSol = expr;
@@ -1338,7 +1340,10 @@ bool ASTBoogieConverter::visit(Return const& _node)
 		bg::Expr::Ref lhs = m_currentRet;
 
 		// First create an assignment, and then an empty return
-		auto ar = ASTBoogieUtils::makeAssign(returnType, rhsType, lhs, rhs, nullptr, Token::Assign, &_node, m_context);
+		auto ar = ASTBoogieUtils::makeAssign(
+						ASTBoogieUtils::AssignParam{lhs, returnType, nullptr},
+						ASTBoogieUtils::AssignParam{rhs, rhsType, _node.expression()},
+						Token::Assign, &_node, m_context);
 		m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
 		for (auto stmt: ar.newStmts)
 			m_currentBlocks.top()->addStmt(stmt);
@@ -1377,11 +1382,14 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			solAssert(initialValue, "Uninitialized local storage pointer.");
 			bg::Expr::Ref init = convertExpression(*initialValue);
-			auto freeze = ASTBoogieUtils::freeze(init, initialValue, &_node, m_context);
-			m_context.localPtrs()[declarations[0].get()] = freeze.expr;
-			for (auto stmt: freeze.stmts)
+
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Freezing local storage pointer " + declarations[0]->name()));
+			auto freezed = ASTBoogieUtils::freeze(init, initialValue, &_node, m_context);
+			m_context.localPtrs()[declarations[0].get()] = freezed.expr;
+			for (auto stmt: freezed.stmts)
 				m_currentBlocks.top()->addStmt(stmt);
-			m_localDecls.insert(m_localDecls.end(), freeze.newDecls.begin(), freeze.newDecls.end());
+			m_localDecls.insert(m_localDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
+
 			return false;
 		}
 	}
@@ -1415,8 +1423,11 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 			// One return value, simple
 			auto decl = declarations[0];
 			auto declType = decl->type();
-			auto ar = ASTBoogieUtils::makeAssign(declType, initalValueType,
-					bg::Expr::id(m_context.mapDeclName(*decl)), rhs, nullptr, Token::Assign, &_node, m_context);
+
+			auto ar = ASTBoogieUtils::makeAssign(
+					ASTBoogieUtils::AssignParam{bg::Expr::id(m_context.mapDeclName(*decl)), declType, nullptr},
+					ASTBoogieUtils::AssignParam{rhs, initalValueType, initialValue},
+					Token::Assign, &_node, m_context);
 			m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
 			for (auto stmt: ar.newStmts)
 				m_currentBlocks.top()->addStmt(stmt);
@@ -1425,6 +1436,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		else
 		{
 			auto initTupleType = dynamic_cast<TupleType const*>(initalValueType);
+			auto initTuple = dynamic_cast<TupleExpression const*>(initialValue);
 			auto rhsTuple = dynamic_pointer_cast<bg::TupleExpr const>(rhs);
 			if (rhsTuple == nullptr)
 			{
@@ -1440,8 +1452,11 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 					auto declType = decl->type();
 					auto exprType = initTupleType->components()[i];
 					auto rhs_i = rhsTuple->elements()[i];
-					auto ar = ASTBoogieUtils::makeAssign(declType, exprType,
-							bg::Expr::id(m_context.mapDeclName(*decl)), rhs_i, nullptr, Token::Assign, &_node, m_context);
+
+					auto ar = ASTBoogieUtils::makeAssign(
+									ASTBoogieUtils::AssignParam{bg::Expr::id(m_context.mapDeclName(*decl)), declType, nullptr},
+									ASTBoogieUtils::AssignParam{rhs_i, exprType, initTuple ? initTuple->components().at(i).get() : nullptr},
+									Token::Assign, &_node, m_context);
 					m_localDecls.insert(m_localDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
 					for (auto stmt: ar.newStmts)
 						m_currentBlocks.top()->addStmt(stmt);

@@ -189,6 +189,12 @@ public:
 	static
 	boogie::Decl::Ref newArray(boogie::TypeDeclRef type, BoogieContext& context);
 
+	struct AssignParam {
+		boogie::Expr::Ref bgExpr;
+		TypePointer type;
+		Expression const* expr;
+	};
+
 	struct AssignResult {
 		std::list<boogie::Decl::Ref> newDecls;
 		std::list<boogie::Stmt::Ref> newStmts;
@@ -200,33 +206,28 @@ public:
 	 * The original lhs pointer is optional, it is checked against the sum function.
 	 */
 	static
-	AssignResult makeAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
-			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context);
+	AssignResult makeAssign(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context);
 
 private:
 	static
-	void makeAssignInternal(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
-			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
-			AssignResult& result);
+	void makeAssignInternal(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode,
+			BoogieContext& context, AssignResult& result);
 
 	static
-	void makeTupleAssign(TupleType const* lhsType, TupleType const* rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
-			Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
+	void makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode,
+			BoogieContext& context, AssignResult& result);
 
 	static
-	void makeStructAssign(StructType const* lhsType, StructType const* rhsType, boogie::Expr::Ref lhsBg,
-			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
-			AssignResult& result);
+	void makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode,
+			BoogieContext& context, AssignResult& result);
 
 	static
-	void makeArrayAssign(ArrayType const* lhsType, ArrayType const* rhsType, boogie::Expr::Ref lhsBg,
-			boogie::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode, BoogieContext& context,
-			AssignResult& result);
+	void makeArrayAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode,
+			BoogieContext& context, AssignResult& result);
 
 	static
-	void makeBasicAssign(TypePointer lhsType, TypePointer rhsType, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg,
-			Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context,
-			AssignResult& result);
+	void makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode,
+			BoogieContext& context, AssignResult& result);
 
 	static
 	void deepCopyStruct(StructDefinition const* structDef,

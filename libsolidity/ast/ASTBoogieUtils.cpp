@@ -929,162 +929,181 @@ bg::Decl::Ref ASTBoogieUtils::newArray(bg::TypeDeclRef type, BoogieContext& cont
 	return context.tmpVar(type, "new_array");
 }
 
-ASTBoogieUtils::AssignResult ASTBoogieUtils::makeAssign(TypePointer lhsType, TypePointer rhsType, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg,
-		Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context)
+ASTBoogieUtils::AssignResult ASTBoogieUtils::makeAssign(AssignParam lhs, AssignParam rhs, langutil::Token op,
+		ASTNode const* assocNode, BoogieContext& context)
 {
 	AssignResult res;
-	makeAssignInternal(lhsType, rhsType, lhsBg, rhsBg, lhs, op, assocNode, context, res);
+	makeAssignInternal(lhs, rhs, op, assocNode, context, res);
 	return res;
 }
 
-void ASTBoogieUtils::makeAssignInternal(TypePointer lhsType, TypePointer rhsType, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg,
-		Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
+void ASTBoogieUtils::makeAssignInternal(AssignParam lhs, AssignParam rhs, langutil::Token op,
+		ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
-	if (auto lhsTupleType = dynamic_cast<TupleType const*>(lhsType))
+	if (dynamic_cast<TupleType const*>(lhs.type))
 	{
-		auto rhsTupleType = dynamic_cast<TupleType const*>(rhsType);
-		solAssert(rhsTupleType, "LHS is tuple but RHS is not.");
-		makeTupleAssign(lhsTupleType, rhsTupleType, lhsBg, rhsBg, lhs, assocNode, context, result);
+		if (dynamic_cast<TupleType const*>(rhs.type))
+			makeTupleAssign(lhs, rhs, assocNode, context, result);
+		else
+			context.reportError(assocNode, "LHS is tuple but RHS is not");
 		return;
 	}
 
-	if (auto lhsStructType = dynamic_cast<StructType const*>(lhsType))
+	if (dynamic_cast<StructType const*>(lhs.type))
 	{
-		auto rhsStructType = dynamic_cast<StructType const*>(rhsType);
-		solAssert(rhsStructType, "LHS is struct but RHS is not.");
-		makeStructAssign(lhsStructType, rhsStructType, lhsBg, rhsBg, lhs, assocNode, context, result);
+		if (dynamic_cast<StructType const*>(rhs.type))
+			makeStructAssign(lhs, rhs, assocNode, context, result);
+		else
+			context.reportError(assocNode, "LHS is struct but RHS is not");
 		return;
 	}
 
-	if (auto lhsArrayType = dynamic_cast<ArrayType const*>(lhsType))
+	if (auto lhsArrayType = dynamic_cast<ArrayType const*>(lhs.type))
 	{
 		if (lhsArrayType->isString())
 		{
-			makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, op, assocNode, context, result);
+			makeBasicAssign(lhs, rhs, op, assocNode, context, result);
 			return;
 		}
-		auto rhsArrayType = dynamic_cast<ArrayType const*>(rhsType);
-		solAssert(rhsArrayType, "LHS is array but RHS is not.");
-		makeArrayAssign(lhsArrayType, rhsArrayType, lhsBg, rhsBg, lhs, assocNode, context, result);
+		if (dynamic_cast<ArrayType const*>(rhs.type))
+			makeArrayAssign(lhs, rhs, assocNode, context, result);
+		else
+			context.reportError(assocNode, "LHS is array but RHS is not");
 		return;
 	}
 
-	makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, op, assocNode, context, result);
+	makeBasicAssign(lhs, rhs, op, assocNode, context, result);
 }
 
-void ASTBoogieUtils::makeTupleAssign(TupleType const* lhsType, TupleType const* rhsType, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg,
-		Expression const* lhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
+void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
-	auto lhsTuple = dynamic_cast<bg::TupleExpr const*>(lhsBg.get());
+	auto lhsTuple = dynamic_cast<bg::TupleExpr const*>(lhs.bgExpr.get());
+	solAssert(lhsTuple, "Expected tuple as LHS");
 	if (context.isBvEncoding())
-		rhsBg = checkImplicitBvConversion(rhsBg, rhsType, lhsType, context);
-	auto rhsTuple = dynamic_cast<bg::TupleExpr const*>(rhsBg.get());
-	solAssert(lhsTuple, "Expected tuple expression");
-	solAssert(rhsTuple, "Expected tuple expression");
-	auto const& lhsElements = lhsTuple->elements();
-	auto const& rhsElements = rhsTuple->elements();
+		rhs.bgExpr = checkImplicitBvConversion(rhs.bgExpr, rhs.type, lhs.type, context);
+	auto rhsTuple = dynamic_cast<bg::TupleExpr const*>(rhs.bgExpr.get());
+	solAssert(rhsTuple, "Expected tuple as RHS");
+	auto lhsTupleExpr = dynamic_cast<TupleExpression const*>(lhs.expr);
+	auto rhsTupleExpr = dynamic_cast<TupleExpression const*>(rhs.expr);
+	auto lhsType = dynamic_cast<TupleType const*>(lhs.type);
+	solAssert(lhsType, "Expected tuple type for LHS");
+	auto const& lhsElems = lhsTuple->elements();
+	auto const& rhsElems = rhsTuple->elements();
+
+	// Introduce temp variables due to expressions like (a, b) = (b, a)
 	vector<bg::VarDeclRef> tmpVars;
-	for (unsigned i = 0; i < lhsElements.size(); ++ i)
+	for (unsigned i = 0; i < lhsElems.size(); ++ i)
 	{
-		if (lhsElements[i])
+		if (lhsElems[i])
 		{
-			// Introduce temp variables due to expressions like (a, b) = (b, a)
+			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			auto elemType = lhsType->components().at(i);
 			auto tmp = context.tmpVar(context.toBoogieType(elemType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
-			makeAssignInternal(elemType, elemType, tmp->getRefTo(), rhsElements[i], nullptr, Token::Assign, assocNode, context, result);
+			makeAssignInternal(
+					AssignParam{tmp->getRefTo(), elemType, nullptr },
+					AssignParam{rhsElems[i], elemType, rhsElem },
+					Token::Assign, assocNode, context, result);
 		}
 		else
 			tmpVars.push_back(nullptr);
 	}
 
-	auto lhsTupleExpr = dynamic_cast<TupleExpression const*>(lhs);
-
-	for (unsigned i = 0; i < lhsElements.size(); ++i)
+	for (unsigned i = 0; i < lhsElems.size(); ++i)
 	{
-		if (lhsElements[i])
+		if (lhsElems[i])
 		{
 			auto const lhsElem = lhsTupleExpr ? lhsTupleExpr->components().at(i).get() : nullptr;
-			makeAssignInternal(lhsType->components().at(i), lhsType->components().at(i),
-					lhsElements[i], tmpVars[i]->getRefTo(), lhsElem, Token::Assign, assocNode, context, result);
+			auto elemType = lhsType->components().at(i);
+			makeAssignInternal(
+					AssignParam{lhsElems[i], elemType, lhsElem },
+					AssignParam{tmpVars[i]->getRefTo(), elemType, nullptr },
+					Token::Assign, assocNode, context, result);
 		}
 	}
 }
 
-void ASTBoogieUtils::makeStructAssign(StructType const* lhsType, StructType const* rhsType,
-		bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode,
-		BoogieContext& context, AssignResult& result)
+void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
+	auto lhsType = dynamic_cast<StructType const*>(lhs.type);
+	auto rhsType = dynamic_cast<StructType const*>(rhs.type);
+	solAssert(lhsType, "Expected struct type for LHS");
+	solAssert(rhsType, "Expected struct type for RHS");
+	auto lhsLoc = lhsType->location();
+	auto rhsLoc = rhsType->location();
 	// LHS is memory
-	if (lhsType->location() == DataLocation::Memory)
+	if (lhsLoc == DataLocation::Memory)
 	{
 		// RHS is memory --> reference copy
-		if (rhsType->location() == DataLocation::Memory)
+		if (rhsLoc == DataLocation::Memory)
 		{
-			makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, Token::Assign, assocNode, context, result);
+			makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 			return;
 		}
 		// RHS is storage --> create new, deep copy
-		else if (rhsType->location() == DataLocation::Storage)
+		else if (rhsLoc == DataLocation::Storage)
 		{
 			// Create new
 			auto varDecl = newStruct(&lhsType->structDefinition(), context);
 			result.newDecls.push_back(varDecl);
-			result.newStmts.push_back(bg::Stmt::assign(lhsBg, varDecl->getRefTo()));
+			result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, varDecl->getRefTo()));
 
 			// Make deep copy
-			deepCopyStruct(&lhsType->structDefinition(), lhsBg, rhsBg,
-					lhsType->location(), rhsType->location(), assocNode, context, result);
+			deepCopyStruct(&lhsType->structDefinition(), lhs.bgExpr, rhs.bgExpr,
+					lhsLoc, rhsLoc, assocNode, context, result);
 			return;
 		}
 		else
 		{
-			context.reportError(assocNode, "Unsupported assignment to memory struct");
+			context.reportError(assocNode, "Assignment from " + dataLocToStr(rhsLoc) + " to memory struct is not supported");
 			return;
 		}
 	}
 	// LHS is storage
-	else if (lhsType->location() == DataLocation::Storage)
+	else if (lhsLoc == DataLocation::Storage)
 	{
 		// RHS is storage
-		if (rhsType->location() == DataLocation::Storage)
+		if (rhsLoc == DataLocation::Storage)
 		{
 			// LHS is local storage --> reference copy
 			if (lhsType->isPointer())
 			{
-				context.reportError(assocNode, "Local storage pointers are not supported");
+				context.reportError(assocNode, "Unsupported reassignment of local storage pointer");
 				return;
 			}
 			// LHS is storage --> deep copy by data types
 			else
 			{
-				makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, Token::Assign, assocNode, context, result);
+				makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 				return;
 			}
 		}
 		// RHS is memory --> deep copy
-		else if (rhsType->location() == DataLocation::Memory)
+		else if (rhsLoc == DataLocation::Memory)
 		{
-			deepCopyStruct(&lhsType->structDefinition(), lhsBg, rhsBg,
-					lhsType->location(), rhsType->location(), assocNode, context, result);
+			deepCopyStruct(&lhsType->structDefinition(), lhs.bgExpr, rhs.bgExpr,
+					lhsLoc, rhsLoc, assocNode, context, result);
 			return;
 		}
 		else
 		{
-			context.reportError(assocNode, "Unsupported assignment to storage struct");
+			context.reportError(assocNode, "Assignment from " + dataLocToStr(rhsLoc) + " to storage struct is not supported");
 			return;
 		}
 	}
+	context.reportError(assocNode, "Assigning to " + dataLocToStr(lhsLoc) + " struct is not supported");
 }
 
-void ASTBoogieUtils::makeArrayAssign(ArrayType const* lhsType, ArrayType const* rhsType,
-		bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg, Expression const* lhs, ASTNode const* assocNode,
-		BoogieContext& context, AssignResult& result)
+void ASTBoogieUtils::makeArrayAssign(AssignParam lhs, AssignParam rhs, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
+	auto lhsType = dynamic_cast<ArrayType const*>(lhs.type);
+	auto rhsType = dynamic_cast<ArrayType const*>(rhs.type);
+	solAssert(lhsType, "Expected array type for LHS");
+	solAssert(rhsType, "Expected array type for RHS");
 	if (lhsType->isString())
 	{
-		makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, Token::Assign, assocNode, context, result);
+		makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 		return;
 	}
 	if (lhsType->location() != rhsType->location())
@@ -1094,41 +1113,40 @@ void ASTBoogieUtils::makeArrayAssign(ArrayType const* lhsType, ArrayType const* 
 			// Create new
 			auto varDecl = newArray(context.toBoogieType(lhsType, assocNode), context);
 			result.newDecls.push_back(varDecl);
-			result.newStmts.push_back(bg::Stmt::assign(lhsBg, varDecl->getRefTo()));
-			lhsBg = context.getMemArray(lhsBg, context.toBoogieType(lhsType->baseType(), assocNode));
+			result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, varDecl->getRefTo()));
+			lhs.bgExpr = context.getMemArray(lhs.bgExpr, context.toBoogieType(lhsType->baseType(), assocNode));
 		}
 		else if (rhsType->location() == DataLocation::Memory)
-			rhsBg = context.getMemArray(rhsBg, context.toBoogieType(rhsType->baseType(), assocNode));
+			rhs.bgExpr = context.getMemArray(rhs.bgExpr, context.toBoogieType(rhsType->baseType(), assocNode));
 	}
-	makeBasicAssign(lhsType, rhsType, lhsBg, rhsBg, lhs, Token::Assign, assocNode, context, result);
+	makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 }
 
-void ASTBoogieUtils::makeBasicAssign(TypePointer lhsType, TypePointer rhsType, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg,
-		Expression const* lhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
+void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context, AssignResult& result)
 {
 	// Bit-precise mode
-	if (context.isBvEncoding() && isBitPreciseType(lhsType))
+	if (context.isBvEncoding() && isBitPreciseType(lhs.type))
 		// Check for implicit conversion
-		rhsBg = checkImplicitBvConversion(rhsBg, rhsType, lhsType, context);
+		rhs.bgExpr = checkImplicitBvConversion(rhs.bgExpr, rhs.type, lhs.type, context);
 
 	ExprWithCC rhsResult;
 	// Check for additional arithmetic needed
 	if (op == Token::Assign)
 	{
-		rhsResult.expr = rhsBg; // rhs already contains the result
+		rhsResult.expr = rhs.bgExpr; // rhs already contains the result
 	}
 	else
 	{
 		// Transform rhs based on the operator, e.g., a += b becomes a := (a + b)
-		unsigned bits = ASTBoogieUtils::getBits(lhsType);
-		bool isSigned = ASTBoogieUtils::isSigned(lhsType);
-		rhsResult = ASTBoogieUtils::encodeArithBinaryOp(context, assocNode, op, lhsBg, rhsBg, bits, isSigned);
+		unsigned bits = ASTBoogieUtils::getBits(lhs.type);
+		bool isSigned = ASTBoogieUtils::isSigned(lhs.type);
+		rhsResult = ASTBoogieUtils::encodeArithBinaryOp(context, assocNode, op, lhs.bgExpr, rhs.bgExpr, bits, isSigned);
 	}
 	if (context.overflow() && rhsResult.cc)
 		result.ocs.push_back(rhsResult.cc);
 
 	// Check if ghost variables need to be updated
-	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(lhs))
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(lhs.expr))
 	{
 		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
 		{
@@ -1137,11 +1155,11 @@ void ASTBoogieUtils::makeBasicAssign(TypePointer lhsType, TypePointer rhsType, b
 				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
 				auto sumId = bg::Expr::id(context.mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
 
-				unsigned bits = ASTBoogieUtils::getBits(lhsType);
-				bool isSigned = ASTBoogieUtils::isSigned(lhsType);
+				unsigned bits = ASTBoogieUtils::getBits(lhs.type);
+				bool isSigned = ASTBoogieUtils::isSigned(lhs.type);
 
 				auto selExpr = bg::Expr::arrsel(sumId, context.boogieThis()->getRefTo());
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(context, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
+				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(context, nullptr, Token::Sub, selExpr, lhs.bgExpr, bits, isSigned);
 				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(context, nullptr, Token::Add, subResult.expr, rhsResult.expr, bits, isSigned);
 				if (context.encoding() == BoogieContext::Encoding::MOD && !isSigned)
 				{
@@ -1155,15 +1173,15 @@ void ASTBoogieUtils::makeBasicAssign(TypePointer lhsType, TypePointer rhsType, b
 	}
 
 	// If LHS is simply an identifier, we can assign to it
-	if (dynamic_pointer_cast<bg::VarExpr const>(lhsBg))
+	if (dynamic_pointer_cast<bg::VarExpr const>(lhs.bgExpr))
 	{
-		solAssert(dynamic_pointer_cast<bg::TupleExpr const>(rhsBg) == nullptr, "");
-		result.newStmts.push_back(bg::Stmt::assign(lhsBg, rhsResult.expr));
+		solAssert(dynamic_pointer_cast<bg::TupleExpr const>(rhs.bgExpr) == nullptr, "Try to assign tuple to non-tuple");
+		result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
 		return;
 	}
 
 	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhsBg))
+	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs.bgExpr))
 	{
 		result.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsResult.expr));
 		return;
@@ -1209,8 +1227,10 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 				auto varDecl = ASTBoogieUtils::newStruct(&memberStructType->structDefinition(), context);
 				result.newDecls.push_back(varDecl);
 				// Update member to point to new
-				makeBasicAssign(memberType, memberType, lhsSel, varDecl->getRefTo(),
-						nullptr, Token::Assign, assocNode, context, result);
+				makeBasicAssign(
+						AssignParam{lhsSel, memberType, nullptr},
+						AssignParam{varDecl->getRefTo(), memberType, nullptr},
+						Token::Assign, assocNode, context, result);
 			}
 			// Do the deep copy
 			deepCopyStruct(&memberStructType->structDefinition(), lhsSel, rhsSel, lhsLoc, rhsLoc, assocNode, context, result);
@@ -1223,8 +1243,10 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 		{
 			auto arrType = dynamic_cast<ArrayType const*>(memberType);
 			if (arrType->isString())
-				makeBasicAssign(arrType, arrType, lhsSel, rhsSel, nullptr, Token::Assign,
-						assocNode, context, result);
+				makeBasicAssign(
+						AssignParam{lhsSel, arrType, nullptr},
+						AssignParam{rhsSel, arrType, nullptr},
+						Token::Assign, assocNode, context, result);
 			else
 			{
 				if (lhsLoc == DataLocation::Memory)
@@ -1235,22 +1257,27 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 							context);
 					result.newDecls.push_back(varDecl);
 					// Update member to point to new
-					makeBasicAssign(memberType, memberType, lhsSel, varDecl->getRefTo(),
-							nullptr, Token::Assign, assocNode, context, result);
-					lhsSel = context.getMemArray(lhsSel, context.toBoogieType(arrType->baseType(), assocNode));
+					makeBasicAssign(
+							AssignParam{lhsSel, memberType, nullptr},
+							AssignParam{varDecl->getRefTo(), memberType, nullptr},
+							Token::Assign, assocNode, context, result);
 				}
 				else if (rhsLoc == DataLocation::Memory)
 					rhsSel = context.getMemArray(rhsSel, context.toBoogieType(arrType->baseType(), assocNode));
 
-				makeBasicAssign(memberType, memberType, lhsSel, rhsSel,
-						nullptr, Token::Assign, assocNode, context, result);
+				makeBasicAssign(
+						AssignParam{lhsSel, memberType, nullptr},
+						AssignParam{rhsSel, memberType, nullptr},
+						Token::Assign, assocNode, context, result);
 			}
 		}
 		// For other types make the copy by updating the LHS with RHS
 		else
 		{
-			makeBasicAssign(memberType, memberType, lhsSel, rhsSel,
-					nullptr, Token::Assign, assocNode, context, result);
+			makeBasicAssign(
+					AssignParam{lhsSel, memberType, nullptr},
+					AssignParam{rhsSel, memberType, nullptr},
+					Token::Assign, assocNode, context, result);
 		}
 	}
 }

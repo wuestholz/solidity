@@ -4,6 +4,7 @@ StructsLocalStorage::testMapping: OK
 StructsLocalStorage::testMappingMember: OK
 StructsLocalStorage::testArray: OK
 StructsLocalStorage::testArrayMember: OK
+StructsLocalStorage::testReassign: OK
 StructsLocalStorage::[fallback]: OK
 StructsLocalStorage::[implicit_constructor]: OK
 No errors found.

@@ -46,9 +46,10 @@ void ASTBoogieExpressionConverter::addSideEffect(bg::Stmt::Ref stmt)
 	m_newStatements.push_back(stmt);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract) :
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract, ASTNode const* currentScope) :
 		m_context(context),
 		m_currentContract(currentContract),
+		m_currentScope(currentScope),
 		m_currentExpr(nullptr),
 		m_currentAddress(nullptr),
 		m_currentMsgValue(nullptr),
@@ -104,9 +105,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	TypePointer lhsType = lhsNode.annotation().type;
 	TypePointer rhsType = rhsNode.annotation().type;
 
-	// What kind of assignment
-	Token assignType = _node.assignmentOperator();
-
 	// Get lhs recursively
 	_node.leftHandSide().accept(*this);
 	bg::Expr::Ref lhsExpr = m_currentExpr;
@@ -115,7 +113,34 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	bg::Expr::Ref rhsExpr = m_currentExpr;
 
-	auto res = ASTBoogieUtils::makeAssign(lhsType, rhsType, lhsExpr, rhsExpr, &lhsNode, assignType, &_node, m_context);
+	// Check for local storage pointer reassignment
+	if (auto structType = dynamic_cast<StructType const*>(lhsType))
+	{
+		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+		{
+			auto lhsId = dynamic_cast<Identifier const*>(&lhsNode);
+			solAssert(lhsId, "Expected identifier for local storage pointer");
+			if (lhsId->annotation().referencedDeclaration->scope() != m_currentScope)
+			{
+				m_context.reportError(&_node, "Local storage pointer reassignment in different scope is not supported");
+				return false;
+			}
+			addSideEffect(bg::Stmt::comment("Freezing local storage pointer " + lhsId->name()));
+			auto freezed = ASTBoogieUtils::freeze(rhsExpr, &rhsNode, &_node, m_context);
+			m_context.localPtrs()[lhsId->annotation().referencedDeclaration] = freezed.expr;
+			for (auto stmt: freezed.stmts)
+				addSideEffect(stmt);
+			m_newDecls.insert(m_newDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
+			m_currentExpr = rhsExpr;
+			return false;
+		}
+	}
+
+
+	auto res = ASTBoogieUtils::makeAssign(
+			ASTBoogieUtils::AssignParam{lhsExpr, lhsType, &lhsNode},
+			ASTBoogieUtils::AssignParam{rhsExpr, rhsType, &rhsNode},
+			_node.assignmentOperator(), &_node, m_context);
 	m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
 	m_ocs.insert(m_ocs.end(), res.ocs.begin(), res.ocs.end());
 	for (auto stmt: res.newStmts)
@@ -231,8 +256,10 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 				// First do the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				auto res = ASTBoogieUtils::makeAssign(_node.annotation().type, _node.annotation().type,
-						lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context);
+				auto res = ASTBoogieUtils::makeAssign(
+						ASTBoogieUtils::AssignParam{lhs, _node.annotation().type, &_node.subExpression()},
+						ASTBoogieUtils::AssignParam{rhsResult.expr, _node.annotation().type, nullptr},
+						Token::Assign, &_node, m_context);
 				for (auto stmt: res.newStmts)
 					addSideEffect(stmt);
 				// Then the assignment tmp := x
@@ -245,8 +272,10 @@ bool ASTBoogieExpressionConverter::visit(UnaryOperation const& _node)
 				// Then the assignment x := x + 1 (or x := x - 1)
 				if (m_context.overflow() && rhsResult.cc)
 					m_ocs.push_back(rhsResult.cc);
-				auto res = ASTBoogieUtils::makeAssign(_node.annotation().type, _node.annotation().type,
-						lhs, rhsResult.expr, &_node.subExpression(), Token::Assign, &_node, m_context);
+				auto res = ASTBoogieUtils::makeAssign(
+						ASTBoogieUtils::AssignParam{lhs, _node.annotation().type, &_node.subExpression()},
+						ASTBoogieUtils::AssignParam{rhsResult.expr, _node.annotation().type, nullptr},
+						Token::Assign, &_node, m_context);
 				for (auto stmt: res.newStmts)
 					addSideEffect(stmt);
 			}

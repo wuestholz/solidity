@@ -12,7 +12,7 @@ LHS    Memory | Deep+new  Ref      Deep+new
               |
      Local st | Ref       Error    Ref
 */
-contract Copying {
+contract StructsCopying {
     struct S {
         int x;
     }
@@ -36,16 +36,15 @@ contract Copying {
 
     function storToMem() public {
         S memory sm = S(3);
-        S memory sm2 = sm;
         s1.x = 1;
-        sm = s1; // Deep copy, but also a new copy, i.e., now independent from sm2
+        assert(s1.x == 1);
+        assert(sm.x == 3);
+        sm = s1; // Deep copy
         assert(s1.x == 1);
         assert(sm.x == 1);
-        assert(sm2.x == 3);
         s1.x = 2;
         assert(s1.x == 2);
         assert(sm.x == 1);
-        assert(sm2.x == 3);
     }
 
     function storToLoc() public {

@@ -1,0 +1,13 @@
+StructsCopying::storToStor: OK
+StructsCopying::storToMem: OK
+StructsCopying::storToLoc: OK
+StructsCopying::memToMem: OK
+StructsCopying::memToStor: OK
+StructsCopying::memToLoc: OK
+StructsCopying::locToLoc: OK
+StructsCopying::locToStor: OK
+StructsCopying::locToMem: OK
+StructsCopying::nestedMemToMem: OK
+StructsCopying::[fallback]: OK
+StructsCopying::[implicit_constructor]: OK
+No errors found.

@@ -18,6 +18,7 @@ private:
 
 	BoogieContext& m_context;
 	ContractDefinition const* m_currentContract;
+	ASTNode const* m_currentScope;
 
 	// Helper variables to pass information between the visit methods
 	boogie::Expr::Ref m_currentExpr;
@@ -84,7 +85,7 @@ public:
 	/**
 	 * Create a new instance with a given context and an optional location used for reporting errors.
 	 */
-	ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract);
+	ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract, ASTNode const* currentScope);
 
 	/**
 	 * Convert a Solidity Expression into a Boogie expression. As a side effect, the conversion might
