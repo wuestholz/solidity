@@ -1184,9 +1184,16 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 		m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		return false;
 	}
+	auto decl = _node.annotation().referencedDeclaration;
+
+	if (m_context.localPtrs().find(decl) != m_context.localPtrs().end())
+	{
+		m_currentExpr = m_context.localPtrs()[decl];
+		return false;
+	}
 
 	// Inline constants
-	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(_node.annotation().referencedDeclaration))
+	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))
 	{
 		if (varDecl->isConstant())
 		{
@@ -1195,16 +1202,16 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 		}
 	}
 
-	string declName = m_context.mapDeclName(*(_node.annotation().referencedDeclaration));
+	string declName = m_context.mapDeclName(*(decl));
 
 	// State variables must be referenced by accessing the map
-	if (ASTBoogieUtils::isStateVar(_node.annotation().referencedDeclaration))
+	if (ASTBoogieUtils::isStateVar(decl))
 		m_currentExpr = bg::Expr::arrsel(bg::Expr::id(declName), m_context.boogieThis()->getRefTo());
 	// Other identifiers can be referenced by their name
 	else
 		m_currentExpr = bg::Expr::id(declName);
 
-	addTCC(m_currentExpr, _node.annotation().referencedDeclaration->type());
+	addTCC(m_currentExpr, decl->type());
 
 	return false;
 }

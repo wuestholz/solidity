@@ -1370,6 +1370,22 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 	auto const& declarations = _node.declarations();
 	auto initialValue = _node.initialValue();
 
+	if (declarations.size() == 1 && declarations[0]->type()->category() == Type::Category::Struct)
+	{
+		auto structType = dynamic_cast<StructType const*>(declarations[0]->type());
+		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+		{
+			solAssert(initialValue, "Uninitialized local storage pointer.");
+			bg::Expr::Ref init = convertExpression(*initialValue);
+			auto freeze = ASTBoogieUtils::freeze(init, initialValue, &_node, m_context);
+			m_context.localPtrs()[declarations[0].get()] = freeze.expr;
+			for (auto stmt: freeze.stmts)
+				m_currentBlocks.top()->addStmt(stmt);
+			m_localDecls.insert(m_localDecls.end(), freeze.newDecls.begin(), freeze.newDecls.end());
+			return false;
+		}
+	}
+
 	for (auto decl: declarations)
 	{
 		// Decl can be null, e.g., var (x,,) = (1,2,3)

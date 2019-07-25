@@ -232,6 +232,16 @@ private:
 	void deepCopyStruct(StructDefinition const* structDef,
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
 				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
+
+public:
+	struct FreezeResult {
+		boogie::Expr::Ref expr;
+		std::list<boogie::Decl::Ref> newDecls;
+		std::list<boogie::Stmt::Ref> stmts;
+	};
+
+	static
+	FreezeResult freeze(boogie::Expr::Ref bgExpr, Expression const* expr, ASTNode const* assocNode, BoogieContext& context);
 };
 
 }
