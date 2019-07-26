@@ -1,4 +1,6 @@
-CallData::f: OK
-CallData::g: OK
+CallData::arr_calldata_to_memory: OK
+CallData::arr_calldata_to_storage: OK
+CallData::struct_calldata_to_storage: OK
+CallData::struct_calldata_to_memory: OK
 CallData::[implicit_constructor]: OK
 No errors found.

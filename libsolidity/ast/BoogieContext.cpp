@@ -243,7 +243,8 @@ bg::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* stru
 
 bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, DataLocation loc)
 {
-	string typeName = "struct_" + ASTBoogieUtils::dataLocToStr(loc) +
+	string typeName = "struct_" + ASTBoogieUtils::dataLocToStr(
+			loc == DataLocation::CallData ? DataLocation::Memory : loc) +
 			"_" + structDef->name() + "#" + toString(structDef->id());
 
 	if (loc == DataLocation::Storage)
@@ -267,7 +268,7 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 		}
 		return m_storStructTypes[structDef];
 	}
-	else if (loc == DataLocation::Memory)
+	else if (loc == DataLocation::Memory || loc == DataLocation::CallData)
 	{
 		if (m_memStructTypes.find(structDef) == m_memStructTypes.end())
 		{

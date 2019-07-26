@@ -1041,8 +1041,8 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 			makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 			return;
 		}
-		// RHS is storage --> create new, deep copy
-		else if (rhsLoc == DataLocation::Storage)
+		// RHS is storage or calldata --> create new, deep copy
+		else if (rhsLoc == DataLocation::Storage || rhsLoc == DataLocation::CallData)
 		{
 			// Create new
 			auto varDecl = newStruct(&lhsType->structDefinition(), context);
@@ -1262,7 +1262,7 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 							AssignParam{varDecl->getRefTo(), memberType, nullptr},
 							Token::Assign, assocNode, context, result);
 				}
-				else if (rhsLoc == DataLocation::Memory)
+				if (rhsLoc == DataLocation::Memory || rhsLoc == DataLocation::CallData)
 					rhsSel = context.getMemArray(rhsSel, context.toBoogieType(arrType->baseType(), assocNode));
 
 				makeBasicAssign(

@@ -1107,7 +1107,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (typeCategory == Type::Category::Struct)
 	{
 		auto structType = dynamic_cast<StructType const*>(type);
-		if (structType->location() == DataLocation::Memory)
+		if (structType->location() == DataLocation::Memory || structType->location() == DataLocation::CallData)
 		{
 			m_currentExpr = bg::Expr::id(m_context.mapDeclName(*_node.annotation().referencedDeclaration));
 			m_currentExpr = bg::Expr::arrsel(m_currentExpr, m_currentAddress);
@@ -1121,6 +1121,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 		else
 		{
+			m_context.reportError(&_node, "Member access unsupported for location " + ASTBoogieUtils::dataLocToStr(structType->location()));
 			m_currentExpr = bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
 		}
 		return false;
