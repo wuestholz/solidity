@@ -1028,7 +1028,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 	if (isArray && _node.memberName() == "length")
 	{
 		auto arrType = dynamic_cast<ArrayType const*>(type);
-		if (type->dataStoredIn(DataLocation::Memory))
+		if (type->dataStoredIn(DataLocation::Memory) || type->dataStoredIn(DataLocation::CallData))
 		{
 			m_currentExpr = m_context.getMemArray(m_currentExpr, m_context.toBoogieType(arrType->baseType(), &_node));
 		}
@@ -1182,7 +1182,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		auto arrType = dynamic_cast<ArrayType const*>(baseType);
 		auto bgArrType = m_context.toBoogieType(arrType->baseType(), &_node);
 		// Extra indirection for memory arrays
-		if (baseType->dataStoredIn(DataLocation::Memory))
+		if (baseType->dataStoredIn(DataLocation::Memory) || baseType->dataStoredIn(DataLocation::CallData))
 		{
 			baseExpr = m_context.getMemArray(baseExpr, bgArrType);
 		}

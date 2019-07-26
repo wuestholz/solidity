@@ -340,7 +340,9 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		if (arrType->location() == DataLocation::Storage)
 			return m_arrDataTypes[baseTypeBoogie->getName()];
 		// Memory arrays have an extra layer of indirection
-		else if (arrType->location() == DataLocation::Memory)
+		// TODO: for precision, calldata arrays could be translated to different
+		// mappings than memory
+		else if (arrType->location() == DataLocation::Memory || arrType->location() == DataLocation::CallData)
 		{
 			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
 			{

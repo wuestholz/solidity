@@ -1116,7 +1116,7 @@ void ASTBoogieUtils::makeArrayAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 			result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, varDecl->getRefTo()));
 			lhs.bgExpr = context.getMemArray(lhs.bgExpr, context.toBoogieType(lhsType->baseType(), assocNode));
 		}
-		else if (rhsType->location() == DataLocation::Memory)
+		if (rhsType->location() == DataLocation::Memory || rhsType->location() == DataLocation::CallData)
 			rhs.bgExpr = context.getMemArray(rhs.bgExpr, context.toBoogieType(rhsType->baseType(), assocNode));
 	}
 	makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
