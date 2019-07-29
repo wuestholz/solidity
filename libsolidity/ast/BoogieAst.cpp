@@ -2,6 +2,7 @@
 // This file is distributed under the MIT License. See SMACK-LICENSE for details.
 //
 #include <libsolidity/ast/BoogieAst.h>
+#include <liblangutil/Exceptions.h>
 #include <sstream>
 #include <iostream>
 #include <set>
@@ -191,17 +192,7 @@ Expr::Ref Expr::arrsel(Ref b, Ref i)
 	return std::make_shared<ArrSelExpr const>(b, i);
 }
 
-Expr::Ref Expr::arrsel(Ref b, std::vector<Ref> const& i)
-{
-	return std::make_shared<ArrSelExpr const>(b, i);
-}
-
 Expr::Ref Expr::arrupd(Ref b, Ref i, Ref v)
-{
-	return std::make_shared<ArrUpdExpr const>(b, i, v);
-}
-
-Expr::Ref Expr::arrupd(Ref b, std::vector<Ref> const& i, Ref v)
 {
 	return std::make_shared<ArrUpdExpr const>(b, i, v);
 }
@@ -279,18 +270,32 @@ Stmt::Ref Stmt::assert_(Expr::Ref e, std::vector<Attr::Ref> const& attrs)
 	return std::make_shared<AssertStmt const>(e, attrs);
 }
 
+Expr::Ref Expr::selectToUpdate(Expr::Ref sel, Expr::Ref value)
+{
+	if (auto selExpr = std::dynamic_pointer_cast<SelExpr const>(sel))
+	{
+		if (auto base = std::dynamic_pointer_cast<SelExpr const>(selExpr->getBase()))
+			return selectToUpdate(base, selExpr->toUpdate(value));
+		else
+			return selExpr->toUpdate(value);
+	}
+	solAssert(false, "Expected datatype/array select");
+	return nullptr;
+}
+
 Stmt::Ref Stmt::assign(Expr::Ref e, Expr::Ref f)
 {
 	if (auto cond = std::dynamic_pointer_cast<CondExpr const>(e))
 		return Stmt::ifelse(cond->getCond(),
 				Block::block("", {Stmt::assign(cond->getThen(), f)}),
 				Block::block("", {Stmt::assign(cond->getElse(), f)}));
+	if (auto sel = std::dynamic_pointer_cast<SelExpr const>(e))
+	{
+		auto upd = std::dynamic_pointer_cast<UpdExpr const>(Expr::selectToUpdate(sel, f));
+		solAssert(upd, "Update expression expected");
+		return Stmt::assign(upd->getBase(), upd);
+	}
 	return std::make_shared<AssignStmt const>(std::vector<Expr::Ref>{e}, std::vector<Expr::Ref>{f});
-}
-
-Stmt::Ref Stmt::assign(std::vector<Expr::Ref> const& lhs, std::vector<Expr::Ref> const& rhs)
-{
-	return std::make_shared<AssignStmt const>(lhs, rhs);
 }
 
 Stmt::Ref Stmt::assume(Expr::Ref e)
@@ -662,15 +667,12 @@ void QuantExpr::print(std::ostream& os) const
 
 void ArrSelExpr::print(std::ostream& os) const
 {
-	os << base;
-	print_seq(os, idxs, "[", ", ", "]");
+	os << base << "[" << idx << "]";
 }
 
 void ArrUpdExpr::print(std::ostream& os) const
 {
-	os << base << "[";
-	print_seq(os, idxs, ", ");
-	os << " := " << val << "]";
+	os << base << "[" << idx << " := " << val << "]";
 }
 
 void VarExpr::print(std::ostream& os) const

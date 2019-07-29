@@ -502,7 +502,7 @@ bool ASTBoogieConverter::isBaseVar(bg::Expr::Ref expr)
 	if (auto exprArrSel = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 	{
 		// Base is reached when it is a variable indexed with 'this'
-		auto idxAsId = dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getIdxs()[0]);
+		auto idxAsId = dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getIdx());
 		if (dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getBase()) &&
 				idxAsId->name() == m_context.boogieThis()->getName())
 		{
@@ -596,7 +596,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 					else
 					{
 						auto repl = replaceBaseVar(modSpec.target, expr);
-						auto write = ASTBoogieUtils::selectToUpdate(repl, modSpec.target);
+						auto write = bg::Expr::selectToUpdate(repl, modSpec.target);
 						expr = bg::Expr::if_then_else(modSpec.cond, write, expr);
 					}
 				}

@@ -165,19 +165,6 @@ public:
 	bool isStateVar(Declaration const *decl);
 
 	/**
-	 * Recursively translate a select expression to an update
-	 */
-	static
-	boogie::Expr::Ref selectToUpdate(boogie::Expr::Ref sel, boogie::Expr::Ref value);
-
-	/**
-	 * Recursively translate a select expression to an update and assign
-	 * it to the base expression
-	 */
-	static
-	boogie::Stmt::Ref selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value);
-
-	/**
 	 * Helper method to give a default value for a type.
 	 */
 	static

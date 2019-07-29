@@ -163,7 +163,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 		for (size_t i = 0; i < _node.components().size(); i++)
 		{
 			_node.components()[i]->accept(*this);
-			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+			addSideEffect(bg::Stmt::assign(
 					bg::Expr::arrsel(
 							m_context.getInnerArray(arrExpr, bgType),
 							m_context.intLit(i, 256)),
@@ -171,7 +171,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 		}
 		m_currentExpr = varDecl->getRefTo();
 		// Set size
-		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+		addSideEffect(bg::Stmt::assign(
 				m_context.getArrayLength(arrExpr, bgType),
 				m_context.intLit(_node.components().size(), 256)));
 		return false;
@@ -519,7 +519,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
 				m_newDecls.push_back(tmpDecl);
 				auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
+				addSideEffect(bg::Stmt::assign(memArr, m_currentExpr));
 				m_currentExpr = tmpDecl->getRefTo();
 			}
 		}
@@ -854,7 +854,7 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 	// Set length
 	solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
 	_node.arguments()[0]->accept(*this);
-	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(arrLen, m_currentExpr));
+	addSideEffect(bg::Stmt::assign(arrLen, m_currentExpr));
 
 	if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
 	{
@@ -863,7 +863,7 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 			auto defaultVal = ASTBoogieUtils::defaultValue(arrType->baseType(), m_context);
 			if (defaultVal)
 			{
-				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+				addSideEffect(bg::Stmt::assign(
 						bg::Expr::arrsel(
 								m_context.getInnerArray(memArr, bgType),
 								m_context.intLit(i, 256)),
@@ -892,7 +892,7 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
 		_node.arguments()[0]->accept(*this);
 		auto arg = m_currentExpr;
-		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+		addSideEffect(bg::Stmt::assign(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
 	}
 	else
@@ -900,7 +900,7 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
 	}
-	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(len, lenUpd.expr));
+	addSideEffect(bg::Stmt::assign(len, lenUpd.expr));
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		addSideEffect(bg::Stmt::comment("Implicit assumption that length cannot overflow"));

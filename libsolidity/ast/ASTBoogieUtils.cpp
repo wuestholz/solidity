@@ -840,28 +840,6 @@ bool ASTBoogieUtils::isStateVar(Declaration const *decl)
 	return false;
 }
 
-
-bg::Expr::Ref ASTBoogieUtils::selectToUpdate(bg::Expr::Ref sel, bg::Expr::Ref value)
-{
-	if (auto selExpr = dynamic_pointer_cast<bg::SelExpr const>(sel))
-	{
-		if (auto base = dynamic_pointer_cast<bg::SelExpr const>(selExpr->getBase()))
-			return selectToUpdate(base, selExpr->toUpdate(value));
-		else
-			return selExpr->toUpdate(value);
-	}
-	solAssert(false, "Expected datatype/array select");
-	return nullptr;
-}
-
-
-bg::Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(bg::Expr::Ref sel, bg::Expr::Ref value)
-{
-	auto upd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(sel, value));
-	solAssert(upd, "Update expression expected");
-	return bg::Stmt::assign(upd->getBase(), upd);
-}
-
 bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& context)
 {
 	switch (type->category())
@@ -1172,21 +1150,7 @@ void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil:
 		}
 	}
 
-	// If LHS is simply an identifier, we can assign to it
-	if (dynamic_pointer_cast<bg::VarExpr const>(lhs.bgExpr))
-	{
-		solAssert(dynamic_pointer_cast<bg::TupleExpr const>(rhs.bgExpr) == nullptr, "Try to assign tuple to non-tuple");
-		result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
-		return;
-	}
-
-	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs.bgExpr))
-	{
-		result.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsResult.expr));
-		return;
-	}
-	context.reportError(assocNode, "Unsupported assignment (LHS must be identifier/indexer)");
+	result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
 }
 
 void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
@@ -1295,7 +1259,7 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr
 		for (unsigned i = 0; i < vars.size(); ++i)
 			if (vars[i] == idExpr->annotation().referencedDeclaration)
 				return PackResult{ptr,
-					{selectToUpdateStmt(bg::Expr::arrsel(ptr->getRefTo(), context.intLit(0, 256)), context.intLit(i, 256))}};
+					{bg::Stmt::assign(bg::Expr::arrsel(ptr->getRefTo(), context.intLit(0, 256)), context.intLit(i, 256))}};
 
 		return PackResult{ptr, {bg::Stmt::assign(ptr->getRefTo(), bg::Expr::id(context.mapDeclName(*idExpr->annotation().referencedDeclaration)))}};
 	}

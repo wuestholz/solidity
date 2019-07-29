@@ -73,14 +73,14 @@ public:
 	static Ref not_(Ref e);
 	static Ref neg(Ref e);
 	static Ref arrsel(Ref b, Ref i);
-	static Ref arrsel(Ref a, std::vector<Ref> const& i);
 	static Ref arrupd(Ref b, Ref i, Ref v);
-	static Ref arrupd(Ref a, std::vector<Ref> const& i, Ref v);
 	static Ref dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref if_then_else(Ref c, Ref t, Ref e);
 	static Ref old(Ref expr);
 	static Ref tuple(std::vector<Ref> const& e);
+
+	static Ref selectToUpdate(Ref sel, Ref value);
 };
 
 struct Binding
@@ -224,23 +224,20 @@ public:
 };
 
 class ArrSelExpr : public SelExpr {
-	std::vector<Ref> idxs;
+	Ref idx;
 public:
-	ArrSelExpr(Ref a, std::vector<Ref> const& i) : SelExpr(a), idxs(i) {}
-	ArrSelExpr(Ref a, Ref i) : SelExpr(a), idxs(std::vector<Ref>(1, i)) {}
-	std::vector<Ref> const& getIdxs() const { return idxs; }
+	ArrSelExpr(Ref a, Ref i) : SelExpr(a), idx(i) {}
+	Ref const& getIdx() const { return idx; }
 	void print(std::ostream& os) const override;
-	Ref toUpdate(Ref v) const override { return Expr::arrupd(base, idxs, v); }
-	Ref replaceBase(Ref b) const override { return Expr::arrsel(b, idxs); }
+	Ref toUpdate(Ref v) const override { return Expr::arrupd(base, idx, v); }
+	Ref replaceBase(Ref b) const override { return Expr::arrsel(b, idx); }
 };
 
 class ArrUpdExpr : public UpdExpr {
-	std::vector<Ref> idxs;
+	Ref idx;
 public:
-	ArrUpdExpr(Ref a, std::vector<Ref> const& i, Expr::Ref v)
-		: UpdExpr(a, v), idxs(i) {}
 	ArrUpdExpr(Ref a, Ref i, Ref v)
-		: UpdExpr(a, v), idxs(std::vector<Ref>(1, i)) {}
+		: UpdExpr(a, v), idx(i) {}
 	void print(std::ostream& os) const override;
 };
 
@@ -326,7 +323,6 @@ public:
 	static Ref assert_(Expr::Ref e,
 		std::vector<Attr::Ref> const& attrs = {});
 	static Ref assign(Expr::Ref e, Expr::Ref f);
-	static Ref assign(std::vector<Expr::Ref> const& lhs, std::vector<Expr::Ref> const& rhs);
 	static Ref assume(Expr::Ref e);
 	static Ref assume(Expr::Ref e, Attr::Ref attr);
 	static Ref call(
