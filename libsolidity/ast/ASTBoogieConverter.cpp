@@ -27,7 +27,7 @@ namespace solidity
 
 bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract, scope()).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(_node);
 
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc: result.tccs)
@@ -414,7 +414,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 			if (typeChecker.checkTypeRequirements(*expr))
 			{
 				// Convert expression to Boogie representation
-				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract, _scope).convert(*expr);
+				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract).convert(*expr);
 				result.expr = convResult.expr;
 				result.exprStr = exprStr;
 				result.exprSol = expr;
@@ -1382,14 +1382,18 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			solAssert(initialValue, "Uninitialized local storage pointer.");
 			bg::Expr::Ref init = convertExpression(*initialValue);
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Packing local storage pointer " + declarations[0]->name()));
 
-			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Freezing local storage pointer " + declarations[0]->name()));
-			auto freezed = ASTBoogieUtils::freeze(init, initialValue, &_node, m_context);
-			m_context.localPtrs()[declarations[0].get()] = freezed.expr;
-			for (auto stmt: freezed.stmts)
+			auto packed = ASTBoogieUtils::pack(initialValue, init, m_currentContract, &_node, m_context);
+			m_localDecls.push_back(packed.ptr);
+			for (auto stmt: packed.stmts)
 				m_currentBlocks.top()->addStmt(stmt);
-			m_localDecls.insert(m_localDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
 
+			auto varDecl = bg::Decl::variable(
+					m_context.mapDeclName(*declarations[0]),
+					m_context.toBoogieType(declarations[0]->type(), declarations[0].get()));
+			m_localDecls.push_back(varDecl);
+			m_currentBlocks.top()->addStmt(bg::Stmt::assign(varDecl->getRefTo(), packed.ptr->getRefTo()));
 			return false;
 		}
 	}

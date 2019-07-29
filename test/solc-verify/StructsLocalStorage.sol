@@ -11,6 +11,7 @@ contract StructsLocalStorage {
     }
 
     S ss;
+    S ss2;
 
     function testSimple() public {
         ss.x = 1;
@@ -19,127 +20,21 @@ contract StructsLocalStorage {
         assert(ss.t.z == 2);
 
         S storage sl = ss;
+        assert(sl.x == 1);
+        assert(sl.t.z == 2);
 
-        sl.x = 3;
-        sl.t.z = 4;
-        assert(ss.x == 3);
-        assert(ss.t.z == 4);
-    }
+        ss.x = 3;
+        ss.t.z = 4;
+        assert(sl.x == 3);
+        assert(sl.t.z == 4);
 
-    function testMember() public {
-        ss.x = 1;
-        ss.t.z = 2;
-        assert(ss.x == 1);
-        assert(ss.t.z == 2);
-
-        T storage tl = ss.t;
-        tl.z = 3;
-
-        assert(ss.x == 1);
-        assert(ss.t.z == 3);
-    }
-
-    mapping(uint=>S) s_map;
-
-    function testMapping() public {
-        s_map[0].x = 1;
-        s_map[0].t.z = 2;
-        s_map[1].x = 3;
-        s_map[1].t.z = 4;
-
-        uint i = 0;
-        S storage sl = s_map[i];
-        i = i + 1;
         sl.x = 5;
         sl.t.z = 6;
-        assert(s_map[0].x == 5);
-        assert(s_map[0].t.z == 6);
-        assert(s_map[1].x == 3);
-        assert(s_map[1].t.z == 4);
-    }
-
-    function testMappingMember() public {
-        s_map[0].x = 1;
-        s_map[0].t.z = 2;
-        s_map[1].x = 3;
-        s_map[1].t.z = 4;
-
-        uint i = 0;
-        T storage tl = s_map[i].t;
-        i = i + 1;
-        tl.z = 5;
-        assert(s_map[0].x == 1);
-        assert(s_map[0].t.z == 5);
-        assert(s_map[1].x == 3);
-        assert(s_map[1].t.z == 4);
-    }
-
-    S[2] s_arr;
-
-    function testArray() public {
-        s_arr[0].x = 1;
-        s_arr[0].t.z = 2;
-        s_arr[1].x = 3;
-        s_arr[1].t.z = 4;
-
-        uint i = 0;
-        S storage sl = s_arr[i];
-        i = i + 1;
-        sl.x = 5;
-        sl.t.z = 6;
-        assert(s_arr[0].x == 5);
-        assert(s_arr[0].t.z == 6);
-        assert(s_arr[1].x == 3);
-        assert(s_arr[1].t.z == 4);
-    }
-
-    function testArrayMember() public {
-        s_arr[0].x = 1;
-        s_arr[0].t.z = 2;
-        s_arr[1].x = 3;
-        s_arr[1].t.z = 4;
-
-        uint i = 0;
-        T storage tl = s_arr[i].t;
-        i = i + 1;
-        tl.z = 5;
-        assert(s_arr[0].x == 1);
-        assert(s_arr[0].t.z == 5);
-        assert(s_arr[1].x == 3);
-        assert(s_arr[1].t.z == 4);
-    }
-
-    T[2] t_arr;
-
-    function testReassign() public {
-        t_arr[0].z = 1;
-        t_arr[1].z = 2;
-        assert(t_arr[0].z == 1);
-        assert(t_arr[1].z == 2);
-
-        uint i = 0;
-        T storage tl = t_arr[i];
-        i++;
-        tl.z = 3;
-        assert(t_arr[0].z == 3);
-        assert(t_arr[1].z == 2);
-
-        tl = t_arr[i]; // Reassign
-        assert(t_arr[0].z == 3);
-        assert(t_arr[1].z == 2);
-
-        tl.z = 4;
-        assert(t_arr[0].z == 3);
-        assert(t_arr[1].z == 4);
+        assert(ss.x == 5);
+        assert(ss.t.z == 6);
     }
 
     function() external payable {
         testSimple();
-        testMember();
-        testMapping();
-        testMappingMember();
-        testArray();
-        testArrayMember();
-        testReassign();
     }
 }

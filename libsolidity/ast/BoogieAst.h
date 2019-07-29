@@ -114,6 +114,10 @@ public:
 	CondExpr(Expr::Ref c, Expr::Ref t, Expr::Ref e)
 		: cond(c), then(t), else_(e) {}
 	void print(std::ostream& os) const override;
+
+	Expr::Ref getCond() const { return cond; }
+	Expr::Ref getThen() const { return then; }
+	Expr::Ref getElse() const { return else_; }
 };
 
 class FunExpr : public Expr {

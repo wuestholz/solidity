@@ -1282,51 +1282,46 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 	}
 }
 
-ASTBoogieUtils::FreezeResult ASTBoogieUtils::freeze(bg::Expr::Ref bgExpr,
-		Expression const* expr, ASTNode const* assocNode, BoogieContext& context)
+ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr::Ref /*bgExpr*/,
+		ContractDefinition const* currentContract, ASTNode const* assocNode, BoogieContext& context)
 {
-	if (auto varExpr = dynamic_pointer_cast<bg::VarExpr const>(bgExpr))
+	auto structType = dynamic_cast<StructType const*>(expr->annotation().type);
+	solAssert(structType, "Trying to pack non-struct expression");
+
+	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
-		return FreezeResult{bgExpr, {}, {}};
-	}
-	if (auto arrSelExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr))
-	{
-		auto idxExpr = dynamic_cast<IndexAccess const*>(expr);
-		if (idxExpr)
-		{
-			auto result = freeze(arrSelExpr->getBase(), &idxExpr->baseExpression(), &idxExpr->baseExpression(), context);
-			auto idxTmpVar = context.tmpVar(context.toBoogieType(idxExpr->indexExpression()->annotation().type, assocNode));
-			result.newDecls.push_back(idxTmpVar);
-			result.stmts.push_back(bg::Stmt::assign(idxTmpVar->getRefTo(), arrSelExpr->getIdxs()[0]));
-			result.expr = bg::Expr::arrsel(result.expr, idxTmpVar->getRefTo());
-			return result;
-		}
-		else
-		{
-			// TODO: check for 'this'
-			return FreezeResult{bgExpr, {}, {}};
-		}
-	}
-	if (auto dtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr))
-	{
-		auto memAccExpr = dynamic_cast<MemberAccess const*>(expr);
-		if (memAccExpr)
-		{
-			auto result = freeze(dtSelExpr->getBase(), &memAccExpr->expression(), &memAccExpr->expression(), context);
-			result.expr = dtSelExpr->replaceBase(result.expr);
-			return result;
-		}
-		else
-		{
-			// TODO check for arrays
-			auto result = freeze(dtSelExpr->getBase(), expr, assocNode, context);
-			result.expr = dtSelExpr->replaceBase(result.expr);
-			return result;
-		}
+		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
+		auto vars = ASTNode::filteredNodes<VariableDeclaration>(currentContract->subNodes());
+		for (unsigned i = 0; i < vars.size(); ++i)
+			if (vars[i] == idExpr->annotation().referencedDeclaration)
+				return PackResult{ptr,
+					{selectToUpdateStmt(bg::Expr::arrsel(ptr->getRefTo(), context.intLit(0, 256)), context.intLit(i, 256))}};
+
+		return PackResult{ptr, {bg::Stmt::assign(ptr->getRefTo(), bg::Expr::id(context.mapDeclName(*idExpr->annotation().referencedDeclaration)))}};
 	}
 
-	context.reportError(assocNode, "Unsupported expression for freezing.");
-	return FreezeResult{nullptr, {}, {}};
+	context.reportError(assocNode, "Unsupported expression for packing");
+	return PackResult{nullptr, {}};
+}
+
+bg::Expr::Ref ASTBoogieUtils::unpack(Identifier const* id, ContractDefinition const* currentContract, BoogieContext& context)
+{
+	auto structType = dynamic_cast<StructType const*>(id->annotation().referencedDeclaration->type());
+	solAssert(structType, "Trying to unpack non-struct expression");
+
+	auto vars = ASTNode::filteredNodes<VariableDeclaration>(currentContract->subNodes());
+	solAssert(vars.size() > 0, "No state variables to unpack");
+
+	auto expr = bg::Expr::arrsel(bg::Expr::id(context.mapDeclName(*vars[0])), context.boogieThis()->getRefTo());
+	auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
+
+	for (unsigned i = 1; i < vars.size(); ++i)
+		expr = bg::Expr::cond(
+				bg::Expr::eq(bg::Expr::arrsel(ptr, context.intLit(0, 256)), context.intLit(i, 256)),
+				bg::Expr::arrsel(bg::Expr::id(context.mapDeclName(*vars[i])), context.boogieThis()->getRefTo()),
+				expr);
+
+	return expr;
 }
 
 }

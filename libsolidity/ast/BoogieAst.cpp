@@ -281,6 +281,10 @@ Stmt::Ref Stmt::assert_(Expr::Ref e, std::vector<Attr::Ref> const& attrs)
 
 Stmt::Ref Stmt::assign(Expr::Ref e, Expr::Ref f)
 {
+	if (auto cond = std::dynamic_pointer_cast<CondExpr const>(e))
+		return Stmt::ifelse(cond->getCond(),
+				Block::block("", {Stmt::assign(cond->getThen(), f)}),
+				Block::block("", {Stmt::assign(cond->getElse(), f)}));
 	return std::make_shared<AssignStmt const>(std::vector<Expr::Ref>{e}, std::vector<Expr::Ref>{f});
 }
 

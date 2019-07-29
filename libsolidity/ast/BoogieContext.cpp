@@ -386,8 +386,10 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 	case Type::Category::Struct:
 	{
 		auto structTp = dynamic_cast<StructType const*>(tp);
+		// Local pointers are arrays
 		if (structTp->location() == DataLocation::Storage && structTp->isPointer())
-			reportError(_associatedNode, "Local storage pointers are not supported");
+			return ASTBoogieUtils::mappingType(intType(256), intType(256));
+
 		return getStructType(&structTp->structDefinition(), structTp->location());
 	}
 	case Type::Category::Enum:

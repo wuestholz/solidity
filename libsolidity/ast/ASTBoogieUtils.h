@@ -235,14 +235,18 @@ private:
 				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
 
 public:
-	struct FreezeResult {
-		boogie::Expr::Ref expr;
-		std::list<boogie::Decl::Ref> newDecls;
+	struct PackResult {
+		boogie::Decl::Ref ptr;
 		std::list<boogie::Stmt::Ref> stmts;
 	};
 
 	static
-	FreezeResult freeze(boogie::Expr::Ref bgExpr, Expression const* expr, ASTNode const* assocNode, BoogieContext& context);
+	PackResult pack(Expression const* expr, boogie::Expr::Ref bgExpr, ContractDefinition const* currentContract,
+			ASTNode const* assocNode, BoogieContext& context);
+
+	static
+	boogie::Expr::Ref unpack(Identifier const* id, ContractDefinition const* currentContract, BoogieContext& context);
+
 };
 
 }

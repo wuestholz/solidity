@@ -46,10 +46,9 @@ void ASTBoogieExpressionConverter::addSideEffect(bg::Stmt::Ref stmt)
 	m_newStatements.push_back(stmt);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract, ASTNode const* currentScope) :
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract) :
 		m_context(context),
 		m_currentContract(currentContract),
-		m_currentScope(currentScope),
 		m_currentExpr(nullptr),
 		m_currentAddress(nullptr),
 		m_currentMsgValue(nullptr),
@@ -120,22 +119,20 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 		{
 			auto lhsId = dynamic_cast<Identifier const*>(&lhsNode);
 			solAssert(lhsId, "Expected identifier for local storage pointer");
-			if (lhsId->annotation().referencedDeclaration->scope() != m_currentScope)
-			{
-				m_context.reportError(&_node, "Local storage pointer reassignment in different scope is not supported");
-				return false;
-			}
-			addSideEffect(bg::Stmt::comment("Freezing local storage pointer " + lhsId->name()));
-			auto freezed = ASTBoogieUtils::freeze(rhsExpr, &rhsNode, &_node, m_context);
-			m_context.localPtrs()[lhsId->annotation().referencedDeclaration] = freezed.expr;
-			for (auto stmt: freezed.stmts)
+			addSideEffect(bg::Stmt::comment("Packing local storage pointer " + lhsId->name()));
+
+			auto packed = ASTBoogieUtils::pack(&rhsNode, rhsExpr, m_currentContract, &rhsNode, m_context);
+			m_newDecls.push_back(packed.ptr);
+			for (auto stmt: packed.stmts)
 				addSideEffect(stmt);
-			m_newDecls.insert(m_newDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
-			m_currentExpr = rhsExpr;
+			addSideEffect(bg::Stmt::assign(
+					bg::Expr::id(m_context.mapDeclName(*lhsId->annotation().referencedDeclaration)),
+					packed.ptr->getRefTo()));
+
+			m_currentExpr = lhsExpr;
 			return false;
 		}
 	}
-
 
 	auto res = ASTBoogieUtils::makeAssign(
 			ASTBoogieUtils::AssignParam{lhsExpr, lhsType, &lhsNode},
@@ -526,6 +523,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				m_currentExpr = tmpDecl->getRefTo();
 			}
 		}
+
+		// Do not unpack local storage pointers
+		if (auto argId = dynamic_cast<Identifier const*>(arg.get()))
+			if (argId->annotation().referencedDeclaration)
+				if (auto structType = dynamic_cast<StructType const*>(argId->annotation().referencedDeclaration->type()))
+					if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+						m_currentExpr = bg::Expr::id(m_context.mapDeclName(*argId->annotation().referencedDeclaration));
 
 		// Do not add argument for call
 		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
@@ -1216,10 +1220,13 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 	}
 	auto decl = _node.annotation().referencedDeclaration;
 
-	if (m_context.localPtrs().find(decl) != m_context.localPtrs().end())
+	if (auto structType = dynamic_cast<StructType const*>(decl->type()))
 	{
-		m_currentExpr = m_context.localPtrs()[decl];
-		return false;
+		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+		{
+			m_currentExpr = ASTBoogieUtils::unpack(&_node, m_currentContract, m_context);
+			return false;
+		}
 	}
 
 	// Inline constants
