@@ -69,7 +69,6 @@ private:
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
-	std::map<Declaration const*, boogie::Expr::Ref> m_localPtrs;
 
 	std::map<std::string,boogie::DataTypeDeclRef> m_arrDataTypes;
 	std::map<std::string,boogie::FuncDeclRef> m_arrConstrs;
@@ -159,8 +158,6 @@ public:
 
 	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
-
-	std::map<Declaration const*, boogie::Expr::Ref>& localPtrs() { return m_localPtrs; }
 
 	boogie::Expr::Ref getMemArray(boogie::Expr::Ref arrPtrExpr, boogie::TypeDeclRef type) { return boogie::Expr::arrsel(m_memArrs[type->getName()]->getRefTo(), arrPtrExpr); }
 	boogie::Expr::Ref getArrayLength(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "length", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }
