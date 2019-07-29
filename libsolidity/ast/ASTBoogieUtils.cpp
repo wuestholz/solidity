@@ -1027,6 +1027,11 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 			result.newDecls.push_back(varDecl);
 			result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, varDecl->getRefTo()));
 
+			// RHS is local storage: unpack first
+			if (rhsLoc == DataLocation::Storage && rhsType->isPointer())
+				if (auto id = dynamic_cast<Identifier const*>(rhs.expr))
+					rhs.bgExpr = unpack(id, context);
+
 			// Make deep copy
 			deepCopyStruct(&lhsType->structDefinition(), lhs.bgExpr, rhs.bgExpr,
 					lhsLoc, rhsLoc, assocNode, context, result);
@@ -1053,6 +1058,11 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 			// LHS is storage --> deep copy by data types
 			else
 			{
+				// Unpack pointers first
+				if (rhsType->isPointer())
+					if (auto id = dynamic_cast<Identifier const*>(rhs.expr))
+						rhs.bgExpr = unpack(id, context);
+
 				makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 				return;
 			}
@@ -1247,7 +1257,7 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 }
 
 ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr::Ref /*bgExpr*/,
-		ContractDefinition const* currentContract, ASTNode const* assocNode, BoogieContext& context)
+		ASTNode const* assocNode, BoogieContext& context)
 {
 	auto structType = dynamic_cast<StructType const*>(expr->annotation().type);
 	solAssert(structType, "Trying to pack non-struct expression");
@@ -1255,7 +1265,7 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
 		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
-		auto vars = ASTNode::filteredNodes<VariableDeclaration>(currentContract->subNodes());
+		auto vars = ASTNode::filteredNodes<VariableDeclaration>(context.currentContract()->subNodes());
 		for (unsigned i = 0; i < vars.size(); ++i)
 			if (vars[i] == idExpr->annotation().referencedDeclaration)
 				return PackResult{ptr,
@@ -1268,12 +1278,12 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr
 	return PackResult{nullptr, {}};
 }
 
-bg::Expr::Ref ASTBoogieUtils::unpack(Identifier const* id, ContractDefinition const* currentContract, BoogieContext& context)
+bg::Expr::Ref ASTBoogieUtils::unpack(Identifier const* id, BoogieContext& context)
 {
 	auto structType = dynamic_cast<StructType const*>(id->annotation().referencedDeclaration->type());
 	solAssert(structType, "Trying to unpack non-struct expression");
 
-	auto vars = ASTNode::filteredNodes<VariableDeclaration>(currentContract->subNodes());
+	auto vars = ASTNode::filteredNodes<VariableDeclaration>(context.currentContract()->subNodes());
 	solAssert(vars.size() > 0, "No state variables to unpack");
 
 	auto expr = bg::Expr::arrsel(bg::Expr::id(context.mapDeclName(*vars[0])), context.boogieThis()->getRefTo());

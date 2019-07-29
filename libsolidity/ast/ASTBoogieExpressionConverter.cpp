@@ -46,9 +46,8 @@ void ASTBoogieExpressionConverter::addSideEffect(bg::Stmt::Ref stmt)
 	m_newStatements.push_back(stmt);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract) :
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context) :
 		m_context(context),
-		m_currentContract(currentContract),
 		m_currentExpr(nullptr),
 		m_currentAddress(nullptr),
 		m_currentMsgValue(nullptr),
@@ -121,13 +120,11 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 			solAssert(lhsId, "Expected identifier for local storage pointer");
 			addSideEffect(bg::Stmt::comment("Packing local storage pointer " + lhsId->name()));
 
-			auto packed = ASTBoogieUtils::pack(&rhsNode, rhsExpr, m_currentContract, &rhsNode, m_context);
+			auto packed = ASTBoogieUtils::pack(&rhsNode, rhsExpr, &rhsNode, m_context);
 			m_newDecls.push_back(packed.ptr);
 			for (auto stmt: packed.stmts)
 				addSideEffect(stmt);
-			addSideEffect(bg::Stmt::assign(
-					bg::Expr::id(m_context.mapDeclName(*lhsId->annotation().referencedDeclaration)),
-					packed.ptr->getRefTo()));
+			addSideEffect(bg::Stmt::assign(lhsExpr, packed.ptr->getRefTo()));
 
 			m_currentExpr = lhsExpr;
 			return false;
@@ -523,13 +520,6 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 				m_currentExpr = tmpDecl->getRefTo();
 			}
 		}
-
-		// Do not unpack local storage pointers
-		if (auto argId = dynamic_cast<Identifier const*>(arg.get()))
-			if (argId->annotation().referencedDeclaration)
-				if (auto structType = dynamic_cast<StructType const*>(argId->annotation().referencedDeclaration->type()))
-					if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
-						m_currentExpr = bg::Expr::id(m_context.mapDeclName(*argId->annotation().referencedDeclaration));
 
 		// Do not add argument for call
 		if (funcName != ASTBoogieUtils::BOOGIE_CALL)
@@ -959,10 +949,10 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 				refDecl->name() == ASTBoogieUtils::SOLIDITY_SUPER)
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 		// current contract name
-		if (refDecl == m_currentContract)
+		if (refDecl == m_context.currentContract())
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 		// any base contract name
-		auto bases = m_currentContract->annotation().linearizedBaseContracts;
+		auto bases = m_context.currentContract()->annotation().linearizedBaseContracts;
 		if (std::find(bases.begin(), bases.end(), refDecl) != bases.end())
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 	}
@@ -1118,6 +1108,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 		else if (structType->location() == DataLocation::Storage)
 		{
+			// Local pointers: unpack first
+			if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+				if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
+					m_currentAddress = ASTBoogieUtils::unpack(id, m_context);
+
 			m_currentExpr = bg::Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
 					m_context.getStructConstructor(&structType->structDefinition()),
@@ -1219,15 +1214,6 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 		return false;
 	}
 	auto decl = _node.annotation().referencedDeclaration;
-
-	if (auto structType = dynamic_cast<StructType const*>(decl->type()))
-	{
-		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
-		{
-			m_currentExpr = ASTBoogieUtils::unpack(&_node, m_currentContract, m_context);
-			return false;
-		}
-	}
 
 	// Inline constants
 	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))

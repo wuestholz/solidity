@@ -86,6 +86,7 @@ private:
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	langutil::EVMVersion m_evmVersion;
 
+	ContractDefinition const* m_currentContract;
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
@@ -124,6 +125,8 @@ public:
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 	int nextId() { return m_nextId++; }
 	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
+	ContractDefinition const* currentContract() const { return m_currentContract; }
+	void setCurrentContract(ContractDefinition const* contract) { m_currentContract = contract; }
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */

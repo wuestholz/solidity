@@ -18,7 +18,6 @@ private:
 	BoogieContext& m_context;
 
 	// Helper variables to pass information between the visit methods
-	ContractDefinition const* m_currentContract;
 	FunctionDefinition const* m_currentFunc; // Function currently being processed
 	unsigned long m_currentModifier; // Index of the current modifier being processed
 

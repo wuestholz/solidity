@@ -228,11 +228,10 @@ public:
 	};
 
 	static
-	PackResult pack(Expression const* expr, boogie::Expr::Ref bgExpr, ContractDefinition const* currentContract,
-			ASTNode const* assocNode, BoogieContext& context);
+	PackResult pack(Expression const* expr, boogie::Expr::Ref bgExpr, ASTNode const* assocNode, BoogieContext& context);
 
 	static
-	boogie::Expr::Ref unpack(Identifier const* id, ContractDefinition const* currentContract, BoogieContext& context);
+	boogie::Expr::Ref unpack(Identifier const* id, BoogieContext& context);
 
 };
 
