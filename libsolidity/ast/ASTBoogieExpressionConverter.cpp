@@ -111,26 +111,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	bg::Expr::Ref rhsExpr = m_currentExpr;
 
-	// Check for local storage pointer reassignment
-	if (auto structType = dynamic_cast<StructType const*>(lhsType))
-	{
-		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
-		{
-			auto lhsId = dynamic_cast<Identifier const*>(&lhsNode);
-			solAssert(lhsId, "Expected identifier for local storage pointer");
-			addSideEffect(bg::Stmt::comment("Packing local storage pointer " + lhsId->name()));
-
-			auto packed = ASTBoogieUtils::pack(&rhsNode, rhsExpr, &rhsNode, m_context);
-			m_newDecls.push_back(packed.ptr);
-			for (auto stmt: packed.stmts)
-				addSideEffect(stmt);
-			addSideEffect(bg::Stmt::assign(lhsExpr, packed.ptr->getRefTo()));
-
-			m_currentExpr = lhsExpr;
-			return false;
-		}
-	}
-
 	auto res = ASTBoogieUtils::makeAssign(
 			ASTBoogieUtils::AssignParam{lhsExpr, lhsType, &lhsNode},
 			ASTBoogieUtils::AssignParam{rhsExpr, rhsType, &rhsNode},

@@ -1049,11 +1049,28 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 		// RHS is storage
 		if (rhsLoc == DataLocation::Storage)
 		{
-			// LHS is local storage --> reference copy
+			// LHS is storage pointer --> reference copy
 			if (lhsType->isPointer())
 			{
-				context.reportError(assocNode, "Unsupported reassignment of local storage pointer");
-				return;
+				// pointer to pointer, simply assign
+				if (rhsType->isPointer())
+				{
+					makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
+					return;
+				}
+				else // Otherwise pack
+				{
+					auto lhsId = dynamic_cast<Identifier const*>(lhs.expr);
+					solAssert(lhsId, "Expected identifier for local storage pointer");
+					result.newStmts.push_back(bg::Stmt::comment("Packing local storage pointer " + lhsId->name()));
+
+					auto packed = pack(rhs.expr, rhs.bgExpr, rhs.expr, context);
+					result.newDecls.push_back(packed.ptr);
+					for (auto stmt: packed.stmts)
+						result.newStmts.push_back(stmt);
+					result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, packed.ptr->getRefTo()));
+					return;
+				}
 			}
 			// LHS is storage --> deep copy by data types
 			else
@@ -1270,12 +1287,10 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr
 			if (vars[i] == idExpr->annotation().referencedDeclaration)
 				return PackResult{ptr,
 					{bg::Stmt::assign(bg::Expr::arrsel(ptr->getRefTo(), context.intLit(0, 256)), context.intLit(i, 256))}};
-
-		return PackResult{ptr, {bg::Stmt::assign(ptr->getRefTo(), bg::Expr::id(context.mapDeclName(*idExpr->annotation().referencedDeclaration)))}};
 	}
 
 	context.reportError(assocNode, "Unsupported expression for packing");
-	return PackResult{nullptr, {}};
+	return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
 }
 
 bg::Expr::Ref ASTBoogieUtils::unpack(Identifier const* id, BoogieContext& context)
