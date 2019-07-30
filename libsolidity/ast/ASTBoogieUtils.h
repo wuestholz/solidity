@@ -233,6 +233,13 @@ public:
 	static
 	boogie::Expr::Ref unpack(Identifier const* id, BoogieContext& context);
 
+private:
+	static
+	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, ASTNode const* assocNode, BoogieContext& context, PackResult& result);
+
+	static
+	boogie::Expr::Ref unpackInternal(Identifier const* id, Declaration const* decl, int depth, boogie::Expr::Ref base, BoogieContext& context);
+
 };
 
 }

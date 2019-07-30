@@ -10,8 +10,8 @@ contract StructsLocalStorage {
         int z;
     }
 
+    T t1;
     S ss;
-    S ss2;
 
     function testSimple() public {
         ss.x = 1;
@@ -34,7 +34,31 @@ contract StructsLocalStorage {
         assert(ss.t.z == 6);
     }
 
+    function testMember() public {
+        ss.x = 1;
+        ss.t.z = 2;
+        t1.z = 3;
+        assert(ss.x == 1);
+        assert(ss.t.z == 2);
+        assert(t1.z == 3);
+
+        T storage tl = ss.t;
+        tl.z = 4;
+
+        assert(ss.x == 1);
+        assert(ss.t.z == 4);
+        assert(t1.z == 3);
+
+        tl = t1;
+        tl.z = 5;
+
+        assert(ss.x == 1);
+        assert(ss.t.z == 4);
+        assert(t1.z == 5);
+    }
+
     function() external payable {
         testSimple();
+        testMember();
     }
 }

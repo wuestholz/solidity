@@ -1,4 +1,5 @@
 StructsLocalStorage::testSimple: OK
+StructsLocalStorage::testMember: OK
 StructsLocalStorage::[fallback]: OK
 StructsLocalStorage::[implicit_constructor]: OK
 No errors found.
