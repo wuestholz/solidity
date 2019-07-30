@@ -72,10 +72,72 @@ contract StructsLocalStorage {
         assert(s2.t.z == 1);
     }
 
+    S[2] s_arr;
+
+    function testArray() public {
+        s_arr[0].x = 1;
+        s_arr[0].t.z = 2;
+        s_arr[1].x = 3;
+        s_arr[1].t.z = 4;
+
+        uint i = 0;
+        S storage sl = s_arr[i];
+        i = i + 1;
+        sl.x = 5;
+        sl.t.z = 6;
+        assert(s_arr[0].x == 5);
+        assert(s_arr[0].t.z == 6);
+        assert(s_arr[1].x == 3);
+        assert(s_arr[1].t.z == 4);
+    }
+
+    function testArrayMember() public {
+        s_arr[0].x = 1;
+        s_arr[0].t.z = 2;
+        s_arr[1].x = 3;
+        s_arr[1].t.z = 4;
+
+        uint i = 0;
+        T storage tl = s_arr[i].t;
+        i = i + 1;
+        tl.z = 5;
+        assert(s_arr[0].x == 1);
+        assert(s_arr[0].t.z == 5);
+        assert(s_arr[1].x == 3);
+        assert(s_arr[1].t.z == 4);
+    }
+
+    T[2] t_arr;
+
+    function testReassign() public {
+        t_arr[0].z = 1;
+        t_arr[1].z = 2;
+        assert(t_arr[0].z == 1);
+        assert(t_arr[1].z == 2);
+
+        uint i = 0;
+        T storage tl = t_arr[i];
+        i++;
+        tl.z = 3;
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 2);
+
+        tl = t_arr[i]; // Reassign
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 2);
+
+        tl.z = 4;
+        assert(t_arr[0].z == 3);
+        assert(t_arr[1].z == 4);
+    }
+
     function() external payable {
         testSimple();
         testMember();
         testConditional(true);
         testConditional(false);
+        testArray();
+        testArrayMember();
+        testReassign();
     }
 }

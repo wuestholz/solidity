@@ -1291,9 +1291,6 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 	// Identifier: search for matching state var in the contract
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
-		auto structType = dynamic_cast<StructType const*>(expr->annotation().type);
-		solAssert(structType, "Trying to pack non-struct identifier");
-
 		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
 		auto vars = ASTNode::filteredNodes<VariableDeclaration>(context.currentContract()->subNodes());
 		for (unsigned i = 0; i < vars.size(); ++i)
@@ -1329,6 +1326,18 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 				return;
 			}
 		}
+	}
+	// Arrays: process base recursively, then store index expression
+	else if (auto idxExpr = dynamic_cast<IndexAccess const*>(expr))
+	{
+		auto bgIdxAccExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr);
+		packInternal(&idxExpr->baseExpression(), bgIdxAccExpr->getBase(), assocNode, context, result);
+		solAssert(result.ptr, "Empty pointer from subexpression");
+		unsigned idx = result.stmts.size();
+		result.stmts.push_back(bg::Stmt::assign(
+				bg::Expr::arrsel(result.ptr->getRefTo(), context.intLit(idx, 256)),
+				bgIdxAccExpr->getIdx()));
+		return;
 	}
 }
 
@@ -1369,25 +1378,41 @@ bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration c
 	else if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))
 	{
 		auto targetTp = dynamic_cast<StructType const*>(id->annotation().referencedDeclaration->type());
-		auto declTp = dynamic_cast<StructType const*>(varDecl->type());
+		auto declTp = varDecl->type();
+
+		// Get rid of arrays by indexing into them
+		while (declTp->category() == Type::Category::Array)
+		{
+			auto arrType = dynamic_cast<ArrayType const*>(declTp);
+			auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
+			auto bgType = context.toBoogieType(arrType->baseType(), id);
+			context.toBoogieType(arrType, id); // TODO: this makes sure that the array types are declared even if the array itself is declared later
+			base = bg::Expr::arrsel(
+					context.getInnerArray(base, context.toBoogieType(arrType->baseType(), id)),
+					bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+			depth++;
+			declTp = arrType->baseType();
+		}
+
+		auto declStructTp = dynamic_cast<StructType const*>(declTp);
 
 		// Found a variable with a matching type, just return
-		if (targetTp && declTp && targetTp->structDefinition() == declTp->structDefinition())
+		if (targetTp && declStructTp && targetTp->structDefinition() == declStructTp->structDefinition())
 		{
 			return base;
 		}
 		// Otherwise if it is a struct, go through members and recurse
-		if (declTp)
+		if (declStructTp)
 		{
-			auto members = declTp->structDefinition().members();
+			auto members = declStructTp->structDefinition().members();
 			bg::Expr::Ref expr = nullptr;
 			auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
 			for (unsigned i = 0; i < members.size(); ++i)
 			{
 				auto baseForSub = bg::Expr::dtsel(base,
 						context.mapDeclName(*members[i]),
-						context.getStructConstructor(&declTp->structDefinition()),
-						dynamic_pointer_cast<bg::DataTypeDecl>(context.getStructType(&declTp->structDefinition(), DataLocation::Storage)));
+						context.getStructConstructor(&declStructTp->structDefinition()),
+						dynamic_pointer_cast<bg::DataTypeDecl>(context.getStructType(&declStructTp->structDefinition(), DataLocation::Storage)));
 				auto subExpr = unpackInternal(id, members[i].get(), depth+1, baseForSub, context);
 				if (subExpr)
 				{
