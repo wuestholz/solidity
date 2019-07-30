@@ -1060,10 +1060,7 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 				}
 				else // Otherwise pack
 				{
-					auto lhsId = dynamic_cast<Identifier const*>(lhs.expr);
-					solAssert(lhsId, "Expected identifier for local storage pointer");
-					result.newStmts.push_back(bg::Stmt::comment("Packing local storage pointer " + lhsId->name()));
-
+					result.newStmts.push_back(bg::Stmt::comment("Packing local storage pointer"));
 					auto packed = pack(rhs.expr, rhs.bgExpr, rhs.expr, context);
 					result.newDecls.push_back(packed.ptr);
 					for (auto stmt: packed.stmts)
@@ -1288,6 +1285,14 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr
 void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 		ASTNode const* assocNode, BoogieContext& context, PackResult& result)
 {
+	// Function calls return pointers, no need to pack, just copy the return value
+	if (dynamic_cast<FunctionCall const*>(expr))
+	{
+		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
+		result.ptr = ptr;
+		result.stmts.push_back( bg::Stmt::assign(ptr->getRefTo(), bgExpr));
+		return;
+	}
 	// Identifier: search for matching state var in the contract
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
