@@ -11,7 +11,7 @@ contract StructsLocalStorageFunc {
     }
 
     S s;
-    U[] u;
+    U[3] u;
 
     function set_x_with_ptr(S storage s_ptr, int _x) internal {
         s_ptr.x = _x;
