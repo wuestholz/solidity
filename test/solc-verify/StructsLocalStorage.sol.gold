@@ -4,6 +4,7 @@ StructsLocalStorage::testConditional: OK
 StructsLocalStorage::testArray: OK
 StructsLocalStorage::testArrayMember: OK
 StructsLocalStorage::testReassign: OK
+StructsLocalStorage::testAlternatingNesting: OK
 StructsLocalStorage::[fallback]: OK
 StructsLocalStorage::[implicit_constructor]: OK
 No errors found.

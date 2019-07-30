@@ -1314,6 +1314,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 	else if (auto memAccExpr = dynamic_cast<MemberAccess const*>(expr))
 	{
 		auto bgMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr);
+		solAssert(bgMemAccExpr, "Expected Boogie member access expression");
 		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), assocNode, context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		auto structType = dynamic_cast<StructType const*>(memAccExpr->expression().annotation().type);
@@ -1335,8 +1336,14 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 	// Arrays: process base recursively, then store index expression
 	else if (auto idxExpr = dynamic_cast<IndexAccess const*>(expr))
 	{
+		// Base has to be extracted in two steps, because an array is
+		// actually a datatype with the actual array and its length
 		auto bgIdxAccExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr);
-		packInternal(&idxExpr->baseExpression(), bgIdxAccExpr->getBase(), assocNode, context, result);
+		solAssert(bgIdxAccExpr, "Expected Boogie index access expression");
+		auto bgDtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgIdxAccExpr->getBase());
+		solAssert(bgIdxAccExpr, "Expected Boogie member access expression below indexer");
+
+		packInternal(&idxExpr->baseExpression(), bgDtSelExpr->getBase(), assocNode, context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		unsigned idx = result.stmts.size();
 		result.stmts.push_back(bg::Stmt::assign(

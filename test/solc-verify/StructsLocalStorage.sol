@@ -131,6 +131,20 @@ contract StructsLocalStorage {
         assert(t_arr[1].z == 4);
     }
 
+    struct U {
+        T[5] tt;
+    }
+
+    U[5] uu;
+
+    function testAlternatingNesting() public {
+        uu[1].tt[2].z = 12;
+        uu[2].tt[1].z = 21;
+
+        T storage tl = uu[1].tt[2];
+        assert(tl.z == 12);
+    }
+
     function() external payable {
         testSimple();
         testMember();
@@ -139,5 +153,6 @@ contract StructsLocalStorage {
         testArray();
         testArrayMember();
         testReassign();
+        testAlternatingNesting();
     }
 }
