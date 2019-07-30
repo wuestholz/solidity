@@ -11,35 +11,32 @@ contract StructsLocalStorageFunc {
     }
 
     S s;
-    U u;
+    U[] u;
 
     function set_x_with_ptr(S storage s_ptr, int _x) internal {
         s_ptr.x = _x;
     }
 
-    function get_ptr(bool cond) internal view returns (S storage) {
-        if (cond) return u.s1;
-        else return u.s2;
+    function get_ptr(uint i, bool cond) internal view returns (S storage) {
+        if (cond) return u[i].s1;
+        else return u[i].s2;
     }
 
     function() external payable {
         // Calling a function
-        S storage sl1 = s;
-        S storage sl2 = u.s1;
-        S storage sl3 = u.s2;
-        set_x_with_ptr(sl1, 1);
-        set_x_with_ptr(sl2, 2);
-        set_x_with_ptr(sl3, 3);
+        set_x_with_ptr(s, 1);
+        set_x_with_ptr(u[0].s1, 2);
+        set_x_with_ptr(u[0].s2, 3);
         assert(s.x == 1);
-        assert(u.s1.x == 2);
-        assert(u.s2.x == 3);
+        assert(u[0].s1.x == 2);
+        assert(u[0].s2.x == 3);
 
         // Returning from function
-        u.s1.x = 1;
-        u.s2.x = 2;
-        S storage sl4 = get_ptr(true);
-        assert(sl4.x == 1);
-        sl4 = get_ptr(false);
-        assert(sl4.x == 2);
+        u[1].s1.x = 1;
+        u[2].s2.x = 2;
+        S storage s_ptr = get_ptr(1, true);
+        assert(s_ptr.x == 1);
+        s_ptr = get_ptr(2, false);
+        assert(s_ptr.x == 2);
     }
 }
