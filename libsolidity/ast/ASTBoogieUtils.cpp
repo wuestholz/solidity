@@ -1061,7 +1061,7 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 				else // Otherwise pack
 				{
 					result.newStmts.push_back(bg::Stmt::comment("Packing local storage pointer"));
-					auto packed = pack(rhs.expr, rhs.bgExpr, rhs.expr, context);
+					auto packed = pack(rhs.expr, rhs.bgExpr, context);
 					result.newDecls.push_back(packed.ptr);
 					for (auto stmt: packed.stmts)
 						result.newStmts.push_back(stmt);
@@ -1270,20 +1270,18 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 	}
 }
 
-ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr::Ref bgExpr,
-		ASTNode const* assocNode, BoogieContext& context)
+ASTBoogieUtils::PackResult ASTBoogieUtils::pack(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context)
 {
 	PackResult result {nullptr, {}};
-	packInternal(expr, bgExpr, assocNode, context, result);
+	packInternal(expr, bgExpr, context, result);
 	if (result.ptr)
 		return result;
 
-	context.reportError(assocNode, "Unsupported expression for packing");
+	context.reportError(expr, "Unsupported expression for packing");
 	return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
 }
 
-void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
-		ASTNode const* assocNode, BoogieContext& context, PackResult& result)
+void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context, PackResult& result)
 {
 	// Function calls return pointers, no need to pack, just copy the return value
 	if (dynamic_cast<FunctionCall const*>(expr))
@@ -1315,7 +1313,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 	{
 		auto bgMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr);
 		solAssert(bgMemAccExpr, "Expected Boogie member access expression");
-		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), assocNode, context, result);
+		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		auto structType = dynamic_cast<StructType const*>(memAccExpr->expression().annotation().type);
 		solAssert(structType, "Trying to pack member of non-struct expression");
@@ -1343,7 +1341,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr,
 		auto bgDtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgIdxAccExpr->getBase());
 		solAssert(bgIdxAccExpr, "Expected Boogie member access expression below indexer");
 
-		packInternal(&idxExpr->baseExpression(), bgDtSelExpr->getBase(), assocNode, context, result);
+		packInternal(&idxExpr->baseExpression(), bgDtSelExpr->getBase(), context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		unsigned idx = result.stmts.size();
 		result.stmts.push_back(bg::Stmt::assign(

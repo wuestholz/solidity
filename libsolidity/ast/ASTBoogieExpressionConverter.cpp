@@ -509,7 +509,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (argStructType->dataStoredIn(DataLocation::Storage) && targetStructType->dataStoredIn(DataLocation::Storage) &&
 					!argStructType->isPointer() && targetStructType->isPointer())
 			{
-				auto packed = ASTBoogieUtils::pack(_node.arguments()[i].get(), m_currentExpr, &_node, m_context);
+				auto packed = ASTBoogieUtils::pack(_node.arguments()[i].get(), m_currentExpr, m_context);
 				m_newDecls.push_back(packed.ptr);
 				for (auto stmt: packed.stmts)
 					addSideEffect(stmt);
