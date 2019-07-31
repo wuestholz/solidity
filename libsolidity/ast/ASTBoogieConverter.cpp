@@ -1180,13 +1180,18 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	string oldContinueLabel = m_currentContinueLabel;
 	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
 
-	// Get condition recursively
+	// Get condition recursively (create block for side effects)
+	m_currentBlocks.push(bg::Block::block());
 	bg::Expr::Ref cond = convertExpression(_node.condition());
+	bg::Block::Ref condSideEffects = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 
-	// Get if branch recursively
+	// Get body recursively
 	m_currentBlocks.push(bg::Block::block());
 	_node.body().accept(*this);
 	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
@@ -1246,8 +1251,12 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		_node.initializationExpression()->accept(*this);
 	}
 
-	// Get condition recursively
+	// Get condition recursively (create block for side effects)
+	m_currentBlocks.push(bg::Block::block());
 	bg::Expr::Ref cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
+	bg::Block::Ref condSideEffects = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 
 	// Get body recursively
 	m_currentBlocks.push(bg::Block::block());
@@ -1260,6 +1269,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Loop expression"));
 		_node.loopExpression()->accept(*this); // Adds statements to current block
 	}
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
