@@ -182,9 +182,16 @@ def main(tmpDir):
             result = redTxt('ERROR') if 'error' in nextOutputLine else (yellowTxt('INCONCLUSIVE') if 'inconclusive' in nextOutputLine else greenTxt('OK'))
             print(getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
 
+    skipped = 0
+    for line in open(bplFile).readlines():
+        if line.startswith('procedure ') and '{:skipped}' in line:
+            print(getMessage(line) + ': ' + yellowTxt('SKIPPED'))
+            skipped += 1
+
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print(greenTxt('No errors found.'))
         if 'inconclusive' in outputLines[-1]: print(yellowTxt('Inconclusive results.'))
+        if skipped > 0: print(yellowTxt('Some functions were skipped.'))
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))

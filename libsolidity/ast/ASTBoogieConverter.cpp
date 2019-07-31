@@ -436,10 +436,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	}
 
 	// Print errors relating to the expression string
-	SourceReferenceFormatter formatter(cerr);
-	for (auto const& error: m_context.errorReporter()->errors())
-		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
+	m_context.printErrors(cerr);
 
 	// Restore error reporter
 	m_context.errorReporter() = originalErrReporter;
@@ -878,6 +875,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else
 		m_currentRet = bg::Expr::tuple(retIds);
 
+	// Create a new error reporter to be able to recover
+	ErrorList errorList;
+	ErrorReporter errorReporter(errorList);
+	ErrorReporter* originalErrReporter = m_context.errorReporter();
+	m_context.errorReporter() = &errorReporter;
+
 	// Convert function body, collect result
 	m_localDecls.clear();
 	// Create new empty block
@@ -912,9 +915,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentModifier = 0;
 	processFuncModifiersAndBody();
 
+	// Print errors related to the function
+	m_context.printErrors(cerr);
+
+	// Restore error reporter
+	m_context.errorReporter() = originalErrReporter;
+
+	// Add function body if there were no errors
 	vector<bg::Block::Ref> blocks;
-	if (!m_currentBlocks.top()->getStatements().empty())
-		blocks.push_back(m_currentBlocks.top());
+	if (Error::containsOnlyWarnings(errorList))
+	{
+		if(!m_currentBlocks.top()->getStatements().empty())
+			blocks.push_back(m_currentBlocks.top());
+	}
+	else
+		m_context.reportWarning(&_node, "Errors while translating function body, will be skipped");
+
 	m_currentBlocks.pop();
 	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
@@ -1005,6 +1021,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		traceabilityName = "[fallback]";
 	traceabilityName = m_currentContract->name() + "::" + traceabilityName;
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
+
+	if (!Error::containsOnlyWarnings(errorList))
+		procDecl->addAttr(bg::Attr::attr("skipped"));
+
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
 	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
 	m_context.addDecl(procDecl);

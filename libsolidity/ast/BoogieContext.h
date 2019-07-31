@@ -125,6 +125,9 @@ public:
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 	int nextId() { return m_nextId++; }
 	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
+
+	void printErrors(std::ostream& out);
+
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */
