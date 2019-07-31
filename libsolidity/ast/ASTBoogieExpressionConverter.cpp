@@ -466,54 +466,25 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		auto arg = _node.arguments()[i];
 		arg->accept(*this);
 
-		// Try to get the definition (for implicit conversions)
-		FunctionDefinition const* calledFunc = nullptr;
-		if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
+		if (auto funcType = dynamic_cast<FunctionType const*>(_node.expression().annotation().type))
 		{
-			if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
-				calledFunc = funcDef;
-		}
-		if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
-		{
-			if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration))
-				calledFunc = funcDef;
-		}
-		// TODO: the above does not work for complex expressions like 'x.f.value(1)()'
-
-		// In bit-precise mode, we need the definition of the function to see the types of the parameters
-		// (for implicit conversions)
-		if (calledFunc && m_context.isBvEncoding())
-			m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
-
-		// Conversions for arrays
-		if (arg->annotation().type->category() == Type::Category::Array && arg->annotation().type->dataStoredIn(DataLocation::Storage))
-		{
-			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
-			if (!arrType->isString())
+			// Check for implicit conversions
+			if (funcType->parameterTypes().size() > i && funcType->parameterTypes()[i] != arg->annotation().type &&
+					funcName != ASTBoogieUtils::BOOGIE_CALL &&
+					!boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_OLD) &&
+					!boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 			{
-				// Create a copy if a storage array is passed to a function
-				auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
-				m_newDecls.push_back(tmpDecl);
-				auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-				addSideEffect(bg::Stmt::assign(memArr, m_currentExpr));
-				m_currentExpr = tmpDecl->getRefTo();
-			}
-		}
-
-		// Conversion for local struct pointers
-		if (calledFunc && arg->annotation().type->category() == Type::Category::Struct)
-		{
-			auto argStructType = dynamic_cast<StructType const*>(arg->annotation().type);
-			auto targetStructType = dynamic_cast<StructType const*>(calledFunc->parameters()[i]->annotation().type);
-			solAssert(targetStructType, "Struct parameter type expected");
-			if (argStructType->dataStoredIn(DataLocation::Storage) && targetStructType->dataStoredIn(DataLocation::Storage) &&
-					!argStructType->isPointer() && targetStructType->isPointer())
-			{
-				auto packed = ASTBoogieUtils::packToLocalPtr(_node.arguments()[i].get(), m_currentExpr, m_context);
-				m_newDecls.push_back(packed.ptr);
-				for (auto stmt: packed.stmts)
+				// Introduce temp variable, make the assignment, including conversions
+				auto argDecl = m_context.tmpVar(m_context.toBoogieType(funcType->parameterTypes()[i], arg.get()), "call_arg");
+				m_newDecls.push_back(argDecl);
+				auto ar = ASTBoogieUtils::makeAssign(
+						ASTBoogieUtils::AssignParam{argDecl->getRefTo(), funcType->parameterTypes()[i], nullptr },
+						ASTBoogieUtils::AssignParam{m_currentExpr, arg->annotation().type, arg.get() },
+						Token::Assign, &_node, m_context);
+				m_newDecls.insert(m_newDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+				for (auto stmt: ar.newStmts)
 					addSideEffect(stmt);
-				m_currentExpr = packed.ptr->getRefTo();
+				m_currentExpr = argDecl->getRefTo();
 			}
 		}
 
