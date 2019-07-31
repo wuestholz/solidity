@@ -509,7 +509,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 			if (argStructType->dataStoredIn(DataLocation::Storage) && targetStructType->dataStoredIn(DataLocation::Storage) &&
 					!argStructType->isPointer() && targetStructType->isPointer())
 			{
-				auto packed = ASTBoogieUtils::pack(_node.arguments()[i].get(), m_currentExpr, m_context);
+				auto packed = ASTBoogieUtils::packToLocalPtr(_node.arguments()[i].get(), m_currentExpr, m_context);
 				m_newDecls.push_back(packed.ptr);
 				for (auto stmt: packed.stmts)
 					addSideEffect(stmt);
@@ -1107,7 +1107,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 			// Local pointers: unpack first
 			if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
 				if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
-					m_currentAddress = ASTBoogieUtils::unpack(id, m_context);
+					m_currentAddress = ASTBoogieUtils::unpackLocalPtr(id, m_context);
 
 			m_currentExpr = bg::Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),

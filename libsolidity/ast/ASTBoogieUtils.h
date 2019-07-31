@@ -227,16 +227,30 @@ public:
 		std::list<boogie::Stmt::Ref> stmts;
 	};
 
+	/**
+	 * Pack an expression into a local storage pointer
+	 */
 	static
-	PackResult pack(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context);
+	PackResult packToLocalPtr(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context);
 
+	/**
+	 * Unpack a local storage pointer into an access to storage
+	 */
 	static
-	boogie::Expr::Ref unpack(Identifier const* id, BoogieContext& context);
+	boogie::Expr::Ref unpackLocalPtr(Identifier const* id, BoogieContext& context);
 
 private:
+	/**
+	 * Packs a path to a local storage into an array. E.g., 'ss[5].t' becomes [i, 5, j] if
+	 *  'ss' is the ith state var and 't' is the jth member.
+	 */
 	static
 	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context, PackResult& result);
 
+	/**
+	 * Unpacks an array into a tree of paths (conditional) to local storage (opposite of packing).
+	 * E.g., ite(arr[0] == 0, statevar1, ite(arr[0] == 1, statevar2, ...
+	 */
 	static
 	boogie::Expr::Ref unpackInternal(Identifier const* id, Declaration const* decl, int depth, boogie::Expr::Ref base, BoogieContext& context);
 
