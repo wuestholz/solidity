@@ -145,6 +145,25 @@ contract StructsLocalStorage {
         assert(tl.z == 12);
     }
 
+    mapping(uint=>S) s_map;
+
+    function testMapping() public {
+        s_map[0].x = 1;
+        s_map[0].t.z = 2;
+        s_map[1].x = 3;
+        s_map[1].t.z = 4;
+
+        uint i = 0;
+        S storage sl = s_map[i];
+        i = i + 1;
+        sl.x = 5;
+        sl.t.z = 6;
+        assert(s_map[0].x == 5);
+        assert(s_map[0].t.z == 6);
+        assert(s_map[1].x == 3);
+        assert(s_map[1].t.z == 4);
+    }
+
     function() external payable {
         testSimple();
         testMember();
@@ -154,5 +173,6 @@ contract StructsLocalStorage {
         testArrayMember();
         testReassign();
         testAlternatingNesting();
+        testMapping();
     }
 }

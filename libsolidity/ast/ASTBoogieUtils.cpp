@@ -1288,7 +1288,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	{
 		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
 		result.ptr = ptr;
-		result.stmts.push_back( bg::Stmt::assign(ptr->getRefTo(), bgExpr));
+		result.stmts.push_back(bg::Stmt::assign(ptr->getRefTo(), bgExpr));
 		return;
 	}
 	// Identifier: search for matching state var in the contract
@@ -1334,14 +1334,27 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	// Arrays: process base recursively, then store index expression
 	else if (auto idxExpr = dynamic_cast<IndexAccess const*>(expr))
 	{
-		// Base has to be extracted in two steps, because an array is
-		// actually a datatype with the actual array and its length
 		auto bgIdxAccExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr);
 		solAssert(bgIdxAccExpr, "Expected Boogie index access expression");
-		auto bgDtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgIdxAccExpr->getBase());
-		solAssert(bgIdxAccExpr, "Expected Boogie member access expression below indexer");
+		bg::Expr::Ref base = bgIdxAccExpr->getBase();
+		if (idxExpr->baseExpression().annotation().type->category() == Type::Category::Array)
+		{
+			// Base has to be extracted in two steps for arrays, because an array is
+			// actually a datatype with the actual array and its length
+			auto bgDtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgIdxAccExpr->getBase());
+			solAssert(bgIdxAccExpr, "Expected Boogie member access expression below indexer");
+			base = bgDtSelExpr->getBase();
+		}
 
-		packInternal(&idxExpr->baseExpression(), bgDtSelExpr->getBase(), context, result);
+		// Report error for unsupported index types
+		auto idxType = idxExpr->indexExpression()->annotation().type->category();
+		if (idxType == Type::Category::StringLiteral || idxType == Type::Category::Array)
+		{
+			context.reportError(idxExpr->indexExpression(), "Unsupported type for index in local pointer");
+			return;
+		}
+
+		packInternal(&idxExpr->baseExpression(), base, context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		unsigned idx = result.stmts.size();
 		result.stmts.push_back(bg::Stmt::assign(
@@ -1390,18 +1403,27 @@ bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration c
 		auto targetTp = dynamic_cast<StructType const*>(id->annotation().referencedDeclaration->type());
 		auto declTp = varDecl->type();
 
-		// Get rid of arrays by indexing into them
-		while (declTp->category() == Type::Category::Array)
+		// Get rid of arrays and mappings by indexing into them
+		while (declTp->category() == Type::Category::Array || declTp->category() == Type::Category::Mapping)
 		{
-			auto arrType = dynamic_cast<ArrayType const*>(declTp);
 			auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
-			auto bgType = context.toBoogieType(arrType->baseType(), id);
-			context.toBoogieType(arrType, id); // TODO: this makes sure that the array types are declared even if the array itself is declared later
-			base = bg::Expr::arrsel(
-					context.getInnerArray(base, context.toBoogieType(arrType->baseType(), id)),
-					bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+			if (auto arrType = dynamic_cast<ArrayType const*>(declTp))
+			{
+				auto bgType = context.toBoogieType(arrType->baseType(), id);
+				context.toBoogieType(arrType, id); // TODO: this makes sure that the array types are declared even if the array itself is declared later
+				base = bg::Expr::arrsel(
+						context.getInnerArray(base, context.toBoogieType(arrType->baseType(), id)),
+						bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+				declTp = arrType->baseType();
+			}
+			else if (auto mapType = dynamic_cast<MappingType const*>(declTp))
+			{
+				base = bg::Expr::arrsel(base, bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+				declTp = mapType->valueType();
+			}
+			else
+				solAssert(false, "Expected array or mapping type");
 			depth++;
-			declTp = arrType->baseType();
 		}
 
 		auto declStructTp = dynamic_cast<StructType const*>(declTp);
