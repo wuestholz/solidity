@@ -925,7 +925,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	vector<bg::Block::Ref> blocks;
 	if (Error::containsOnlyWarnings(errorList))
 	{
-		if(!m_currentBlocks.top()->getStatements().empty())
+		if (!m_currentBlocks.top()->getStatements().empty())
 			blocks.push_back(m_currentBlocks.top());
 	}
 	else
