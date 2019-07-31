@@ -241,8 +241,8 @@ public:
 
 private:
 	/**
-	 * Packs a path to a local storage into an array. E.g., 'ss[5].t' becomes [i, 5, j] if
-	 *  'ss' is the ith state var and 't' is the jth member.
+	 * Packs a path to a local storage into an array. E.g., 'ss[i].t' becomes [2, i, 3] if
+	 *  'ss' is the 2nd state var and 't' is the 3rd member.
 	 */
 	static
 	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context, PackResult& result);
