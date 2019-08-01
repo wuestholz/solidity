@@ -46,11 +46,37 @@ contract Loops {
         return result;
     }
 
+    function whileSideEffect(uint param) private pure returns (uint) {
+        uint i = 0;
+        uint x;
+        /**
+         * @notice invariant x == i
+         * @notice invariant i <= param
+         */
+        while((x = i) < param)
+        {
+            i++;
+        }
+        return x;
+    }
+
+    function forSideEffect(uint param) private pure returns (uint) {
+        uint x;
+        /**
+         * @notice invariant x == i
+         * @notice invariant i <= param
+         */
+        for (uint i = 0; (x = i) < param; i++) {}
+        return x;
+    }
+
     function() external payable {
         assert(whileLoopFunc(5) == 15);
         assert(forLoopFunc(9) == 19);
         assert(breakLoop(5) == 15);
         assert(breakLoop(95) == 100);
+        assert(whileSideEffect(10) == 10);
+        assert(forSideEffect(10) == 10);
     }
 
 }

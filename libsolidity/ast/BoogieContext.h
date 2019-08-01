@@ -127,6 +127,9 @@ public:
 	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
 	ContractDefinition const* currentContract() const { return m_currentContract; }
 	void setCurrentContract(ContractDefinition const* contract) { m_currentContract = contract; }
+
+	void printErrors(std::ostream& out);
+
 	/**
 	 * Map a declaration name to a name in Boogie
 	 */

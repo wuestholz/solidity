@@ -436,10 +436,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	}
 
 	// Print errors relating to the expression string
-	SourceReferenceFormatter formatter(cerr);
-	for (auto const& error: m_context.errorReporter()->errors())
-		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
+	m_context.printErrors(cerr);
 
 	// Restore error reporter
 	m_context.errorReporter() = originalErrReporter;
@@ -877,6 +874,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	else
 		m_currentRet = bg::Expr::tuple(retIds);
 
+	// Create a new error reporter to be able to recover
+	ErrorList errorList;
+	ErrorReporter errorReporter(errorList);
+	ErrorReporter* originalErrReporter = m_context.errorReporter();
+	m_context.errorReporter() = &errorReporter;
+
 	// Convert function body, collect result
 	m_localDecls.clear();
 	// Create new empty block
@@ -911,9 +914,22 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentModifier = 0;
 	processFuncModifiersAndBody();
 
+	// Print errors related to the function
+	m_context.printErrors(cerr);
+
+	// Restore error reporter
+	m_context.errorReporter() = originalErrReporter;
+
+	// Add function body if there were no errors
 	vector<bg::Block::Ref> blocks;
-	if (!m_currentBlocks.top()->getStatements().empty())
-		blocks.push_back(m_currentBlocks.top());
+	if (Error::containsOnlyWarnings(errorList))
+	{
+		if (!m_currentBlocks.top()->getStatements().empty())
+			blocks.push_back(m_currentBlocks.top());
+	}
+	else
+		m_context.reportWarning(&_node, "Errors while translating function body, will be skipped");
+
 	m_currentBlocks.pop();
 	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
 
@@ -1004,6 +1020,10 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		traceabilityName = "[fallback]";
 	traceabilityName = m_context.currentContract()->name() + "::" + traceabilityName;
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
+
+	if (!Error::containsOnlyWarnings(errorList))
+		procDecl->addAttr(bg::Attr::attr("skipped"));
+
 	string funcType = _node.visibility() == Declaration::Visibility::External ? "" : " : " + _node.type()->toString();
 	m_context.addGlobalComment("\nFunction: " + _node.name() + funcType);
 	m_context.addDecl(procDecl);
@@ -1179,13 +1199,18 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	string oldContinueLabel = m_currentContinueLabel;
 	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
 
-	// Get condition recursively
+	// Get condition recursively (create block for side effects)
+	m_currentBlocks.push(bg::Block::block());
 	bg::Expr::Ref cond = convertExpression(_node.condition());
+	bg::Block::Ref condSideEffects = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 
-	// Get if branch recursively
+	// Get body recursively
 	m_currentBlocks.push(bg::Block::block());
 	_node.body().accept(*this);
 	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
@@ -1245,8 +1270,12 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		_node.initializationExpression()->accept(*this);
 	}
 
-	// Get condition recursively
+	// Get condition recursively (create block for side effects)
+	m_currentBlocks.push(bg::Block::block());
 	bg::Expr::Ref cond = _node.condition() ? convertExpression(*_node.condition()) : nullptr;
+	bg::Block::Ref condSideEffects = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 
 	// Get body recursively
 	m_currentBlocks.push(bg::Block::block());
@@ -1259,6 +1288,7 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 		m_currentBlocks.top()->addStmt(bg::Stmt::comment("Loop expression"));
 		_node.loopExpression()->accept(*this); // Adds statements to current block
 	}
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 	bg::Block::ConstRef body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
