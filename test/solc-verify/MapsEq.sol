@@ -18,7 +18,7 @@ contract MapsEq {
     // We need an explicit precondition for the constructor
     // to silence false alarms related to uninitialized maps
     // in Boogie
-    
+
     /// @notice precondition __verifier_eq(x, y)
     constructor() public {}
 }
