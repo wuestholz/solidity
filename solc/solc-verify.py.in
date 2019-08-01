@@ -43,6 +43,9 @@ def greenTxt(txt):
 def redTxt(txt):
     return '\033[91m' + txt + '\x1b[0m' if sys.stdout.isatty() else txt
 
+def blueTxt(txt):
+    return '\033[94m' + txt + '\x1b[0m' if sys.stdout.isatty() else txt
+
 def main(tmpDir):
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Verify Solidity smart contracts.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -76,19 +79,19 @@ def main(tmpDir):
         solcArgs += ' --boogie-mod-analysis'
     convertCommand = args.solc + ' ' + solcArgs
     if args.verbose:
-        print("Solc command: " + convertCommand)
+        print(blueTxt('Solc command: ') + convertCommand)
     compilerOutputStr = ''
     try:
         compilerOutput = subprocess.check_output(convertCommand, shell = True, stderr=subprocess.STDOUT)
         compilerOutputStr = compilerOutput.decode('utf-8')
         if args.verbose:
-            print('----- Compiler output -----')
-            print(compilerOutputStr)
-            print('---------------------------')
+            print(blueTxt('----- Compiler output -----'))
+            printVerbose(compilerOutputStr)
+            print(blueTxt('---------------------------'))
     except subprocess.CalledProcessError as err:
         compilerOutputStr = err.output.decode('utf-8')
         print(yellowTxt('Error while running compiler, details:'))
-        print(compilerOutputStr)
+        printVerbose(compilerOutputStr)
         return ERROR_COMPILER
 
     # Run timer
@@ -121,7 +124,7 @@ def main(tmpDir):
 
     verifyCommand = 'mono ' + args.boogie + ' ' + bplFile + ' ' + boogieArgs
     if args.verbose:
-        print("Verifier command: " + verifyCommand)
+        print(blueTxt('Verifier command: ') + verifyCommand)
     try:
         verifierOutput = subprocess.check_output(verifyCommand, shell = True, stderr=subprocess.STDOUT)
         timer.cancel()
@@ -131,21 +134,21 @@ def main(tmpDir):
         else:
             print(yellowTxt('Error while running verifier, details:'))
         if err.returncode != -9 or args.verbose:
-            print('----- Verifier output -----')
-            print(err.output.decode('utf-8'))
-            print('---------------------------')
+            print(blueTxt('----- Verifier output -----'))
+            printVerbose(err.output.decode('utf-8'))
+            print(blueTxt('---------------------------'))
         timer.cancel()
         return ERROR_PROCESS_ERROR
 
     verifierOutputStr = verifierOutput.decode('utf-8')
     if re.search('Boogie program verifier finished with', verifierOutputStr) == None:
         print(yellowTxt('Error while running verifier, details:'))
-        print(verifierOutputStr)
+        printVerbose(verifierOutputStr)
         return ERROR_BOOGIE_ERROR
     elif args.verbose:
-        print('----- Verifier output -----')
-        print(verifierOutputStr)
-        print('---------------------------')
+        print(blueTxt('----- Verifier output -----'))
+        printVerbose(verifierOutputStr)
+        print(blueTxt('---------------------------'))
 
     # Print warnings if requested
     warnings = 0
@@ -182,15 +185,30 @@ def main(tmpDir):
             result = redTxt('ERROR') if 'error' in nextOutputLine else (yellowTxt('INCONCLUSIVE') if 'inconclusive' in nextOutputLine else greenTxt('OK'))
             print(getFunctionName(outputLine.replace('Verifying ', '').replace(' ...',''), bplFile) + ': ' + result)
 
+    skipped = 0
+    for line in open(bplFile).readlines():
+        if line.startswith('procedure ') and '{:skipped}' in line:
+            print(getMessage(line) + ': ' + yellowTxt('SKIPPED'))
+            skipped += 1
+
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print(greenTxt('No errors found.'))
         if 'inconclusive' in outputLines[-1]: print(yellowTxt('Inconclusive results.'))
+        if skipped > 0: print(yellowTxt('Some functions were skipped. Use --verbose to see details.'))
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))
         if warnings > 0 and not args.show_warnings:
             print(yellowTxt('Use --show-warnings to see the warnings for potential false alarms.'))
         return ERRORS_VERIFICATION
+
+def printVerbose(txt):
+    txt = txt.replace('Warning: ', yellowTxt('Warning') + ': ')
+    txt = txt.replace('Error: ', yellowTxt('Error') + ': ')
+    txt = txt.replace('solc-verify error: ', yellowTxt('solc-verify error') + ': ')
+    txt = txt.replace(']  error', ']  ' + redTxt('error'))
+    txt = txt.replace(']  verified', ']  ' + greenTxt('verified'))
+    print(txt)
 
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
