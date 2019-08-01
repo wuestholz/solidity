@@ -2,4 +2,4 @@ Partial::f: OK
 Partial::[implicit_constructor]: OK
 Partial::cannotverify: SKIPPED
 No errors found.
-Some functions were skipped.
+Some functions were skipped. Use --verbose to see details.

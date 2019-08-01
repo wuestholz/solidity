@@ -86,12 +86,12 @@ def main(tmpDir):
         compilerOutputStr = compilerOutput.decode('utf-8')
         if args.verbose:
             print(blueTxt('----- Compiler output -----'))
-            print(compilerOutputStr)
+            printVerbose(compilerOutputStr)
             print(blueTxt('---------------------------'))
     except subprocess.CalledProcessError as err:
         compilerOutputStr = err.output.decode('utf-8')
         print(yellowTxt('Error while running compiler, details:'))
-        print(compilerOutputStr)
+        printVerbose(compilerOutputStr)
         return ERROR_COMPILER
 
     # Run timer
@@ -135,7 +135,7 @@ def main(tmpDir):
             print(yellowTxt('Error while running verifier, details:'))
         if err.returncode != -9 or args.verbose:
             print(blueTxt('----- Verifier output -----'))
-            print(err.output.decode('utf-8'))
+            printVerbose(err.output.decode('utf-8'))
             print(blueTxt('---------------------------'))
         timer.cancel()
         return ERROR_PROCESS_ERROR
@@ -143,11 +143,11 @@ def main(tmpDir):
     verifierOutputStr = verifierOutput.decode('utf-8')
     if re.search('Boogie program verifier finished with', verifierOutputStr) == None:
         print(yellowTxt('Error while running verifier, details:'))
-        print(verifierOutputStr)
+        printVerbose(verifierOutputStr)
         return ERROR_BOOGIE_ERROR
     elif args.verbose:
         print(blueTxt('----- Verifier output -----'))
-        print(verifierOutputStr)
+        printVerbose(verifierOutputStr)
         print(blueTxt('---------------------------'))
 
     # Print warnings if requested
@@ -194,13 +194,21 @@ def main(tmpDir):
     if (re.match('Boogie program verifier finished with \\d+ verified, 0 errors', outputLines[-1])):
         print(greenTxt('No errors found.'))
         if 'inconclusive' in outputLines[-1]: print(yellowTxt('Inconclusive results.'))
-        if skipped > 0: print(yellowTxt('Some functions were skipped.'))
+        if skipped > 0: print(yellowTxt('Some functions were skipped. Use --verbose to see details.'))
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))
         if warnings > 0 and not args.show_warnings:
             print(yellowTxt('Use --show-warnings to see the warnings for potential false alarms.'))
         return ERRORS_VERIFICATION
+
+def printVerbose(txt):
+    txt = txt.replace('Warning: ', yellowTxt('Warning') + ': ')
+    txt = txt.replace('Error: ', yellowTxt('Error') + ': ')
+    txt = txt.replace('solc-verify error: ', yellowTxt('solc-verify error') + ': ')
+    txt = txt.replace(']  error', ']  ' + redTxt('error'))
+    txt = txt.replace(']  verified', ']  ' + greenTxt('verified'))
+    print(txt)
 
 # Gets the line related to an error in the output
 def getRelatedLineFromBpl(outputLine, offset):
