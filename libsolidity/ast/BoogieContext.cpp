@@ -5,6 +5,7 @@
 #include <libsolidity/ast/TypeProvider.h>
 
 #include <liblangutil/ErrorReporter.h>
+#include <liblangutil/SourceReferenceFormatter.h>
 
 using namespace std;
 using namespace dev;
@@ -86,6 +87,14 @@ BoogieContext::BoogieContext(Encoding encoding,
 bg::VarDeclRef BoogieContext::tmpVar(bg::TypeDeclRef type, string prefix)
 {
 	return bg::Decl::variable(prefix + "#" + toString(nextId()), type);
+}
+
+void BoogieContext::printErrors(ostream& out)
+{
+	SourceReferenceFormatter formatter(out);
+	for (auto const& error: errorReporter()->errors())
+		formatter.printExceptionInformation(*error,
+				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)

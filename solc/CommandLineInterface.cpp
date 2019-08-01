@@ -1275,11 +1275,7 @@ void CommandLineInterface::handleBoogie()
 		}
 	}
 
-	for (auto const& error: errorReporter.errors())
-	{
-		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
-	}
+	context.printErrors(serr(false));
 
 	if (!Error::containsOnlyWarnings(errorReporter.errors()))
 	{
