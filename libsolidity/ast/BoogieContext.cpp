@@ -40,6 +40,12 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 		auto old = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_OLD + "_" + oldType, funType);
 		m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(old));
 	}
+
+	// Magic variable for 'eq' function
+	auto eqFunType = TypeProvider::function(strings { }, strings { "bool" },
+					FunctionType::Kind::Internal, true, StateMutability::Pure);
+	auto eq = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_EQ, eqFunType);
+	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(eq));
 }
 
 BoogieContext::BoogieContext(Encoding encoding,
