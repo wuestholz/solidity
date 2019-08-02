@@ -1,3 +1,7 @@
+test/solc-verify/StructsLocalStorageFunc.sol:20:5: Warning: Errors while translating function body, will be skipped
+test/solc-verify/StructsLocalStorageFunc.sol:18:5: Warning: Boogie: Unhandled default value, constructor verification might fail.
 StructsLocalStorageFunc::[fallback]: OK
 StructsLocalStorageFunc::[implicit_constructor]: OK
+StructsLocalStorageFunc::set_t_x_with_ptr: SKIPPED
 No errors found.
+Some functions were skipped. Use --verbose to see details.

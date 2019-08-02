@@ -278,7 +278,6 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 			}
 			m_storStructTypes[structDef] = bg::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
-			getStructConstructor(structDef);
 		}
 		return m_storStructTypes[structDef];
 	}

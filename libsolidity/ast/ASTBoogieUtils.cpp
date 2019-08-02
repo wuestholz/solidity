@@ -1376,7 +1376,8 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 bg::Expr::Ref ASTBoogieUtils::unpackLocalPtr(Identifier const* id, BoogieContext& context)
 {
 	auto expr = unpackInternal(id, context.currentContract(), 0, nullptr, context);
-	solAssert(expr, "Nothing to unpack");
+	if (!expr)
+		context.reportError(id, "Nothing to unpack, perhaps there are no instances of the type");
 	return expr;
 }
 
@@ -1403,7 +1404,8 @@ bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration c
 							subExpr, unpackedExpr);
 			}
 		}
-		solAssert(unpackedExpr, "Nothing to unpack");
+		if (!unpackedExpr)
+			context.reportError(id, "Nothing to unpack, perhaps there are no instances of the type");
 		return unpackedExpr;
 	}
 	// Variable (state var or struct member)
