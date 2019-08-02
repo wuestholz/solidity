@@ -245,7 +245,7 @@ private:
 	 *  'ss' is the 2nd state var and 't' is the 3rd member.
 	 */
 	static
-	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context, PackResult& result);
+	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result);
 
 	/**
 	 * Unpacks an array into a tree of paths (conditional) to local storage (opposite of packing).

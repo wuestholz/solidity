@@ -1273,7 +1273,13 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context)
 {
 	PackResult result {nullptr, {}};
-	packInternal(expr, bgExpr, context, result);
+	auto structType = dynamic_cast<StructType const*>(expr->annotation().type);
+	if (!structType)
+	{
+		context.reportError(expr, "Expected struct type");
+		return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
+	}
+	packInternal(expr, bgExpr, structType, context, result);
 	if (result.ptr)
 		return result;
 
@@ -1281,7 +1287,7 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr
 	return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
 }
 
-void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context, PackResult& result)
+void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result)
 {
 	// Packs an expression (path to storage) into a local pointer as an array
 	// The general idea is to associate each state variable and member with an index
@@ -1316,7 +1322,13 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
 		auto ptr = context.tmpVar(context.localPtrType());
-		auto vars = ASTNode::filteredNodes<VariableDeclaration>(context.currentContract()->subNodes());
+		// Collect all variables from all contracts that can see the struct
+		vector<VariableDeclaration const*> vars;
+		for (auto contr: context.stats().contractsForStruct(&structType->structDefinition()))
+		{
+			auto subVars = ASTNode::filteredNodes<VariableDeclaration>(contr->subNodes());
+			vars.insert(vars.end(), subVars.begin(), subVars.end());
+		}
 		for (unsigned i = 0; i < vars.size(); ++i)
 		{
 			// If found, put its index into the packed array
@@ -1338,11 +1350,11 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	{
 		auto bgMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr);
 		solAssert(bgMemAccExpr, "Expected Boogie member access expression");
-		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), context, result);
+		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), structType, context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
-		auto structType = dynamic_cast<StructType const*>(memAccExpr->expression().annotation().type);
-		solAssert(structType, "Trying to pack member of non-struct expression");
-		auto members = structType->structDefinition().members();
+		auto eStructType = dynamic_cast<StructType const*>(memAccExpr->expression().annotation().type);
+		solAssert(eStructType, "Trying to pack member of non-struct expression");
+		auto members = eStructType->structDefinition().members();
 		for (unsigned i = 0; i < members.size(); ++i)
 		{
 			// If matching member found, put index in next position of the packed array
@@ -1382,7 +1394,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 			return;
 		}
 
-		packInternal(&idxExpr->baseExpression(), base, context, result);
+		packInternal(&idxExpr->baseExpression(), base, structType, context, result);
 		solAssert(result.ptr, "Empty pointer from subexpression");
 		unsigned nextPos = result.stmts.size();
 		result.stmts.push_back(bg::Stmt::assign(
@@ -1416,7 +1428,15 @@ bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration c
 	// Contract: go through state vars and create conditional expression recursively
 	if (auto contrDef = dynamic_cast<ContractDefinition const*>(decl))
 	{
-		auto vars = ASTNode::filteredNodes<VariableDeclaration>(contrDef->subNodes());
+		auto structType = dynamic_cast<StructType const*>(id->annotation().type);
+		solAssert(structType, "Expected struct type when unpacking");
+		// Collect all variables from all contracts that can see the struct
+		vector<VariableDeclaration const*> vars;
+		for (auto contr: context.stats().contractsForStruct(&structType->structDefinition()))
+		{
+			auto subVars = ASTNode::filteredNodes<VariableDeclaration>(contr->subNodes());
+			vars.insert(vars.end(), subVars.begin(), subVars.end());
+		}
 
 		bg::Expr::Ref unpackedExpr = nullptr;
 		auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));

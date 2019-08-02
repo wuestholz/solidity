@@ -6,6 +6,7 @@
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/DeclarationContainer.h>
+#include <libsolidity/ast/ASTBoogieStats.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <set>
 
@@ -59,6 +60,7 @@ public:
 
 private:
 
+	ASTBoogieStats m_stats;
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 	std::map<std::string, boogie::Decl::Ref> m_stringLiterals;
 	std::map<std::string, boogie::Decl::Ref> m_addressLiterals;
@@ -110,8 +112,10 @@ public:
 			bool modAnalysis,
 			langutil::ErrorReporter* errorReporter,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
-			langutil::EVMVersion evmVersion);
+			langutil::EVMVersion evmVersion,
+			ASTBoogieStats stats);
 
+	ASTBoogieStats& stats() { return m_stats; }
 	Encoding encoding() const { return m_encoding; }
 	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
 	bool overflow() const { return m_overflow; }

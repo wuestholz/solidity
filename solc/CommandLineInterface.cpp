@@ -1247,7 +1247,7 @@ void CommandLineInterface::handleBoogie()
 
 	BoogieContext context(encoding, overflow,
 			m_args.count(g_strAstBoogieModAnalysis) || stats.hasModifiesSpecs(),
-			&errorReporter, m_compiler->getScopes(), m_evmVersion);
+			&errorReporter, m_compiler->getScopes(), m_evmVersion, stats);
 	ASTBoogieConverter boogieConverter(context);
 
 	SourceReferenceFormatter formatter(serr(false));
