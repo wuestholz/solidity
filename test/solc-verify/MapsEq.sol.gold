@@ -1,6 +1,0 @@
-MapsEq::upd_correct: OK
-MapsEq::upd_incorrect: ERROR
- - test/solc-verify/MapsEq.sol:13:5: Invariant '__verifier_eq(x, y)' might not hold at end of function.
-MapsEq::[constructor]: OK
-MapsEq::[receive_ether_selfdestruct]: OK
-Errors were found by the verifier.

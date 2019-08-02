@@ -853,7 +853,20 @@ void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, ve
 
 void ASTBoogieExpressionConverter::functionCallEq(FunctionCall const& _node, vector<bg::Expr::Ref> const& args)
 {
-	solAssert(args.size() == 2, "Verifier eq function must have exactly one argument");
+	if (args.size() != 2)
+	{
+		m_context.reportError(&_node, "Equality predicate must take exactly two arguments");
+		return;
+	}
+	auto argType1 = _node.arguments()[0]->annotation().type;
+	auto argType2 = _node.arguments()[1]->annotation().type;
+	if (*argType1 != *argType2)
+	{
+		m_context.reportError(&_node, "Arguments must have the same type");
+		return;
+	}
+	if (argType1->isValueType() && argType2->isValueType())
+		m_context.reportWarning(&_node, "Use operator == for comparing value types");
 	m_currentExpr = bg::Expr::eq(args[0], args[1]);
 	addTCC(m_currentExpr, _node.annotation().type);
 }
