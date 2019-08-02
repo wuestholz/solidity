@@ -1052,16 +1052,6 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 					m_context.toBoogieType(_node.type(), &_node)));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));
 	m_context.addDecl(varDecl);
-
-	// Arrays require an extra variable for their length
-	if (_node.type()->category() == Type::Category::Array)
-	{
-		m_context.addDecl(
-				bg::Decl::variable(m_context.mapDeclName(_node) + ASTBoogieUtils::BOOGIE_LENGTH,
-						ASTBoogieUtils::mappingType(
-								m_context.addressType(),
-								m_context.intType(256))));
-	}
 	return false;
 }
 
