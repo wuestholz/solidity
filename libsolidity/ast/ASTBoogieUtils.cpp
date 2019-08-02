@@ -1286,7 +1286,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	// Function calls return pointers, no need to pack, just copy the return value
 	if (dynamic_cast<FunctionCall const*>(expr))
 	{
-		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
+		auto ptr = context.tmpVar(context.localPtrType());
 		result.ptr = ptr;
 		result.stmts.push_back(bg::Stmt::assign(ptr->getRefTo(), bgExpr));
 		return;
@@ -1294,7 +1294,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	// Identifier: search for matching state variable in the contract
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
-		auto ptr = context.tmpVar(ASTBoogieUtils::mappingType(context.intType(256), context.intType(256)));
+		auto ptr = context.tmpVar(context.localPtrType());
 		auto vars = ASTNode::filteredNodes<VariableDeclaration>(context.currentContract()->subNodes());
 		for (unsigned i = 0; i < vars.size(); ++i)
 		{

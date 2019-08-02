@@ -222,6 +222,11 @@ bg::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return bg::Decl::typee("int");
 }
 
+bg::TypeDeclRef BoogieContext::localPtrType()
+{
+	return ASTBoogieUtils::mappingType(intType(256), intType(256));
+}
+
 bg::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
 {
 	if (m_storStructConstrs.find(structDef) == m_storStructConstrs.end())
