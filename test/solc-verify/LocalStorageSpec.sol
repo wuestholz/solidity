@@ -17,7 +17,7 @@ contract B is A {
   }
 }
 
-contract C is B {
+contract LocalStorageSpec is B {
   S s;
   function setC0(S storage s_ptr) internal {
     setB0(s_ptr);
