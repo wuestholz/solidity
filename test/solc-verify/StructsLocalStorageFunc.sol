@@ -10,8 +10,16 @@ contract StructsLocalStorageFunc {
         S s2;
     }
 
+    struct T {
+        int x;
+    }
+
     S s;
     U[3] u;
+
+    function set_t_x_with_ptr(T storage t_ptr, int _x) internal {
+        t_ptr.x = _x;
+    }
 
     function set_x_with_ptr(S storage s_ptr, int _x) internal {
         s_ptr.x = _x;
