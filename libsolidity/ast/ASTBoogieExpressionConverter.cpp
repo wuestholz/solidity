@@ -454,7 +454,12 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		allArgs.push_back(m_context.boogieThis()->getRefTo()); // this
 	else
 		allArgs.push_back(m_currentAddress); // this
-	allArgs.push_back(m_context.boogieThis()->getRefTo()); // msg.sender
+	// msg.sender is by default this, except for internal calls
+	auto sender = m_context.boogieThis()->getRefTo();
+	if (auto funcType = dynamic_cast<FunctionType const*>(_node.expression().annotation().type))
+		if (funcType->kind() == FunctionType::Kind::Internal)
+			sender = m_context.boogieMsgSender()->getRefTo();
+	allArgs.push_back(sender); // msg.sender
 	bg::Expr::Ref defaultMsgValue = m_context.intLit(0, 256);
 	bg::Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
 	allArgs.push_back(msgValue); // msg.value
