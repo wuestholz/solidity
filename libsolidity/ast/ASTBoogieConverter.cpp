@@ -399,7 +399,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	try
 	{
 		// Parse
-		CharStream exprStream(exprStr, "DocString");
+		CharStream exprStream(exprStr, "Annotation");
 		ASTPointer<Expression> expr = Parser(*m_context.errorReporter(), m_context.evmVersion())
 			.parseExpression(std::make_shared<Scanner>(exprStream));
 		if (!expr)
@@ -443,8 +443,12 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	// Add a single error in the original reporter if there were errors
 	if (!Error::containsOnlyWarnings(errorList))
 	{
-		m_context.reportError(&_node, "Error while processing annotation for node");
+		m_context.reportError(&_node, "Error(s) while processing annotation for node");
 		return false;
+	}
+	else if (errorList.size() > 0)
+	{
+		m_context.reportWarning(&_node, "Warning(s) while processing annotation for node");
 	}
 	return true;
 }

@@ -56,6 +56,7 @@ private:
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
 	void functionCallSum(FunctionCall const& _node);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
+	void functionCallEq(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallNewArray(FunctionCall const& _node);
 	void functionCallPushPop(MemberAccess const* memAccExpr, ArrayType const* arrType, FunctionCall const& _node);
 

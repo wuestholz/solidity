@@ -583,6 +583,13 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 		return false;
 	}
 
+	// Eq function
+	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_EQ))
+	{
+		functionCallEq(_node, regularArgs);
+		return false;
+	}
+
 	// Struct initialization
 	if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
 	{
@@ -841,6 +848,26 @@ void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, ve
 {
 	solAssert(args.size() == 1, "Verifier old function must have exactly one argument");
 	m_currentExpr = bg::Expr::old(args[0]);
+	addTCC(m_currentExpr, _node.annotation().type);
+}
+
+void ASTBoogieExpressionConverter::functionCallEq(FunctionCall const& _node, vector<bg::Expr::Ref> const& args)
+{
+	if (args.size() != 2)
+	{
+		m_context.reportError(&_node, "Equality predicate must take exactly two arguments");
+		return;
+	}
+	auto argType1 = _node.arguments()[0]->annotation().type;
+	auto argType2 = _node.arguments()[1]->annotation().type;
+	if (*argType1 != *argType2)
+	{
+		m_context.reportError(&_node, "Arguments must have the same type");
+		return;
+	}
+	if (argType1->isValueType() && argType2->isValueType())
+		m_context.reportWarning(&_node, "Use operator == for comparing value types");
+	m_currentExpr = bg::Expr::eq(args[0], args[1]);
 	addTCC(m_currentExpr, _node.annotation().type);
 }
 
