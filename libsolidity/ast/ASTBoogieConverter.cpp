@@ -446,7 +446,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 		m_context.reportError(&_node, "Error(s) while processing annotation for node");
 		return false;
 	}
-	else if(errorList.size() > 0)
+	else if (errorList.size() > 0)
 	{
 		m_context.reportWarning(&_node, "Warning(s) while processing annotation for node");
 	}
