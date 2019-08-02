@@ -1,5 +1,5 @@
-Partial::f: OK
+Partial::[fallback]: OK
 Partial::[implicit_constructor]: OK
-Partial::cannotverify: SKIPPED
+Partial::unsupported: SKIPPED
 No errors found.
 Some functions were skipped. Use --verbose to see details.
