@@ -1283,6 +1283,27 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr
 
 void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context, PackResult& result)
 {
+	// Packs an expression (path to storage) into a local pointer as an array
+	// The general idea is to associate each state variable and member with an index
+	// so that the path can be encoded as an integer array.
+	//
+	// Example:
+	// contract C {
+	//   struct T { int z; }
+	//   struct S {
+	//     T t1;     --> 0
+	//     T[] ts;   --> 1 + array index
+	//   }
+	//
+	//   T t1;       --> 0
+	//   S s1;       --> 1
+	//   S[] ss;     --> 2 + array index
+	// }
+	//
+	// t1 becomes [0]
+	// s1.t1 becomes [1, 0]
+	// ss[5].ts[3] becomes [2, 5, 1, 3]
+
 	// Function calls return pointers, no need to pack, just copy the return value
 	if (dynamic_cast<FunctionCall const*>(expr))
 	{
@@ -1383,6 +1404,15 @@ bg::Expr::Ref ASTBoogieUtils::unpackLocalPtr(Identifier const* id, BoogieContext
 
 bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration const* decl, int depth, bg::Expr::Ref base, BoogieContext& context)
 {
+	// Unpacks a local storage pointer represented as an array of integers
+	// into a conditional expression. The general idea is the opposite of packing:
+	// go through each state variable (recursively for complex types) and associate
+	// a conditional expression. For the example in pack, unpacking an array [arr]
+	// would be like the following:
+	// ite(arr[0] == 0, t1,
+	// ite(arr[0] == 1,
+	//   ite(arr[1] == 0, s1.t1, s1.ts[arr[2]], ... )))
+
 	// Contract: go through state vars and create conditional expression recursively
 	if (auto contrDef = dynamic_cast<ContractDefinition const*>(decl))
 	{
