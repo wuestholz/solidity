@@ -1426,7 +1426,7 @@ bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration c
 	//   ite(arr[1] == 0, s1.t1, s1.ts[arr[2]], ... )))
 
 	// Contract: go through state vars and create conditional expression recursively
-	if (auto contrDef = dynamic_cast<ContractDefinition const*>(decl))
+	if (dynamic_cast<ContractDefinition const*>(decl))
 	{
 		auto structType = dynamic_cast<StructType const*>(id->annotation().type);
 		solAssert(structType, "Expected struct type when unpacking");
