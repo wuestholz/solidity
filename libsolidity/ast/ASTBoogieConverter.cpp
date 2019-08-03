@@ -199,15 +199,11 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 
 void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 {
-	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
-
-	// this.balance = 0
-	m_currentBlocks.top()->addStmt(bg::Stmt::assign(
-			m_context.boogieBalance()->getRefTo(),
-			bg::Expr::arrupd(
-					m_context.boogieBalance()->getRefTo(),
-					m_context.boogieThis()->getRefTo(),
-					ASTBoogieUtils::defaultValue(tp_uint256, m_context))));
+	// assume(this.balance >= 0)
+	m_currentBlocks.top()->addStmt(bg::Stmt::assume(
+			ASTBoogieUtils::encodeArithBinaryOp(m_context, nullptr, Token::GreaterThanOrEqual,
+					bg::Expr::arrsel(m_context.boogieBalance()->getRefTo(), m_context.boogieThis()->getRefTo()),
+					m_context.intLit(0, 256), 256, false).expr));
 
 	// Initialize state variables first, must be done for
 	// base class members as well
