@@ -6,6 +6,7 @@
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/analysis/GlobalContext.h>
 #include <libsolidity/analysis/DeclarationContainer.h>
+#include <libsolidity/ast/ASTBoogieStats.h>
 #include <libsolidity/ast/BoogieAst.h>
 #include <set>
 
@@ -59,6 +60,7 @@ public:
 
 private:
 
+	ASTBoogieStats m_stats;
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
 	std::map<std::string, boogie::Decl::Ref> m_stringLiterals;
 	std::map<std::string, boogie::Decl::Ref> m_addressLiterals;
@@ -69,7 +71,6 @@ private:
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
-	std::map<Declaration const*, boogie::Expr::Ref> m_localPtrs;
 
 	std::map<std::string,boogie::DataTypeDeclRef> m_arrDataTypes;
 	std::map<std::string,boogie::FuncDeclRef> m_arrConstrs;
@@ -87,6 +88,7 @@ private:
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> m_scopes;
 	langutil::EVMVersion m_evmVersion;
 
+	ContractDefinition const* m_currentContract;
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
 	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
 
@@ -110,8 +112,10 @@ public:
 			bool modAnalysis,
 			langutil::ErrorReporter* errorReporter,
 			std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>> scopes,
-			langutil::EVMVersion evmVersion);
+			langutil::EVMVersion evmVersion,
+			ASTBoogieStats stats);
 
+	ASTBoogieStats& stats() { return m_stats; }
 	Encoding encoding() const { return m_encoding; }
 	bool isBvEncoding() const { return m_encoding == Encoding::BV; }
 	bool overflow() const { return m_overflow; }
@@ -125,6 +129,8 @@ public:
 	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 	int nextId() { return m_nextId++; }
 	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
+	ContractDefinition const* currentContract() const { return m_currentContract; }
+	void setCurrentContract(ContractDefinition const* contract) { m_currentContract = contract; }
 
 	void printErrors(std::ostream& out);
 
@@ -160,10 +166,10 @@ public:
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 
+	boogie::TypeDeclRef localPtrType();
+
 	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
-
-	std::map<Declaration const*, boogie::Expr::Ref>& localPtrs() { return m_localPtrs; }
 
 	boogie::Expr::Ref getMemArray(boogie::Expr::Ref arrPtrExpr, boogie::TypeDeclRef type) { return boogie::Expr::arrsel(m_memArrs[type->getName()]->getRefTo(), arrPtrExpr); }
 	boogie::Expr::Ref getArrayLength(boogie::Expr::Ref arrayExpr, boogie::TypeDeclRef type) { return boogie::Expr::dtsel(arrayExpr, "length", m_arrConstrs[type->getName()], m_arrDataTypes[type->getName()]); }

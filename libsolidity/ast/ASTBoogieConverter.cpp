@@ -27,7 +27,7 @@ namespace solidity
 
 bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 {
-	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context, m_currentContract, scope()).convert(_node);
+	ASTBoogieExpressionConverter::Result result = ASTBoogieExpressionConverter(m_context).convert(_node);
 
 	m_localDecls.insert(end(m_localDecls), begin(result.newDecls), end(result.newDecls));
 	for (auto tcc: result.tccs)
@@ -211,15 +211,15 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 	// Initialize state variables first, must be done for
 	// base class members as well
-	for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
+	for (auto contract: m_context.currentContract()->annotation().linearizedBaseContracts)
 		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
 			initializeStateVar(*sv, _scope);
 
 	int pushedScopes = 0;
 	// First initialize the arguments from derived to base
-	for (auto base: m_currentContract->annotation().linearizedBaseContracts)
+	for (auto base: m_context.currentContract()->annotation().linearizedBaseContracts)
 	{
-		if (base == m_currentContract)
+		if (base == m_context.currentContract())
 			continue; // Only include base statements, not ours
 
 		// Check if base has a constructor
@@ -236,8 +236,8 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 
 		// Try to get the argument list (from either inheritance specifiers or modifiers)
 		std::vector<ASTPointer<Expression>> const* argsList = nullptr;
-		auto constrArgs = m_currentContract->annotation().baseConstructorArguments.find(baseConstr);
-		if (constrArgs != m_currentContract->annotation().baseConstructorArguments.end())
+		auto constrArgs = m_context.currentContract()->annotation().baseConstructorArguments.find(baseConstr);
+		if (constrArgs != m_context.currentContract()->annotation().baseConstructorArguments.end())
 		{
 			if (auto ispec = dynamic_cast<InheritanceSpecifier const*>(constrArgs->second))
 				argsList = ispec->arguments(); // Inheritance specifier
@@ -270,11 +270,11 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 	}
 
 	// Second, inline the bodies from base to derived
-	for (auto it = m_currentContract->annotation().linearizedBaseContracts.rbegin();
-			it != m_currentContract->annotation().linearizedBaseContracts.rend(); ++it)
+	for (auto it = m_context.currentContract()->annotation().linearizedBaseContracts.rbegin();
+			it != m_context.currentContract()->annotation().linearizedBaseContracts.rend(); ++it)
 	{
 		auto base = *it;
-		if (base == m_currentContract)
+		if (base == m_context.currentContract())
 			continue; // Only include base statements, not ours
 
 		// Check if base has a constructor
@@ -391,7 +391,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 	// are pointing to positions in the docstring
 	ErrorList errorList;
 	ErrorReporter errorReporter(errorList);
-	TypeChecker typeChecker(m_context.evmVersion(), errorReporter, m_currentContract);
+	TypeChecker typeChecker(m_context.evmVersion(), errorReporter, m_context.currentContract());
 
 	ErrorReporter* originalErrReporter = m_context.errorReporter();
 	m_context.errorReporter() = &errorReporter;
@@ -414,7 +414,7 @@ bool ASTBoogieConverter::parseExpr(string exprStr, ASTNode const& _node, ASTNode
 			if (typeChecker.checkTypeRequirements(*expr))
 			{
 				// Convert expression to Boogie representation
-				auto convResult = ASTBoogieExpressionConverter(m_context, m_currentContract, _scope).convert(*expr);
+				auto convResult = ASTBoogieExpressionConverter(m_context).convert(*expr);
 				result.expr = convResult.expr;
 				result.exprStr = exprStr;
 				result.exprSol = expr;
@@ -503,7 +503,7 @@ bool ASTBoogieConverter::isBaseVar(bg::Expr::Ref expr)
 	if (auto exprArrSel = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 	{
 		// Base is reached when it is a variable indexed with 'this'
-		auto idxAsId = dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getIdxs()[0]);
+		auto idxAsId = dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getIdx());
 		if (dynamic_pointer_cast<bg::VarExpr const>(exprArrSel->getBase()) &&
 				idxAsId->name() == m_context.boogieThis()->getName())
 		{
@@ -576,7 +576,7 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 	if (m_context.modAnalysis() && !_node.isConstructor() && !canModifyAll)
 	{
 		// Linearized base contracts include the current contract as well
-		for (auto contract: m_currentContract->annotation().linearizedBaseContracts)
+		for (auto contract: m_context.currentContract()->annotation().linearizedBaseContracts)
 		{
 			for (auto varDecl: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
 			{
@@ -597,14 +597,14 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 					else
 					{
 						auto repl = replaceBaseVar(modSpec.target, expr);
-						auto write = ASTBoogieUtils::selectToUpdate(repl, modSpec.target);
+						auto write = bg::Expr::selectToUpdate(repl, modSpec.target);
 						expr = bg::Expr::if_then_else(modSpec.cond, write, expr);
 					}
 				}
 
 				expr = bg::Expr::eq(varThis, expr);
 				string varName = varDecl->name();
-				if (m_currentContract->annotation().linearizedBaseContracts.size() > 1)
+				if (m_context.currentContract()->annotation().linearizedBaseContracts.size() > 1)
 					varName = contract->name() + "::" + varName;
 				procDecl->getEnsures().push_back(bg::Specification::spec(expr,
 						ASTBoogieUtils::createAttrs(_node.location(), "Function might modify '" + varName + "' illegally", *m_context.currentScanner())));
@@ -675,7 +675,6 @@ void ASTBoogieConverter::processFuncModifiersAndBody()
 
 ASTBoogieConverter::ASTBoogieConverter(BoogieContext& context) :
 				m_context(context),
-				m_currentContract(nullptr),
 				m_currentFunc(nullptr),
 				m_currentModifier(0),
 				m_currentRet(nullptr),
@@ -715,7 +714,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 {
 	rememberScope(_node);
 
-	m_currentContract = &_node;
+	m_context.setCurrentContract(&_node);
 	// Boogie programs are flat, contracts do not appear explicitly
 	m_context.addGlobalComment("\n------- Contract: " + _node.name() + " -------");
 
@@ -940,7 +939,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 
 	// Get the name of the function
 	string funcName = _node.isConstructor() ?
-			ASTBoogieUtils::getConstructorName(m_currentContract) :
+			ASTBoogieUtils::getConstructorName(m_context.currentContract()) :
 			m_context.mapDeclName(_node);
 
 	// Create the procedure
@@ -1023,7 +1022,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 		traceabilityName = "[constructor]";
 	else if (_node.isFallback())
 		traceabilityName = "[fallback]";
-	traceabilityName = m_currentContract->name() + "::" + traceabilityName;
+	traceabilityName = m_context.currentContract()->name() + "::" + traceabilityName;
 	procDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), traceabilityName, *m_context.currentScanner()));
 
 	if (!Error::containsOnlyWarnings(errorList))
@@ -1406,14 +1405,18 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 		{
 			solAssert(initialValue, "Uninitialized local storage pointer.");
 			bg::Expr::Ref init = convertExpression(*initialValue);
+			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Packing local storage pointer " + declarations[0]->name()));
 
-			m_currentBlocks.top()->addStmt(bg::Stmt::comment("Freezing local storage pointer " + declarations[0]->name()));
-			auto freezed = ASTBoogieUtils::freeze(init, initialValue, &_node, m_context);
-			m_context.localPtrs()[declarations[0].get()] = freezed.expr;
-			for (auto stmt: freezed.stmts)
+			auto packed = ASTBoogieUtils::packToLocalPtr(initialValue, init, m_context);
+			m_localDecls.push_back(packed.ptr);
+			for (auto stmt: packed.stmts)
 				m_currentBlocks.top()->addStmt(stmt);
-			m_localDecls.insert(m_localDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
 
+			auto varDecl = bg::Decl::variable(
+					m_context.mapDeclName(*declarations[0]),
+					m_context.toBoogieType(declarations[0]->type(), declarations[0].get()));
+			m_localDecls.push_back(varDecl);
+			m_currentBlocks.top()->addStmt(bg::Stmt::assign(varDecl->getRefTo(), packed.ptr->getRefTo()));
 			return false;
 		}
 	}

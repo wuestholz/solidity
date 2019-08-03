@@ -840,28 +840,6 @@ bool ASTBoogieUtils::isStateVar(Declaration const *decl)
 	return false;
 }
 
-
-bg::Expr::Ref ASTBoogieUtils::selectToUpdate(bg::Expr::Ref sel, bg::Expr::Ref value)
-{
-	if (auto selExpr = dynamic_pointer_cast<bg::SelExpr const>(sel))
-	{
-		if (auto base = dynamic_pointer_cast<bg::SelExpr const>(selExpr->getBase()))
-			return selectToUpdate(base, selExpr->toUpdate(value));
-		else
-			return selExpr->toUpdate(value);
-	}
-	solAssert(false, "Expected datatype/array select");
-	return nullptr;
-}
-
-
-bg::Stmt::Ref ASTBoogieUtils::selectToUpdateStmt(bg::Expr::Ref sel, bg::Expr::Ref value)
-{
-	auto upd = dynamic_pointer_cast<bg::UpdExpr const>(selectToUpdate(sel, value));
-	solAssert(upd, "Update expression expected");
-	return bg::Stmt::assign(upd->getBase(), upd);
-}
-
 bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& context)
 {
 	switch (type->category())
@@ -1049,6 +1027,11 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 			result.newDecls.push_back(varDecl);
 			result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, varDecl->getRefTo()));
 
+			// RHS is local storage: unpack first
+			if (rhsLoc == DataLocation::Storage && rhsType->isPointer())
+				if (auto id = dynamic_cast<Identifier const*>(rhs.expr))
+					rhs.bgExpr = unpackLocalPtr(id, context);
+
 			// Make deep copy
 			deepCopyStruct(&lhsType->structDefinition(), lhs.bgExpr, rhs.bgExpr,
 					lhsLoc, rhsLoc, assocNode, context, result);
@@ -1066,15 +1049,34 @@ void ASTBoogieUtils::makeStructAssign(AssignParam lhs, AssignParam rhs, ASTNode 
 		// RHS is storage
 		if (rhsLoc == DataLocation::Storage)
 		{
-			// LHS is local storage --> reference copy
+			// LHS is storage pointer --> reference copy
 			if (lhsType->isPointer())
 			{
-				context.reportError(assocNode, "Unsupported reassignment of local storage pointer");
-				return;
+				// pointer to pointer, simply assign
+				if (rhsType->isPointer())
+				{
+					makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
+					return;
+				}
+				else // Otherwise pack
+				{
+					result.newStmts.push_back(bg::Stmt::comment("Packing local storage pointer"));
+					auto packed = packToLocalPtr(rhs.expr, rhs.bgExpr, context);
+					result.newDecls.push_back(packed.ptr);
+					for (auto stmt: packed.stmts)
+						result.newStmts.push_back(stmt);
+					result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, packed.ptr->getRefTo()));
+					return;
+				}
 			}
 			// LHS is storage --> deep copy by data types
 			else
 			{
+				// Unpack pointers first
+				if (rhsType->isPointer())
+					if (auto id = dynamic_cast<Identifier const*>(rhs.expr))
+						rhs.bgExpr = unpackLocalPtr(id, context);
+
 				makeBasicAssign(lhs, rhs, Token::Assign, assocNode, context, result);
 				return;
 			}
@@ -1172,21 +1174,7 @@ void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil:
 		}
 	}
 
-	// If LHS is simply an identifier, we can assign to it
-	if (dynamic_pointer_cast<bg::VarExpr const>(lhs.bgExpr))
-	{
-		solAssert(dynamic_pointer_cast<bg::TupleExpr const>(rhs.bgExpr) == nullptr, "Try to assign tuple to non-tuple");
-		result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
-		return;
-	}
-
-	// If LHS is a selector (arrays/maps/datatypes), it needs to be transformed to an update
-	if (auto lhsSel = dynamic_pointer_cast<bg::SelExpr const>(lhs.bgExpr))
-	{
-		result.newStmts.push_back(ASTBoogieUtils::selectToUpdateStmt(lhsSel, rhsResult.expr));
-		return;
-	}
-	context.reportError(assocNode, "Unsupported assignment (LHS must be identifier/indexer)");
+	result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
 }
 
 void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
@@ -1282,51 +1270,257 @@ void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,
 	}
 }
 
-ASTBoogieUtils::FreezeResult ASTBoogieUtils::freeze(bg::Expr::Ref bgExpr,
-		Expression const* expr, ASTNode const* assocNode, BoogieContext& context)
+ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr, bg::Expr::Ref bgExpr, BoogieContext& context)
 {
-	if (auto varExpr = dynamic_pointer_cast<bg::VarExpr const>(bgExpr))
+	PackResult result {nullptr, {}};
+	auto structType = dynamic_cast<StructType const*>(expr->annotation().type);
+	if (!structType)
 	{
-		return FreezeResult{bgExpr, {}, {}};
+		context.reportError(expr, "Expected struct type");
+		return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
 	}
-	if (auto arrSelExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr))
+	packInternal(expr, bgExpr, structType, context, result);
+	if (result.ptr)
+		return result;
+
+	context.reportError(expr, "Unsupported expression for packing into local pointer");
+	return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
+}
+
+void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result)
+{
+	// Packs an expression (path to storage) into a local pointer as an array
+	// The general idea is to associate each state variable and member with an index
+	// so that the path can be encoded as an integer array.
+	//
+	// Example:
+	// contract C {
+	//   struct T { int z; }
+	//   struct S {
+	//     T t1;     --> 0
+	//     T[] ts;   --> 1 + array index
+	//   }
+	//
+	//   T t1;       --> 0
+	//   S s1;       --> 1
+	//   S[] ss;     --> 2 + array index
+	// }
+	//
+	// t1 becomes [0]
+	// s1.t1 becomes [1, 0]
+	// ss[5].ts[3] becomes [2, 5, 1, 3]
+
+	// Function calls return pointers, no need to pack, just copy the return value
+	if (dynamic_cast<FunctionCall const*>(expr))
 	{
-		auto idxExpr = dynamic_cast<IndexAccess const*>(expr);
-		if (idxExpr)
+		auto ptr = context.tmpVar(context.localPtrType());
+		result.ptr = ptr;
+		result.stmts.push_back(bg::Stmt::assign(ptr->getRefTo(), bgExpr));
+		return;
+	}
+	// Identifier: search for matching state variable in the contract
+	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
+	{
+		auto ptr = context.tmpVar(context.localPtrType());
+		// Collect all variables from all contracts that can see the struct
+		vector<VariableDeclaration const*> vars;
+		for (auto contr: context.stats().contractsForStruct(&structType->structDefinition()))
 		{
-			auto result = freeze(arrSelExpr->getBase(), &idxExpr->baseExpression(), &idxExpr->baseExpression(), context);
-			auto idxTmpVar = context.tmpVar(context.toBoogieType(idxExpr->indexExpression()->annotation().type, assocNode));
-			result.newDecls.push_back(idxTmpVar);
-			result.stmts.push_back(bg::Stmt::assign(idxTmpVar->getRefTo(), arrSelExpr->getIdxs()[0]));
-			result.expr = bg::Expr::arrsel(result.expr, idxTmpVar->getRefTo());
-			return result;
+			auto subVars = ASTNode::filteredNodes<VariableDeclaration>(contr->subNodes());
+			vars.insert(vars.end(), subVars.begin(), subVars.end());
 		}
-		else
+		for (unsigned i = 0; i < vars.size(); ++i)
 		{
-			// TODO: check for 'this'
-			return FreezeResult{bgExpr, {}, {}};
+			// If found, put its index into the packed array
+			if (vars[i] == idExpr->annotation().referencedDeclaration)
+			{
+				// Must be the first element in the packed array
+				solAssert(!result.ptr, "Reassignment of packed pointer");
+				solAssert(result.stmts.empty(), "Non-empty packing statements");
+				result.ptr = ptr;
+				result.stmts.push_back(bg::Stmt::assign(
+						bg::Expr::arrsel(ptr->getRefTo(), context.intLit(0, 256)),
+						context.intLit(i, 256)));
+				return;
+			}
 		}
 	}
-	if (auto dtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr))
+	// Member access: process base recursively, then find matching member
+	else if (auto memAccExpr = dynamic_cast<MemberAccess const*>(expr))
 	{
-		auto memAccExpr = dynamic_cast<MemberAccess const*>(expr);
-		if (memAccExpr)
+		auto bgMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgExpr);
+		solAssert(bgMemAccExpr, "Expected Boogie member access expression");
+		packInternal(&memAccExpr->expression(), bgMemAccExpr->getBase(), structType, context, result);
+		solAssert(result.ptr, "Empty pointer from subexpression");
+		auto eStructType = dynamic_cast<StructType const*>(memAccExpr->expression().annotation().type);
+		solAssert(eStructType, "Trying to pack member of non-struct expression");
+		auto members = eStructType->structDefinition().members();
+		for (unsigned i = 0; i < members.size(); ++i)
 		{
-			auto result = freeze(dtSelExpr->getBase(), &memAccExpr->expression(), &memAccExpr->expression(), context);
-			result.expr = dtSelExpr->replaceBase(result.expr);
-			return result;
+			// If matching member found, put index in next position of the packed array
+			if (members[i].get() == memAccExpr->annotation().referencedDeclaration)
+			{
+				unsigned nextPos = result.stmts.size();
+				result.stmts.push_back(
+						bg::Stmt::assign(
+								bg::Expr::arrsel(result.ptr->getRefTo(), context.intLit(nextPos, 256)),
+								context.intLit(i, 256)));
+				return;
+			}
 		}
-		else
+	}
+	// Arrays and mappings: process base recursively, then store index expression in next position
+	// in the packed array
+	else if (auto idxExpr = dynamic_cast<IndexAccess const*>(expr))
+	{
+		auto bgIdxAccExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(bgExpr);
+		solAssert(bgIdxAccExpr, "Expected Boogie index access expression");
+		bg::Expr::Ref base = bgIdxAccExpr->getBase();
+
+		// Base has to be extracted in two steps for arrays, because an array is
+		// actually a datatype with the actual array and its length
+		if (idxExpr->baseExpression().annotation().type->category() == Type::Category::Array)
 		{
-			// TODO check for arrays
-			auto result = freeze(dtSelExpr->getBase(), expr, assocNode, context);
-			result.expr = dtSelExpr->replaceBase(result.expr);
-			return result;
+			auto bgDtSelExpr = dynamic_pointer_cast<bg::DtSelExpr const>(bgIdxAccExpr->getBase());
+			solAssert(bgIdxAccExpr, "Expected Boogie member access expression below indexer");
+			base = bgDtSelExpr->getBase();
 		}
+
+		// Report error for unsupported index types
+		auto idxType = idxExpr->indexExpression()->annotation().type->category();
+		if (idxType == Type::Category::StringLiteral || idxType == Type::Category::Array)
+		{
+			context.reportError(idxExpr->indexExpression(), "Unsupported type for index in local pointer");
+			return;
+		}
+
+		packInternal(&idxExpr->baseExpression(), base, structType, context, result);
+		solAssert(result.ptr, "Empty pointer from subexpression");
+		unsigned nextPos = result.stmts.size();
+		result.stmts.push_back(bg::Stmt::assign(
+				bg::Expr::arrsel(result.ptr->getRefTo(), context.intLit(nextPos, 256)),
+				bgIdxAccExpr->getIdx()));
+		return;
 	}
 
-	context.reportError(assocNode, "Unsupported expression for freezing.");
-	return FreezeResult{nullptr, {}, {}};
+	context.reportError(expr, "Unsupported expression for packing into local pointer");
+}
+
+bg::Expr::Ref ASTBoogieUtils::unpackLocalPtr(Identifier const* id, BoogieContext& context)
+{
+	auto expr = unpackInternal(id, context.currentContract(), 0, nullptr, context);
+	if (!expr)
+		context.reportError(id, "Nothing to unpack, perhaps there are no instances of the type");
+	return expr;
+}
+
+bg::Expr::Ref ASTBoogieUtils::unpackInternal(Identifier const* id, Declaration const* decl, int depth, bg::Expr::Ref base, BoogieContext& context)
+{
+	// Unpacks a local storage pointer represented as an array of integers
+	// into a conditional expression. The general idea is the opposite of packing:
+	// go through each state variable (recursively for complex types) and associate
+	// a conditional expression. For the example in pack, unpacking an array [arr]
+	// would be like the following:
+	// ite(arr[0] == 0, t1,
+	// ite(arr[0] == 1,
+	//   ite(arr[1] == 0, s1.t1, s1.ts[arr[2]], ... )))
+
+	// Contract: go through state vars and create conditional expression recursively
+	if (dynamic_cast<ContractDefinition const*>(decl))
+	{
+		auto structType = dynamic_cast<StructType const*>(id->annotation().type);
+		solAssert(structType, "Expected struct type when unpacking");
+		// Collect all variables from all contracts that can see the struct
+		vector<VariableDeclaration const*> vars;
+		for (auto contr: context.stats().contractsForStruct(&structType->structDefinition()))
+		{
+			auto subVars = ASTNode::filteredNodes<VariableDeclaration>(contr->subNodes());
+			vars.insert(vars.end(), subVars.begin(), subVars.end());
+		}
+
+		bg::Expr::Ref unpackedExpr = nullptr;
+		auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
+		for (unsigned i = 0; i < vars.size(); ++i)
+		{
+			auto subExpr = unpackInternal(id, vars[i], depth+1,
+					bg::Expr::arrsel(bg::Expr::id(context.mapDeclName(*vars[i])), context.boogieThis()->getRefTo()), context);
+			if (subExpr)
+			{
+				if (!unpackedExpr)
+					unpackedExpr = subExpr;
+				else
+					unpackedExpr = bg::Expr::cond(
+							bg::Expr::eq(bg::Expr::arrsel(ptr, context.intLit(depth, 256)), context.intLit(i, 256)),
+							subExpr, unpackedExpr);
+			}
+		}
+		if (!unpackedExpr)
+			context.reportError(id, "Nothing to unpack, perhaps there are no instances of the type");
+		return unpackedExpr;
+	}
+	// Variable (state var or struct member)
+	else if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))
+	{
+		auto targetTp = dynamic_cast<StructType const*>(id->annotation().referencedDeclaration->type());
+		auto declTp = varDecl->type();
+
+		// Get rid of arrays and mappings by indexing into them
+		while (declTp->category() == Type::Category::Array || declTp->category() == Type::Category::Mapping)
+		{
+			auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
+			if (auto arrType = dynamic_cast<ArrayType const*>(declTp))
+			{
+				auto bgType = context.toBoogieType(arrType->baseType(), id);
+				context.toBoogieType(arrType, id); // TODO: this makes sure that the array types are declared even if the array itself is declared later
+				base = bg::Expr::arrsel(
+						context.getInnerArray(base, context.toBoogieType(arrType->baseType(), id)),
+						bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+				declTp = arrType->baseType();
+			}
+			else if (auto mapType = dynamic_cast<MappingType const*>(declTp))
+			{
+				base = bg::Expr::arrsel(base, bg::Expr::arrsel(ptr, context.intLit(depth, 256)));
+				declTp = mapType->valueType();
+			}
+			else
+				solAssert(false, "Expected array or mapping type");
+			depth++;
+		}
+
+		auto declStructTp = dynamic_cast<StructType const*>(declTp);
+
+		// Found a variable with a matching type, just return
+		if (targetTp && declStructTp && targetTp->structDefinition() == declStructTp->structDefinition())
+		{
+			return base;
+		}
+		// Otherwise if it is a struct, go through members and recurse
+		if (declStructTp)
+		{
+			auto members = declStructTp->structDefinition().members();
+			bg::Expr::Ref expr = nullptr;
+			auto ptr = bg::Expr::id(context.mapDeclName(*id->annotation().referencedDeclaration));
+			for (unsigned i = 0; i < members.size(); ++i)
+			{
+				auto baseForSub = bg::Expr::dtsel(base,
+						context.mapDeclName(*members[i]),
+						context.getStructConstructor(&declStructTp->structDefinition()),
+						dynamic_pointer_cast<bg::DataTypeDecl>(context.getStructType(&declStructTp->structDefinition(), DataLocation::Storage)));
+				auto subExpr = unpackInternal(id, members[i].get(), depth+1, baseForSub, context);
+				if (subExpr)
+				{
+					if (!expr)
+						expr = subExpr;
+					else
+						expr = bg::Expr::cond(
+								bg::Expr::eq(bg::Expr::arrsel(ptr, context.intLit(depth, 256)), context.intLit(i, 256)),
+								subExpr, expr);
+				}
+			}
+			return expr;
+		}
+	}
+	return nullptr;
 }
 
 }

@@ -117,7 +117,7 @@ contract StructsCopying {
         s1.x = 1;
         S storage sl1 = s1;
         S memory sm = S(3);
-        sm = s1; // Deep copy
+        sm = sl1; // Deep copy
         assert(sl1.x == 1);
         assert(sm.x == 1);
         sl1.x = 2;

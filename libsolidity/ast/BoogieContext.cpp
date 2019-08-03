@@ -55,9 +55,11 @@ BoogieContext::BoogieContext(Encoding encoding,
 		ErrorReporter* errorReporter,
 		std::map<ASTNode const*,
 		std::shared_ptr<DeclarationContainer>> scopes,
-		EVMVersion evmVersion)
+		EVMVersion evmVersion,
+		ASTBoogieStats stats)
 :
-		m_program(), m_encoding(encoding), m_overflow(overflow), m_modAnalysis(modAnalysis), m_errorReporter(errorReporter),
+		m_stats(stats), m_program(), m_encoding(encoding), m_overflow(overflow),
+		m_modAnalysis(modAnalysis), m_errorReporter(errorReporter),
 		m_currentScanner(nullptr), m_scopes(scopes), m_evmVersion(evmVersion),
 		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
@@ -228,6 +230,11 @@ bg::TypeDeclRef BoogieContext::intType(unsigned size) const
 		return bg::Decl::typee("int");
 }
 
+bg::TypeDeclRef BoogieContext::localPtrType()
+{
+	return ASTBoogieUtils::mappingType(intType(256), intType(256));
+}
+
 bg::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
 {
 	if (m_storStructConstrs.find(structDef) == m_storStructConstrs.end())
@@ -279,7 +286,6 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 			}
 			m_storStructTypes[structDef] = bg::Decl::datatype(typeName, members);
 			addDecl(m_storStructTypes[structDef]);
-			getStructConstructor(structDef);
 		}
 		return m_storStructTypes[structDef];
 	}
@@ -401,8 +407,10 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 	case Type::Category::Struct:
 	{
 		auto structTp = dynamic_cast<StructType const*>(tp);
+		// Local pointers are arrays
 		if (structTp->location() == DataLocation::Storage && structTp->isPointer())
-			reportError(_associatedNode, "Local storage pointers are not supported");
+			return ASTBoogieUtils::mappingType(intType(256), intType(256));
+
 		return getStructType(&structTp->structDefinition(), structTp->location());
 	}
 	case Type::Category::Enum:

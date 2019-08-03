@@ -46,10 +46,8 @@ void ASTBoogieExpressionConverter::addSideEffect(bg::Stmt::Ref stmt)
 	m_newStatements.push_back(stmt);
 }
 
-ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context, ContractDefinition const* currentContract, ASTNode const* currentScope) :
+ASTBoogieExpressionConverter::ASTBoogieExpressionConverter(BoogieContext& context) :
 		m_context(context),
-		m_currentContract(currentContract),
-		m_currentScope(currentScope),
 		m_currentExpr(nullptr),
 		m_currentAddress(nullptr),
 		m_currentMsgValue(nullptr),
@@ -113,30 +111,6 @@ bool ASTBoogieExpressionConverter::visit(Assignment const& _node)
 	_node.rightHandSide().accept(*this);
 	bg::Expr::Ref rhsExpr = m_currentExpr;
 
-	// Check for local storage pointer reassignment
-	if (auto structType = dynamic_cast<StructType const*>(lhsType))
-	{
-		if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
-		{
-			auto lhsId = dynamic_cast<Identifier const*>(&lhsNode);
-			solAssert(lhsId, "Expected identifier for local storage pointer");
-			if (lhsId->annotation().referencedDeclaration->scope() != m_currentScope)
-			{
-				m_context.reportError(&_node, "Local storage pointer reassignment in different scope is not supported");
-				return false;
-			}
-			addSideEffect(bg::Stmt::comment("Freezing local storage pointer " + lhsId->name()));
-			auto freezed = ASTBoogieUtils::freeze(rhsExpr, &rhsNode, &_node, m_context);
-			m_context.localPtrs()[lhsId->annotation().referencedDeclaration] = freezed.expr;
-			for (auto stmt: freezed.stmts)
-				addSideEffect(stmt);
-			m_newDecls.insert(m_newDecls.end(), freezed.newDecls.begin(), freezed.newDecls.end());
-			m_currentExpr = rhsExpr;
-			return false;
-		}
-	}
-
-
 	auto res = ASTBoogieUtils::makeAssign(
 			ASTBoogieUtils::AssignParam{lhsExpr, lhsType, &lhsNode},
 			ASTBoogieUtils::AssignParam{rhsExpr, rhsType, &rhsNode},
@@ -166,7 +140,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 		for (size_t i = 0; i < _node.components().size(); i++)
 		{
 			_node.components()[i]->accept(*this);
-			addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+			addSideEffect(bg::Stmt::assign(
 					bg::Expr::arrsel(
 							m_context.getInnerArray(arrExpr, bgType),
 							m_context.intLit(i, 256)),
@@ -174,7 +148,7 @@ bool ASTBoogieExpressionConverter::visit(TupleExpression const& _node)
 		}
 		m_currentExpr = varDecl->getRefTo();
 		// Set size
-		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+		addSideEffect(bg::Stmt::assign(
 				m_context.getArrayLength(arrExpr, bgType),
 				m_context.intLit(_node.components().size(), 256)));
 		return false;
@@ -496,39 +470,26 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	{
 		auto arg = _node.arguments()[i];
 		arg->accept(*this);
-		// In bit-precise mode, we need the definition of the function to see the types of the parameters
-		// (for implicit conversions)
-		if (m_context.isBvEncoding())
-		{
-			// Try to get the definition
-			FunctionDefinition const* calledFunc = nullptr;
-			if (auto exprId = dynamic_cast<Identifier const*>(&_node.expression()))
-			{
-				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprId->annotation().referencedDeclaration))
-					calledFunc = funcDef;
-			}
-			if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
-			{
-				if (auto funcDef = dynamic_cast<FunctionDefinition const *>(exprMa->annotation().referencedDeclaration))
-					calledFunc = funcDef;
-			}
-			// TODO: the above does not work for complex expressions like 'x.f.value(1)()'
 
-			if (calledFunc)
-				m_currentExpr = ASTBoogieUtils::checkImplicitBvConversion(m_currentExpr, arg->annotation().type, calledFunc->parameters()[i]->annotation().type, m_context);
-		}
-
-		if (arg->annotation().type->category() == Type::Category::Array && arg->annotation().type->dataStoredIn(DataLocation::Storage))
+		if (auto funcType = dynamic_cast<FunctionType const*>(_node.expression().annotation().type))
 		{
-			auto arrType = dynamic_cast<ArrayType const*>(arg->annotation().type);
-			if (!arrType->isString())
+			// Check for implicit conversions
+			if (funcType->parameterTypes().size() > i && funcType->parameterTypes()[i] != arg->annotation().type &&
+					funcName != ASTBoogieUtils::BOOGIE_CALL &&
+					!boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_OLD) &&
+					!boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 			{
-				// Create a copy if a storage array is passed to a function
-				auto tmpDecl = m_context.tmpVar(m_context.toBoogieType(arrType->withLocation(DataLocation::Memory, false), &_node));
-				m_newDecls.push_back(tmpDecl);
-				auto memArr = m_context.getMemArray(tmpDecl->getRefTo(), m_context.toBoogieType(arrType->baseType(), &_node));
-				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(memArr, m_currentExpr));
-				m_currentExpr = tmpDecl->getRefTo();
+				// Introduce temp variable, make the assignment, including conversions
+				auto argDecl = m_context.tmpVar(m_context.toBoogieType(funcType->parameterTypes()[i], arg.get()), "call_arg");
+				m_newDecls.push_back(argDecl);
+				auto ar = ASTBoogieUtils::makeAssign(
+						ASTBoogieUtils::AssignParam{argDecl->getRefTo(), funcType->parameterTypes()[i], nullptr },
+						ASTBoogieUtils::AssignParam{m_currentExpr, arg->annotation().type, arg.get() },
+						Token::Assign, &_node, m_context);
+				m_newDecls.insert(m_newDecls.end(), ar.newDecls.begin(), ar.newDecls.end());
+				for (auto stmt: ar.newStmts)
+					addSideEffect(stmt);
+				m_currentExpr = argDecl->getRefTo();
 			}
 		}
 
@@ -882,7 +843,7 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 	// Set length
 	solAssert(_node.arguments().size() == 1, "Array initializer must have exactly one argument for size.");
 	_node.arguments()[0]->accept(*this);
-	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(arrLen, m_currentExpr));
+	addSideEffect(bg::Stmt::assign(arrLen, m_currentExpr));
 
 	if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
 	{
@@ -891,7 +852,7 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 			auto defaultVal = ASTBoogieUtils::defaultValue(arrType->baseType(), m_context);
 			if (defaultVal)
 			{
-				addSideEffect(ASTBoogieUtils::selectToUpdateStmt(
+				addSideEffect(bg::Stmt::assign(
 						bg::Expr::arrsel(
 								m_context.getInnerArray(memArr, bgType),
 								m_context.intLit(i, 256)),
@@ -920,7 +881,7 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
 		_node.arguments()[0]->accept(*this);
 		auto arg = m_currentExpr;
-		addSideEffect(ASTBoogieUtils::selectToUpdateStmt(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+		addSideEffect(bg::Stmt::assign(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
 	}
 	else
@@ -928,7 +889,7 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		solAssert(_node.arguments().size() == 0, "Pop must take no arguments");
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Sub, len, m_context.intLit(1, 256), 256, false);
 	}
-	addSideEffect(ASTBoogieUtils::selectToUpdateStmt(len, lenUpd.expr));
+	addSideEffect(bg::Stmt::assign(len, lenUpd.expr));
 	if (m_context.encoding() == BoogieContext::Encoding::MOD)
 	{
 		addSideEffect(bg::Stmt::comment("Implicit assumption that length cannot overflow"));
@@ -987,10 +948,10 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 				refDecl->name() == ASTBoogieUtils::SOLIDITY_SUPER)
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 		// current contract name
-		if (refDecl == m_currentContract)
+		if (refDecl == m_context.currentContract())
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 		// any base contract name
-		auto bases = m_currentContract->annotation().linearizedBaseContracts;
+		auto bases = m_context.currentContract()->annotation().linearizedBaseContracts;
 		if (std::find(bases.begin(), bases.end(), refDecl) != bases.end())
 			m_currentAddress = m_context.boogieThis()->getRefTo();
 	}
@@ -1146,6 +1107,11 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		}
 		else if (structType->location() == DataLocation::Storage)
 		{
+			// Local pointers: unpack first
+			if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
+				if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
+					m_currentAddress = ASTBoogieUtils::unpackLocalPtr(id, m_context);
+
 			m_currentExpr = bg::Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
 					m_context.getStructConstructor(&structType->structDefinition()),
@@ -1247,12 +1213,6 @@ bool ASTBoogieExpressionConverter::visit(Identifier const& _node)
 		return false;
 	}
 	auto decl = _node.annotation().referencedDeclaration;
-
-	if (m_context.localPtrs().find(decl) != m_context.localPtrs().end())
-	{
-		m_currentExpr = m_context.localPtrs()[decl];
-		return false;
-	}
 
 	// Inline constants
 	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))

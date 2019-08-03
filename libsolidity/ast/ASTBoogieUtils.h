@@ -165,19 +165,6 @@ public:
 	bool isStateVar(Declaration const *decl);
 
 	/**
-	 * Recursively translate a select expression to an update
-	 */
-	static
-	boogie::Expr::Ref selectToUpdate(boogie::Expr::Ref sel, boogie::Expr::Ref value);
-
-	/**
-	 * Recursively translate a select expression to an update and assign
-	 * it to the base expression
-	 */
-	static
-	boogie::Stmt::Ref selectToUpdateStmt(boogie::Expr::Ref sel, boogie::Expr::Ref value);
-
-	/**
 	 * Helper method to give a default value for a type.
 	 */
 	static
@@ -235,14 +222,38 @@ private:
 				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
 
 public:
-	struct FreezeResult {
-		boogie::Expr::Ref expr;
-		std::list<boogie::Decl::Ref> newDecls;
+	struct PackResult {
+		boogie::Decl::Ref ptr;
 		std::list<boogie::Stmt::Ref> stmts;
 	};
 
+	/**
+	 * Pack an expression into a local storage pointer
+	 */
 	static
-	FreezeResult freeze(boogie::Expr::Ref bgExpr, Expression const* expr, ASTNode const* assocNode, BoogieContext& context);
+	PackResult packToLocalPtr(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context);
+
+	/**
+	 * Unpack a local storage pointer into an access to storage
+	 */
+	static
+	boogie::Expr::Ref unpackLocalPtr(Identifier const* id, BoogieContext& context);
+
+private:
+	/**
+	 * Packs a path to a local storage into an array. E.g., 'ss[i].t' becomes [2, i, 3] if
+	 *  'ss' is the 2nd state var and 't' is the 3rd member.
+	 */
+	static
+	void packInternal(Expression const* expr, boogie::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result);
+
+	/**
+	 * Unpacks an array into a tree of paths (conditional) to local storage (opposite of packing).
+	 * E.g., ite(arr[0] == 0, statevar1, ite(arr[0] == 1, statevar2, ...
+	 */
+	static
+	boogie::Expr::Ref unpackInternal(Identifier const* id, Declaration const* decl, int depth, boogie::Expr::Ref base, BoogieContext& context);
+
 };
 
 }
