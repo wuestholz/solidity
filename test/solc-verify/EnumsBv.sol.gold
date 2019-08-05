@@ -1,6 +1,0 @@
-EnumsBv::ok: OK
-EnumsBv::ok2: OK
-EnumsBv::fail: ERROR
- - test/solc-verify/EnumsBv.sol:19:17: Conversion to enum might be out of range
-EnumsBv::[implicit_constructor]: OK
-Errors were found by the verifier.

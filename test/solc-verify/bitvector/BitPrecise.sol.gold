@@ -1,0 +1,5 @@
+BitPrecise::add128: ERROR
+ - test/solc-verify/bitvector/BitPrecise.sol:6:9: Assertion might not hold.
+BitPrecise::add8: OK
+BitPrecise::[implicit_constructor]: OK
+Errors were found by the verifier.

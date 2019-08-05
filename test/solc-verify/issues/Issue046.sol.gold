@@ -1,0 +1,4 @@
+C1::[constructor]: OK
+C2::[constructor]: ERROR
+ - test/solc-verify/issues/Issue046.sol:13:9: Assertion might not hold.
+Errors were found by the verifier.

@@ -1,0 +1,8 @@
+A::setX: OK
+A::[implicit_constructor]: OK
+B::[constructor]: OK
+B::incr: OK
+B::incr_incorrect: ERROR
+ - test/solc-verify/specs/SpecificationGetter.sol:25:5: Invariant 'a.x() == y ' might not hold at end of function.
+B::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.

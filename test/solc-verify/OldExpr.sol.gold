@@ -1,6 +1,0 @@
-OldExpr::[constructor]: OK
-OldExpr::changeOwnerCorrect: OK
-OldExpr::changeOwnerIncorrect: ERROR
- - test/solc-verify/OldExpr.sol:19:5: Postcondition 'msg.sender == __verifier_old_address(owner) || owner == __verifier_old_address(owner) ' might not hold at end of function.
-OldExpr::increment: OK
-Errors were found by the verifier.

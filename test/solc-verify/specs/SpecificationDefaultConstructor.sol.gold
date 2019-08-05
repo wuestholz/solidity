@@ -1,0 +1,5 @@
+SpecificationDefaultConstructor::add: OK
+SpecificationDefaultConstructor::[implicit_constructor]: ERROR
+ - test/solc-verify/specs/SpecificationDefaultConstructor.sol:6:1: State variable initializers might violate invariant 'x == y'.
+SpecificationDefaultConstructor::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.

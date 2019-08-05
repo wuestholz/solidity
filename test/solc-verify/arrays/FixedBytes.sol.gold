@@ -1,0 +1,7 @@
+FixedBytes::getValueSafe: OK
+FixedBytes::getValueUnsafe: ERROR
+ - test/solc-verify/arrays/FixedBytes.sol:14:16: Index may be out of bounds
+FixedBytes::singleByte: ERROR
+ - test/solc-verify/arrays/FixedBytes.sol:20:16: Index may be out of bounds
+FixedBytes::[implicit_constructor]: OK
+Errors were found by the verifier.

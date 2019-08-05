@@ -47,7 +47,7 @@ popd
 cp truffle-config.js truffle
 
 # Copy the contracts to the truffle
-CONTRACTS_WITH_MAIN=`grep -l 'function() external payable' *.sol`
+CONTRACTS_WITH_MAIN=`grep -r -l --include '*.sol' 'function() external payable' .`
 cp $CONTRACTS_WITH_MAIN truffle/contracts/
 
 # Add to migrations

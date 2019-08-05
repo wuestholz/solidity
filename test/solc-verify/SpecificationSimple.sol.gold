@@ -1,8 +1,0 @@
-SpecificationSimple::[constructor]: OK
-SpecificationSimple::add: OK
-SpecificationSimple::add_incorrect: ERROR
- - test/solc-verify/SpecificationSimple.sol:20:5: Invariant 'x == y' might not hold at end of function.
-SpecificationSimple::add_incorrect_2: ERROR
- - test/solc-verify/SpecificationSimple.sol:27:9: Invariant 'x == y' might not hold when entering function.
-SpecificationSimple::[receive_ether_selfdestruct]: OK
-Errors were found by the verifier.
