@@ -112,6 +112,16 @@ bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl
 		bg::Stmt::Ref valueAssign = bg::Stmt::assign(bg::Expr::id(id), bg::Expr::arrupd(
 				bg::Expr::id(id), m_context.boogieThis()->getRefTo(), value));
 		output.push_back(valueAssign);
+
+		// Initialize the sum, if there, to default value
+		if (m_context.currentSumDecls()[&_decl])
+		{
+			bg::Expr::Ref sum = bg::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
+			bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
+					bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), m_context.intLit(0, 256)));
+			output.push_back(sum_default);
+		}
+
 		ok = true;
 	}
 	else

@@ -7,6 +7,8 @@
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/SourceReferenceFormatter.h>
 
+#include <boost/algorithm/string.hpp>
+
 using namespace std;
 using namespace dev;
 using namespace dev::solidity;
@@ -219,7 +221,7 @@ bg::TypeDeclRef BoogieContext::boolType() const
 
 bg::TypeDeclRef BoogieContext::stringType() const
 {
-	return bg::Decl::elementarytype("string_t");
+	return bg::Decl::customtype("string_t");
 }
 
 bg::TypeDeclRef BoogieContext::intType(unsigned size) const
@@ -300,6 +302,23 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 	}
 	reportError(structDef, "Unsupported data location (" + ASTBoogieUtils::dataLocToStr(loc) + ") for struct.");
 	return errType();
+}
+
+bg::FuncDeclRef BoogieContext::defaultArray(bg::TypeDeclRef keyType, bg::TypeDeclRef valueType, string valueSmt)
+{
+	string funcName = "default_" + keyType->getName() + "_" + valueType->getName();
+	boost::replace_all(funcName, "[", "_k_");
+	boost::replace_all(funcName, "]", "_v_");
+
+	if (m_defaultArrays.find(funcName) == m_defaultArrays.end())
+	{
+		vector<bg::Attr::Ref> attrs;
+		attrs.push_back(bg::Attr::attr("builtin", valueSmt));
+		auto funcDecl = bg::Decl::function(funcName, {}, bg::Decl::arraytype(keyType, valueType), nullptr, attrs);
+		addBuiltinFunction(funcDecl);
+		m_defaultArrays[funcName] = funcDecl;
+	}
+	return m_defaultArrays[funcName];
 }
 
 bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)

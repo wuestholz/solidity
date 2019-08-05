@@ -36,6 +36,7 @@ public:
 
 	virtual ~Expr() {}
 	virtual void print(std::ostream& os) const = 0;
+	std::string tostring() const;
 	static Ref exists(std::vector<Binding> const&, Ref e);
 	static Ref forall(std::vector<Binding> const&, Ref e);
 	static Ref and_(Ref l, Ref r);
@@ -532,18 +533,21 @@ public:
 class TypeDecl : public Decl {
 protected:
 	std::string alias;
+	std::string smttype;
 public:
-	TypeDecl(std::string n, std::string a, std::vector<Attr::Ref> const& ax)
-		: Decl(TYPE, n, ax), alias(a) {}
+	TypeDecl(std::string n, std::string a, std::vector<Attr::Ref> const& ax, std::string smt)
+		: Decl(TYPE, n, ax), alias(a), smttype(smt) {}
+	std::string getAlias() const { return alias; }
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == TYPE; }
+	std::string getSmtType() const { return smttype; }
 };
 
 class DataTypeDecl : public TypeDecl {
 	std::vector<Binding> members;
 public:
 	DataTypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax, std::vector<Binding> members)
-		: TypeDecl(n, t, ax), members(members) { attrs.push_back(Attr::attr("datatype")); }
+		: TypeDecl(n, t, ax, "|T@" + n + "|"), members(members) { attrs.push_back(Attr::attr("datatype")); }
 	std::vector<Binding> getMembers() const { return members; }
 	void print(std::ostream& os) const override;
 };

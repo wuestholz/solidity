@@ -836,24 +836,38 @@ bool ASTBoogieUtils::isStateVar(Declaration const *decl)
 
 bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& context)
 {
-	switch (type->category())
+	return defaultValueInternal(type, context).bgExpr;
+}
+
+ASTBoogieUtils::DefVal ASTBoogieUtils::defaultValueInternal(TypePointer type, BoogieContext& context)
+{
+	switch (type->category()) // TODO: bitvectors
 	{
 	case Type::Category::Integer:
+	{
 		// 0
-		return context.intLit(0, ASTBoogieUtils::getBits(type));
-	case Type::Category::Enum:
-		// 0
-		return context.intLit(0, 256);
-	case Type::Category::Bool:
-		// False
-		return bg::Expr::lit(false);
+		auto lit = context.intLit(0, ASTBoogieUtils::getBits(type));
+		return {lit->tostring(), lit};
+	}
 	case Type::Category::Address:
 	case Type::Category::Contract:
-		return context.intLit(0, 256);
+	case Type::Category::Enum:
+	{
+		// 0
+		auto lit = context.intLit(0, 256);
+		return {lit->tostring(), lit};
+	}
+	case Type::Category::Bool:
+	{
+		// False
+		auto lit = bg::Expr::lit(false);
+		return {lit->tostring(), lit};
+	}
 	case Type::Category::FixedBytes:
 	{
 		auto fbType = dynamic_cast<FixedBytesType const*>(type);
-		return context.intLit(0, fbType->numBytes() * 8);
+		auto lit = context.intLit(0, fbType->numBytes() * 8);
+		return {lit->tostring(), lit};
 	}
 	case Type::Category::Struct:
 	{
@@ -863,27 +877,46 @@ bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& cont
 		{
 			MemberList const& members = structType->members(0); // No need for scope, just regular struct members
 			// Get the default value for the members
-			std::vector<bg::Expr::Ref> memberDefaultValues;
+			vector<bg::Expr::Ref> memberDefValExprs;
+			vector<string> memberDefValSmts;
 			for (auto& member: members)
 			{
-				bg::Expr::Ref memberDefaultValue = defaultValue(member.type, context);
-				if (memberDefaultValue == nullptr)
-					return nullptr;
-				memberDefaultValues.push_back(memberDefaultValue);
+				DefVal memberDefaultValue = defaultValueInternal(member.type, context);
+				if (memberDefaultValue.bgExpr == nullptr)
+					return {"", nullptr};
+				memberDefValExprs.push_back(memberDefaultValue.bgExpr);
+				memberDefValSmts.push_back(memberDefaultValue.smt);
 			}
 			// Now construct the struct value
 			StructDefinition const& structDefinition = structType->structDefinition();
 			bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
-			return bg::Expr::fn(decl->getName(), memberDefaultValues);
+			string smt = "(|" + decl->getName() + "|";
+			for (string s: memberDefValSmts)
+				smt += " " + s;
+			smt += ")";
+			return {smt, bg::Expr::fn(decl->getName(), memberDefValExprs)};
 		}
 		break;
+	}
+	case Type::Category::Mapping:
+	{
+		MappingType const* mappingType = dynamic_cast<MappingType const*>(type);
+		auto keyType = context.toBoogieType(mappingType->keyType(), nullptr);
+		auto valType = context.toBoogieType(mappingType->valueType(), nullptr);
+		auto mapType = context.toBoogieType(type, nullptr);
+
+		auto baseDefVal = defaultValueInternal(mappingType->valueType(), context);
+		string typeSmt = mapType->getSmtType();
+		string smt = "((as const " + typeSmt + ") " + baseDefVal.smt + ")";
+		auto bgExpr = bg::Expr::fn(context.defaultArray(keyType, valType, smt)->getName(), vector<bg::Expr::Ref>());
+		return {smt, bgExpr};
 	}
 	default:
 		// For unhandled, just return null
 		break;
 	}
 
-	return nullptr;
+	return {"", nullptr};
 }
 
 bg::Decl::Ref ASTBoogieUtils::newStruct(StructDefinition const* structDef, BoogieContext& context)

@@ -166,6 +166,14 @@ public:
 	static
 	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
 
+	struct DefVal {
+		std::string smt;
+		boogie::Expr::Ref bgExpr;
+	};
+
+	static
+	DefVal defaultValueInternal(TypePointer _type, BoogieContext& context);
+
 	static
 	boogie::Decl::Ref newStruct(StructDefinition const* structDef, BoogieContext& context);
 

@@ -7,10 +7,18 @@
 #include <iostream>
 #include <set>
 #include <cassert>
+#include <boost/algorithm/string/predicate.hpp>
 
 namespace boogie {
 
 unsigned Decl::uniqueId = 0;
+
+std::string Expr::tostring() const
+{
+	std::stringstream ss;
+	print(ss);
+	return ss.str();
+}
 
 Expr::Ref Expr::exists(std::vector<Binding> const& vars, Ref e)
 {
@@ -368,23 +376,29 @@ Stmt::Ref Stmt::label(std::string s)
 
 TypeDeclRef Decl::elementarytype(std::string name)
 {
-	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>());
+	std::string smtname = name;
+	if (name == "int" || name == "bool")
+		smtname[0] = toupper(smtname[0]);
+	if (boost::starts_with(name, "bv"))
+		smtname = "(_ BitVec " + name.substr(2) + ")";
+	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>(), smtname);
 }
 
 TypeDeclRef Decl::aliasedtype(std::string name, TypeDeclRef alias)
 {
-	return std::make_shared<TypeDecl>(name, alias->getName(), std::vector<Attr::Ref>());
+	return std::make_shared<TypeDecl>(name, alias->getName(), std::vector<Attr::Ref>(), alias->getSmtType());
 }
 
 TypeDeclRef Decl::customtype(std::string name)
 {
-	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>());
+	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>(), "T@" + name);
 }
 
 TypeDeclRef Decl::arraytype(TypeDeclRef keyType, TypeDeclRef valueType)
 {
 	return std::make_shared<TypeDecl>("[" + keyType->getName() + "]" + valueType->getName(),
-			"", std::vector<Attr::Ref>());
+			"", std::vector<Attr::Ref>(),
+			"(Array " + keyType->getSmtType() + " " + valueType->getSmtType() + ")");
 }
 
 DataTypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members)
