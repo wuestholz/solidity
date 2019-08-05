@@ -55,7 +55,10 @@ void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _s
 			{
 				if (decl->type()->toString() == target)
 				{
-					if (ASTBoogieUtils::isStateVar(decl))
+					auto varDecl = dynamic_cast<VariableDeclaration const*>(decl);
+					if (varDecl && varDecl->isConstant())
+						output.push_back(convertExpression(*varDecl->value()));
+					else if (ASTBoogieUtils::isStateVar(decl))
 						output.push_back(bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()));
 					else
 						output.push_back(bg::Expr::id(m_context.mapDeclName(*decl)));
