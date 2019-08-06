@@ -1,3 +1,4 @@
-Test::[constructor]: OK
-Test::[receive_ether_selfdestruct]: OK
+MappingInit::[constructor]: OK
+MappingInit::[fallback]: OK
+MappingInit::[receive_ether_selfdestruct]: OK
 No errors found.

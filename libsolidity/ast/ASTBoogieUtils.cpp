@@ -898,6 +898,31 @@ ASTBoogieUtils::DefVal ASTBoogieUtils::defaultValueInternal(TypePointer type, Bo
 		}
 		break;
 	}
+	case Type::Category::Array:
+	{
+		ArrayType const* arrayType = dynamic_cast<ArrayType const*>(type);
+		if (arrayType->dataStoredIn(DataLocation::Storage))
+		{
+			auto keyType = context.intType(256);
+			auto valType = context.toBoogieType(arrayType->baseType(), nullptr);
+
+			auto baseDefVal = defaultValueInternal(arrayType->baseType(), context);
+
+			string typeSmt = "(Array " + keyType->getSmtType() + " " + valType->getSmtType() + ")";
+			string smt = "((as const " + typeSmt + ") " + baseDefVal.smt + ")";
+			bg::FuncDeclRef arrConstr = context.getArrayConstructor(valType);
+			auto len = context.intLit(arrayType->length(), 256);
+			auto defArr = bg::Expr::fn(context.defaultArray(keyType, valType, smt)->getName(), vector<bg::Expr::Ref>());
+			vector<bg::Expr::Ref> args;
+			args.push_back(defArr);
+			args.push_back(len);
+			auto bgExpr = bg::Expr::fn(arrConstr->getName(), args);
+			// SMT expression is constructed afterwards (not to be included in the const array function)
+			smt = "(|" + arrConstr->getName() + "| " + smt + " " + len->tostring() + ")";
+			return {smt, bgExpr};
+		}
+		break;
+	}
 	case Type::Category::Mapping:
 	{
 		MappingType const* mappingType = dynamic_cast<MappingType const*>(type);

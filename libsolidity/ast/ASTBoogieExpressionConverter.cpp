@@ -1192,6 +1192,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		{
 			baseExpr = m_context.getMemArray(baseExpr, bgArrType);
 		}
+		m_context.toBoogieType(baseType, &_node); // Make sure that types are declared
 		baseExpr = m_context.getInnerArray(baseExpr, bgArrType);
 	}
 
