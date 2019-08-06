@@ -889,12 +889,12 @@ ASTBoogieUtils::DefVal ASTBoogieUtils::defaultValueInternal(TypePointer type, Bo
 			}
 			// Now construct the struct value
 			StructDefinition const& structDefinition = structType->structDefinition();
-			bg::FuncDeclRef decl = context.getStructConstructor(&structDefinition);
-			string smt = "(|" + decl->getName() + "|";
+			bg::FuncDeclRef structConstr = context.getStructConstructor(&structDefinition);
+			string smtExpr = "(|" + structConstr->getName() + "|";
 			for (string s: memberDefValSmts)
-				smt += " " + s;
-			smt += ")";
-			return {smt, bg::Expr::fn(decl->getName(), memberDefValExprs)};
+				smtExpr += " " + s;
+			smtExpr += ")";
+			return {smtExpr, bg::Expr::fn(structConstr->getName(), memberDefValExprs)};
 		}
 		break;
 	}
@@ -905,21 +905,19 @@ ASTBoogieUtils::DefVal ASTBoogieUtils::defaultValueInternal(TypePointer type, Bo
 		{
 			auto keyType = context.intType(256);
 			auto valType = context.toBoogieType(arrayType->baseType(), nullptr);
-
 			auto baseDefVal = defaultValueInternal(arrayType->baseType(), context);
-
-			string typeSmt = "(Array " + keyType->getSmtType() + " " + valType->getSmtType() + ")";
-			string smt = "((as const " + typeSmt + ") " + baseDefVal.smt + ")";
+			string smtType = "(Array " + keyType->getSmtType() + " " + valType->getSmtType() + ")";
+			string smtExpr = "((as const " + smtType + ") " + baseDefVal.smt + ")";
 			bg::FuncDeclRef arrConstr = context.getArrayConstructor(valType);
-			auto len = context.intLit(arrayType->length(), 256);
-			auto defArr = bg::Expr::fn(context.defaultArray(keyType, valType, smt)->getName(), vector<bg::Expr::Ref>());
+			auto arrLength = context.intLit(arrayType->length(), 256);
+			auto innerArr = bg::Expr::fn(context.defaultArray(keyType, valType, smtExpr)->getName(), vector<bg::Expr::Ref>());
 			vector<bg::Expr::Ref> args;
-			args.push_back(defArr);
-			args.push_back(len);
+			args.push_back(innerArr);
+			args.push_back(arrLength);
 			auto bgExpr = bg::Expr::fn(arrConstr->getName(), args);
 			// SMT expression is constructed afterwards (not to be included in the const array function)
-			smt = "(|" + arrConstr->getName() + "| " + smt + " " + len->tostring() + ")";
-			return {smt, bgExpr};
+			smtExpr = "(|" + arrConstr->getName() + "| " + smtExpr + " " + arrLength->tostring() + ")";
+			return {smtExpr, bgExpr};
 		}
 		break;
 	}
@@ -931,10 +929,10 @@ ASTBoogieUtils::DefVal ASTBoogieUtils::defaultValueInternal(TypePointer type, Bo
 		auto mapType = context.toBoogieType(type, nullptr);
 
 		auto baseDefVal = defaultValueInternal(mappingType->valueType(), context);
-		string typeSmt = mapType->getSmtType();
-		string smt = "((as const " + typeSmt + ") " + baseDefVal.smt + ")";
-		auto bgExpr = bg::Expr::fn(context.defaultArray(keyType, valType, smt)->getName(), vector<bg::Expr::Ref>());
-		return {smt, bgExpr};
+		string smtType = mapType->getSmtType();
+		string smtExpr = "((as const " + smtType + ") " + baseDefVal.smt + ")";
+		auto bgExpr = bg::Expr::fn(context.defaultArray(keyType, valType, smtExpr)->getName(), vector<bg::Expr::Ref>());
+		return {smtExpr, bgExpr};
 	}
 	default:
 		// For unhandled, just return null
