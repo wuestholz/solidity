@@ -378,7 +378,7 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 		std::vector<bg::Stmt::Ref> stmts;
 		bool ok = defaultValueAssignment(_node, _scope, stmts);
 		if (!ok)
-			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+			m_context.reportWarning(&_node, "Unhandled default value, constructor verification might fail");
 		for (auto stmt: stmts)
 			m_currentBlocks.top()->addStmt(stmt);
 	}
@@ -1501,7 +1501,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 									bg::Expr::id(m_context.mapDeclName(*declNode)), defaultVal));
 			else
-				m_context.reportWarning(declNode.get(), "Boogie: Unhandled default value, verification might fail.");
+				m_context.reportWarning(declNode.get(), "Unhandled default value, verification might fail");
 		}
 	}
 	return false;

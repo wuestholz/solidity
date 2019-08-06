@@ -154,10 +154,12 @@ def main(tmpDir):
     # Print warnings if requested
     warnings = 0
     for line in compilerOutputStr.split('\n'):
-        if ': Warning: ' in line:
+        if ': Warning: ' in line or ': solc-verify warning: ' in line:
             warnings += 1
             if args.show_warnings:
-                print(line.replace(': Warning: ', ': ' + yellowTxt('Warning') + ': '))
+                line = line.replace(': Warning: ', ': ' + yellowTxt('Warning') + ': ')
+                line = line.replace(': solc-verify warning: ', ': ' + yellowTxt('solc-verify warning') + ': ')
+                print(line)
 
     # Map results back to .sol file
     prefix = '' if args.errors_only else ' - '
@@ -208,6 +210,7 @@ def printVerbose(txt):
     txt = txt.replace('Warning: ', yellowTxt('Warning') + ': ')
     txt = txt.replace('Error: ', yellowTxt('Error') + ': ')
     txt = txt.replace('solc-verify error: ', yellowTxt('solc-verify error') + ': ')
+    txt = txt.replace('solc-verify warning: ', yellowTxt('solc-verify warning') + ': ')
     txt = txt.replace(']  error', ']  ' + redTxt('error'))
     txt = txt.replace(']  verified', ']  ' + greenTxt('verified'))
     print(txt)

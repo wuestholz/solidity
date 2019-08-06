@@ -96,7 +96,7 @@ void BoogieContext::printErrors(ostream& out)
 	SourceReferenceFormatter formatter(out);
 	for (auto const& error: errorReporter()->errors())
 		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
+				(error->type() == Error::Type::Warning) ? "solc-verify warning" : "solc-verify error");
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)
