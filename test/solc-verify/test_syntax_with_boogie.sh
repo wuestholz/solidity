@@ -82,7 +82,7 @@ function solcverify_check()
 {
     filename="${1}"
     shift
-    solcverify_args="$@"
+    solcverify_args="$@ --verbose"
 
     # Test id
     test_string="$filename"

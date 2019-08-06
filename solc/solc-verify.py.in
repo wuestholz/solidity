@@ -17,6 +17,7 @@ ERROR_SOLVER_NOT_FOUND=-2
 ERROR_PROCESS_ERROR=-3
 ERROR_BOOGIE_ERROR=-4
 ERRORS_VERIFICATION=-5
+ERROR_PARTIAL=-6
 
 def kill():
     parent = psutil.Process(os.getpid())
@@ -195,6 +196,7 @@ def main(tmpDir):
         print(greenTxt('No errors found.'))
         if 'inconclusive' in outputLines[-1]: print(yellowTxt('Inconclusive results.'))
         if skipped > 0: print(yellowTxt('Some functions were skipped. Use --verbose to see details.'))
+        if 'inconclusive' in outputLines[-1] or skipped > 0: return ERROR_PARTIAL
         return ERROR_NO_ERRROR
     else:
         print(redTxt('Errors were found by the verifier.'))
