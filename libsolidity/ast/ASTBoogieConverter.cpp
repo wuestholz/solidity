@@ -275,7 +275,7 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node)
 		}
 		else
 		{
-			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
+			m_context.reportWarning(&_node, "Unhandled default value, constructor verification might fail");
 		}
 	}
 }
@@ -1397,7 +1397,7 @@ bool ASTBoogieConverter::visit(VariableDeclarationStatement const& _node)
 				m_currentBlocks.top()->addStmt(bg::Stmt::assign(
 									bg::Expr::id(m_context.mapDeclName(*declNode)), defaultVal));
 			else
-				m_context.reportWarning(declNode.get(), "Boogie: Unhandled default value, verification might fail.");
+				m_context.reportWarning(declNode.get(), "Unhandled default value, verification might fail");
 		}
 	}
 	return false;

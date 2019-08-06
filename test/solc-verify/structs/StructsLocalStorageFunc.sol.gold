@@ -1,4 +1,4 @@
-test/solc-verify/structs/StructsLocalStorageFunc.sol:20:5: Warning: Errors while translating function body, will be skipped
+test/solc-verify/structs/StructsLocalStorageFunc.sol:20:5: solc-verify warning: Errors while translating function body, will be skipped
 StructsLocalStorageFunc::[fallback]: OK
 StructsLocalStorageFunc::[implicit_constructor]: OK
 StructsLocalStorageFunc::set_t_x_with_ptr: SKIPPED

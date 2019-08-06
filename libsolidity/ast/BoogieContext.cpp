@@ -98,7 +98,7 @@ void BoogieContext::printErrors(ostream& out)
 	SourceReferenceFormatter formatter(out);
 	for (auto const& error: errorReporter()->errors())
 		formatter.printExceptionInformation(*error,
-				(error->type() == Error::Type::Warning) ? "Warning" : "solc-verify error");
+				(error->type() == Error::Type::Warning) ? "solc-verify warning" : "solc-verify error");
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)
@@ -358,47 +358,53 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		Type const* baseType = arrType->baseType();
 		bg::TypeDeclRef baseTypeBoogie = toBoogieType(baseType, _associatedNode);
 
+		string baseName = baseTypeBoogie->getName();
+		string baseNameNoSpec = baseName;
+		boost::replace_all(baseNameNoSpec, "[", "_k_");
+		boost::replace_all(baseNameNoSpec, "]", "_v_");
+
 		// Declare datatype and constructor if needed
-		if (m_arrDataTypes.find(baseTypeBoogie->getName()) == m_arrDataTypes.end())
+		if (m_arrDataTypes.find(baseName) == m_arrDataTypes.end())
 		{
 			// Datatype: [int]T + length
 			vector<bg::Binding> members = {
 					{bg::Expr::id("arr"), bg::Decl::arraytype(intType(256), baseTypeBoogie)},
 				{bg::Expr::id("length"), intType(256)}};
-			m_arrDataTypes[baseTypeBoogie->getName()] = bg::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
-			addDecl(m_arrDataTypes[baseTypeBoogie->getName()]);
+			m_arrDataTypes[baseName] = bg::Decl::datatype(baseNameNoSpec + "_arr_type", members);
+
+			addDecl(m_arrDataTypes[baseName]);
 
 			// Constructor for datatype
 			vector<bg::Attr::Ref> attrs;
 			attrs.push_back(bg::Attr::attr("constructor"));
-			string name = baseTypeBoogie->getName() + "_arr#constr";
-			m_arrConstrs[baseTypeBoogie->getName()] = bg::Decl::function(name, members,
-					m_arrDataTypes[baseTypeBoogie->getName()], nullptr, attrs);
-			addDecl(m_arrConstrs[baseTypeBoogie->getName()]);
+			string name = baseNameNoSpec + "_arr#constr";
+			m_arrConstrs[baseName] = bg::Decl::function(name, members,
+					m_arrDataTypes[baseName], nullptr, attrs);
+			addDecl(m_arrConstrs[baseName]);
 		}
 
 		// Storage arrays are simply the data structures
 		if (arrType->location() == DataLocation::Storage)
-			return m_arrDataTypes[baseTypeBoogie->getName()];
+			return m_arrDataTypes[baseName];
 		// Memory arrays have an extra layer of indirection
 		// TODO: for precision, calldata arrays could be translated to different
 		// mappings than memory
 		else if (arrType->location() == DataLocation::Memory || arrType->location() == DataLocation::CallData)
 		{
-			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
+			if (m_memArrPtrTypes.find(baseName) == m_memArrPtrTypes.end())
 			{
 				// Pointer type
-				m_memArrPtrTypes[baseTypeBoogie->getName()] = bg::Decl::customtype(baseTypeBoogie->getName() + "_arr_ptr");
-				addDecl(m_memArrPtrTypes[baseTypeBoogie->getName()]);
+				m_memArrPtrTypes[baseName] = bg::Decl::customtype(baseNameNoSpec + "_arr_ptr");
+				addDecl(m_memArrPtrTypes[baseName]);
 
 				// The actual storage
-				m_memArrs[baseTypeBoogie->getName()] = bg::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
+				m_memArrs[baseName] = bg::Decl::variable("mem_arr_" + baseNameNoSpec,
 						bg::Decl::arraytype(
-								m_memArrPtrTypes[baseTypeBoogie->getName()],
-								m_arrDataTypes[baseTypeBoogie->getName()]));
-				addDecl(m_memArrs[baseTypeBoogie->getName()]);
+								m_memArrPtrTypes[baseName],
+								m_arrDataTypes[baseName]));
+				addDecl(m_memArrs[baseName]);
 			}
-			return m_memArrPtrTypes[baseTypeBoogie->getName()];
+			return m_memArrPtrTypes[baseName];
 		}
 		else
 		{
