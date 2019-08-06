@@ -42,140 +42,6 @@ bg::Expr::Ref ASTBoogieConverter::convertExpression(Expression const& _node)
 	return result.expr;
 }
 
-void ASTBoogieConverter::getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<bg::Expr::Ref>& output)
-{
-	std::string target = _type->toString();
-	DeclarationContainer const* decl_container = m_context.scopes()[&_scope].get();
-	for (; decl_container != nullptr; decl_container = decl_container->enclosingContainer())
-	{
-		for (auto const& decl_pair: decl_container->declarations())
-		{
-			auto const& decl_vector = decl_pair.second;
-			for (auto const& decl: decl_vector)
-			{
-				if (decl->type()->toString() == target)
-				{
-					auto varDecl = dynamic_cast<VariableDeclaration const*>(decl);
-					if (varDecl && varDecl->isConstant())
-						output.push_back(convertExpression(*varDecl->value()));
-					else if (ASTBoogieUtils::isStateVar(decl))
-						output.push_back(bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()));
-					else
-						output.push_back(bg::Expr::id(m_context.mapDeclName(*decl)));
-				}
-				else
-				{
-					// Structs: go through fields: TODO: memory structs, recursion
-					if (decl->type()->category() == Type::Category::Struct)
-					{
-						auto s = dynamic_cast<StructType const*>(decl->type());
-						for (auto const& s_member: s->members(nullptr))
-							if (s_member.declaration->type()->toString() == target)
-							{
-								if (ASTBoogieUtils::isStateVar(decl))
-									bg::Expr::dtsel(bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(*decl)), m_context.boogieThis()->getRefTo()),
-											m_context.mapDeclName(*s_member.declaration),
-											m_context.getStructConstructor(&s->structDefinition()),
-											dynamic_pointer_cast<bg::DataTypeDecl>(m_context.getStructType(&s->structDefinition(), DataLocation::Storage)));
-							}
-					}
-					// Magic
-					if (decl->type()->category() == Type::Category::Magic)
-					{
-						auto m = dynamic_cast<MagicType const*>(decl->type());
-						for (auto const& m_member: m->members(nullptr))
-							if (m_member.type->toString() == target)
-								// Only sender for now. TODO: Better handling of magic variables
-								// and names
-								if (m_member.name == ASTBoogieUtils::SOLIDITY_SENDER)
-									output.push_back(m_context.boogieMsgSender()->getRefTo());
-					}
-				}
-			}
-		}
-	}
-}
-
-bool ASTBoogieConverter::defaultValueAssignment(VariableDeclaration const& _decl, ASTNode const& _scope, std::vector<bg::Stmt::Ref>& output)
-{
-	bool ok = false;
-
-	std::string id = m_context.mapDeclName(_decl);
-	TypePointer type = _decl.type();
-
-	// Default value for the given type
-	bg::Expr::Ref value = ASTBoogieUtils::defaultValue(type, m_context);
-
-	// If there just assign
-	if (value)
-	{
-		bg::Stmt::Ref valueAssign = bg::Stmt::assign(bg::Expr::id(id), bg::Expr::arrupd(
-				bg::Expr::id(id), m_context.boogieThis()->getRefTo(), value));
-		output.push_back(valueAssign);
-
-		// Initialize the sum, if there, to default value
-		if (m_context.currentSumDecls()[&_decl])
-		{
-			bg::Expr::Ref sum = bg::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
-			bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
-					bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), m_context.intLit(0, 256)));
-			output.push_back(sum_default);
-		}
-
-		ok = true;
-	}
-	else
-	{
-		// Otherwise, it's probably a complex type
-		switch (type->category())
-		{
-		case Type::Category::Mapping:
-		{
-			// Type of the index and element
-			TypePointer key_type = dynamic_cast<MappingType const&>(*type).keyType();
-			TypePointer element_type = dynamic_cast<MappingType const&>(*type).valueType();
-			// Default value for elements
-			value = ASTBoogieUtils::defaultValue(element_type, m_context);
-			if (value)
-			{
-				// Get all ids to initialize
-				std::vector<bg::Expr::Ref> index_ids;
-				getVariablesOfType(key_type, _scope, index_ids);
-				// Initialize all instantiations to default value
-				for (auto index_id: index_ids)
-				{
-					// a[this][i] = v
-					// a = update(a, this
-					//        update(sel(a, this), i, v)
-					//     )
-					auto map_id = bg::Expr::id(id);
-					auto this_i = m_context.boogieThis()->getRefTo();
-					auto valueAssign = bg::Stmt::assign(map_id,
-							bg::Expr::arrupd(map_id, this_i,
-									bg::Expr::arrupd(bg::Expr::arrsel(map_id, this_i), index_id, value)));
-					output.push_back(valueAssign);
-				}
-				// Initialize the sum, if there, to default value
-				if (m_context.currentSumDecls()[&_decl])
-				{
-					bg::Expr::Ref sum = bg::Expr::id(id + ASTBoogieUtils::BOOGIE_SUM);
-					bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
-							bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), value));
-					output.push_back(sum_default);
-				}
-				ok = true;
-			}
-			break;
-		}
-		default:
-			// Return null
-			break;
-		}
-	}
-
-	return ok;
-}
-
 void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _node)
 {
 	m_context.addGlobalComment("\nDefault constructor");
@@ -184,7 +50,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 
 	// Include preamble
 	m_currentBlocks.push(bg::Block::block());
-	constructorPreamble(_node);
+	constructorPreamble();
 	bg::Block::Ref block = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	solAssert(m_currentBlocks.empty(), "Non-empty stack of blocks at the end of function.");
@@ -210,7 +76,7 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 	m_context.addDecl(procDecl);
 }
 
-void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
+void ASTBoogieConverter::constructorPreamble()
 {
 	// assume(this.balance >= 0)
 	m_currentBlocks.top()->addStmt(bg::Stmt::assume(
@@ -222,7 +88,7 @@ void ASTBoogieConverter::constructorPreamble(ASTNode const& _scope)
 	// base class members as well
 	for (auto contract: m_context.currentContract()->annotation().linearizedBaseContracts)
 		for (auto sv: ASTNode::filteredNodes<VariableDeclaration>(contract->subNodes()))
-			initializeStateVar(*sv, _scope);
+			initializeStateVar(*sv);
 
 	int pushedScopes = 0;
 	// First initialize the arguments from derived to base
@@ -365,16 +231,19 @@ void ASTBoogieConverter::createEtherReceiveFunc(ContractDefinition const& _node)
 	m_context.addDecl(balIncrProc);
 }
 
-void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope)
+void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node)
 {
 	// Constants are inlined
 	if (_node.isConstant())
 		return;
 
+	string varName = m_context.mapDeclName(_node);
+	bg::Expr::Ref varDecl = bg::Expr::id(varName);
+
 	if (_node.value()) // If there is an explicit initializer
 	{
 		bg::Expr::Ref rhs = convertExpression(*_node.value());
-		bg::Expr::Ref lhs = bg::Expr::arrsel(bg::Expr::id(m_context.mapDeclName(_node)), m_context.boogieThis()->getRefTo());
+		bg::Expr::Ref lhs = bg::Expr::arrsel(varDecl, m_context.boogieThis()->getRefTo());
 		auto ar = ASTBoogieUtils::makeAssign(
 				ASTBoogieUtils::AssignParam{lhs, _node.type(), nullptr},
 				ASTBoogieUtils::AssignParam{rhs, _node.value()->annotation().type, _node.value().get()},
@@ -384,13 +253,30 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node, AS
 			m_currentBlocks.top()->addStmt(stmt);
 
 
-	} else { // Use implicit default value
-		std::vector<bg::Stmt::Ref> stmts;
-		bool ok = defaultValueAssignment(_node, _scope, stmts);
-		if (!ok)
+	}
+	else // Use implicit default value
+	{
+		TypePointer type = _node.type();
+		bg::Expr::Ref value = ASTBoogieUtils::defaultValue(type, m_context);
+		if (value)
+		{
+			bg::Stmt::Ref valueAssign = bg::Stmt::assign(varDecl, bg::Expr::arrupd(
+					varDecl, m_context.boogieThis()->getRefTo(), value));
+			m_currentBlocks.top()->addStmt(valueAssign);
+
+			// Initialize the sum, if there, to default value
+			if (m_context.currentSumDecls()[&_node])
+			{
+				bg::Expr::Ref sum = bg::Expr::id(varName + ASTBoogieUtils::BOOGIE_SUM);
+				bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
+						bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), m_context.intLit(0, 256)));
+				m_currentBlocks.top()->addStmt(sum_default);
+			}
+		}
+		else
+		{
 			m_context.reportWarning(&_node, "Boogie: Unhandled default value, constructor verification might fail.");
-		for (auto stmt: stmts)
-			m_currentBlocks.top()->addStmt(stmt);
+		}
 	}
 }
 
@@ -900,7 +786,7 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	m_currentBlocks.push(bg::Block::block());
 	// Include constructor preamble
 	if (_node.isConstructor())
-		constructorPreamble(_node);
+		constructorPreamble();
 	// Payable functions should handle msg.value
 	if (_node.isPayable())
 	{

@@ -44,16 +44,6 @@ private:
 	boogie::Expr::Ref convertExpression(Expression const& _node);
 
 	/**
-	 * Helper method to get all Boogie IDs of a given type in the current scope.
-	 */
-	void getVariablesOfType(TypePointer _type, ASTNode const& _scope, std::vector<boogie::Expr::Ref>& output);
-
-	/**
-	 * Helper method to produce statement assigning a default value for a declared variable.
-	 */
-	bool defaultValueAssignment(VariableDeclaration const& _node, ASTNode const& _scope, std::vector<boogie::Stmt::Ref>& output);
-
-	/**
 	 * Create default constructor for a contract (it is required when there is no constructor,
 	 * but state variables are initialized when declared)
 	 */
@@ -63,7 +53,7 @@ private:
 	 * Helper method to add the extra preamble that a constructor requires.
 	 * Used by both regular and implicit constructors.
 	 */
-	void constructorPreamble(ASTNode const& _scope);
+	void constructorPreamble();
 
 	void createEtherReceiveFunc(ContractDefinition const& _node);
 
@@ -71,7 +61,7 @@ private:
 	 * Helper method to initialize a state variable based on an explicit expression or
 	 * a default value
 	 */
-	void initializeStateVar(VariableDeclaration const& _node, ASTNode const& _scope);
+	void initializeStateVar(VariableDeclaration const& _node);
 
 	/**
 	 * Helper method to parse an expression from a string with a given scope
