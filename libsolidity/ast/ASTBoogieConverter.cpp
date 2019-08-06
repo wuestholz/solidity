@@ -734,7 +734,7 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
 		m_context.addDecl(
 					bg::Decl::variable(m_context.mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
-							ASTBoogieUtils::mappingType(m_context.addressType(),
+							bg::Decl::arraytype(m_context.addressType(),
 							m_context.toBoogieType(sumDecl.second, sumDecl.first))));
 	}
 
@@ -807,7 +807,7 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
 		auto memberDecl = bg::Decl::variable(m_context.mapDeclName(*member),
-				ASTBoogieUtils::mappingType(structMemType, memberType));
+				bg::Decl::arraytype(structMemType, memberType));
 		memberDecl->addAttrs(attrs);
 		m_context.addDecl(memberDecl);
 	}
@@ -1050,7 +1050,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	auto varDecl = bg::Decl::variable(m_context.mapDeclName(_node),
-			ASTBoogieUtils::mappingType(
+			bg::Decl::arraytype(
 					m_context.addressType(),
 					m_context.toBoogieType(_node.type(), &_node)));
 	varDecl->addAttrs(ASTBoogieUtils::createAttrs(_node.location(), _node.name(), *m_context.currentScanner()));

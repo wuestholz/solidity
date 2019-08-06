@@ -503,10 +503,11 @@ public:
 	void addAttr(Attr::Ref a) { attrs.push_back(a); }
 	void addAttrs(std::vector<Attr::Ref> const& ax) { for (auto a: ax) addAttr(a); }
 
-	static TypeDeclRef typee(std::string name, std::string type = "",
-		std::vector<Attr::Ref> const& attrs = {});
-	static DataTypeDeclRef datatype(std::string name, std::vector<Binding> members = {}, std::string type = "",
-		std::vector<Attr::Ref> const& attrs = {});
+	static TypeDeclRef elementarytype(std::string name);
+	static TypeDeclRef aliasedtype(std::string name, TypeDeclRef alias);
+	static TypeDeclRef customtype(std::string name);
+	static TypeDeclRef arraytype(TypeDeclRef keyType, TypeDeclRef valueType);
+	static DataTypeDeclRef datatype(std::string name, std::vector<Binding> members);
 	static Ref axiom(Expr::Ref e, std::string name = "");
 	static FuncDeclRef function(
 		std::string name,
@@ -532,8 +533,8 @@ class TypeDecl : public Decl {
 protected:
 	std::string alias;
 public:
-	TypeDecl(std::string n, std::string t, std::vector<Attr::Ref> const& ax)
-		: Decl(TYPE, n, ax), alias(t) {}
+	TypeDecl(std::string n, std::string a, std::vector<Attr::Ref> const& ax)
+		: Decl(TYPE, n, ax), alias(a) {}
 	void print(std::ostream& os) const override;
 	static bool classof(Decl::ConstRef D) { return D->getKind() == TYPE; }
 };

@@ -69,7 +69,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 	// address type
 	addDecl(addressType());
 	// address.balance
-	m_boogieBalance = bg::Decl::variable("__balance", ASTBoogieUtils::mappingType(addressType(), intType(256)));
+	m_boogieBalance = bg::Decl::variable("__balance", bg::Decl::arraytype(addressType(), intType(256)));
 	addDecl(m_boogieBalance);
 	// This, sender, value
 	m_boogieThis = bg::Decl::variable("__this", addressType());
@@ -209,30 +209,30 @@ void BoogieContext::addDecl(bg::Decl::Ref decl)
 bg::TypeDeclRef BoogieContext::addressType() const
 {
 	bg::TypeDeclRef it = intType(256);
-	return bg::Decl::typee("address_t", it->getName());
+	return bg::Decl::aliasedtype("address_t", it);
 }
 
 bg::TypeDeclRef BoogieContext::boolType() const
 {
-	return bg::Decl::typee("bool");
+	return bg::Decl::elementarytype("bool");
 }
 
 bg::TypeDeclRef BoogieContext::stringType() const
 {
-	return bg::Decl::typee("string_t");
+	return bg::Decl::elementarytype("string_t");
 }
 
 bg::TypeDeclRef BoogieContext::intType(unsigned size) const
 {
 	if (isBvEncoding())
-		return bg::Decl::typee("bv" + toString(size));
+		return bg::Decl::elementarytype("bv" + toString(size));
 	else
-		return bg::Decl::typee("int");
+		return bg::Decl::elementarytype("int");
 }
 
 bg::TypeDeclRef BoogieContext::localPtrType()
 {
-	return ASTBoogieUtils::mappingType(intType(256), intType(256));
+	return bg::Decl::arraytype(intType(256), intType(256));
 }
 
 bg::FuncDeclRef BoogieContext::getStructConstructor(StructDefinition const* structDef)
@@ -293,13 +293,13 @@ bg::TypeDeclRef BoogieContext::getStructType(StructDefinition const* structDef, 
 	{
 		if (m_memStructTypes.find(structDef) == m_memStructTypes.end())
 		{
-			m_memStructTypes[structDef] = bg::Decl::typee("address_" + typeName);
+			m_memStructTypes[structDef] = bg::Decl::customtype("address_" + typeName);
 			addDecl(m_memStructTypes[structDef]);
 		}
 		return m_memStructTypes[structDef];
 	}
 	reportError(structDef, "Unsupported data location (" + ASTBoogieUtils::dataLocToStr(loc) + ") for struct.");
-	return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+	return errType();
 }
 
 bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _associatedNode)
@@ -344,7 +344,7 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		{
 			// Datatype: [int]T + length
 			vector<bg::Binding> members = {
-					{bg::Expr::id("arr"), ASTBoogieUtils::mappingType(intType(256), baseTypeBoogie)},
+					{bg::Expr::id("arr"), bg::Decl::arraytype(intType(256), baseTypeBoogie)},
 				{bg::Expr::id("length"), intType(256)}};
 			m_arrDataTypes[baseTypeBoogie->getName()] = bg::Decl::datatype(baseTypeBoogie->getName() + "_arr_type", members);
 			addDecl(m_arrDataTypes[baseTypeBoogie->getName()]);
@@ -369,12 +369,12 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 			if (m_memArrPtrTypes.find(baseTypeBoogie->getName()) == m_memArrPtrTypes.end())
 			{
 				// Pointer type
-				m_memArrPtrTypes[baseTypeBoogie->getName()] = bg::Decl::typee(baseTypeBoogie->getName() + "_arr_ptr");
+				m_memArrPtrTypes[baseTypeBoogie->getName()] = bg::Decl::customtype(baseTypeBoogie->getName() + "_arr_ptr");
 				addDecl(m_memArrPtrTypes[baseTypeBoogie->getName()]);
 
 				// The actual storage
 				m_memArrs[baseTypeBoogie->getName()] = bg::Decl::variable("mem_arr_" + baseTypeBoogie->getName(),
-						ASTBoogieUtils::mappingType(
+						bg::Decl::arraytype(
 								m_memArrPtrTypes[baseTypeBoogie->getName()],
 								m_arrDataTypes[baseTypeBoogie->getName()]));
 				addDecl(m_memArrs[baseTypeBoogie->getName()]);
@@ -385,14 +385,14 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		{
 			reportError(_associatedNode, "Unsupported location (" +
 					ASTBoogieUtils::dataLocToStr(arrType->location()) + ") for array type");
-			return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+			return errType();
 		}
 		break;
 	}
 	case Type::Category::Mapping:
 	{
 		auto mapType = dynamic_cast<MappingType const*>(tp);
-		return ASTBoogieUtils::mappingType(toBoogieType(mapType->keyType(), _associatedNode),
+		return bg::Decl::arraytype(toBoogieType(mapType->keyType(), _associatedNode),
 				toBoogieType(mapType->valueType(), _associatedNode));
 	}
 	case Type::Category::FixedBytes:
@@ -409,7 +409,7 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		auto structTp = dynamic_cast<StructType const*>(tp);
 		// Local pointers are arrays
 		if (structTp->location() == DataLocation::Storage && structTp->isPointer())
-			return ASTBoogieUtils::mappingType(intType(256), intType(256));
+			return bg::Decl::arraytype(intType(256), intType(256));
 
 		return getStructType(&structTp->structDefinition(), structTp->location());
 	}
@@ -420,7 +420,7 @@ bg::TypeDeclRef BoogieContext::toBoogieType(TypePointer tp, ASTNode const* _asso
 		reportError(_associatedNode, "Unsupported type: '" + tpStr.substr(0, tpStr.find(' ')) + "'");
 	}
 
-	return bg::Decl::typee(ASTBoogieUtils::ERR_TYPE);
+	return errType();
 }
 
 bg::Expr::Ref BoogieContext::intLit(bg::bigint lit, int bits) const

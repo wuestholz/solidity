@@ -366,15 +366,30 @@ Stmt::Ref Stmt::label(std::string s)
 	return std::make_shared<LabelStmt const>(s);
 }
 
-TypeDeclRef Decl::typee(std::string name, std::string type, std::vector<Attr::Ref> const& attrs)
+TypeDeclRef Decl::elementarytype(std::string name)
 {
-	return std::make_shared<TypeDecl>(name,type,attrs);
+	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>());
 }
 
-DataTypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members,
-		std::string type, std::vector<Attr::Ref> const& attrs)
+TypeDeclRef Decl::aliasedtype(std::string name, TypeDeclRef alias)
 {
-	return std::make_shared<DataTypeDecl>(name, type, attrs, members);
+	return std::make_shared<TypeDecl>(name, alias->getName(), std::vector<Attr::Ref>());
+}
+
+TypeDeclRef Decl::customtype(std::string name)
+{
+	return std::make_shared<TypeDecl>(name, "", std::vector<Attr::Ref>());
+}
+
+TypeDeclRef Decl::arraytype(TypeDeclRef keyType, TypeDeclRef valueType)
+{
+	return std::make_shared<TypeDecl>("[" + keyType->getName() + "]" + valueType->getName(),
+			"", std::vector<Attr::Ref>());
+}
+
+DataTypeDeclRef Decl::datatype(std::string name, std::vector<Binding> members)
+{
+	return std::make_shared<DataTypeDecl>(name, "", std::vector<Attr::Ref>(), members);
 }
 
 Decl::Ref Decl::axiom(Expr::Ref e, std::string name)

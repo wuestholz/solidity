@@ -42,7 +42,6 @@ public:
 
 	// Boogie types
 	static std::string const BOOGIE_INT_CONST_TYPE;
-	static std::string const ERR_TYPE;
 
 	// Other identifiers
 	static std::string const VERIFIER_SUM;
@@ -96,9 +95,6 @@ public:
 
 	static
 	std::string getConstructorName(ContractDefinition const* contract);
-
-	static
-	boogie::TypeDeclRef mappingType(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType);
 
 	/**
 	 * Create attributes for original source location and message

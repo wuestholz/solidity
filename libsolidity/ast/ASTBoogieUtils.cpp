@@ -41,7 +41,6 @@ string const ASTBoogieUtils::VERIFIER_OLD = "__verifier_old";
 string const ASTBoogieUtils::VERIFIER_EQ = "__verifier_eq";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
 string const ASTBoogieUtils::BOOGIE_SUM = "#sum";
-string const ASTBoogieUtils::ERR_TYPE = "__ERROR_UNSUPPORTED_TYPE";
 string const ASTBoogieUtils::SOLIDITY_NOW = "now";
 string const ASTBoogieUtils::BOOGIE_NOW = "__now";
 string const ASTBoogieUtils::SOLIDITY_NUMBER = "number";
@@ -298,11 +297,6 @@ string ASTBoogieUtils::dataLocToStr(DataLocation loc)
 string ASTBoogieUtils::getConstructorName(ContractDefinition const* contract)
 {
 	return BOOGIE_CONSTRUCTOR + "#" + toString(contract->id());
-}
-
-bg::TypeDeclRef ASTBoogieUtils::mappingType(bg::TypeDeclRef keyType, bg::TypeDeclRef valueType)
-{
-	return bg::Decl::typee("[" + keyType->getName() + "]" + valueType->getName());
 }
 
 std::vector<bg::Attr::Ref> ASTBoogieUtils::createAttrs(SourceLocation const& loc, std::string const& message, Scanner const& scanner)
@@ -1277,14 +1271,14 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr
 	if (!structType)
 	{
 		context.reportError(expr, "Expected struct type");
-		return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
+		return PackResult{context.tmpVar(context.errType()), {}};
 	}
 	packInternal(expr, bgExpr, structType, context, result);
 	if (result.ptr)
 		return result;
 
 	context.reportError(expr, "Unsupported expression for packing into local pointer");
-	return PackResult{context.tmpVar(bg::Decl::typee(ERR_TYPE)), {}};
+	return PackResult{context.tmpVar(context.errType()), {}};
 }
 
 void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result)

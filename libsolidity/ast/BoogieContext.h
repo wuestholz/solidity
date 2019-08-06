@@ -165,8 +165,8 @@ public:
 	boogie::TypeDeclRef stringType() const;
 	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
-
 	boogie::TypeDeclRef localPtrType();
+	boogie::TypeDeclRef errType() const { return boogie::Decl::elementarytype("__ERROR_UNSUPPORTED_TYPE"); }
 
 	boogie::FuncDeclRef getStructConstructor(StructDefinition const* structDef);
 	boogie::TypeDeclRef getStructType(StructDefinition const* structDef, DataLocation loc);
