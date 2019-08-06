@@ -1175,6 +1175,13 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, tp_uint256, m_context);
 	}
 
+	if (baseType->category() == Type::Category::Mapping && m_context.isBvEncoding())
+	{
+		// For mappings, do implicit conversion
+		auto mappingType = dynamic_cast<MappingType const*>(baseType);
+		indexExpr = ASTBoogieUtils::checkImplicitBvConversion(indexExpr, indexType, mappingType->keyType(), m_context);
+	}
+
 	// Indexing arrays requires accessing the actual array inside the datatype
 	if (baseType->category() == Type::Category::Array)
 	{
