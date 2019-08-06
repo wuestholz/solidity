@@ -847,20 +847,18 @@ void ASTBoogieExpressionConverter::functionCallNewArray(FunctionCall const& _nod
 
 	if (auto lit = dynamic_pointer_cast<bg::IntLit const>(m_currentExpr))
 	{
-		for (size_t i = 0; i < lit->getVal(); i++)
+		auto defaultVal = ASTBoogieUtils::defaultValue(arrType->baseType(), m_context);
+		if (defaultVal)
 		{
-			auto defaultVal = ASTBoogieUtils::defaultValue(arrType->baseType(), m_context);
-			if (defaultVal)
-			{
+			for (size_t i = 0; i < lit->getVal(); i++)
 				addSideEffect(bg::Stmt::assign(
 						bg::Expr::arrsel(
 								m_context.getInnerArray(memArr, bgType),
 								m_context.intLit(i, 256)),
 						defaultVal));
-			}
-			else
-				m_context.reportWarning(&_node, "Could not set default value for array element");
 		}
+		else
+			m_context.reportWarning(&_node, "Could not set default values for array elements");
 	}
 	else
 		m_context.reportWarning(&_node, "Array size not known at compile time, elements could not be set to default value");
