@@ -559,7 +559,8 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 			}
 			// Parse the target (identifier/selector)
 			BoogieContext::DocTagExpr target;
-			if (parseExpr(docTag.second.content.substr(ASTBoogieUtils::DOCTAG_MODIFIES.length() + 1, targetEnd), _node, &_node, target))
+			size_t targetStart = ASTBoogieUtils::DOCTAG_MODIFIES.length() + 1;
+			if (parseExpr(docTag.second.content.substr(targetStart, targetEnd - targetStart + 1), _node, &_node, target))
 			{
 				if (Declaration const* varDecl = getModifiesBase(target.exprSol.get()))
 					modSpecs[varDecl].push_back(ModSpec(condExpr, target.expr));

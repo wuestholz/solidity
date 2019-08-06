@@ -119,6 +119,8 @@ ASTPointer<Expression> Parser::parseExpression(shared_ptr<Scanner> const& _scann
 		m_scanner = _scanner;
 		auto result = parseExpression();
 		solAssert(m_recursionDepth == 0, "");
+		if (m_scanner->currentToken() != Token::EOS)
+			parserError(string("Expected end of expression but got ") + tokenName(m_scanner->currentToken()));
 		return result;
 	}
 	catch (FatalError const&)
