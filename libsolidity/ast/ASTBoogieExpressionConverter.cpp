@@ -17,18 +17,6 @@ namespace dev
 namespace solidity
 {
 
-bg::Expr::Ref ASTBoogieExpressionConverter::getSumShadowVar(ASTNode const* node)
-{
-	if (auto sumBase = dynamic_cast<Identifier const*>(node))
-		if (auto sumBaseDecl = sumBase->annotation().referencedDeclaration)
-			return bg::Expr::arrsel(
-					bg::Expr::id(m_context.mapDeclName(*sumBaseDecl) + ASTBoogieUtils::BOOGIE_SUM),
-					m_context.boogieThis()->getRefTo());
-
-	m_context.reportError(node, "Unsupported identifier for sum function");
-	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
-}
-
 void ASTBoogieExpressionConverter::addTCC(bg::Expr::Ref expr, TypePointer tp)
 {
 	if (m_context.encoding() == BoogieContext::Encoding::MOD && ASTBoogieUtils::isBitPreciseType(tp))
@@ -788,21 +776,8 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(bg::Expr::Ref msgVa
 
 void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
 {
-	TypePointer tp = _node.annotation().type;
-	if (auto id = dynamic_pointer_cast<Identifier const>(_node.arguments()[0]))
-	{
-		auto sumDecl = id->annotation().referencedDeclaration;
-		m_context.currentSumDecls()[sumDecl] = tp;
-
-		auto declCategory = id->annotation().type->category();
-		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
-			m_context.reportError(&_node, "Argument of sum must be an array or a mapping");
-	}
-	else
-		m_context.reportError(&_node, "Argument of sum must be an identifier");
-
-	m_currentExpr = getSumShadowVar(_node.arguments()[0].get());
-	addTCC(m_currentExpr, tp);
+	m_currentExpr = m_context.addAndGetSumVar(_node.arguments()[0].get(), _node.annotation().type);
+	addTCC(m_currentExpr, _node.annotation().type);
 }
 
 void ASTBoogieExpressionConverter::functionCallOld(FunctionCall const& _node, vector<bg::Expr::Ref> const& args)

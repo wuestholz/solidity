@@ -48,6 +48,13 @@ public:
 			expr(expr), exprStr(exprStr), exprSol(exprSol), tccs(tccs), ocs(ocs) {}
 	};
 
+	struct SumSpec {
+		Declaration const* base; // Base array over which we sum
+		std::vector<Declaration const*> path; // Path of member accesses
+		TypePointer type; // Type of the resulting sum
+		boogie::VarDeclRef shadowVar; // Shadow variable that needs to be updated
+	};
+
 	/**
 	 * Global context with magic variables for verification-specific functions such as sum. We
 	 * use this in the name resolver, so all other stuff is already in the scope of the resolver.
@@ -92,7 +99,7 @@ private:
 
 	ContractDefinition const* m_currentContract;
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
-	std::map<Declaration const*, TypePointer> m_currentSumDecls; // List of declarations that need shadow variable to sum
+	std::list<SumSpec> m_currentSumSpecs;
 
 	typedef std::map<std::string, boogie::Decl::ConstRef> builtin_cache;
 	builtin_cache m_builtinFunctions;
@@ -128,13 +135,17 @@ public:
 	std::map<ASTNode const*, std::shared_ptr<DeclarationContainer>>& scopes() { return m_scopes; }
 	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
-	std::map<Declaration const*, TypePointer>& currentSumDecls() { return m_currentSumDecls; }
 	int nextId() { return m_nextId++; }
 	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
 	ContractDefinition const* currentContract() const { return m_currentContract; }
 	void setCurrentContract(ContractDefinition const* contract) { m_currentContract = contract; }
 
 	void printErrors(std::ostream& out);
+
+	boogie::Expr::Ref addAndGetSumVar(Expression const* expr, TypePointer type);
+	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
+	std::list<boogie::Stmt::Ref> updateSumVars(Expression const* lhs, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
+	void clearSumSpecs() { m_currentSumSpecs.clear(); }
 
 	/**
 	 * Map a declaration name to a name in Boogie

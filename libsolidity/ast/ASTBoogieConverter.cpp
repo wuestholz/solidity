@@ -265,13 +265,8 @@ void ASTBoogieConverter::initializeStateVar(VariableDeclaration const& _node)
 			m_currentBlocks.top()->addStmt(valueAssign);
 
 			// Initialize the sum, if there, to default value
-			if (m_context.currentSumDecls()[&_node])
-			{
-				bg::Expr::Ref sum = bg::Expr::id(varName + ASTBoogieUtils::BOOGIE_SUM);
-				bg::Stmt::Ref sum_default = bg::Stmt::assign(sum,
-						bg::Expr::arrupd(sum, m_context.boogieThis()->getRefTo(), m_context.intLit(0, 256)));
-				m_currentBlocks.top()->addStmt(sum_default);
-			}
+			for (auto stmt: m_context.initSumVars(&_node))
+				m_currentBlocks.top()->addStmt(stmt);
 		}
 		else
 		{
@@ -616,22 +611,12 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process contract invariants
 	m_context.currentContractInvars().clear();
-	m_context.currentSumDecls().clear();
+	m_context.clearSumSpecs();
 
 	for (auto invar: getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_CONTRACT_INVAR))
 	{
 		m_context.addGlobalComment("Contract invariant: " + invar.exprStr);
 		m_context.currentContractInvars().push_back(invar);
-	}
-
-	// Add new shadow variables for sum
-	for (auto sumDecl: m_context.currentSumDecls())
-	{
-		m_context.addGlobalComment("Shadow variable for sum over '" + sumDecl.first->name() + "'");
-		m_context.addDecl(
-					bg::Decl::variable(m_context.mapDeclName(*sumDecl.first) + ASTBoogieUtils::BOOGIE_SUM,
-							bg::Decl::arraytype(m_context.addressType(),
-							m_context.toBoogieType(sumDecl.second, sumDecl.first))));
 	}
 
 	// Process inheritance specifiers (not included in subNodes)

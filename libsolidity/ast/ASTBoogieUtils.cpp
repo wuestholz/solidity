@@ -40,7 +40,6 @@ string const ASTBoogieUtils::VERIFIER_SUM = "__verifier_sum";
 string const ASTBoogieUtils::VERIFIER_OLD = "__verifier_old";
 string const ASTBoogieUtils::VERIFIER_EQ = "__verifier_eq";
 string const ASTBoogieUtils::BOOGIE_CONSTRUCTOR = "__constructor";
-string const ASTBoogieUtils::BOOGIE_SUM = "#sum";
 string const ASTBoogieUtils::SOLIDITY_NOW = "now";
 string const ASTBoogieUtils::BOOGIE_NOW = "__now";
 string const ASTBoogieUtils::SOLIDITY_NUMBER = "number";
@@ -1197,32 +1196,9 @@ void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil:
 	if (context.overflow() && rhsResult.cc)
 		result.ocs.push_back(rhsResult.cc);
 
-	// Check if ghost variables need to be updated
-	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(lhs.expr))
-	{
-		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
-		{
-			if (context.currentSumDecls()[lhsId->annotation().referencedDeclaration])
-			{
-				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
-				auto sumId = bg::Expr::id(context.mapDeclName(*lhsId->annotation().referencedDeclaration) + ASTBoogieUtils::BOOGIE_SUM);
-
-				unsigned bits = ASTBoogieUtils::getBits(lhs.type);
-				bool isSigned = ASTBoogieUtils::isSigned(lhs.type);
-
-				auto selExpr = bg::Expr::arrsel(sumId, context.boogieThis()->getRefTo());
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(context, nullptr, Token::Sub, selExpr, lhs.bgExpr, bits, isSigned);
-				auto updResult = ASTBoogieUtils::encodeArithBinaryOp(context, nullptr, Token::Add, subResult.expr, rhsResult.expr, bits, isSigned);
-				if (context.encoding() == BoogieContext::Encoding::MOD && !isSigned)
-				{
-					result.newStmts.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
-					result.newStmts.push_back(bg::Stmt::assume(subResult.cc));
-				}
-				result.newStmts.push_back(bg::Stmt::assign(sumId,
-						bg::Expr::arrupd(sumId, context.boogieThis()->getRefTo(), updResult.expr)));
-			}
-		}
-	}
+	// Check if sum ghost variables need to be updated
+	for (auto stmt: context.updateSumVars(lhs.expr, lhs.bgExpr, rhsResult.expr))
+		result.newStmts.push_back(stmt);
 
 	result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
 }

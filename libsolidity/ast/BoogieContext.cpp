@@ -63,7 +63,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 		m_stats(stats), m_program(), m_encoding(encoding), m_overflow(overflow),
 		m_modAnalysis(modAnalysis), m_errorReporter(errorReporter),
 		m_currentScanner(nullptr), m_scopes(scopes), m_evmVersion(evmVersion),
-		m_currentContractInvars(), m_currentSumDecls(), m_builtinFunctions(),
+		m_currentContractInvars(), m_currentSumSpecs(), m_builtinFunctions(),
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
 	// Initialize global declarations
@@ -99,6 +99,91 @@ void BoogieContext::printErrors(ostream& out)
 	for (auto const& error: errorReporter()->errors())
 		formatter.printExceptionInformation(*error,
 				(error->type() == Error::Type::Warning) ? "solc-verify warning" : "solc-verify error");
+}
+
+bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer type)
+{
+	if (auto id = dynamic_cast<Identifier const*>(expr))
+	{
+		Declaration const* decl = id->annotation().referencedDeclaration;
+
+		auto declCategory = id->annotation().type->category();
+		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
+		{
+			reportError(expr, "Argument of sum must be an array or a mapping");
+			return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
+		}
+
+		SumSpec* spec = nullptr;
+		for (auto existingSpec: m_currentSumSpecs)
+		{
+			if (existingSpec.base == decl)
+			{
+				spec = &existingSpec;
+				break;
+			}
+		}
+
+		if (!spec) {
+			bg::VarDeclRef shadow = bg::Decl::variable(mapDeclName(*decl) + "#SUM",
+					bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
+			addDecl(shadow);
+			m_currentSumSpecs.push_back({decl, {}, type, shadow});
+			spec = &m_currentSumSpecs.back();
+		}
+
+		solAssert(spec, "Spec not found nor created");
+		return bg::Expr::arrsel(spec->shadowVar->getRefTo(), boogieThis()->getRefTo());
+	}
+	else
+		reportError(expr, "Argument of sum must be an identifier");
+
+	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
+}
+
+list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
+{
+	list<bg::Stmt::Ref> init;
+	for (auto spec: m_currentSumSpecs)
+		if (spec.base == decl)
+			init.push_back(bg::Stmt::assign(
+					bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo()),
+					intLit(0, 256)));
+	return init;
+}
+
+list<bg::Stmt::Ref> BoogieContext::updateSumVars(Expression const* lhs, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg)
+{
+	list<bg::Stmt::Ref> upd;
+	if (auto lhsIdx = dynamic_cast<IndexAccess const*>(lhs))
+	{
+		if (auto lhsId = dynamic_cast<Identifier const*>(&lhsIdx->baseExpression()))
+		{
+			auto lhsDecl = lhsId->annotation().referencedDeclaration;
+
+			for (auto spec: m_currentSumSpecs)
+			{
+				if (spec.base == lhsDecl)
+				{
+
+					unsigned bits = ASTBoogieUtils::getBits(spec.type);
+					bool isSigned = ASTBoogieUtils::isSigned(spec.type);
+					// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
+					auto selExpr = bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo());
+					auto subResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
+					auto addResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Add, subResult.expr, rhsBg, bits, isSigned);
+					if (encoding() == Encoding::MOD && !isSigned)
+					{
+						upd.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
+						upd.push_back(bg::Stmt::assume(subResult.cc));
+					}
+					upd.push_back(bg::Stmt::assign(selExpr, addResult.expr));
+				}
+			}
+		}
+	}
+
+	return upd;
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)

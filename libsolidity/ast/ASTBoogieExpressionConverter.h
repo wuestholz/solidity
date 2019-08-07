@@ -35,9 +35,6 @@ private:
 	// Overflow conditions
 	std::list<boogie::Expr::Ref> m_ocs;
 
-	// Helper method to get the length of an array
-	boogie::Expr::Ref getSumShadowVar(ASTNode const* node);
-
 	// Helper method to add a type checking condition for an expression with a given type
 	void addTCC(boogie::Expr::Ref expr, TypePointer tp);
 
