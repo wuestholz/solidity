@@ -123,11 +123,20 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 
 		if (!id)
 		{
-			// Or an indexer: x[this][i]
 			auto subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(idxExpr->getBase());
+
+			if (!subIdxExpr)
+			{
+				// For arrays: skip inner array selection
+				auto subMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(idxExpr->getBase());
+				if (subMemAccExpr)
+					subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(subMemAccExpr->getBase());
+			}
+
 			if (subIdxExpr)
 				id = dynamic_pointer_cast<bg::VarExpr const>(subIdxExpr->getBase());
 				// TODO: subindexer must be 'this'
+
 			if (!id && errors)
 				reportError(errors, "Base of indexer must be identifier");
 		}

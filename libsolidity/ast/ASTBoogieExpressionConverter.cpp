@@ -855,7 +855,18 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 		solAssert(_node.arguments().size() == 1, "Push must take exactly one argument");
 		_node.arguments()[0]->accept(*this);
 		auto arg = m_currentExpr;
-		addSideEffect(bg::Stmt::assign(bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arg));
+		// First we assign the default value (without updating the sum)
+		addSideEffect(bg::Stmt::assign(
+				bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len),
+				ASTBoogieUtils::defaultValue(arrType->baseType(), m_context)));
+		// Then we put the actual argument (updating also the sum)
+		auto res = ASTBoogieUtils::makeAssign(
+			ASTBoogieUtils::AssignParam{bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arrType->baseType(), nullptr},
+			ASTBoogieUtils::AssignParam{arg, _node.arguments()[0]->annotation().type, _node.arguments()[0].get()},
+			Token::Assign, &_node, m_context);
+		m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
+		for (auto stmt: res.newStmts)
+			addSideEffect(stmt);
 		lenUpd = ASTBoogieUtils::encodeArithBinaryOp(m_context, &_node, Token::Add, len, m_context.intLit(1, 256), 256, false);
 	}
 	else
@@ -868,6 +879,17 @@ void ASTBoogieExpressionConverter::functionCallPushPop(MemberAccess const* memAc
 	{
 		addSideEffect(bg::Stmt::comment("Implicit assumption that length cannot overflow"));
 		addSideEffect(bg::Stmt::assume(lenUpd.cc));
+	}
+	if (memAccExpr->memberName() == "pop")
+	{
+		// Reset the removed element (updating the sum)
+		auto res = ASTBoogieUtils::makeAssign(
+			ASTBoogieUtils::AssignParam{bg::Expr::arrsel(m_context.getInnerArray(arr, bgType), len), arrType->baseType(), nullptr},
+			ASTBoogieUtils::AssignParam{ASTBoogieUtils::defaultValue(arrType->baseType(), m_context), arrType->baseType(), nullptr},
+			Token::Assign, &_node, m_context);
+		m_newDecls.insert(m_newDecls.end(), res.newDecls.begin(), res.newDecls.end());
+		for (auto stmt: res.newStmts)
+			addSideEffect(stmt);
 	}
 }
 
