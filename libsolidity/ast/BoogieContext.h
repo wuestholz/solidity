@@ -48,9 +48,13 @@ public:
 			expr(expr), exprStr(exprStr), exprSol(exprSol), tccs(tccs), ocs(ocs) {}
 	};
 
-	struct SumSpec {
+	struct SumPath {
 		Declaration const* base; // Base array over which we sum
 		std::vector<Declaration const*> path; // Path of member accesses
+	};
+
+	struct SumSpec {
+		SumPath path; // Path of the member we sum over
 		TypePointer type; // Type of the resulting sum
 		boogie::VarDeclRef shadowVar; // Shadow variable that needs to be updated
 	};
@@ -142,6 +146,9 @@ public:
 
 	void printErrors(std::ostream& out);
 
+private:
+	void getPath(Expression const* expr, SumPath& path, bool errors = true);
+public:
 	boogie::Expr::Ref addAndGetSumVar(Expression const* expr, TypePointer type);
 	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
 	std::list<boogie::Stmt::Ref> updateSumVars(Expression const* lhs, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
