@@ -1197,7 +1197,7 @@ void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil:
 		result.ocs.push_back(rhsResult.cc);
 
 	// Check if sum ghost variables need to be updated
-	for (auto stmt: context.updateSumVars(lhs.expr, lhs.bgExpr, rhsResult.expr))
+	for (auto stmt: context.updateSumVars(lhs.bgExpr, rhsResult.expr))
 		result.newStmts.push_back(stmt);
 
 	result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));

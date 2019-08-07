@@ -49,8 +49,8 @@ public:
 	};
 
 	struct SumPath {
-		Declaration const* base; // Base array over which we sum
-		std::vector<Declaration const*> path; // Path of member accesses
+		std::string base; // Base array over which we sum
+		std::vector<std::string> path; // Path of member accesses
 	};
 
 	struct SumSpec {
@@ -147,12 +147,12 @@ public:
 	void printErrors(std::ostream& out);
 
 private:
-	void getPath(Expression const* expr, SumPath& path, bool errors = true);
+	void getPath(boogie::Expr::Ref expr, SumPath& path, ASTNode const* errors = nullptr);
 	bool pathsEqual(SumPath const& p1, SumPath const& p2);
 public:
-	boogie::Expr::Ref addAndGetSumVar(Expression const* expr, TypePointer type);
+	boogie::Expr::Ref addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type);
 	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
-	std::list<boogie::Stmt::Ref> updateSumVars(Expression const* lhs, boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
+	std::list<boogie::Stmt::Ref> updateSumVars(boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
 	void clearSumSpecs() { m_currentSumSpecs.clear(); }
 
 	/**

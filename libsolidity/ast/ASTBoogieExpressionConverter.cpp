@@ -521,7 +521,8 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// Sum function
 	if (boost::algorithm::starts_with(funcName, ASTBoogieUtils::VERIFIER_SUM))
 	{
-		functionCallSum(_node);
+		solAssert(regularArgs.size() == 1, "Sum should have exactly one argument");
+		functionCallSum(_node, regularArgs[0]);
 		return false;
 	}
 
@@ -774,9 +775,9 @@ void ASTBoogieExpressionConverter::functionCallRevertBalance(bg::Expr::Ref msgVa
 	addSideEffect(bg::Stmt::ifelse(bg::Expr::not_(okDataTuple->elements()[0]), revert));
 }
 
-void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node)
+void ASTBoogieExpressionConverter::functionCallSum(FunctionCall const& _node, bg::Expr::Ref arg)
 {
-	m_currentExpr = m_context.addAndGetSumVar(_node.arguments()[0].get(), _node.annotation().type);
+	m_currentExpr = m_context.addAndGetSumVar(arg, _node.arguments()[0].get(), _node.annotation().type);
 	addTCC(m_currentExpr, _node.annotation().type);
 }
 

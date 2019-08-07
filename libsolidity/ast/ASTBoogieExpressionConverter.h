@@ -49,7 +49,7 @@ private:
 	void functionCallNewStruct(StructDefinition const* structDef, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallReduceBalance(boogie::Expr::Ref msgValue);
 	void functionCallRevertBalance(boogie::Expr::Ref msgValue);
-	void functionCallSum(FunctionCall const& _node);
+	void functionCallSum(FunctionCall const& _node, boogie::Expr::Ref arg);
 	void functionCallOld(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallEq(FunctionCall const& _node, std::vector<boogie::Expr::Ref> const& args);
 	void functionCallNewArray(FunctionCall const& _node);

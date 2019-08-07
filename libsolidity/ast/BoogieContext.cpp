@@ -101,43 +101,44 @@ void BoogieContext::printErrors(ostream& out)
 				(error->type() == Error::Type::Warning) ? "solc-verify warning" : "solc-verify error");
 }
 
-void BoogieContext::getPath(Expression const* expr, SumPath& path, bool errors)
+void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* errors)
 {
-	Identifier const* id = dynamic_cast<Identifier const*>(expr);
-	if (!id)
+	shared_ptr<bg::VarExpr const> id = nullptr;
+	if (auto idxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 	{
-		if (auto idxExpr = dynamic_cast<IndexAccess const*>(expr))
+		// Check if we reached a state var: x[this]
+		id = dynamic_pointer_cast<bg::VarExpr const>(idxExpr->getBase());
+		// indexer should be 'this'
+
+		if (!id)
 		{
-			id = dynamic_cast<Identifier const*>(&idxExpr->baseExpression());
+			// Or an indexer: x[this][i]
+			auto subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(idxExpr->getBase());
+			if (subIdxExpr)
+				id = dynamic_pointer_cast<bg::VarExpr const>(subIdxExpr->getBase());
+				// subindexer must be 'this'
 			if (!id && errors)
-				reportError(expr, "Base of indexer must be identifier");
+				reportError(errors, "Base of indexer must be identifier");
 		}
 	}
 
 	if (id)
 	{
-		Declaration const* decl = id->annotation().referencedDeclaration;
-		auto declCategory = id->annotation().type->category();
-		if (declCategory != Type::Category::Mapping && declCategory != Type::Category::Array)
-		{
-			if (errors)
-				reportError(expr, "Argument of sum must be an array or a mapping");
-			return;
-		}
-		solAssert(!path.base, "Base set twice");
-		path.base = decl;
+		solAssert(path.base == "", "Base set twice");
+		path.base = id->name();
 		return;
 	}
 
-	if (auto memAcc = dynamic_cast<MemberAccess const*>(expr))
+	// Member access (x[this][i].y.z): add member to path and recurse
+	if (auto memAcc = dynamic_pointer_cast<bg::DtSelExpr const>(expr))
 	{
-		path.path.insert(path.path.begin(), memAcc->annotation().referencedDeclaration);
-		getPath(&memAcc->expression(), path, errors);
+		path.path.insert(path.path.begin(), memAcc->getMember());
+		getPath(memAcc->getBase(), path, errors);
 		return;
 	}
 
 	if (errors)
-		reportError(expr, "Unsupported expression to sum over");
+		reportError(errors, "Unsupported expression to sum over");
 }
 
 bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
@@ -145,13 +146,13 @@ bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
 	return p1.base == p2.base && p1.path == p2.path;
 }
 
-bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer type)
+bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type)
 {
 	// TODO report error if top level expression is not int, or int array, or map to int
-	SumPath path = {nullptr, {}};
-	getPath(expr, path);
+	SumPath path = {"", {}};
+	getPath(bgExpr, path, expr);
 
-	if (path.base)
+	if (path.base != "")
 	{
 		SumSpec* spec = nullptr;
 		for (auto existingSpec: m_currentSumSpecs)
@@ -165,9 +166,9 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer
 
 		if (!spec)
 		{
-			string shadowName = mapDeclName(*path.base);
+			string shadowName = path.base;
 			for (auto mem: path.path)
-				shadowName += "#" + mapDeclName(*mem);
+				shadowName += "#" + mem;
 			bg::VarDeclRef shadow = bg::Decl::variable(shadowName + "#SUM",
 					bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
 			addDecl(shadow);
@@ -185,21 +186,21 @@ list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
 {
 	list<bg::Stmt::Ref> init;
 	for (auto spec: m_currentSumSpecs)
-		if (spec.path.base == decl)
+		if (spec.path.base == mapDeclName(*decl))
 			init.push_back(bg::Stmt::assign(
 					bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo()),
 					intLit(0, 256)));
 	return init;
 }
 
-list<bg::Stmt::Ref> BoogieContext::updateSumVars(Expression const* lhs, bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg)
+list<bg::Stmt::Ref> BoogieContext::updateSumVars(bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg)
 {
-	SumPath path = {nullptr, {}};
-	getPath(lhs, path, false);
+	SumPath path = {"", {}};
+	getPath(lhsBg, path);
 
 	list<bg::Stmt::Ref> upd;
 
-	if (path.base)
+	if (path.base != "")
 	{
 		for (auto spec: m_currentSumSpecs)
 		{
