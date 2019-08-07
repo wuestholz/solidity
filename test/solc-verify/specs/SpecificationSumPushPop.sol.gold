@@ -1,6 +1,10 @@
-C::add: OK
-C::insert: OK
-C::remove: OK
-C::[implicit_constructor]: OK
-C::[receive_ether_selfdestruct]: OK
+Simple::add: OK
+Simple::insert: OK
+Simple::remove: OK
+Simple::[implicit_constructor]: OK
+Simple::[receive_ether_selfdestruct]: OK
+WithStruct::insert: OK
+WithStruct::remove: OK
+WithStruct::[implicit_constructor]: OK
+WithStruct::[receive_ether_selfdestruct]: OK
 No errors found.

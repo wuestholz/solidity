@@ -1,7 +1,8 @@
 pragma solidity >=0.5.0;
+pragma experimental ABIEncoderV2;
 
 /// @notice invariant __verifier_sum_uint(items[__verifier_idx_uint]) == total
-contract C {
+contract Simple {
     uint total;
     uint[] items;
 
@@ -17,6 +18,28 @@ contract C {
 
     function remove() public {
         total -= items[items.length-1];
+        items.pop();
+    }
+}
+
+/// @notice invariant __verifier_sum_uint(items[__verifier_idx_uint].price) == total
+contract WithStruct {
+    uint total;
+
+    struct Item {
+        uint price;
+        uint id;
+    }
+
+    Item[] items;
+
+    function insert(Item memory item) public {
+        items.push(item);
+        total += item.price;
+    }
+
+    function remove() public {
+        total -= items[items.length-1].price;
         items.pop();
     }
 }
