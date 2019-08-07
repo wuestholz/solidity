@@ -45,6 +45,7 @@ public:
 
 	// Other identifiers
 	static std::string const VERIFIER_SUM;
+	static std::string const VERIFIER_IDX;
 	static std::string const VERIFIER_OLD;
 	static std::string const VERIFIER_EQ;
 	static std::string const BOOGIE_CONSTRUCTOR;

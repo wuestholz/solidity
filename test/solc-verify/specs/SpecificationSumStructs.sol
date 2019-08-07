@@ -1,8 +1,8 @@
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
-/// @notice invariant __verifier_sum_uint(ss[0].x) == xsum
-/// @notice invariant __verifier_sum_uint(ss[0].t.z) == zsum
+/// @notice invariant __verifier_sum_uint(ss[__verifier_idx_address].x) == xsum
+/// @notice invariant __verifier_sum_uint(ss[__verifier_idx_address].t.z) == zsum
 contract C {
 
     uint xsum = 0;
@@ -17,28 +17,28 @@ contract C {
         T t;
     }
 
-    mapping(uint=>S) ss;
+    mapping(address=>S) ss;
 
-    function addToX(uint i, uint v) public {
-        ss[i].x += v;
+    function addToX(uint v) public {
+        ss[msg.sender].x += v;
         xsum += v;
     }
 
-    function addToZ(uint i, uint v) public {
-        ss[i].t.z += v;
+    function addToZ(uint v) public {
+        ss[msg.sender].t.z += v;
         zsum += v;
     }
 
-    function setT(uint i, T memory t) public {
-        uint oldz = ss[i].t.z;
-        ss[i].t = t;
+    function setT(T memory t) public {
+        uint oldz = ss[msg.sender].t.z;
+        ss[msg.sender].t = t;
         zsum = zsum - oldz + t.z;
     }
 
-    function setS(uint i, S memory s) public {
-        uint oldz = ss[i].t.z;
-        uint oldx = ss[i].x;
-        ss[i] = s;
+    function setS(S memory s) public {
+        uint oldz = ss[msg.sender].t.z;
+        uint oldx = ss[msg.sender].x;
+        ss[msg.sender] = s;
         zsum = zsum - oldz + s.t.z;
         xsum = xsum - oldx + s.x;
     }

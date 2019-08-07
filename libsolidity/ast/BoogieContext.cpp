@@ -49,6 +49,17 @@ BoogieContext::BoogieGlobalContext::BoogieGlobalContext()
 					FunctionType::Kind::Internal, true, StateMutability::Pure);
 	auto eq = new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_EQ, eqFunType);
 	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(eq));
+
+	// Add magic variables for 'index'
+	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(
+			new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_IDX + "_address",
+					TypeProvider::address())));
+	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(
+			new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_IDX + "_int",
+					TypeProvider::integer(8, IntegerType::Modifier::Signed))));
+	m_magicVariables.push_back(shared_ptr<MagicVariableDeclaration const>(
+			new MagicVariableDeclaration(ASTBoogieUtils::VERIFIER_IDX + "_uint",
+					TypeProvider::integer(8, IntegerType::Modifier::Unsigned))));
 }
 
 BoogieContext::BoogieContext(Encoding encoding,
