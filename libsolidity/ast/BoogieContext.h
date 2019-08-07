@@ -48,18 +48,6 @@ public:
 			expr(expr), exprStr(exprStr), exprSol(exprSol), tccs(tccs), ocs(ocs) {}
 	};
 
-	struct SumPath {
-		std::string base; // Base array over which we sum
-		std::vector<std::string> path; // Path of member accesses
-		std::vector<std::shared_ptr<boogie::DtSelExpr const>> selexprs;
-	};
-
-	struct SumSpec {
-		SumPath path; // Path of the member we sum over
-		TypePointer type; // Type of the resulting sum
-		boogie::VarDeclRef shadowVar; // Shadow variable that needs to be updated
-	};
-
 	/**
 	 * Global context with magic variables for verification-specific functions such as sum. We
 	 * use this in the name resolver, so all other stuff is already in the scope of the resolver.
@@ -71,6 +59,16 @@ public:
 	};
 
 private:
+	struct SumPath {
+		std::string base; // Base array over which we sum
+		std::vector<std::shared_ptr<boogie::DtSelExpr const>> members; // Path of member accesses
+	};
+
+	struct SumSpec {
+		SumPath path; // Path of the member we sum over
+		TypePointer type; // Type of the resulting sum
+		boogie::VarDeclRef shadowVar; // Shadow variable that needs to be updated
+	};
 
 	ASTBoogieStats m_stats;
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)

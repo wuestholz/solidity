@@ -115,27 +115,31 @@ void BoogieContext::printErrors(ostream& out)
 void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* errors)
 {
 	shared_ptr<bg::VarExpr const> id = nullptr;
-	if (auto idxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
+	if (auto arrSelExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(expr))
 	{
 		// Check if we reached a state var: x[this]
-		id = dynamic_pointer_cast<bg::VarExpr const>(idxExpr->getBase());
-		// TODO: indexer should be 'this'
+		if (auto bgThis = dynamic_pointer_cast<bg::VarExpr const>(arrSelExpr->getIdx()))
+			if (bgThis->name() == boogieThis()->getName())
+				id = dynamic_pointer_cast<bg::VarExpr const>(arrSelExpr->getBase());
+
 
 		if (!id)
 		{
-			auto subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(idxExpr->getBase());
+			// Check if we reached an indexer: x[this][i]
+			auto subArrSelExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(arrSelExpr->getBase());
 
-			if (!subIdxExpr)
+			if (!subArrSelExpr)
 			{
-				// For arrays: skip inner array selection
-				auto subMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(idxExpr->getBase());
-				if (subMemAccExpr)
-					subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(subMemAccExpr->getBase());
+				// For arrays: skip inner array selection: x[this].innerarray[i]
+				if (auto subMemAccExpr = dynamic_pointer_cast<bg::DtSelExpr const>(arrSelExpr->getBase()))
+					subArrSelExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(subMemAccExpr->getBase());
 			}
 
-			if (subIdxExpr)
-				id = dynamic_pointer_cast<bg::VarExpr const>(subIdxExpr->getBase());
-				// TODO: subindexer must be 'this'
+			// Now get the id from the state var x[this]
+			if (subArrSelExpr)
+				if (auto bgThis = dynamic_pointer_cast<bg::VarExpr const>(subArrSelExpr->getIdx()))
+					if (bgThis->name() == boogieThis()->getName())
+						id = dynamic_pointer_cast<bg::VarExpr const>(subArrSelExpr->getBase());
 
 			if (!id && errors)
 				reportError(errors, "Base of indexer must be identifier");
@@ -149,11 +153,11 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 		return;
 	}
 
-	// Member access (x[this][i].y.z): add member to path and recurse
+	// Member access add member to path and recurse, e.g., x[this][i].y.z
+	// adds 'z' to the path and recureses on x[this][i].y
 	if (auto memAcc = dynamic_pointer_cast<bg::DtSelExpr const>(expr))
 	{
-		path.path.insert(path.path.begin(), memAcc->getMember());
-		path.selexprs.insert(path.selexprs.begin(), memAcc);
+		path.members.insert(path.members.begin(), memAcc);
 		getPath(memAcc->getBase(), path, errors);
 		return;
 	}
@@ -164,43 +168,61 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 
 bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
 {
-	return p1.base == p2.base && p1.path == p2.path;
+	if (p1.base != p2.base)
+		return false;
+	if (p1.members.size() != p2.members.size())
+		return false;
+	for (unsigned i = 0; i < p1.members.size(); ++i)
+		if (p1.members[i]->getMember() != p2.members[i]->getMember())
+			return false;
+	return true;
 }
 
 bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type)
 {
-	// TODO report error if top level expression is not int, or int array, or map to int
-	SumPath path = {"", {}, {}};
+	// Expression must be int, or an int array/mapping
+	auto intType = dynamic_cast<IntegerType const*>(expr->annotation().type);
+	if (auto arrType = dynamic_cast<ArrayType const*>(expr->annotation().type))
+		intType = dynamic_cast<IntegerType const*>(arrType->baseType());
+	if (auto mapType = dynamic_cast<MappingType const*>(expr->annotation().type))
+		intType = dynamic_cast<IntegerType const*>(mapType->valueType());
+
+	if (!intType)
+	{
+		reportError(expr, "Argument of sum must be an array, mapping or member access to integers");
+		return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
+	}
+
+	SumPath path = {"", {}};
 	getPath(bgExpr, path, expr);
 
-	if (path.base != "")
+	solAssert(path.base != "", "Could not get path to sum declaration");
+
+	// Check if there is a spec already
+	SumSpec* spec = nullptr;
+	for (auto existingSpec: m_currentSumSpecs)
 	{
-		SumSpec* spec = nullptr;
-		for (auto existingSpec: m_currentSumSpecs)
+		if (pathsEqual(existingSpec.path, path))
 		{
-			if (pathsEqual(existingSpec.path, path))
-			{
-				spec = &existingSpec;
-				break;
-			}
+			spec = &existingSpec;
+			break;
 		}
-
-		if (!spec)
-		{
-			string shadowName = path.base;
-			for (auto mem: path.path)
-				shadowName += "#" + mem;
-			bg::VarDeclRef shadow = bg::Decl::variable(shadowName + "#SUM",
-					bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
-			addDecl(shadow);
-			m_currentSumSpecs.push_back({path, type, shadow});
-			spec = &m_currentSumSpecs.back();
-		}
-
-		solAssert(spec, "Spec not found nor created");
-		return bg::Expr::arrsel(spec->shadowVar->getRefTo(), boogieThis()->getRefTo());
 	}
-	return bg::Expr::id(ASTBoogieUtils::ERR_EXPR);
+
+	if (!spec) // If not, create new
+	{
+		string shadowName = path.base;
+		for (auto mem: path.members)
+			shadowName += "#" + mem->getMember();
+		bg::VarDeclRef shadow = bg::Decl::variable(shadowName + "#SUM",
+				bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
+		addDecl(shadow);
+		m_currentSumSpecs.push_back({path, type, shadow});
+		spec = &m_currentSumSpecs.back();
+	}
+
+	solAssert(spec, "Sum specification not found nor created");
+	return bg::Expr::arrsel(spec->shadowVar->getRefTo(), boogieThis()->getRefTo());
 }
 
 list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
@@ -216,53 +238,54 @@ list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
 
 list<bg::Stmt::Ref> BoogieContext::updateSumVars(bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg)
 {
-	SumPath path = {"", {}, {}};
+	SumPath path = {"", {}};
 	getPath(lhsBg, path);
 
-	list<bg::Stmt::Ref> upd;
+	if (path.base == "")
+		return {}; // No need to sum
 
-	if (path.base != "")
+	// Otherwise go through all specs
+	list<bg::Stmt::Ref> sumUpdates;
+	for (auto spec: m_currentSumSpecs)
 	{
-		for (auto spec: m_currentSumSpecs)
+		if (spec.path.base == path.base && spec.path.members.size() >= path.members.size())
 		{
-			if (spec.path.base == path.base && spec.path.path.size() >= path.path.size())
+			// Check for matching prefix, e.g., if sum is over ss[idx].t.z and
+			// the lhs is ss[i].t then the matching prefix is until ss[idx].t
+			bool match = true;
+			unsigned i = 0;
+			while (i < path.members.size())
 			{
-				// Check for matching prefix
-				bool match = true;
-				unsigned i = 0;
-				while (i < path.path.size())
-				{
-					if (spec.path.path[i] != path.path[i])
-						match = false;
-					++i;
-				}
-				if (!match)
-					continue;
-
-				// Remaining part of the path has to be added to both LHS and RHS
-				while (i < spec.path.path.size())
-				{
-					lhsBg = spec.path.selexprs[i]->replaceBase(lhsBg);
-					rhsBg = spec.path.selexprs[i]->replaceBase(rhsBg);
-					++i;
-				}
-
-				unsigned bits = ASTBoogieUtils::getBits(spec.type);
-				bool isSigned = ASTBoogieUtils::isSigned(spec.type);
-				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
-				auto selExpr = bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo());
-				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
-				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Add, subResult.expr, rhsBg, bits, isSigned);
-				if (encoding() == Encoding::MOD && !isSigned)
-				{
-					upd.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
-					upd.push_back(bg::Stmt::assume(subResult.cc));
-				}
-				upd.push_back(bg::Stmt::assign(selExpr, addResult.expr));
+				if (spec.path.members[i]->getMember() != path.members[i]->getMember())
+					match = false;
+				++i;
 			}
+			if (!match)
+				continue;
+
+			// Remaining part of the path (.z) has to be added to both LHS and RHS
+			while (i < spec.path.members.size())
+			{
+				lhsBg = spec.path.members[i]->replaceBase(lhsBg);
+				rhsBg = spec.path.members[i]->replaceBase(rhsBg);
+				++i;
+			}
+
+			unsigned bits = ASTBoogieUtils::getBits(spec.type);
+			bool isSigned = ASTBoogieUtils::isSigned(spec.type);
+			// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
+			auto selExpr = bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo());
+			auto subResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
+			auto addResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Add, subResult.expr, rhsBg, bits, isSigned);
+			if (encoding() == Encoding::MOD && !isSigned)
+			{
+				sumUpdates.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
+				sumUpdates.push_back(bg::Stmt::assume(subResult.cc));
+			}
+			sumUpdates.push_back(bg::Stmt::assign(selExpr, addResult.expr));
 		}
 	}
-	return upd;
+	return sumUpdates;
 }
 
 string BoogieContext::mapDeclName(Declaration const& decl)
