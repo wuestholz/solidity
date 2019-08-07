@@ -148,6 +148,7 @@ public:
 
 private:
 	void getPath(Expression const* expr, SumPath& path, bool errors = true);
+	bool pathsEqual(SumPath const& p1, SumPath const& p2);
 public:
 	boogie::Expr::Ref addAndGetSumVar(Expression const* expr, TypePointer type);
 	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);

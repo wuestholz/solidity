@@ -129,12 +129,25 @@ void BoogieContext::getPath(Expression const* expr, SumPath& path, bool errors)
 		return;
 	}
 
+	if (auto memAcc = dynamic_cast<MemberAccess const*>(expr))
+	{
+		path.path.insert(path.path.begin(), memAcc->annotation().referencedDeclaration);
+		getPath(&memAcc->expression(), path, errors);
+		return;
+	}
+
 	if (errors)
 		reportError(expr, "Unsupported expression to sum over");
 }
 
+bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
+{
+	return p1.base == p2.base && p1.path == p2.path;
+}
+
 bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer type)
 {
+	// TODO report error if top level expression is not int, or int array, or map to int
 	SumPath path = {nullptr, {}};
 	getPath(expr, path);
 
@@ -143,7 +156,7 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer
 		SumSpec* spec = nullptr;
 		for (auto existingSpec: m_currentSumSpecs)
 		{
-			if (existingSpec.path.base == path.base)
+			if (pathsEqual(existingSpec.path, path))
 			{
 				spec = &existingSpec;
 				break;
@@ -152,7 +165,10 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(Expression const* expr, TypePointer
 
 		if (!spec)
 		{
-			bg::VarDeclRef shadow = bg::Decl::variable(mapDeclName(*path.base) + "#SUM",
+			string shadowName = mapDeclName(*path.base);
+			for (auto mem: path.path)
+				shadowName += "#" + mapDeclName(*mem);
+			bg::VarDeclRef shadow = bg::Decl::variable(shadowName + "#SUM",
 					bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
 			addDecl(shadow);
 			m_currentSumSpecs.push_back({path, type, shadow});
@@ -187,7 +203,7 @@ list<bg::Stmt::Ref> BoogieContext::updateSumVars(Expression const* lhs, bg::Expr
 	{
 		for (auto spec: m_currentSumSpecs)
 		{
-			if (spec.path.base == path.base)
+			if (pathsEqual(spec.path, path))
 			{
 				unsigned bits = ASTBoogieUtils::getBits(spec.type);
 				bool isSigned = ASTBoogieUtils::isSigned(spec.type);
