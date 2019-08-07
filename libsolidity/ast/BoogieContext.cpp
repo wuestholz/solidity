@@ -108,7 +108,7 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 	{
 		// Check if we reached a state var: x[this]
 		id = dynamic_pointer_cast<bg::VarExpr const>(idxExpr->getBase());
-		// indexer should be 'this'
+		// TODO: indexer should be 'this'
 
 		if (!id)
 		{
@@ -116,7 +116,7 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 			auto subIdxExpr = dynamic_pointer_cast<bg::ArrSelExpr const>(idxExpr->getBase());
 			if (subIdxExpr)
 				id = dynamic_pointer_cast<bg::VarExpr const>(subIdxExpr->getBase());
-				// subindexer must be 'this'
+				// TODO: subindexer must be 'this'
 			if (!id && errors)
 				reportError(errors, "Base of indexer must be identifier");
 		}
@@ -133,6 +133,7 @@ void BoogieContext::getPath(bg::Expr::Ref expr, SumPath& path, ASTNode const* er
 	if (auto memAcc = dynamic_pointer_cast<bg::DtSelExpr const>(expr))
 	{
 		path.path.insert(path.path.begin(), memAcc->getMember());
+		path.selexprs.insert(path.selexprs.begin(), memAcc);
 		getPath(memAcc->getBase(), path, errors);
 		return;
 	}
@@ -149,7 +150,7 @@ bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
 bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type)
 {
 	// TODO report error if top level expression is not int, or int array, or map to int
-	SumPath path = {"", {}};
+	SumPath path = {"", {}, {}};
 	getPath(bgExpr, path, expr);
 
 	if (path.base != "")
@@ -195,7 +196,7 @@ list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
 
 list<bg::Stmt::Ref> BoogieContext::updateSumVars(bg::Expr::Ref lhsBg, bg::Expr::Ref rhsBg)
 {
-	SumPath path = {"", {}};
+	SumPath path = {"", {}, {}};
 	getPath(lhsBg, path);
 
 	list<bg::Stmt::Ref> upd;
@@ -204,8 +205,28 @@ list<bg::Stmt::Ref> BoogieContext::updateSumVars(bg::Expr::Ref lhsBg, bg::Expr::
 	{
 		for (auto spec: m_currentSumSpecs)
 		{
-			if (pathsEqual(spec.path, path))
+			if (spec.path.base == path.base && spec.path.path.size() >= path.path.size())
 			{
+				// Check for matching prefix
+				bool match = true;
+				unsigned i = 0;
+				while (i < path.path.size())
+				{
+					if (spec.path.path[i] != path.path[i])
+						match = false;
+					++i;
+				}
+				if (!match)
+					continue;
+
+				// Remaining part of the path has to be added to both LHS and RHS
+				while (i < spec.path.path.size())
+				{
+					lhsBg = spec.path.selexprs[i]->replaceBase(lhsBg);
+					rhsBg = spec.path.selexprs[i]->replaceBase(rhsBg);
+					++i;
+				}
+
 				unsigned bits = ASTBoogieUtils::getBits(spec.type);
 				bool isSigned = ASTBoogieUtils::isSigned(spec.type);
 				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]

@@ -51,6 +51,7 @@ public:
 	struct SumPath {
 		std::string base; // Base array over which we sum
 		std::vector<std::string> path; // Path of member accesses
+		std::vector<std::shared_ptr<boogie::DtSelExpr const>> selexprs;
 	};
 
 	struct SumSpec {

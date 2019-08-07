@@ -1,0 +1,7 @@
+C::addToX: OK
+C::addToZ: OK
+C::setT: OK
+C::setS: OK
+C::[implicit_constructor]: OK
+C::[receive_ether_selfdestruct]: OK
+No errors found.
