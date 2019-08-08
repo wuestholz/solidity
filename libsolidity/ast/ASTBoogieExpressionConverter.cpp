@@ -1156,7 +1156,7 @@ bool ASTBoogieExpressionConverter::visit(IndexAccess const& _node)
 				m_currentExpr = slice;
 			else
 			{
-				m_currentExpr = bg::Expr::if_then_else(
+				m_currentExpr = bg::Expr::cond(
 						bg::Expr::eq(indexExpr, bg::Expr::lit(i)),
 						slice, m_currentExpr);
 			}

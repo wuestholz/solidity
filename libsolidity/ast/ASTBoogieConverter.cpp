@@ -483,13 +483,13 @@ void ASTBoogieConverter::addModifiesSpecs(FunctionDefinition const& _node, bg::P
 				{
 					if (isBaseVar(modSpec.target))
 					{
-						expr = bg::Expr::if_then_else(modSpec.cond, varThis, expr);
+						expr = bg::Expr::cond(modSpec.cond, varThis, expr);
 					}
 					else
 					{
 						auto repl = replaceBaseVar(modSpec.target, expr);
 						auto write = bg::Expr::selectToUpdate(repl, modSpec.target);
-						expr = bg::Expr::if_then_else(modSpec.cond, write, expr);
+						expr = bg::Expr::cond(modSpec.cond, write, expr);
 					}
 				}
 

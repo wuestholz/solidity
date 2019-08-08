@@ -215,11 +215,6 @@ Expr::Ref Expr::dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTyp
 	return std::make_shared<DtUpdExpr>(b, mem, v, constr, dt);
 }
 
-Expr::Ref Expr::if_then_else(Ref c, Ref t, Ref e)
-{
-	return std::make_shared<IfThenElseExpr const>(c, t, e);
-}
-
 Expr::Ref Expr::old(Ref expr)
 {
 	return std::make_shared<OldExpr const>(expr);
@@ -723,11 +718,6 @@ void CodeExpr::print(std::ostream& os) const
 		print_seq(os, decls, "	", "\n	", "\n");
 	print_seq(os, blocks, "\n");
 	os << "\n" << "}|";
-}
-
-void IfThenElseExpr::print(std::ostream& os) const
-{
-	os << "(if " << cond << " then " << true_value << " else " << false_value << ")";
 }
 
 void TupleExpr::print(std::ostream& os) const

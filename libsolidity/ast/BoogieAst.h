@@ -77,7 +77,6 @@ public:
 	static Ref arrupd(Ref b, Ref i, Ref v);
 	static Ref dtsel(Ref b, std::string mem, FuncDeclRef constr, DataTypeDeclRef dt);
 	static Ref dtupd(Ref b, std::string mem, Ref v, FuncDeclRef constr, DataTypeDeclRef dt);
-	static Ref if_then_else(Ref c, Ref t, Ref e);
 	static Ref old(Ref expr);
 	static Ref tuple(std::vector<Ref> const& e);
 
@@ -254,16 +253,6 @@ class OldExpr : public Expr {
 	Ref expr;
 public:
 	OldExpr(Ref expr) : expr(expr) {}
-	void print(std::ostream& os) const override;
-};
-
-class IfThenElseExpr : public Expr {
-	Ref cond;
-	Ref true_value;
-	Ref false_value;
-public:
-	IfThenElseExpr(Ref c, Ref t, Ref e)
-		: cond(c), true_value(t), false_value(e) {}
 	void print(std::ostream& os) const override;
 };
 
