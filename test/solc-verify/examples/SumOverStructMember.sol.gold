@@ -1,0 +1,5 @@
+Bank::deposit: OK
+Bank::withdraw: OK
+Bank::[implicit_constructor]: OK
+Bank::[receive_ether_selfdestruct]: OK
+No errors found.

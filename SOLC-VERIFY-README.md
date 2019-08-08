@@ -65,6 +65,13 @@ solc-verify.py SimpleBankReentrancy.sol
 solc-verify.py SimpleBankCorrect.sol
 ```
 
+### Sum over struct members
+
+This example ([`SumOverStructMember.sol`](test/solc-verify/examples/SumOverStructMember.sol)) presents a modified version of the simple bank, where the accounts are complex structures and the sum is expressed over a member of this structure.
+```
+solc-verify.py SumOverStructMember.sol
+```
+
 ### BecToken
 
 This example ([`BecTokenSimplifiedOverflow.sol`](test/solc-verify/examples/BecTokenSimplifiedOverflow.sol)) presents a part of the BecToken, which had an overflow issue. It uses the `SafeMath` library for most operations to prevent overflows, but there is a multiplication in `batchTransfer` (line 61) that can overflow. The function transfers a given `_value` to a given number of `_receivers`. It first reduces the balance of the sender with the product of the value and the number of receivers and then transfers the value to each receiver in a loop. If the product overflows, a small product will be reduced from the sender, but large values will be transferred to the receivers. Our tool can detect this issue by the following command (using CVC4):
@@ -94,6 +101,6 @@ See the contracts under `test/solc-verify/examples` for examples.
 - **Contract level invariants**  (`invariant <EXPRESSION>`) can be attached to contracts. They are added as both a pre- and a postcondition to each _public_ function. The expression can refer to state variables in the contract.
 -**Loop invariants**  (`invariant <EXPRESSION>`) can be attached to _for_ and _while_ loops. The expression can refer ta variables in scope of the loop, including the loop counter.
 - **Modification specifiers** (`modifies <TARGET> [if <CONDITION>]`) can be attached to functions. The target can be a state variable, an index access or a member access. Optionally, a condition can also be given. They will be checked at the end of the function (whether only the specified variables were modified).
-- Specifications can refer to a special **sum function over collections** (`__verifier_sum_int` or `__verifier_sum_uint`). The argument must be an array of integers or a mapping with integer values.
+- Contract and loop invariants can refer to a special **sum function over collections** (`__verifier_sum_int` or `__verifier_sum_uint`). The argument must be an array/mapping state variable with integer values, or must point to an integer member if the array/mapping contains structures (see [`SumOverStructMember.sol`](test/solc-verify/examples/SumOverStructMember.sol)).
 - Postconditions can refer to the **old value** of a variable (before the transaction) using `__verifier_old_<TYPE>` (e.g., `__verifier_old_uint(...)`).
 - Specifications can refer to a special **equality predicate** (`__verifier_eq`) for reference types such as structures, arrays and mappings (not comparable with the standard Solidity operator `==`). It takes two arguments with the same type. For storage data location it performs a deep equality check, for other data locations it performs a reference equality check.
