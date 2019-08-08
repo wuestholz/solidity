@@ -102,7 +102,7 @@ private:
 
 	ContractDefinition const* m_currentContract;
 	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
-	std::list<SumSpec> m_currentSumSpecs;
+	std::map<ContractDefinition const*, std::list<SumSpec>> m_currentSumSpecs;
 
 	typedef std::map<std::string, boogie::Decl::ConstRef> builtin_cache;
 	builtin_cache m_builtinFunctions;
@@ -152,7 +152,6 @@ public:
 	boogie::Expr::Ref addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type);
 	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
 	std::list<boogie::Stmt::Ref> updateSumVars(boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
-	void clearSumSpecs() { m_currentSumSpecs.clear(); }
 
 	/**
 	 * Map a declaration name to a name in Boogie

@@ -1,0 +1,7 @@
+Base::add: OK
+Base::[implicit_constructor]: OK
+Base::[receive_ether_selfdestruct]: OK
+Derived::sub: OK
+Derived::[implicit_constructor]: OK
+Derived::[receive_ether_selfdestruct]: OK
+No errors found.

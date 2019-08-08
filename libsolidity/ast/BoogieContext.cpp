@@ -200,12 +200,15 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expressio
 
 	// Check if there is a spec already
 	SumSpec* spec = nullptr;
-	for (auto existingSpec: m_currentSumSpecs)
+	for (auto contr: m_currentContract->annotation().linearizedBaseContracts)
 	{
-		if (pathsEqual(existingSpec.path, path))
+		for (auto existingSpec: m_currentSumSpecs[contr])
 		{
-			spec = &existingSpec;
-			break;
+			if (pathsEqual(existingSpec.path, path))
+			{
+				spec = &existingSpec;
+				break;
+			}
 		}
 	}
 
@@ -217,8 +220,8 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expressio
 		bg::VarDeclRef shadow = bg::Decl::variable(shadowName + "#SUM",
 				bg::Decl::arraytype(addressType(), toBoogieType(type, expr)));
 		addDecl(shadow);
-		m_currentSumSpecs.push_back({path, type, shadow});
-		spec = &m_currentSumSpecs.back();
+		m_currentSumSpecs[m_currentContract].push_back({path, type, shadow});
+		spec = &m_currentSumSpecs[m_currentContract].back();
 	}
 
 	solAssert(spec, "Sum specification not found nor created");
@@ -228,11 +231,12 @@ bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expressio
 list<bg::Stmt::Ref> BoogieContext::initSumVars(Declaration const* decl)
 {
 	list<bg::Stmt::Ref> init;
-	for (auto spec: m_currentSumSpecs)
-		if (spec.path.base == mapDeclName(*decl))
-			init.push_back(bg::Stmt::assign(
-					bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo()),
-					intLit(0, 256)));
+	for (auto contr: m_currentContract->annotation().linearizedBaseContracts)
+		for (auto spec: m_currentSumSpecs[contr])
+			if (spec.path.base == mapDeclName(*decl))
+				init.push_back(bg::Stmt::assign(
+						bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo()),
+						intLit(0, 256)));
 	return init;
 }
 
@@ -246,43 +250,46 @@ list<bg::Stmt::Ref> BoogieContext::updateSumVars(bg::Expr::Ref lhsBg, bg::Expr::
 
 	// Otherwise go through all specs
 	list<bg::Stmt::Ref> sumUpdates;
-	for (auto spec: m_currentSumSpecs)
+	for (auto contr: m_currentContract->annotation().linearizedBaseContracts)
 	{
-		if (spec.path.base == path.base && spec.path.members.size() >= path.members.size())
+		for (auto spec: m_currentSumSpecs[contr])
 		{
-			// Check for matching prefix, e.g., if sum is over ss[idx].t.z and
-			// the lhs is ss[i].t then the matching prefix is until ss[idx].t
-			bool match = true;
-			unsigned i = 0;
-			while (i < path.members.size())
+			if (spec.path.base == path.base && spec.path.members.size() >= path.members.size())
 			{
-				if (spec.path.members[i]->getMember() != path.members[i]->getMember())
-					match = false;
-				++i;
-			}
-			if (!match)
-				continue;
+				// Check for matching prefix, e.g., if sum is over ss[idx].t.z and
+				// the lhs is ss[i].t then the matching prefix is until ss[idx].t
+				bool match = true;
+				unsigned i = 0;
+				while (i < path.members.size())
+				{
+					if (spec.path.members[i]->getMember() != path.members[i]->getMember())
+						match = false;
+					++i;
+				}
+				if (!match)
+					continue;
 
-			// Remaining part of the path (.z) has to be added to both LHS and RHS
-			while (i < spec.path.members.size())
-			{
-				lhsBg = spec.path.members[i]->replaceBase(lhsBg);
-				rhsBg = spec.path.members[i]->replaceBase(rhsBg);
-				++i;
-			}
+				// Remaining part of the path (.z) has to be added to both LHS and RHS
+				while (i < spec.path.members.size())
+				{
+					lhsBg = spec.path.members[i]->replaceBase(lhsBg);
+					rhsBg = spec.path.members[i]->replaceBase(rhsBg);
+					++i;
+				}
 
-			unsigned bits = ASTBoogieUtils::getBits(spec.type);
-			bool isSigned = ASTBoogieUtils::isSigned(spec.type);
-			// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
-			auto selExpr = bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo());
-			auto subResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
-			auto addResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Add, subResult.expr, rhsBg, bits, isSigned);
-			if (encoding() == Encoding::MOD && !isSigned)
-			{
-				sumUpdates.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
-				sumUpdates.push_back(bg::Stmt::assume(subResult.cc));
+				unsigned bits = ASTBoogieUtils::getBits(spec.type);
+				bool isSigned = ASTBoogieUtils::isSigned(spec.type);
+				// arr[i] = x becomes arr#sum := arr#sum[this := ((arr#sum[this] - arr[i]) + x)]
+				auto selExpr = bg::Expr::arrsel(spec.shadowVar->getRefTo(), boogieThis()->getRefTo());
+				auto subResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Sub, selExpr, lhsBg, bits, isSigned);
+				auto addResult = ASTBoogieUtils::encodeArithBinaryOp(*this, nullptr, Token::Add, subResult.expr, rhsBg, bits, isSigned);
+				if (encoding() == Encoding::MOD && !isSigned)
+				{
+					sumUpdates.push_back(bg::Stmt::comment("Implicit assumption that unsigned sum cannot underflow."));
+					sumUpdates.push_back(bg::Stmt::assume(subResult.cc));
+				}
+				sumUpdates.push_back(bg::Stmt::assign(selExpr, addResult.expr));
 			}
-			sumUpdates.push_back(bg::Stmt::assign(selExpr, addResult.expr));
 		}
 	}
 	return sumUpdates;

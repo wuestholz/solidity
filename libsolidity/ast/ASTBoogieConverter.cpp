@@ -611,7 +611,6 @@ bool ASTBoogieConverter::visit(ContractDefinition const& _node)
 
 	// Process contract invariants
 	m_context.currentContractInvars().clear();
-	m_context.clearSumSpecs();
 
 	for (auto invar: getExprsFromDocTags(_node, _node.annotation(), &_node, ASTBoogieUtils::DOCTAG_CONTRACT_INVAR))
 	{
