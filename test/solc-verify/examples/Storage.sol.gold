@@ -1,0 +1,6 @@
+Storage::[constructor]: OK
+Storage::changeOwner: OK
+Storage::set: OK
+Storage::update: OK
+Storage::clear: OK
+No errors found.

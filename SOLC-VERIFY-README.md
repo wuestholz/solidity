@@ -76,6 +76,13 @@ In the correct version ([`BecTokenSimplifiedCorrect.sol`](test/solc-verify/examp
 solc-verify.py BecTokenSimplifiedCorrect.sol --arithmetic mod-overflow --solver cvc4
 ```
 
+### Storage
+
+This example ([`Storage.sol`](test/solc-verify/examples/Storage.sol)) presents a simple storage example, where each user can set, update or clear their data (represented as an integer) in the storage. The owner can clear any data. This example demonstrates annotation possibilities (such as modifications) over complex datatypes (such as structs and mappings).
+```
+solc-verify.py Storage.sol
+```
+
 ## Specification Annotations
 
 Specification annotations must be included in special documentation comments (`///` or `/** */`) and must start with the special doctag `@notice`.
