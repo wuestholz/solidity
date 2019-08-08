@@ -1197,11 +1197,47 @@ void ASTBoogieUtils::makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil:
 	if (context.overflow() && rhsResult.cc)
 		result.ocs.push_back(rhsResult.cc);
 
-	// Check if sum ghost variables need to be updated
-	for (auto stmt: context.updateSumVars(lhs.bgExpr, rhsResult.expr))
+	// First lift conditionals (due to local pointers)
+	lhs.bgExpr = liftCond(lhs.bgExpr);
+	// Then check if sum ghost variables need to be updated
+	for (auto stmt: checkForSums(lhs.bgExpr, rhsResult.expr, context))
 		result.newStmts.push_back(stmt);
 
 	result.newStmts.push_back(bg::Stmt::assign(lhs.bgExpr, rhsResult.expr));
+}
+
+boogie::Expr::Ref ASTBoogieUtils::liftCond(boogie::Expr::Ref expr)
+{
+	if (auto selExpr = dynamic_pointer_cast<bg::SelExpr const>(expr))
+	{
+		// First recurse
+		selExpr = dynamic_pointer_cast<bg::SelExpr const>(selExpr->replaceBase(liftCond(selExpr->getBase())));
+		solAssert(selExpr, "");
+		// Then check if lifting is needed
+		if (auto baseCond = dynamic_pointer_cast<bg::CondExpr const>(selExpr->getBase()))
+		{
+			return bg::Expr::cond(baseCond->getCond(),
+					liftCond(selExpr->replaceBase(baseCond->getThen())),
+					liftCond(selExpr->replaceBase(baseCond->getElse())));
+		}
+		return selExpr;
+	}
+	return expr;
+}
+
+list<bg::Stmt::Ref> ASTBoogieUtils::checkForSums(bg::Expr::Ref lhs, bg::Expr::Ref rhs, BoogieContext& context)
+{
+	if (auto condExpr = dynamic_pointer_cast<bg::CondExpr const>(lhs))
+	{
+		vector<bg::Stmt::Ref> thenSums;
+		for (auto stmt: checkForSums(condExpr->getThen(), rhs, context))
+			thenSums.push_back(stmt);
+		vector<bg::Stmt::Ref> elseSums;
+		for (auto stmt: checkForSums(condExpr->getElse(), rhs, context))
+			elseSums.push_back(stmt);
+		return {bg::Stmt::ifelse(condExpr->getCond(), bg::Block::block("", thenSums), bg::Block::block("", elseSums))};
+	}
+	return context.updateSumVars(lhs, rhs);
 }
 
 void ASTBoogieUtils::deepCopyStruct(StructDefinition const* structDef,

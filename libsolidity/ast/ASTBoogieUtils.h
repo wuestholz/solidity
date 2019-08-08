@@ -220,6 +220,19 @@ private:
 	void makeBasicAssign(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode,
 			BoogieContext& context, AssignResult& result);
 
+	/**
+	 * Helper method to lift a conditional by pushing member accesses inside.
+	 * E.g., ite(c, t, e).x becomes ite(c, t.x, e.x)
+	 */
+	static
+	boogie::Expr::Ref liftCond(boogie::Expr::Ref expr);
+
+	/**
+	 * Checks if any sum shadow variable has to be updated based on the lhs
+	 */
+	static
+	std::list<boogie::Stmt::Ref> checkForSums(boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, BoogieContext& context);
+
 	static
 	void deepCopyStruct(StructDefinition const* structDef,
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,

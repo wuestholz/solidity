@@ -1,0 +1,8 @@
+C::addToX: OK
+C::addToXincorrect: ERROR
+ - test/solc-verify/specs/SpecificationSumLocalPtr.sol:35:5: Invariant '__verifier_sum_uint(ss[__verifier_idx_address].x) == xsum' might not hold at end of function.
+C::addToXofS1: OK
+C::addToZ: OK
+C::[implicit_constructor]: OK
+C::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.
