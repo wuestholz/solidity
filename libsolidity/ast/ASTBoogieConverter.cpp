@@ -1078,25 +1078,11 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 
 	string oldContinueLabel = m_currentContinueLabel;
 	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
+	string oldBreakLabel = m_currentBreakLabel;
+	m_currentBreakLabel = "break" + toString(m_context.nextId());
 
-	// Get condition recursively (create block for side effects)
-	m_currentBlocks.push(bg::Block::block());
-	bg::Expr::Ref cond = convertExpression(_node.condition());
-	bg::Block::Ref condSideEffects = m_currentBlocks.top();
-	m_currentBlocks.pop();
-	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
-
-	// Get body recursively
-	m_currentBlocks.push(bg::Block::block());
-	_node.body().accept(*this);
-	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
-	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
-	bg::Block::ConstRef body = m_currentBlocks.top();
-	m_currentBlocks.pop();
-	m_currentContinueLabel = oldContinueLabel;
-
+	// Collect invariants
 	std::vector<bg::Specification::Ref> invars;
-
 	// No overflow in code
 	if (m_context.overflow())
 	{
@@ -1123,7 +1109,25 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
+	// Get condition recursively (create block for side effects)
+	m_currentBlocks.push(bg::Block::block());
+	bg::Expr::Ref cond = convertExpression(_node.condition());
+	bg::Block::Ref condSideEffects = m_currentBlocks.top();
+	m_currentBlocks.pop();
+
+	// Get body recursively
+	m_currentBlocks.push(bg::Block::block());
+	_node.body().accept(*this);
+	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
+	bg::Block::ConstRef body = m_currentBlocks.top();
+	m_currentBlocks.pop();
+	m_currentContinueLabel = oldContinueLabel;
+
+	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
 	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, invars));
+	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentBreakLabel));
+	m_currentBreakLabel = oldBreakLabel;
 
 	return false;
 }
@@ -1141,6 +1145,8 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 
 	string oldContinueLabel = m_currentContinueLabel;
 	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
+	string oldBreakLabel = m_currentBreakLabel;
+	m_currentBreakLabel = "break" + toString(m_context.nextId());
 
 	// Get initialization recursively (adds statement to current block)
 	m_currentBlocks.top()->addStmt(bg::Stmt::comment("The following while loop was mapped from a for loop"));
@@ -1202,6 +1208,8 @@ bool ASTBoogieConverter::visit(ForStatement const& _node)
 	// TODO: check that invariants did not introduce new sum variables
 
 	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, invars));
+	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentBreakLabel));
+	m_currentBreakLabel = oldBreakLabel;
 
 	return false;
 }
@@ -1216,8 +1224,7 @@ bool ASTBoogieConverter::visit(Continue const& _node)
 bool ASTBoogieConverter::visit(Break const& _node)
 {
 	rememberScope(_node);
-
-	m_currentBlocks.top()->addStmt(bg::Stmt::break_());
+	m_currentBlocks.top()->addStmt(bg::Stmt::goto_({m_currentBreakLabel}));
 	return false;
 }
 
