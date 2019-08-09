@@ -669,7 +669,12 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 {
 	rememberScope(_node);
 
-	m_context.addGlobalComment("\n------- Struct: " + _node.name() + "-------");
+	m_context.addGlobalComment("\n------- Struct " + _node.name() + " -------");
+	m_context.addGlobalComment("Storage");
+	m_context.getStructType(&_node, DataLocation::Storage);
+	m_context.getStructConstructor(&_node);
+
+	m_context.addGlobalComment("Memory");
 	// Define type for memory
 	bg::TypeDeclRef structMemType = m_context.getStructType(&_node, DataLocation::Memory);
 	// Create mappings for each member (only for memory structs)
@@ -686,11 +691,12 @@ bool ASTBoogieConverter::visit(StructDefinition const& _node)
 			memberType = m_context.toBoogieType(TypeProvider::withLocationIfReference(DataLocation::Memory, member->type()), member.get());
 
 		auto attrs = ASTBoogieUtils::createAttrs(member->location(), member->name(), *m_context.currentScanner());
-		auto memberDecl = bg::Decl::variable(m_context.mapDeclName(*member),
-				bg::Decl::arraytype(structMemType, memberType));
+		auto memberDecl = bg::Decl::variable(m_context.mapDeclName(*member), bg::Decl::arraytype(structMemType, memberType));
 		memberDecl->addAttrs(attrs);
+		m_context.addGlobalComment("Member " + member->name());
 		m_context.addDecl(memberDecl);
 	}
+	m_context.addGlobalComment("\n------- End of struct " + _node.name() + " -------");
 
 	return false;
 }
@@ -927,7 +933,7 @@ bool ASTBoogieConverter::visit(VariableDeclaration const& _node)
 	if (_node.isConstant())
 		return false;
 
-	m_context.addGlobalComment("\nState variable: " + _node.name() + " : " + _node.type()->toString());
+	m_context.addGlobalComment("\nState variable: " + _node.name() + ": " + _node.type()->toString());
 	// State variables are represented as maps from address to their type
 	auto varDecl = bg::Decl::variable(m_context.mapDeclName(_node),
 			bg::Decl::arraytype(

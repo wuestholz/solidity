@@ -78,7 +78,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 		m_transferIncluded(false), m_callIncluded(false), m_sendIncluded(false)
 {
 	// Initialize global declarations
-	addGlobalComment("Global declarations and definitions related to the address type");
+	addGlobalComment("Global declarations and definitions");
 	// address type
 	addDecl(addressType());
 	// address.balance
