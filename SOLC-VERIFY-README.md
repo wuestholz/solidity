@@ -2,7 +2,7 @@
 
 This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. More information can be found in this readme.
 
-A preliminary [paper](https://arxiv.org/abs/1907.04262) was presented at [VSTTE'19](https://sri-csl.github.io/VSTTE19/), but the tool had major improvements since then, including support for Solidity 0.5.x, complex datatypes, memory models and new kinds of specification annotations. Up-to-date information can be found in this readme. 
+A preliminary [paper](https://arxiv.org/abs/1907.04262) was presented at [VSTTE'19](https://sri-csl.github.io/VSTTE19/), but the tool had major improvements since then, including support for Solidity 0.5.x, complex datatypes, memory models and new kinds of specification annotations. Up-to-date information can be found in this readme.
 
 ## Build and Install
 
