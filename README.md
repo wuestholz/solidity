@@ -73,6 +73,6 @@ Any contributions are welcome!
 
 # Formal Verification Extension
 
-This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. This extension is currently under development and some features have a limited support.
+This is an extended version of the compiler that is able to perform automated formal verification on Solidity code using annotations and modular program verification. For more information on building, installing and examples, see [SOLC-VERIFY-README.md](SOLC-VERIFY-README.md).
 
-For more information on building, installing and examples, see [SOLC-VERIFY-README.md](SOLC-VERIFY-README.md) and our [paper](https://arxiv.org/abs/1907.04262) presented at [VSTTE'19](https://sri-csl.github.io/VSTTE19/).
+A preliminary [paper](https://arxiv.org/abs/1907.04262) was also presented at [VSTTE'19](https://sri-csl.github.io/VSTTE19/) but the tool had major improvements since then. Up-to-date information can be found in [SOLC-VERIFY-README.md](SOLC-VERIFY-README.md).
