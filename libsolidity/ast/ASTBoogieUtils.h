@@ -233,7 +233,7 @@ public:
 
 	/** Unpacks a local storage pointer into an access to storage. */
 	static
-	boogie::Expr::Ref unpackLocalPtr(Identifier const* id, BoogieContext& context);
+	boogie::Expr::Ref unpackLocalPtr(Expression const* ptrExpr, boogie::Expr::Ref ptrBgExpr, BoogieContext& context);
 
 private:
 	/**
@@ -248,7 +248,7 @@ private:
 	 * E.g., ite(arr[0] == 0, statevar1, ite(arr[0] == 1, statevar2, ...
 	 */
 	static
-	boogie::Expr::Ref unpackInternal(Identifier const* id, Declaration const* decl, int depth, boogie::Expr::Ref base, BoogieContext& context);
+	boogie::Expr::Ref unpackInternal(Expression const* ptrExpr, boogie::Expr::Ref ptrBgExpr, Declaration const* decl, int depth, boogie::Expr::Ref base, BoogieContext& context);
 
 };
 

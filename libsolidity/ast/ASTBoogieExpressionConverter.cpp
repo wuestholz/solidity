@@ -1105,8 +1105,7 @@ bool ASTBoogieExpressionConverter::visit(MemberAccess const& _node)
 		{
 			// Local pointers: unpack first
 			if (structType->dataStoredIn(DataLocation::Storage) && structType->isPointer())
-				if (auto id = dynamic_cast<Identifier const*>(&_node.expression()))
-					m_currentAddress = ASTBoogieUtils::unpackLocalPtr(id, m_context);
+				m_currentAddress = ASTBoogieUtils::unpackLocalPtr(&_node.expression(), m_currentAddress, m_context);
 
 			m_currentExpr = bg::Expr::dtsel(m_currentAddress,
 					m_context.mapDeclName(*_node.annotation().referencedDeclaration),
