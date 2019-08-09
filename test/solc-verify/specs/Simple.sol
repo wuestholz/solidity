@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
  * @notice invariant x == y
  * @notice some random comment
  */
-contract SpecificationSimple {
+contract Simple {
     uint x;
     uint y;
 

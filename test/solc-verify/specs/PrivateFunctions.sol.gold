@@ -1,0 +1,6 @@
+PrivateFunctions::add: OK
+PrivateFunctions::addWrong: ERROR
+ - test/solc-verify/specs/PrivateFunctions.sol:17:5: Invariant 'x == y' might not hold at end of function.
+PrivateFunctions::[implicit_constructor]: OK
+PrivateFunctions::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.

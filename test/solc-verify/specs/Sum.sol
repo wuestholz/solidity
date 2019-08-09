@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 /**
  * @notice invariant __verifier_sum_uint(user_balances) == total_supply
  */
-contract SomeContract {
+contract Sum {
     uint8 total_supply;
     mapping(address=>uint8) user_balances;
 

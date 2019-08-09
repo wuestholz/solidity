@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 /**
  * @notice invariant x == y
  */
-contract SpecificationPrivateFunctions {
+contract PrivateFunctions {
     uint x;
     uint y;
 

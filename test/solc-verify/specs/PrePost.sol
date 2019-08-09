@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-contract SpecificationPrePost {
+contract PrePost {
     /**
      * @notice precondition y >= 0
      * @notice postcondition result >= x

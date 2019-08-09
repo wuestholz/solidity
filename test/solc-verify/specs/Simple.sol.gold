@@ -1,0 +1,8 @@
+Simple::[constructor]: OK
+Simple::add: OK
+Simple::add_incorrect: ERROR
+ - test/solc-verify/specs/Simple.sol:20:5: Invariant 'x == y' might not hold at end of function.
+Simple::add_incorrect_2: ERROR
+ - test/solc-verify/specs/Simple.sol:27:9: Invariant 'x == y' might not hold when entering function.
+Simple::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.

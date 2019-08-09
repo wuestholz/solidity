@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-contract SpecificationLoopInvar {
+contract LoopInvar {
     function correct() public pure {
         int i = 0;
         int x = 0;

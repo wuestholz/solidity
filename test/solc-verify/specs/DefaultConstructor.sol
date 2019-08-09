@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 /**
  * @notice invariant x == y
  */
-contract SpecificationDefaultConstructor {
+contract DefaultConstructor {
     // The generated default constructor (setting the initial values) should fail
     uint x = 0;
     uint y = 1;

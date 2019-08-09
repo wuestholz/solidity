@@ -1,0 +1,7 @@
+Sum::deposit: OK
+Sum::withdraw: OK
+Sum::withdraw_incorrect: ERROR
+ - test/solc-verify/specs/Sum.sol:20:5: Invariant '__verifier_sum_uint(user_balances) == total_supply' might not hold at end of function.
+Sum::[implicit_constructor]: OK
+Sum::[receive_ether_selfdestruct]: OK
+Errors were found by the verifier.
