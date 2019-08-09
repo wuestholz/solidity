@@ -186,7 +186,23 @@ jobs:
             pip install --user codespell
       - run:
           name: Check spelling
-          command: ~/.local/bin/codespell -S "*.enc,.git" -I ./scripts/codespell_whitelist.txt
+          command: ~/.local/bin/codespell -S "*.enc,.git,Dockerfile*" -I ./scripts/codespell_whitelist.txt
+
+  chk_docs_examples:
+    docker:
+      - image: circleci/node
+    environment:
+      TERM: xterm
+    steps:
+      - checkout
+      - attach_workspace:
+          at: build
+      - run:
+          name: JS deps
+          command: sudo npm install -g solhint
+      - run:
+          name: Test Docs examples
+          command: ./test/docsCodeStyle.sh
 
   chk_coding_style:
     docker:
@@ -271,7 +287,7 @@ jobs:
           at: build
       - run:
           name: "soltest: Syntax Tests"
-          command: build/test/soltest -t 'syntaxTest*' -- --no-ipc --testpath test
+          command: build/test/soltest -t 'syntaxTest*' -- --testpath test
       - run:
           name: "Code Coverage: Syntax Tests"
           command: codecov --flags syntax --gcov-root build
@@ -322,10 +338,14 @@ jobs:
 
   b_archlinux:
     docker:
-      - image: ethereum/solidity-buildpack-deps:archlinux
+      - image: archlinux/base
     environment:
       TERM: xterm
     steps:
+      - run:
+          name: Install build dependencies
+          command: |
+            pacman --noconfirm -Syu --noprogressbar --needed base-devel boost cmake z3 cvc4 git openssh tar
       - checkout
       - run: *run_build
       - store_artifacts: *artifacts_solc
@@ -463,7 +483,6 @@ jobs:
     environment:
       EVM: constantinople
       OPTIMIZE: 0
-      SOLTEST_IPC: 0
       ASAN_OPTIONS: check_initialization_order=true:detect_stack_use_after_return=true:strict_init_order=true:strict_string_checks=true:detect_invalid_pointer_pairs=2
 
   t_ubu_homestead:
@@ -680,6 +699,7 @@ workflows:
       # basic checks
       - chk_spelling: *workflow_trigger_on_tags
       - chk_coding_style: *workflow_trigger_on_tags
+      - chk_docs_examples: *workflow_trigger_on_tags
       - chk_buglist: *workflow_trigger_on_tags
       - chk_proofs: *workflow_trigger_on_tags
 
@@ -745,4 +765,3 @@ workflows:
       # Code Coverage enabled build and tests
       - b_ubu_codecov: *workflow_trigger_on_tags
       - t_ubu_codecov: *workflow_ubuntu1904_codecov
-

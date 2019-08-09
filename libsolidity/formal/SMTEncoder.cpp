@@ -214,10 +214,16 @@ void SMTEncoder::endVisit(Assignment const& _assignment)
 	};
 	Token op = _assignment.assignmentOperator();
 	if (op != Token::Assign && !compoundOps.count(op))
+	{
+		// Give it a new index anyway to keep the SSA scheme sound.
+		if (auto varDecl = identifierToVariable(_assignment.leftHandSide()))
+			m_context.newValue(*varDecl);
+
 		m_errorReporter.warning(
 			_assignment.location(),
 			"Assertion checker does not yet implement this assignment operator."
 		);
+	}
 	else if (!smt::isSupportedType(_assignment.annotation().type->category()))
 	{
 		// Give it a new index anyway to keep the SSA scheme sound.
@@ -637,13 +643,15 @@ void SMTEncoder::endVisit(Return const& _return)
 		auto returnParams = m_callStack.back().first->returnParameters();
 		if (returnParams.size() > 1)
 		{
-			auto tuple = dynamic_cast<TupleExpression const*>(_return.expression());
-			solAssert(tuple, "");
-			auto const& components = tuple->components();
+			auto const& symbTuple = dynamic_pointer_cast<smt::SymbolicTupleVariable>(m_context.expression(*_return.expression()));
+			solAssert(symbTuple, "");
+			auto const& components = symbTuple->components();
 			solAssert(components.size() == returnParams.size(), "");
 			for (unsigned i = 0; i < returnParams.size(); ++i)
-				if (components.at(i))
-					m_context.addAssertion(expr(*components.at(i)) == m_context.newValue(*returnParams.at(i)));
+			{
+				solAssert(components.at(i), "");
+				m_context.addAssertion(components.at(i)->currentValue() == m_context.newValue(*returnParams.at(i)));
+			}
 		}
 		else if (returnParams.size() == 1)
 			m_context.addAssertion(expr(*_return.expression()) == m_context.newValue(*returnParams.front()));
@@ -759,6 +767,11 @@ void SMTEncoder::arrayIndexAssignment(Expression const& _expr, smt::Expression c
 			m_context.resetVariables([&](VariableDeclaration const& _var) {
 				if (_var == *varDecl)
 					return false;
+
+				// If both are state variables no need to clear knowledge.
+				if (_var.isStateVariable() && varDecl->isStateVariable())
+					return false;
+
 				TypePointer prefix = _var.type();
 				TypePointer originalType = typeWithoutPointer(varDecl->type());
 				while (
@@ -1026,10 +1039,16 @@ void SMTEncoder::assignment(
 )
 {
 	if (!smt::isSupportedType(_type->category()))
+	{
+		// Give it a new index anyway to keep the SSA scheme sound.
+		if (auto varDecl = identifierToVariable(_left))
+			m_context.newValue(*varDecl);
+
 		m_errorReporter.warning(
 			_location,
 			"Assertion checker does not yet implement type " + _type->toString()
 		);
+	}
 	else if (auto varDecl = identifierToVariable(_left))
 	{
 		solAssert(_right.size() == 1, "");
@@ -1393,4 +1412,33 @@ FunctionDefinition const* SMTEncoder::functionCallToDefinition(FunctionCall cons
 		funDef = dynamic_cast<FunctionDefinition const*>(fun->annotation().referencedDeclaration);
 
 	return funDef;
+}
+
+void SMTEncoder::createReturnedExpressions(FunctionCall const& _funCall)
+{
+	FunctionDefinition const* funDef = functionCallToDefinition(_funCall);
+	if (!funDef)
+		return;
+
+	auto const& returnParams = funDef->returnParameters();
+	for (auto param: returnParams)
+		createVariable(*param);
+
+	if (returnParams.size() > 1)
+	{
+		auto const& symbTuple = dynamic_pointer_cast<smt::SymbolicTupleVariable>(m_context.expression(_funCall));
+		solAssert(symbTuple, "");
+		if (symbTuple->components().empty())
+		{
+			vector<shared_ptr<smt::SymbolicVariable>> components;
+			for (auto param: returnParams)
+			{
+				solAssert(m_context.knownVariable(*param), "");
+				components.push_back(m_context.variable(*param));
+			}
+			symbTuple->setComponents(move(components));
+		}
+	}
+	else if (returnParams.size() == 1)
+		defineExpr(_funCall, currentValue(*returnParams.front()));
 }

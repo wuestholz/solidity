@@ -35,14 +35,6 @@ namespace solidity
 namespace test
 {
 
-#define soltestAssert(CONDITION, DESCRIPTION) \
-	do \
-	{ \
-		if (!(CONDITION)) \
-			BOOST_THROW_EXCEPTION(runtime_error(DESCRIPTION)); \
-	} \
-	while (false)
-
 /**
  * Common superclass of anything that can be run via isoltest.
  */
@@ -52,7 +44,6 @@ public:
 	struct Config
 	{
 		std::string filename;
-		std::string ipcPath;
 		langutil::EVMVersion evmVersion;
 	};
 

@@ -13,13 +13,20 @@ Compiler Features:
  * Metadata: Update the swarm hash, changes ``bzzr0`` to ``bzzr1`` and urls to use ``bzz-raw://``.
  * Standard JSON Interface: Compile only selected sources and contracts.
  * Standard JSON Interface: Provide secondary error locations (e.g. the source position of other conflicting declarations).
+ * SMTChecker: Do not erase knowledge about storage pointers if another storage pointer is assigned.
+ * Standard JSON Interface: Provide AST even on errors if ``--error-recovery`` commandline switch or StandardCompiler `settings.parserErrorRecovery` is true.
+ * Yul Optimizer: Do not inline function if it would result in expressions being duplicated that are not cheap.
 
 
 
 
 Bugfixes:
+ * ABI decoder: Ensure that decoded arrays always point to distinct memory locations.
+ * Code Generator: Treat dynamically encoded but statically sized arrays and structs in calldata properly.
  * SMTChecker: Fix internal error when inlining functions that contain tuple expressions.
  * SMTChecker: Fix pointer knowledge erasing in loops.
+ * SMTChecker: Fix internal error when using compound bitwise assignment operators inside branches.
+ * SMTChecker: Fix internal error when inlining a function that returns a tuple containing an unsupported type inside a branch.
  * View/Pure Checker: Properly detect state variable access through base class.
  * Yul analyzer: Check availability of data objects already in analysis phase.
  * Yul Optimizer: Fix an issue where memory-accessing code was removed even though ``msize`` was used in the program.
@@ -35,7 +42,7 @@ Important Bugfixes:
 
 
 Compiler Features:
- * Commandline Interface: Experimental parser error recovery via the ``--error-recovery`` commandline switch.
+ * Commandline Interface: Experimental parser error recovery via the ``--error-recovery`` commandline switch or StandardCompiler `settings.parserErrorRecovery` boolean.
  * Optimizer: Add rule to simplify ``SUB(~0, X)`` to ``NOT(X)``.
  * Yul Optimizer: Make the optimizer work for all dialects of Yul including eWasm.
 

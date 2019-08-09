@@ -17,7 +17,11 @@
 
 #include <test/libsolidity/util/BytesUtils.h>
 
+#include <test/libsolidity/util/SoltestErrors.h>
+
 #include <liblangutil/Common.h>
+
+#include <libdevcore/StringUtils.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -33,6 +37,40 @@ using namespace solidity;
 using namespace dev::solidity::test;
 using namespace std;
 using namespace soltest;
+
+bytes BytesUtils::alignLeft(bytes _bytes)
+{
+	soltestAssert(_bytes.size() <= 32, "");
+	size_t size = _bytes.size();
+	return std::move(_bytes) + bytes(32 - size, 0);
+}
+
+bytes BytesUtils::alignRight(bytes _bytes)
+{
+	soltestAssert(_bytes.size() <= 32, "");
+	return bytes(32 - _bytes.size(), 0) + std::move(_bytes);
+}
+
+bytes BytesUtils::applyAlign(
+	Parameter::Alignment _alignment,
+	ABIType& _abiType,
+	bytes _bytes
+)
+{
+	if (_alignment != Parameter::Alignment::None)
+		_abiType.alignDeclared = true;
+
+	switch (_alignment)
+	{
+	case Parameter::Alignment::Left:
+		_abiType.align = ABIType::AlignLeft;
+		return alignLeft(std::move(_bytes));
+	case Parameter::Alignment::Right:
+	default:
+		_abiType.align = ABIType::AlignRight;
+		return alignRight(std::move(_bytes));
+	}
+}
 
 bytes BytesUtils::convertBoolean(string const& _literal)
 {
@@ -60,10 +98,7 @@ bytes BytesUtils::convertHexNumber(string const& _literal)
 {
 	try
 	{
-		if (_literal.size() % 2)
-			throw Error(Error::Type::ParserError, "Hex number encoding invalid.");
-		else
-			return fromHex(_literal);
+		return fromHex(_literal);
 	}
 	catch (std::exception const&)
 	{
@@ -83,9 +118,20 @@ bytes BytesUtils::convertString(string const& _literal)
 	}
 }
 
-string BytesUtils::formatUnsigned(bytes const& _bytes) const
+string BytesUtils::formatUnsigned(bytes const& _bytes)
 {
 	stringstream os;
+
+	soltestAssert(!_bytes.empty() && _bytes.size() <= 32, "");
+
+	return fromBigEndian<u256>(_bytes).str();
+}
+
+string BytesUtils::formatSigned(bytes const& _bytes)
+{
+	stringstream os;
+
+	soltestAssert(!_bytes.empty() && _bytes.size() <= 32, "");
 
 	if (*_bytes.begin() & 0x80)
 		os << u2s(fromBigEndian<u256>(_bytes));
@@ -95,19 +141,7 @@ string BytesUtils::formatUnsigned(bytes const& _bytes) const
 	return os.str();
 }
 
-string BytesUtils::formatSigned(bytes const& _bytes) const
-{
-	stringstream os;
-
-	if (*_bytes.begin() & 0x80)
-		os << u2s(fromBigEndian<u256>(_bytes));
-	else
-		os << fromBigEndian<u256>(_bytes);
-
-	return os.str();
-}
-
-string BytesUtils::formatBoolean(bytes const& _bytes) const
+string BytesUtils::formatBoolean(bytes const& _bytes)
 {
 	stringstream os;
 	u256 result = fromBigEndian<u256>(_bytes);
@@ -122,18 +156,15 @@ string BytesUtils::formatBoolean(bytes const& _bytes) const
 	return os.str();
 }
 
-string BytesUtils::formatHex(bytes const& _bytes) const
+string BytesUtils::formatHex(bytes const& _bytes)
 {
-	stringstream os;
+	soltestAssert(!_bytes.empty() && _bytes.size() <= 32, "");
+	u256 value = fromBigEndian<u256>(_bytes);
 
-	string hex{toHex(_bytes, HexPrefix::Add)};
-	boost::algorithm::replace_all(hex, "00", "");
-	os << hex;
-
-	return os.str();
+	return toCompactHexWithPrefix(value);
 }
 
-string BytesUtils::formatHexString(bytes const& _bytes) const
+string BytesUtils::formatHexString(bytes const& _bytes)
 {
 	stringstream os;
 
@@ -142,7 +173,7 @@ string BytesUtils::formatHexString(bytes const& _bytes) const
 	return os.str();
 }
 
-string BytesUtils::formatString(bytes const& _bytes, size_t _cutOff) const
+string BytesUtils::formatString(bytes const& _bytes, size_t _cutOff)
 {
 	stringstream os;
 
@@ -171,35 +202,96 @@ string BytesUtils::formatString(bytes const& _bytes, size_t _cutOff) const
 	return os.str();
 }
 
-bytes BytesUtils::alignLeft(bytes _bytes) const
+string BytesUtils::formatRawBytes(bytes const& _bytes)
 {
-	return std::move(_bytes) + bytes(32 - _bytes.size(), 0);
-}
+	if (_bytes.empty())
+		return "[]";
 
-bytes BytesUtils::alignRight(bytes _bytes) const
-{
-	return bytes(32 - _bytes.size(), 0) + std::move(_bytes);
-}
-
-bytes BytesUtils::applyAlign(
-	Parameter::Alignment _alignment,
-	ABIType& _abiType,
-	bytes _bytes
-) const
-{
-	if (_alignment != Parameter::Alignment::None)
-		_abiType.alignDeclared = true;
-
-	switch (_alignment)
+	stringstream os;
+	auto it = _bytes.begin();
+	for (size_t i = 0; i < _bytes.size(); i += 32)
 	{
-	case Parameter::Alignment::Left:
-		_abiType.align = ABIType::AlignLeft;
-		return alignLeft(std::move(_bytes));
-	case Parameter::Alignment::Right:
-		_abiType.align = ABIType::AlignRight;
-		return alignRight(std::move(_bytes));
-	default:
-		_abiType.align = ABIType::AlignRight;
-		return alignRight(std::move(_bytes));
+		bytes byteRange{it, it + 32};
+
+		os << "  " << byteRange;
+
+		it += 32;
+		if (it != _bytes.end())
+			os << endl;
 	}
+
+	return os.str();
 }
+
+string BytesUtils::formatBytes(
+	bytes const& _bytes,
+	ABIType const& _abiType
+)
+{
+	stringstream os;
+
+	switch (_abiType.type)
+	{
+	case ABIType::UnsignedDec:
+		// Check if the detected type was wrong and if this could
+		// be signed. If an unsigned was detected in the expectations,
+		// but the actual result returned a signed, it would be formatted
+		// incorrectly.
+		if (*_bytes.begin() & 0x80)
+			os << formatSigned(_bytes);
+		else
+			os << formatUnsigned(_bytes);
+		break;
+	case ABIType::SignedDec:
+		os << formatSigned(_bytes);
+		break;
+	case ABIType::Boolean:
+		os << formatBoolean(_bytes);
+		break;
+	case ABIType::Hex:
+		os << formatHex(_bytes);
+		break;
+	case ABIType::HexString:
+		os << formatHexString(_bytes);
+		break;
+	case ABIType::String:
+		os << formatString(_bytes);
+		break;
+	case ABIType::Failure:
+		break;
+	case ABIType::None:
+		break;
+	}
+	return os.str();
+}
+
+string BytesUtils::formatBytesRange(
+	bytes _bytes,
+	dev::solidity::test::ParameterList const& _parameters,
+	bool _highlight
+)
+{
+	stringstream os;
+	auto it = _bytes.begin();
+
+	for (auto const& parameter: _parameters)
+	{
+		bytes byteRange{it, it + static_cast<long>(parameter.abiType.size)};
+
+		if (!parameter.matchesBytes(byteRange))
+			AnsiColorized(
+				os,
+				_highlight,
+				{dev::formatting::RED_BACKGROUND}
+			) << formatBytes(byteRange, parameter.abiType);
+		else
+			os << parameter.rawString;
+
+
+		it += static_cast<long>(parameter.abiType.size);
+		if (&parameter != &_parameters.back())
+			os << ", ";
+	}
+	return os.str();
+}
+
