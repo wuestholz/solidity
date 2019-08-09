@@ -1225,7 +1225,11 @@ list<bg::Stmt::Ref> ASTBoogieUtils::checkForSums(bg::Expr::Ref lhs, bg::Expr::Re
 		vector<bg::Stmt::Ref> elseSums;
 		for (auto stmt: checkForSums(condExpr->getElse(), rhs, context))
 			elseSums.push_back(stmt);
-		return {bg::Stmt::ifelse(condExpr->getCond(), bg::Block::block("", thenSums), bg::Block::block("", elseSums))};
+
+		if (thenSums.empty() && elseSums.empty())
+			return {};
+		else
+			return {bg::Stmt::ifelse(condExpr->getCond(), bg::Block::block("", thenSums), bg::Block::block("", elseSums))};
 	}
 	return context.updateSumVars(lhs, rhs);
 }
