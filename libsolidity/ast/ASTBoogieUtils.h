@@ -38,10 +38,6 @@ public:
 	static std::string const SOLIDITY_ASSERT;
 	static std::string const SOLIDITY_REQUIRE;
 	static std::string const SOLIDITY_REVERT;
-	// no constant required for 'throw' because it is a separate statement
-
-	// Boogie types
-	static std::string const BOOGIE_INT_CONST_TYPE;
 
 	// Other identifiers
 	static std::string const VERIFIER_SUM;
@@ -69,36 +65,25 @@ public:
 	static std::string const DOCTAG_MODIFIES_ALL;
 	static std::string const DOCTAG_MODIFIES_COND;
 
-	/**
-	 * Create the procedure corresponding to address.transfer()
-	 */
+	/** Creates the procedure corresponding to address.transfer(). */
 	static
 	boogie::ProcDeclRef createTransferProc(BoogieContext& context);
-
-	/**
-	 * Create the procedure corresponding to address.call()
-	 */
+	/** Creates the procedure corresponding to address.call(). */
 	static
 	boogie::ProcDeclRef createCallProc(BoogieContext& context);
-
-	/**
-	 * Create the procedure corresponding to address.send()
-	 */
+	/** Creates the procedure corresponding to address.send().*/
 	static
 	boogie::ProcDeclRef createSendProc(BoogieContext& context);
 
-	/**
-	 * Data locations as strings
-	 */
+	/** Data locations as strings. */
 	static
 	std::string dataLocToStr(DataLocation loc);
 
+	/** Gets the Boogie constructor name. */
 	static
 	std::string getConstructorName(ContractDefinition const* contract);
 
-	/**
-	 * Create attributes for original source location and message
-	 */
+	/** Creates attributes for original source location with message. */
 	static
 	std::vector<boogie::Attr::Ref> createAttrs(langutil::SourceLocation const& loc, std::string const& message, langutil::Scanner const& scanner);
 
@@ -122,23 +107,15 @@ public:
 	static
 	ExprWithCC encodeArithUnaryOp(BoogieContext& context, ASTNode const* associatedNode, langutil::Token op, boogie::Expr::Ref subExpr, unsigned bits, bool isSigned);
 
-	/**
-	 * Check if a type can be represented with bitvectors
-	 */
+	/** Checks if a type is represented with bitvectors. */
 	static bool isBitPreciseType(TypePointer type);
-
-	/**
-	 * Get the number of bits required to represent type
-	 */
+	/** Gets the number of bits required to represent type. */
 	static unsigned getBits(TypePointer type);
-
-	/**
-	 * Check if the type is signed
-	 */
+	/** Checks if the type is signed. */
 	static bool isSigned(TypePointer type);
 
 	/**
-	 * Check if bitvector type conversion from the implicit type conversion from exprType
+	 * Check if implicit conversion is needed from exprType
 	 * to targetType. If yes, the conversion expression is returned, otherwise expr is
 	 * returned unchanged. For example, if exprType is uint32 and targetType is uint40,
 	 * then we return an extension of 8 bits to expr.
@@ -146,7 +123,7 @@ public:
 	static
 	boogie::Expr::Ref checkImplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
-
+	/** Checks if explicit conversions are possible. */
 	static
 	boogie::Expr::Ref checkExplicitBvConversion(boogie::Expr::Ref expr, TypePointer exprType, TypePointer targetType, BoogieContext& context);
 
@@ -157,35 +134,40 @@ public:
 	static
 	boogie::Expr::Ref getTCCforExpr(boogie::Expr::Ref expr, TypePointer tp);
 
-	static
-	bool isStateVar(Declaration const *decl);
-
-	/**
-	 * Helper method to give a default value for a type.
-	 */
+	/** Helper method to give a default value for a type. */
 	static
 	boogie::Expr::Ref defaultValue(TypePointer _type, BoogieContext& context);
 
+private:
+	/** Helper structure for getting default value of a type, including
+	 * complex types such as arrays and structs.
+	 */
 	struct DefVal {
-		std::string smt;
-		boogie::Expr::Ref bgExpr;
+		std::string smt; // Default value as SMT expression (needed for arrays)
+		boogie::Expr::Ref bgExpr; // Default value as Boogie expression
 	};
-
 	static
 	DefVal defaultValueInternal(TypePointer _type, BoogieContext& context);
 
+public:
+	/** Allocates a new memory struct. */
 	static
 	boogie::Decl::Ref newStruct(StructDefinition const* structDef, BoogieContext& context);
 
+	/** Allocates a new memory array. */
 	static
 	boogie::Decl::Ref newArray(boogie::TypeDeclRef type, BoogieContext& context);
 
+	// Helper methods for assignments
+
+	/** Parameter (LHS or RHS) of an assignment. */
 	struct AssignParam {
-		boogie::Expr::Ref bgExpr;
-		TypePointer type;
-		Expression const* expr;
+		boogie::Expr::Ref bgExpr; // Boogie expression
+		TypePointer type; // Type
+		Expression const* expr; // Original expression (not all kinds of assignments require it)
 	};
 
+	/** Result of an assignment (including side effects). */
 	struct AssignResult {
 		std::list<boogie::Decl::Ref> newDecls;
 		std::list<boogie::Stmt::Ref> newStmts;
@@ -194,7 +176,8 @@ public:
 
 	/**
 	 * Helper function to make an assignment, handling all conversions and side effects.
-	 * The original lhs pointer is optional, it is checked against the sum function.
+	 * Besides Solidit Assignment expressions, it is used for assigning return parameters,
+	 * initial values, etc.
 	 */
 	static
 	AssignResult makeAssign(AssignParam lhs, AssignParam rhs, langutil::Token op, ASTNode const* assocNode, BoogieContext& context);
@@ -227,9 +210,7 @@ private:
 	static
 	boogie::Expr::Ref liftCond(boogie::Expr::Ref expr);
 
-	/**
-	 * Checks if any sum shadow variable has to be updated based on the lhs
-	 */
+	/** Checks if any sum shadow variable has to be updated based on the lhs. */
 	static
 	std::list<boogie::Stmt::Ref> checkForSums(boogie::Expr::Ref lhs, boogie::Expr::Ref rhs, BoogieContext& context);
 
@@ -238,21 +219,19 @@ private:
 				boogie::Expr::Ref lhsBase, boogie::Expr::Ref rhsBase, DataLocation lhsLoc, DataLocation rhsLoc,
 				ASTNode const* assocNode, BoogieContext& context, AssignResult& result);
 
+	// Local storage pointers
 public:
+	/* Result of packing a local storage pointer into an array. **/
 	struct PackResult {
-		boogie::Decl::Ref ptr;
-		std::list<boogie::Stmt::Ref> stmts;
+		boogie::Decl::Ref ptr; // Resulting pointer
+		std::list<boogie::Stmt::Ref> stmts; // Side effects of packing (filling the pointer array)
 	};
 
-	/**
-	 * Pack an expression into a local storage pointer
-	 */
+	/** Packs an expression into a local storage pointer. */
 	static
 	PackResult packToLocalPtr(Expression const* expr, boogie::Expr::Ref bgExpr, BoogieContext& context);
 
-	/**
-	 * Unpack a local storage pointer into an access to storage
-	 */
+	/** Unpacks a local storage pointer into an access to storage. */
 	static
 	boogie::Expr::Ref unpackLocalPtr(Identifier const* id, BoogieContext& context);
 

@@ -22,9 +22,7 @@ namespace solidity
 class BoogieContext {
 public:
 
-	/**
-	 * Encoding for arithmetic types and operations.
-	 */
+	/** Encoding for arithmetic types and operations. */
 	enum Encoding
 	{
 		INT, // Use integers
@@ -32,6 +30,7 @@ public:
 		MOD  // Use integers with modulo operations
 	};
 
+	/** Expression (annotation) parsed from a documentation tag. */
 	struct DocTagExpr {
 		boogie::Expr::Ref expr; // Expression converted to Boogie
 		std::string exprStr; // Expression in original format
@@ -59,11 +58,13 @@ public:
 	};
 
 private:
+	/** Path in an array/mapping member that needs sum */
 	struct SumPath {
 		std::string base; // Base array over which we sum
 		std::vector<std::shared_ptr<boogie::DtSelExpr const>> members; // Path of member accesses
 	};
 
+	/** Specification for an array/mapping that needs sum */
 	struct SumSpec {
 		SumPath path; // Path of the member we sum over
 		TypePointer type; // Type of the resulting sum
@@ -72,12 +73,15 @@ private:
 
 	ASTBoogieStats m_stats;
 	boogie::Program m_program; // Result of the conversion is a single Boogie program (top-level node)
+
 	std::map<std::string, boogie::Decl::Ref> m_stringLiterals;
 	std::map<std::string, boogie::Decl::Ref> m_addressLiterals;
+
 	boogie::VarDeclRef m_boogieBalance;
 	boogie::VarDeclRef m_boogieThis;
 	boogie::VarDeclRef m_boogieMsgSender;
 	boogie::VarDeclRef m_boogieMsgValue;
+
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_memStructTypes;
 	std::map<StructDefinition const*,boogie::TypeDeclRef> m_storStructTypes;
 	std::map<StructDefinition const*,boogie::FuncDeclRef> m_storStructConstrs;
@@ -101,7 +105,7 @@ private:
 	langutil::EVMVersion m_evmVersion;
 
 	ContractDefinition const* m_currentContract;
-	std::list<DocTagExpr> m_currentContractInvars; // Invariants for the current contract (in Boogie and original format)
+	std::list<DocTagExpr> m_currentContractInvars;
 	std::map<ContractDefinition const*, std::list<SumSpec>> m_currentSumSpecs;
 
 	typedef std::map<std::string, boogie::Decl::ConstRef> builtin_cache;
@@ -113,6 +117,7 @@ private:
 	bool m_callIncluded;
 	bool m_sendIncluded;
 
+	// A stack of extra scopes (added to declaration names) used in inlining
 	std::list<std::pair<ASTNode const*, std::string>> m_extraScopes;
 
 	int m_nextId = 0;
@@ -139,50 +144,63 @@ public:
 	langutil::EVMVersion& evmVersion() { return m_evmVersion; }
 	std::list<DocTagExpr>& currentContractInvars() { return m_currentContractInvars; }
 	int nextId() { return m_nextId++; }
-	boogie::VarDeclRef tmpVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
+	boogie::VarDeclRef freshTempVar(boogie::TypeDeclRef type, std::string prefix = "tmp");
 	ContractDefinition const* currentContract() const { return m_currentContract; }
 	void setCurrentContract(ContractDefinition const* contract) { m_currentContract = contract; }
-
 	void printErrors(std::ostream& out);
 
-private:
-	void getPath(boogie::Expr::Ref expr, SumPath& path, ASTNode const* errors = nullptr);
-	bool pathsEqual(SumPath const& p1, SumPath const& p2);
 public:
-	boogie::Expr::Ref addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type);
-	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
-	std::list<boogie::Stmt::Ref> updateSumVars(boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
-
-	/**
-	 * Map a declaration name to a name in Boogie
-	 */
-	std::string mapDeclName(Declaration const& decl);
-
-	boogie::Expr::Ref getStringLiteral(std::string str);
-	boogie::Expr::Ref getAddressLiteral(std::string addr);
-
-	/**
-	 * Print the actual Boogie program to an output stream
-	 */
+	/** Prints the Boogie program to an output stream. */
 	void print(std::ostream& _stream) { m_program.print(_stream); }
 
+	// Built-in functions and members
 	void includeTransferFunction();
 	void includeCallFunction();
 	void includeSendFunction();
+	boogie::VarDeclRef boogieBalance() const { return m_boogieBalance; }
+	boogie::VarDeclRef boogieThis() const { return m_boogieThis; }
+	boogie::VarDeclRef boogieMsgSender() const { return m_boogieMsgSender; }
+	boogie::VarDeclRef boogieMsgValue() const { return m_boogieMsgValue; }
 
+	/** Maps a declaration name to a name in Boogie, including extra scoping if needed. */
+	std::string mapDeclName(Declaration const& decl);
+
+	// Sum function related
+private:
+	/**
+	 * Converts an expression to a path for summing. E.g., ss[i].x.y becomes
+	 * {base: ss, members: {x, y}}
+	 * Optionally a node can be given to report errors.
+	 */
+	void getPath(boogie::Expr::Ref expr, SumPath& path, ASTNode const* errors = nullptr);
+	bool pathsEqual(SumPath const& p1, SumPath const& p2);
+public:
+	/** Gets the sum shadow variable for a given expression. If it does not exist, it is created. */
+	boogie::Expr::Ref getSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type);
+	/** Initializes all sum shadow variables related to a given base declaration. */
+	std::list<boogie::Stmt::Ref> initSumVars(Declaration const* decl);
+	/** Updates sum variables of an assignment (lhs, rhs) if the lhs requires sum. */
+	std::list<boogie::Stmt::Ref> updateSumVars(boogie::Expr::Ref lhsBg, boogie::Expr::Ref rhsBg);
+
+	/** Push an extra scope for declarations under the scode of a given node. */
 	void pushExtraScope(ASTNode const* node, std::string id) { m_extraScopes.push_back(std::make_pair(node, id)); }
+	/** Pop an extra scope. */
 	void popExtraScope() { m_extraScopes.pop_back(); }
 
+	// Error reporting
 	void reportError(ASTNode const* associatedNode, std::string message);
 	void reportWarning(ASTNode const* associatedNode, std::string message);
 
 	void addGlobalComment(std::string str);
 	void addDecl(boogie::Decl::Ref decl);
 
+	// Types
+
+	/** Maps a Solidity type to a Boogie type. */
+	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode);
 	boogie::TypeDeclRef addressType() const;
 	boogie::TypeDeclRef boolType() const;
 	boogie::TypeDeclRef stringType() const;
-	/** Returns the integer type corresponding to the encoding */
 	boogie::TypeDeclRef intType(unsigned size) const;
 	boogie::TypeDeclRef localPtrType();
 	boogie::TypeDeclRef errType() const { return boogie::Decl::elementarytype("__ERROR_UNSUPPORTED_TYPE"); }
@@ -197,18 +215,12 @@ public:
 
 	boogie::FuncDeclRef defaultArray(boogie::TypeDeclRef keyType, boogie::TypeDeclRef valueType, std::string valueSmt);
 
-	/**
-	 * Map a Solidity type to a Boogie type
-	 */
-	boogie::TypeDeclRef toBoogieType(TypePointer tp, ASTNode const* _associatedNode);
-
-	boogie::VarDeclRef boogieBalance() const { return m_boogieBalance; }
-	boogie::VarDeclRef boogieThis() const { return m_boogieThis; }
-	boogie::VarDeclRef boogieMsgSender() const { return m_boogieMsgSender; }
-	boogie::VarDeclRef boogieMsgValue() const { return m_boogieMsgValue; }
-
+	/** Creates an int literal corresponding to the encoding. */
 	boogie::Expr::Ref intLit(boogie::bigint lit, int bits) const;
-
+	/** Gets the Boogie representation of a string literal. */
+	boogie::Expr::Ref getStringLiteral(std::string str);
+	/** Gets the Boogie representation of an address literal. */
+	boogie::Expr::Ref getAddressLiteral(std::string addr);
 	/** Slice of an integer corresponding to the encoding */
 	boogie::Expr::Ref intSlice(boogie::Expr::Ref base, unsigned size, unsigned high, unsigned low);
 

@@ -99,7 +99,7 @@ BoogieContext::BoogieContext(Encoding encoding,
 		addDecl(bg::Decl::variable(ASTBoogieUtils::VERIFIER_OVERFLOW, boolType()));
 }
 
-bg::VarDeclRef BoogieContext::tmpVar(bg::TypeDeclRef type, string prefix)
+bg::VarDeclRef BoogieContext::freshTempVar(bg::TypeDeclRef type, string prefix)
 {
 	return bg::Decl::variable(prefix + "#" + toString(nextId()), type);
 }
@@ -178,7 +178,7 @@ bool BoogieContext::pathsEqual(SumPath const& p1, SumPath const& p2)
 	return true;
 }
 
-bg::Expr::Ref BoogieContext::addAndGetSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type)
+bg::Expr::Ref BoogieContext::getSumVar(boogie::Expr::Ref bgExpr, Expression const* expr, TypePointer type)
 {
 	// Expression must be int, or an int array/mapping
 	auto intType = dynamic_cast<IntegerType const*>(expr->annotation().type);

@@ -826,14 +826,6 @@ bg::Expr::Ref ASTBoogieUtils::getTCCforExpr(bg::Expr::Ref expr, TypePointer tp)
 	return bg::Expr::lit(true);
 }
 
-bool ASTBoogieUtils::isStateVar(Declaration const *decl)
-{
-	if (auto varDecl = dynamic_cast<VariableDeclaration const*>(decl))
-		return varDecl->isStateVariable();
-
-	return false;
-}
-
 bg::Expr::Ref ASTBoogieUtils::defaultValue(TypePointer type, BoogieContext& context)
 {
 	return defaultValueInternal(type, context).bgExpr;
@@ -948,13 +940,13 @@ bg::Decl::Ref ASTBoogieUtils::newStruct(StructDefinition const* structDef, Boogi
 	// TODO: make sure that it is a new address
 	string prefix = "new_struct_" + structDef->name();
 	bg::TypeDeclRef varType = context.getStructType(structDef, DataLocation::Memory);
-	return context.tmpVar(varType, prefix);
+	return context.freshTempVar(varType, prefix);
 }
 
 bg::Decl::Ref ASTBoogieUtils::newArray(bg::TypeDeclRef type, BoogieContext& context)
 {
 	// TODO: make sure that it is a new address
-	return context.tmpVar(type, "new_array");
+	return context.freshTempVar(type, "new_array");
 }
 
 ASTBoogieUtils::AssignResult ASTBoogieUtils::makeAssign(AssignParam lhs, AssignParam rhs, langutil::Token op,
@@ -1026,7 +1018,7 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 		{
 			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			auto elemType = lhsType->components().at(i);
-			auto tmp = context.tmpVar(context.toBoogieType(elemType, assocNode));
+			auto tmp = context.freshTempVar(context.toBoogieType(elemType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
 			makeAssignInternal(
@@ -1340,14 +1332,14 @@ ASTBoogieUtils::PackResult ASTBoogieUtils::packToLocalPtr(Expression const* expr
 	if (!structType)
 	{
 		context.reportError(expr, "Expected struct type");
-		return PackResult{context.tmpVar(context.errType()), {}};
+		return PackResult{context.freshTempVar(context.errType()), {}};
 	}
 	packInternal(expr, bgExpr, structType, context, result);
 	if (result.ptr)
 		return result;
 
 	context.reportError(expr, "Unsupported expression for packing into local pointer");
-	return PackResult{context.tmpVar(context.errType()), {}};
+	return PackResult{context.freshTempVar(context.errType()), {}};
 }
 
 void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, StructType const* structType, BoogieContext& context, PackResult& result)
@@ -1376,7 +1368,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	// Function calls return pointers, no need to pack, just copy the return value
 	if (dynamic_cast<FunctionCall const*>(expr))
 	{
-		auto ptr = context.tmpVar(context.localPtrType());
+		auto ptr = context.freshTempVar(context.localPtrType());
 		result.ptr = ptr;
 		result.stmts.push_back(bg::Stmt::assign(ptr->getRefTo(), bgExpr));
 		return;
@@ -1384,7 +1376,7 @@ void ASTBoogieUtils::packInternal(Expression const* expr, bg::Expr::Ref bgExpr, 
 	// Identifier: search for matching state variable in the contract
 	if (auto idExpr = dynamic_cast<Identifier const*>(expr))
 	{
-		auto ptr = context.tmpVar(context.localPtrType());
+		auto ptr = context.freshTempVar(context.localPtrType());
 		// Collect all variables from all contracts that can see the struct
 		vector<VariableDeclaration const*> vars;
 		for (auto contr: context.stats().contractsForStruct(&structType->structDefinition()))
