@@ -590,7 +590,7 @@ jobs:
             xbuild Source/Boogie.sln
             popd
             # Set CMAKE options, TODO: try to do it in the environment variable
-            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV
+            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries -DUSE_CVC4=OFF"' >> $BASH_ENV
       - run: *setup_prerelease_commit_hash
       - run: *run_build
       - store_artifacts: *artifacts_solc
