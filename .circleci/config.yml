@@ -618,7 +618,7 @@ jobs:
             echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
             apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libcvc4-dev cvc4 libjsoncpp-dev=1.7.4-\*
-            apt-get -qy install mono-complete
+            apt-get -qy install mono-devel
             # Set-up Boogie (TODO: use dotnet tool)
             pushd .
             git clone https://github.com/dddejan/boogie.git
@@ -652,7 +652,7 @@ jobs:
             apt-get -qq update
             apt-get -qy install cvc4 python3 python3-pip
             pip3 install psutil
-            apt-get -qy install mono-complete
+            apt-get -qy install mono-devel
             # Set-up Boogie (TODO: use dotnet tool, TODO: do only once for build/test)
             pushd .
             git clone https://github.com/dddejan/boogie.git
