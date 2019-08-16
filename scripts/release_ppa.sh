@@ -55,9 +55,9 @@ keyid=70D110489D66E2F6
 email=builds@ethereum.org
 packagename=solc
 
-static_build_distribution=cosmic
+static_build_distribution=disco
 
-DISTRIBUTIONS="bionic cosmic disco"
+DISTRIBUTIONS="bionic disco"
 
 if is_release
 then
@@ -83,8 +83,15 @@ else
     else
         pparepo=ethereum-dev
     fi
-    SMTDEPENDENCY="libcvc4-dev,
+    if [ $distribution = disco ]
+    then
+        SMTDEPENDENCY="libz3-static-dev,
+               libcvc4-dev,
                "
+    else
+        SMTDEPENDENCY="libz3-static-dev,
+               "
+    fi
     CMAKE_OPTIONS=""
 fi
 ppafilesurl=https://launchpad.net/~ethereum/+archive/ubuntu/${pparepo}/+files

@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE(division)
 			}
 		}
 	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
+	CHECK_SUCCESS_OR_WARNING(text, "might happen");
 	text = R"(
 		contract C {
 			function mul(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -257,8 +257,11 @@ BOOST_AUTO_TEST_CASE(import_base)
 		pragma solidity >=0.0;
 		contract Base {
 			uint x;
-			function f() internal {
+			address a;
+			function f() internal returns (uint) {
+				a = address(this);
 				++x;
+				return 2;
 			}
 		}
 	)"},
@@ -268,7 +271,7 @@ BOOST_AUTO_TEST_CASE(import_base)
 		import "base";
 		contract Der is Base {
 			function g(uint y) public {
-				f();
+				x += f();
 				assert(y > x);
 			}
 		}
@@ -327,6 +330,7 @@ BOOST_AUTO_TEST_CASE(import_library)
 	BOOST_CHECK_EQUAL(asserts, 1);
 
 }
+
 
 BOOST_AUTO_TEST_SUITE_END()
 
