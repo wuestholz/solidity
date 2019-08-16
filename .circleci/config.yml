@@ -578,7 +578,7 @@ jobs:
             apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
             echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
-            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libcvc4-dev cvc4 libjsoncpp-dev=1.7.4-\*
+            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev cvc4 libjsoncpp-dev=1.7.4-\*
             apt-get -qy install mono-devel
             # Set-up Boogie (TODO: use dotnet tool)
             pushd .
@@ -590,7 +590,7 @@ jobs:
             xbuild Source/Boogie.sln
             popd
             # Set CMAKE options, TODO: try to do it in the environment variable
-            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries -DUSE_CVC4=OFF"' >> $BASH_ENV
+            echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV
       - run: *setup_prerelease_commit_hash
       - run: *run_build
       - store_artifacts: *artifacts_solc
