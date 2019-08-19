@@ -575,14 +575,17 @@ jobs:
       - run:
           name: Install build dependencies
           command: |
+            wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
+            chmod a+x cvc4-1.6-x86_64-linux-opt
+            cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
             apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
             echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
-            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev cvc4 libjsoncpp-dev=1.7.4-\*
             apt-get -qy install mono-devel
+            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libjsoncpp-dev=1.7.4-\*
             # Set-up Boogie (TODO: use dotnet tool)
             pushd .
-            git clone https://github.com/dddejan/boogie.git
+            git clone https://github.com/boogie-org/boogie.git
             cd boogie
             mozroots --import --sync
             wget https://nuget.org/nuget.exe
@@ -608,15 +611,18 @@ jobs:
       - run:
           name: Install dependencies
           command: |
+            wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
+            chmod a+x cvc4-1.6-x86_64-linux-opt
+            cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
             apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
             echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
-            apt-get -qy install cvc4 python3 python3-pip
-            pip3 install psutil
             apt-get -qy install mono-devel
+            apt-get -qy install python3 python3-pip
+            pip3 install psutil
             # Set-up Boogie (TODO: use dotnet tool, TODO: do only once for build/test)
             pushd .
-            git clone https://github.com/dddejan/boogie.git
+            git clone https://github.com/boogie-org/boogie.git
             cd boogie
             mozroots --import --sync
             wget https://nuget.org/nuget.exe
