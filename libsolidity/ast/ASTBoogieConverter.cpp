@@ -1070,27 +1070,16 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 {
 	rememberScope(_node);
 
-	if (_node.isDoWhile())
-	{
-		m_context.reportError(&_node, "Do-while loops are not supported");
-		return false;
-	}
-
 	string oldContinueLabel = m_currentContinueLabel;
 	m_currentContinueLabel = "$continue" + toString(m_context.nextId());
 	string oldBreakLabel = m_currentBreakLabel;
 	m_currentBreakLabel = "break" + toString(m_context.nextId());
 
 	// Collect invariants
-	std::vector<bg::Specification::Ref> invars;
+	list<pair<bg::Expr::Ref, string>> invars;
 	// No overflow in code
 	if (m_context.overflow())
-	{
-		invars.push_back(bg::Specification::spec(
-				bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)),
-				ASTBoogieUtils::createAttrs(_node.location(), "No overflow", *m_context.currentScanner())
-		));
-	}
+		invars.push_back({bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW)), "No overflow"});
 
 	std::vector<BoogieContext::DocTagExpr> loopInvars = getExprsFromDocTags(_node, _node.annotation(), scope(), ASTBoogieUtils::DOCTAG_LOOP_INVAR);
 	if (includeContractInvars(_node.annotation()))
@@ -1098,14 +1087,12 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	for (auto invar: loopInvars)
 	{
 		for (auto tcc: invar.tccs)
-			invars.push_back(bg::Specification::spec(tcc,
-					ASTBoogieUtils::createAttrs(_node.location(), "variables in range for '" + invar.exprStr + "'", *m_context.currentScanner())));
+			invars.push_back({tcc, "variables in range for '" + invar.exprStr + "'"});
 
 		for (auto oc: invar.ocs)
-			invars.push_back(bg::Specification::spec(oc,
-					ASTBoogieUtils::createAttrs(_node.location(), "no overflow in '" + invar.exprStr + "'", *m_context.currentScanner())));
+			invars.push_back({oc,"no overflow in '" + invar.exprStr + "'"});
 
-		invars.push_back(bg::Specification::spec(invar.expr, ASTBoogieUtils::createAttrs(_node.location(), invar.exprStr, *m_context.currentScanner())));
+		invars.push_back({invar.expr, invar.exprStr});
 	}
 	// TODO: check that invariants did not introduce new sum variables
 
@@ -1120,12 +1107,34 @@ bool ASTBoogieConverter::visit(WhileStatement const& _node)
 	_node.body().accept(*this);
 	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentContinueLabel));
 	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
-	bg::Block::ConstRef body = m_currentBlocks.top();
+	bg::Block::Ref body = m_currentBlocks.top();
 	m_currentBlocks.pop();
 	m_currentContinueLabel = oldContinueLabel;
 
+	if (_node.isDoWhile())
+	{
+		// Check invariants before
+		for (auto inv: invars)
+			m_currentBlocks.top()->addStmt(bg::Stmt::assert_(
+					inv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + inv.second + "' might not hold on loop entry", *m_context.currentScanner())));
+		// Inline body before loop
+		for (auto stmt: body->getStatements())
+			if (!dynamic_pointer_cast<bg::LabelStmt const>(stmt))
+				m_currentBlocks.top()->addStmt(stmt);
+		// Check invariants after first iteration
+		for (auto inv: invars)
+			m_currentBlocks.top()->addStmt(bg::Stmt::assert_(
+					inv.first,
+					ASTBoogieUtils::createAttrs(_node.location(), "Invariant '" + inv.second + "' might not hold after first iteration", *m_context.currentScanner())));
+	}
+
+	vector<bg::Specification::Ref> specs;
+	for (auto inv: invars)
+		specs.push_back(bg::Specification::spec(inv.first,
+				ASTBoogieUtils::createAttrs(_node.location(), inv.second, *m_context.currentScanner())));
 	m_currentBlocks.top()->addStmts(condSideEffects->getStatements());
-	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, invars));
+	m_currentBlocks.top()->addStmt(bg::Stmt::while_(cond, body, specs));
 	m_currentBlocks.top()->addStmt(bg::Stmt::label(m_currentBreakLabel));
 	m_currentBreakLabel = oldBreakLabel;
 
