@@ -1,0 +1,9 @@
+C::f1: OK
+C::f2: ERROR
+ - test/solc-verify/specs/DoWhile.sol:19:9: Invariant 'x == i' might not hold on loop entry
+C::f3: ERROR
+ - test/solc-verify/specs/DoWhile.sol:29:9: Invariant 'x == i' might not hold after first iteration
+C::f4: ERROR
+ - test/solc-verify/specs/DoWhile.sol:39:9: Invariant 'x == i' might not be maintained by the loop
+C::[implicit_constructor]: OK
+Errors were found by the verifier.

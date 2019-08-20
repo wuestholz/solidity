@@ -36,6 +36,7 @@ private:
 	int m_nextReturnLabelId;
 
 	std::string m_currentContinueLabel;
+	std::string m_currentBreakLabel;
 
 	/**
 	 * Helper method to convert an expression using the dedicated expression converter class,

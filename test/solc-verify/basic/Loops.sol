@@ -17,6 +17,21 @@ contract Loops {
         return result;
     }
 
+    function doWhileLoopFunc(uint param) private pure returns (uint) {
+        uint i = 0;
+        uint result = param;
+
+        /**
+         * @notice invariant result == param + i
+         */
+        do {
+            result = result + 1;
+            i = i + 1;
+        } while (i < 10);
+
+        return result;
+    }
+
     function forLoopFunc(uint param) private pure returns (uint) {
         uint result = param;
 
@@ -72,6 +87,7 @@ contract Loops {
 
     function() external payable {
         assert(whileLoopFunc(5) == 15);
+        assert(doWhileLoopFunc(5) == 15);
         assert(forLoopFunc(9) == 19);
         assert(breakLoop(5) == 15);
         assert(breakLoop(95) == 100);
