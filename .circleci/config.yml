@@ -44,6 +44,31 @@ defaults:
       name: Correctness proofs for optimization rules
       command: scripts/run_proofs.sh
 
+  - setup_sverif_cvc4: &setup_sverif_cvc4
+      name: Install CVC4
+      command: | # apt installs old version (1.5) but we require 1.6
+        wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
+        chmod a+x cvc4-1.6-x86_64-linux-opt
+        cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
+
+  - setup_sverif_boogie: &setup_sverif_boogie
+      name: Install Boogie
+      command: |
+        # Mono (https://www.mono-project.com/download/stable/#download-lin)
+        apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+        echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
+        apt-get -qq update
+        apt-get -qy install mono-devel
+        # Boogie
+        pushd .
+        git clone https://github.com/boogie-org/boogie.git
+        cd boogie
+        mozroots --import --sync
+        wget https://nuget.org/nuget.exe
+        mono ./nuget.exe restore Source/Boogie.sln
+        xbuild Source/Boogie.sln
+        popd
+
   # --------------------------------------------------------------------------
   # Artifacts Templates
 
@@ -565,34 +590,18 @@ jobs:
 
   b_ubu_sverif:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1804
     environment:
       TERM: xterm
-      COVERAGE: "ON"
       DEBIAN_FRONTEND: noninteractive
     steps:
       - checkout
+      - run: *setup_sverif_cvc4
+      - run: *setup_sverif_boogie
       - run:
           name: Install build dependencies
           command: |
-            wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
-            chmod a+x cvc4-1.6-x86_64-linux-opt
-            cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
-            apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-            echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
-            apt-get -qq update
-            apt-get -qy install mono-devel
-            apt-get -qy install cmake libboost-regex-dev libboost-filesystem-dev libboost-test-dev libboost-system-dev libboost-program-options-dev libjsoncpp-dev=1.7.4-\*
-            # Set-up Boogie (TODO: use dotnet tool)
-            pushd .
-            git clone https://github.com/boogie-org/boogie.git
-            cd boogie
-            mozroots --import --sync
-            wget https://nuget.org/nuget.exe
-            mono ./nuget.exe restore Source/Boogie.sln
-            xbuild Source/Boogie.sln
-            popd
-            # Set CMAKE options, TODO: try to do it in the environment variable
+            # TODO: try to set cmake options in the environment variable
             echo 'export CMAKE_OPTIONS="-DBOOGIE_BIN=$HOME/project/boogie/Binaries"' >> $BASH_ENV
       - run: *setup_prerelease_commit_hash
       - run: *run_build
@@ -601,44 +610,49 @@ jobs:
 
   t_ubu_sverif_bg:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1804
     environment:
       TERM: xterm
     steps:
       - checkout
       - attach_workspace:
           at: build
+      - run: *setup_sverif_cvc4
+      - run: *setup_sverif_boogie
       - run:
           name: Install dependencies
           command: |
-            wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
-            chmod a+x cvc4-1.6-x86_64-linux-opt
-            cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
-            apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-            echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | tee /etc/apt/sources.list.d/mono-official-stable.list
             apt-get -qq update
-            apt-get -qy install mono-devel
             apt-get -qy install python3 python3-pip
             pip3 install psutil
-            # Set-up Boogie (TODO: use dotnet tool, TODO: do only once for build/test)
-            pushd .
-            git clone https://github.com/boogie-org/boogie.git
-            cd boogie
-            mozroots --import --sync
-            wget https://nuget.org/nuget.exe
-            mono ./nuget.exe restore Source/Boogie.sln
-            xbuild Source/Boogie.sln
-            popd
       - run:
           name: Test solc-verify with Boogie
           command: ./test/solc-verify/test_with_boogie.sh
+
+  t_ubu_sverif_syn:
+    docker:
+      - image: ethereum/solidity-buildpack-deps:ubuntu1804
+    environment:
+      TERM: xterm
+    steps:
+      - checkout
+      - attach_workspace:
+          at: build
+      - run: *setup_sverif_cvc4
+      - run: *setup_sverif_boogie
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get -qq update
+            apt-get -qy install python3 python3-pip
+            pip3 install psutil
       - run:
           name: Test solc-verify on Syntax tests
           command: ./test/solc-verify/test_syntax_with_boogie.sh
 
   t_ubu_sverif_trf:
     docker:
-      - image: buildpack-deps:bionic
+      - image: ethereum/solidity-buildpack-deps:ubuntu1804
     environment:
       TERM: xterm
     steps:
@@ -698,6 +712,7 @@ workflows:
       # solc-verify build and tests
       - b_ubu_sverif: *workflow_trigger_on_tags
       - t_ubu_sverif_bg: *workflow_sverif
+      - t_ubu_sverif_syn: *workflow_sverif
       - t_ubu_sverif_trf: *workflow_sverif
 
   nightly:
