@@ -739,3 +739,19 @@ workflows:
       # Code Coverage enabled build and tests
       - b_ubu_codecov: *workflow_trigger_on_tags
       - t_ubu_codecov: *workflow_ubuntu1904_codecov
+
+  sverif_nightly:
+
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - boogie
+
+    jobs:
+      - b_ubu_sverif: *workflow_trigger_on_tags
+      - t_ubu_sverif_bg: *workflow_sverif
+      - t_ubu_sverif_syn: *workflow_sverif
+      - t_ubu_sverif_trf: *workflow_sverif
