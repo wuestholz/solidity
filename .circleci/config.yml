@@ -46,10 +46,10 @@ defaults:
 
   - setup_sverif_cvc4: &setup_sverif_cvc4
       name: Install CVC4
-      command: | # apt installs old version (1.5) but we require 1.6
-        wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.6-x86_64-linux-opt
-        chmod a+x cvc4-1.6-x86_64-linux-opt
-        cp cvc4-1.6-x86_64-linux-opt /usr/local/bin/cvc4
+      command: | # apt installs old version (1.5) so we download a newer manually
+        wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.7-x86_64-linux-opt
+        chmod a+x cvc4-1.7-x86_64-linux-opt
+        cp cvc4-1.7-x86_64-linux-opt /usr/local/bin/cvc4
 
   - setup_sverif_boogie: &setup_sverif_boogie
       name: Install Boogie
