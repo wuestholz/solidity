@@ -735,12 +735,12 @@ bool ASTBoogieConverter::visit(FunctionDefinition const& _node)
 	TypePointer tp_uint256 = TypeProvider::integer(256, IntegerType::Modifier::Unsigned);
 
 	// Input parameters
-	vector<bg::Binding> params {
-		// Globally available stuff
-		{m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() }, // this
-		{m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() }, // msg.sender
-		{m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() } // msg.value
-	};
+	vector<bg::Binding> params;
+	// Globally available stuff
+	if (!m_context.currentContract()->isLibrary())
+		params.push_back({m_context.boogieThis()->getRefTo(), m_context.boogieThis()->getType() });// this
+	params.push_back({m_context.boogieMsgSender()->getRefTo(), m_context.boogieMsgSender()->getType() });// msg.sender
+	params.push_back({m_context.boogieMsgValue()->getRefTo(), m_context.boogieMsgValue()->getType() }); // msg.value
 	// Add original parameters of the function
 	for (auto par: _node.parameters())
 		params.push_back({bg::Expr::id(m_context.mapDeclName(*par)), m_context.toBoogieType(par->type(), par.get())});

@@ -438,17 +438,17 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	vector<bg::Expr::Ref> allArgs;
 	vector<bg::Expr::Ref> regularArgs;
 	// First, pass extra arguments
-	if (m_isLibraryCall)
-		allArgs.push_back(m_context.boogieThis()->getRefTo()); // this
-	else
+	if (!m_isLibraryCall)
 		allArgs.push_back(m_currentAddress); // this
 	// msg.sender is by default this, except for internal calls
 	auto sender = m_context.boogieThis()->getRefTo();
+	bool internal = false;
 	if (auto funcType = dynamic_cast<FunctionType const*>(_node.expression().annotation().type))
-		if (funcType->kind() == FunctionType::Kind::Internal)
-			sender = m_context.boogieMsgSender()->getRefTo();
+		internal = funcType->kind() == FunctionType::Kind::Internal;
+	if (internal)
+		sender = m_context.boogieMsgSender()->getRefTo();
 	allArgs.push_back(sender); // msg.sender
-	bg::Expr::Ref defaultMsgValue = m_context.intLit(0, 256);
+	bg::Expr::Ref defaultMsgValue = internal ? m_context.boogieMsgValue()->getRefTo() : m_context.intLit(0, 256);
 	bg::Expr::Ref msgValue = m_currentMsgValue ? m_currentMsgValue : defaultMsgValue;
 	allArgs.push_back(msgValue); // msg.value
 	if (m_isLibraryCall && !m_isLibraryCallStatic)
