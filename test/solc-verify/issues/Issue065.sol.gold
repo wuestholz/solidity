@@ -1,0 +1,4 @@
+Issue065::value: OK
+Issue065::[fallback]: OK
+Issue065::[implicit_constructor]: OK
+No errors found.

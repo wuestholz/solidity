@@ -357,7 +357,7 @@ bool ASTBoogieExpressionConverter::visit(FunctionCall const& _node)
 	// 'm_currentMsgValue' to 'y'.
 	if (auto exprMa = dynamic_cast<MemberAccess const*>(&_node.expression()))
 	{
-		if (exprMa->memberName() == "value")
+		if (exprMa->expression().annotation().type->category() == Type::Category::Function && exprMa->memberName() == "value")
 		{
 			// Process the argument
 			solAssert(_node.arguments().size() == 1, "Call to the value function should have exactly one argument");
