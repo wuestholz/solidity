@@ -6,18 +6,47 @@ A preliminary [paper](https://arxiv.org/abs/1907.04262) was presented at [VSTTE'
 
 ## Build and Install
 
-Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires Python 3, [Z3 (SMT solver)](https://github.com/Z3Prover/z3) and [Boogie](https://github.com/boogie-org/boogie) as a verification backend. Alternatively, [CVC4](http://cvc4.cs.stanford.edu) can also be used instead of Z3. On a standard Ubuntu system, solc-verify can be built and installed as follows.
+Solc-verify is mainly developed and tested on Ubuntu and OS X. It requires [Z3](https://github.com/Z3Prover/z3) or [CVC4](http://cvc4.cs.stanford.edu), and [Boogie](https://github.com/boogie-org/boogie) as a verification backend. On a standard Ubuntu system (18.04), solc-verify can be built and installed as follows.
 
+**[CVC4](http://cvc4.cs.stanford.edu)** (>=1.6 required)
 ```
+wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.7-x86_64-linux-opt
+chmod a+x cvc4-1.7-x86_64-linux-opt
+sudo cp cvc4-1.7-x86_64-linux-opt /usr/local/bin/cvc4
+```
+
+**[Mono](https://www.mono-project.com/download/stable/#download-lin)** (required for Boogie)
+```
+sudo apt install gnupg ca-certificates -y
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+echo "deb https://download.mono-project.com/repo/ubuntu stable-bionic main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+sudo apt update
+sudo apt install mono-devel -y
+```
+
+**[Boogie](https://github.com/boogie-org/boogie)**
+```
+git clone https://github.com/boogie-org/boogie.git
+cd boogie
+wget https://nuget.org/nuget.exe
+mono ./nuget.exe restore Source/Boogie.sln
+xbuild Source/Boogie.sln
+cd ..
+```
+
+**solc-verify**
+```
+sudo apt install python3-pip -y
+pip3 install psutil
 git clone https://github.com/SRI-CSL/solidity.git
 cd solidity
-pip3 install psutil
 ./scripts/install_deps.sh
 mkdir build
 cd build
-cmake -DBOOGIE_BIN="<PATH TO BOOGIE BINARY>" ..
+cmake -DBOOGIE_BIN="<PATH TO BOOGIE BINARIES FOLDER>" ..
 make
 sudo make install
+cd ../..
 ```
 
 ## Running solc-verify
@@ -30,7 +59,7 @@ The entry point is the script `solc-verify.py`. The script has a single position
 - `--modifies-analysis`: State variables are checked for modifications only if there are modification annotations or if this flag is given.
 - `--output OUTPUT`: Output directory where the intermediate (e.g., Boogie) files are created (tmp directory by default).
 - `--verbose`: Print all output of the compiler and the verifier.
-- `--smtlog SMTLOG`: Log the inputs given by Boogie to the SMT solver into a file (not given by default).
+- `--smt-log SMTLOG`: Log the inputs given by Boogie to the SMT solver into a file (not given by default).
 - `--errors-only`: Only display error messages and omit displaying names of correct functions (not given by default).
 - `--show-warnings`: Display warning messages (not given by default).
 - `--solc SOLC`: Path to the Solidity compiler to use (which must include our Boogie translator extension) (by default it is the one that includes the Python script).
@@ -99,10 +128,10 @@ They must be side-effect free Solidity expressions and can refer to variables wi
 
 See the contracts under `test/solc-verify/examples` for examples.
 
-- **Function pre/postconditions** (`precondition <EXPRESSION>` / `postcondition <EXPRESSION>`) can be attached to functions. Preconditions are assumed before executing the function and postconditions are asserted in the end. The expression can refer to variables in the scope of the function. The postcondition can also refer to the return value.
-- **Contract level invariants**  (`invariant <EXPRESSION>`) can be attached to contracts. They are added as both a pre- and a postcondition to each _public_ function. The expression can refer to state variables in the contract.
--**Loop invariants**  (`invariant <EXPRESSION>`) can be attached to _for_ and _while_ loops. The expression can refer ta variables in scope of the loop, including the loop counter.
-- **Modification specifiers** (`modifies <TARGET> [if <CONDITION>]`) can be attached to functions. The target can be a state variable, an index access or a member access. Optionally, a condition can also be given. They will be checked at the end of the function (whether only the specified variables were modified).
+- **Function pre/postconditions** (`precondition <EXPRESSION>` / `postcondition <EXPRESSION>`) can be attached to functions. Preconditions are assumed before executing the function and postconditions are asserted in the end. The expression can refer to variables in the scope of the function. The postcondition can also refer to the return value if it is named.
+- **Contract level invariants**  (`invariant <EXPRESSION>`) can be attached to contracts. They are included as both a pre- and a postcondition for each _public_ function. The expression can refer to state variables in the contract.
+- **Loop invariants**  (`invariant <EXPRESSION>`) can be attached to _for_ and _while_ loops. The expression can refer to variables in scope of the loop, including the loop counter.
+- **Modification specifiers** (`modifies <TARGET> [if <CONDITION>]`) can be attached to functions. The target can be a state variable, including index and member accesses. Optionally, a condition can also be given. They will be checked at the end of the function (whether only the specified variables were modified). See [`Storage.sol`](test/solc-verify/examples/Storage.sol).
 - Contract and loop invariants can refer to a special **sum function over collections** (`__verifier_sum_int` or `__verifier_sum_uint`). The argument must be an array/mapping state variable with integer values, or must point to an integer member if the array/mapping contains structures (see [`SumOverStructMember.sol`](test/solc-verify/examples/SumOverStructMember.sol)).
 - Postconditions can refer to the **old value** of a variable (before the transaction) using `__verifier_old_<TYPE>` (e.g., `__verifier_old_uint(...)`).
 - Specifications can refer to a special **equality predicate** (`__verifier_eq`) for reference types such as structures, arrays and mappings (not comparable with the standard Solidity operator `==`). It takes two arguments with the same type. For storage data location it performs a deep equality check, for other data locations it performs a reference equality check.
