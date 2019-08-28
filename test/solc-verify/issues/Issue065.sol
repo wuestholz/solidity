@@ -5,7 +5,7 @@ contract Issue065 {
     function value() public pure returns (uint r) {
         return 1;
     }
-    
+
     function() external payable {
         assert(Issue065(this).value() == 1);
     }
