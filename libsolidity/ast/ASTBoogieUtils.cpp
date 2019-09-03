@@ -1007,6 +1007,8 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 	auto rhsTupleExpr = dynamic_cast<TupleExpression const*>(rhs.expr);
 	auto lhsType = dynamic_cast<TupleType const*>(lhs.type);
 	solAssert(lhsType, "Expected tuple type for LHS");
+	auto rhsType = dynamic_cast<TupleType const*>(rhs.type);
+	solAssert(rhsType, "Expected tuple type for RHS");
 	auto const& lhsElems = lhsTuple->elements();
 	auto const& rhsElems = rhsTuple->elements();
 
@@ -1017,28 +1019,35 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 		if (lhsElems[i])
 		{
 			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
-			auto elemType = lhsType->components().at(i);
-			auto tmp = context.freshTempVar(context.toBoogieType(elemType, assocNode));
+			auto rhsElemType = rhsType->components().at(i);
+			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
+			if (isBitPreciseType(lhsType->components().at(i)))
+				rhsElemType = lhsType->components().at(i);
+			auto tmp = context.freshTempVar(context.toBoogieType(rhsElemType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
 			makeAssignInternal(
-					AssignParam{tmp->getRefTo(), elemType, nullptr },
-					AssignParam{rhsElems[i], elemType, rhsElem },
+					AssignParam{tmp->getRefTo(), rhsElemType, nullptr },
+					AssignParam{rhsElems[i], rhsElemType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
 		else
 			tmpVars.push_back(nullptr);
 	}
 
-	for (unsigned i = 0; i < lhsElems.size(); ++i)
+	for (int i = lhsElems.size() - 1; i >= 0; --i)
 	{
 		if (lhsElems[i])
 		{
 			auto const lhsElem = lhsTupleExpr ? lhsTupleExpr->components().at(i).get() : nullptr;
-			auto elemType = lhsType->components().at(i);
+			auto lhsElemType = lhsType->components().at(i);
+			auto rhsElemType = lhsType->components().at(i);
+			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
+			if (isBitPreciseType(lhsElemType))
+				rhsElemType = lhsElemType;
 			makeAssignInternal(
-					AssignParam{lhsElems[i], elemType, lhsElem },
-					AssignParam{tmpVars[i]->getRefTo(), elemType, nullptr },
+					AssignParam{lhsElems[i], lhsElemType, lhsElem },
+					AssignParam{tmpVars[i]->getRefTo(), rhsElemType, nullptr },
 					Token::Assign, assocNode, context, result);
 		}
 	}
