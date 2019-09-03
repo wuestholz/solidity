@@ -1023,11 +1023,17 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
 			if (isBitPreciseType(lhsType->components().at(i)))
 				rhsElemType = lhsType->components().at(i);
-			auto tmp = context.freshTempVar(context.toBoogieType(rhsElemType, assocNode));
+
+			auto tmpVarType = rhsElemType;
+
+			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
+			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
+				tmpVarType = TypeProvider::withLocation(rhsRef,DataLocation::Storage, true);
+			auto tmp = context.freshTempVar(context.toBoogieType(tmpVarType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
 			makeAssignInternal(
-					AssignParam{tmp->getRefTo(), rhsElemType, nullptr },
+					AssignParam{tmp->getRefTo(), tmpVarType, nullptr },
 					AssignParam{rhsElems[i], rhsElemType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
@@ -1041,13 +1047,17 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 		{
 			auto const lhsElem = lhsTupleExpr ? lhsTupleExpr->components().at(i).get() : nullptr;
 			auto lhsElemType = lhsType->components().at(i);
-			auto rhsElemType = lhsType->components().at(i);
+			auto rhsElemType = rhsType->components().at(i);
 			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
 			if (isBitPreciseType(lhsElemType))
 				rhsElemType = lhsElemType;
+			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
+			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
+				rhsElemType = TypeProvider::withLocation(rhsRef, DataLocation::Storage, true);
+			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			makeAssignInternal(
 					AssignParam{lhsElems[i], lhsElemType, lhsElem },
-					AssignParam{tmpVars[i]->getRefTo(), rhsElemType, nullptr },
+					AssignParam{tmpVars[i]->getRefTo(), rhsElemType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
 	}
