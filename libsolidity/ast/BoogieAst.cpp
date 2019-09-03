@@ -820,7 +820,15 @@ void IfElseStmt::print(std::ostream& os) const
 void WhileStmt::print(std::ostream& os) const
 {
 	os << "while (";
-	cond->print(os);
+	if (cond)
+	{
+		cond->print(os);
+	}
+	else
+	{
+		// Can be null in for loops when condition is omitted, e.g. for (;;) { break }
+		os << "true";
+	}
 	os << ")";
 
 	if (invars.empty())
