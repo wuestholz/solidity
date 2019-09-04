@@ -129,7 +129,7 @@ contract NGToken is ERC223 {
 		//https://docs.google.com/document/d/1YLPtQxZu1UAvO9cZ1O2RPXBbT0mooh4DYKjA_jp-RLM/
 		//force to 0 before calling "approve" again
 		require((_value == 0) || (allowed[msg.sender][_spender] == 0));
-	
+
 		allowed[msg.sender][_spender] = _value;
 		emit Approval(msg.sender, _spender, _value);
 		return true;
