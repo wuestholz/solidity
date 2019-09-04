@@ -231,7 +231,7 @@ contract SMT is StandardToken {
      * which call approve method, and agents may charge agency fees
      * @param _from The address which should transfer SMT to others
      * @param _spender The spender who allowed by _from
-     * @param _value The value that should be transfered.
+     * @param _value The value that should be transferred.
      * @param _v
      * @param _r
      * @param _s
