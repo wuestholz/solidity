@@ -6,7 +6,7 @@ pragma solidity >=0.5.0;
 
 interface ERC20 {
 	//ERC-20 Token Standard https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20-token-standard.md
-	
+
 	function name() external view returns (string memory);
 	function symbol() external view returns (string memory);
 	function decimals() external view returns (uint8);
@@ -16,7 +16,7 @@ interface ERC20 {
 	function transferFrom(address _from, address _to, uint256 _value) external returns (bool success);
 	function approve(address _spender, uint256 _value) external returns (bool success);
 	function allowance(address _owner, address _spender) external view returns (uint256);
-	
+
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 }
@@ -31,10 +31,10 @@ interface ERC223Receiver {
 
 contract ERC223 is ERC20 {
 	//ERC223 token standard https://github.com/Dexaran/ERC223-token-standard
-	
+
 	function transfer(address _to, uint256 _value, bytes memory _data) public returns (bool success);
 	function transfer(address _to, uint256 _value, bytes memory _data, string memory _customFallback) public returns (bool success);
-	
+
 	event Transfer(address indexed _from, address indexed _to, uint256 _value, bytes _data);
 }
 
@@ -46,24 +46,24 @@ contract NGToken is ERC223 {
 	uint256 private totalBurned				= 0;
 	mapping(address => uint256) private balances;
 	mapping(address => mapping(address => uint256)) private allowed;
-	
+
 	constructor() public {
 	  balances[msg.sender] = INITIAL_SUPPLY;
 	}
-	
+
 	//ERC20
 	function name() public view returns (string memory) {
 		return NAME;
 	}
-	
+
 	function symbol() public view returns (string memory) {
 		return SYMBOL;
 	}
-	
+
 	function decimals() public view returns (uint8) {
 		return DECIMALS;
 	}
-	
+
 	function totalSupply() public view returns (uint256) {
 		return INITIAL_SUPPLY - totalBurned;
 	}
@@ -71,7 +71,7 @@ contract NGToken is ERC223 {
 	function balanceOf(address _owner) public view returns (uint256) {
 		return balances[_owner];
 	}
-	
+
 	function transfer(address _to, uint256 _value) public returns (bool success) {
 		if (isContract(_to)) {
 			bytes memory empty;
@@ -124,17 +124,17 @@ contract NGToken is ERC223 {
 		emit Transfer(_from, _to, _value, empty);
     return true;
 	}
-	
+
 	function approve(address _spender, uint256 _value) public returns (bool success) {
 		//https://docs.google.com/document/d/1YLPtQxZu1UAvO9cZ1O2RPXBbT0mooh4DYKjA_jp-RLM/
 		//force to 0 before calling "approve" again
 		require((_value == 0) || (allowed[msg.sender][_spender] == 0));
-		
+	
 		allowed[msg.sender][_spender] = _value;
 		emit Approval(msg.sender, _spender, _value);
 		return true;
 	}
-	
+
     function approveAndCall(address _spender, uint256 _value, bytes memory _extraData) public returns (bool success) {
       TokenRecipient spender = TokenRecipient(_spender);
       if (approve(_spender, _value)) {
@@ -158,12 +158,12 @@ contract NGToken is ERC223 {
 		}
 		emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
 		return true;
-	}	
-	
+	}
+
 	function allowance(address _owner, address _spender) public view returns (uint256) {
 		return allowed[_owner][_spender];
 	}
-	
+
 	//ERC233
 	function transfer(address _to, uint256 _value, bytes memory _data) public returns (bool success) {
 		if (isContract(_to)) {
@@ -220,7 +220,7 @@ contract NGToken is ERC223 {
     }
 		return (length > 0);
   }
-	
+
 	//Burn
   event Burn(address indexed burner, uint256 value, uint256 currentSupply, bytes data);
 
