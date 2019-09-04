@@ -229,9 +229,9 @@ contract SMT is StandardToken {
     /*
      * Proxy approve that some one can authorize the agent for broadcast transaction
      * which call approve method, and agents may charge agency fees
-     * @param _from The address which should tranfer SMT to others
+     * @param _from The address which should transfer SMT to others
      * @param _spender The spender who allowed by _from
-     * @param _value The value that should be tranfered.
+     * @param _value The value that should be transfered.
      * @param _v
      * @param _r
      * @param _s
