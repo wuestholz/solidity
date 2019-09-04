@@ -124,7 +124,7 @@ contract Controlled is Owned{
                 assert(!locked[_addr]);
             }
         }
-        
+
         _;
     }
 
@@ -185,7 +185,7 @@ contract SMT is StandardToken {
     string public version = 'v0.1';       //SMT 0.1 standard. Just an arbitrary versioning scheme.
     uint256 public allocateEndTime;
 
-    
+
     // The nonce for avoid transfer replay attacks
     mapping(address => uint256) nonces;
 

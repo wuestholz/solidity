@@ -88,19 +88,19 @@ contract StandardToken is Token {
     uint256 public totalSupply;
 }
 
-contract Bittelux is StandardToken { 
+contract Bittelux is StandardToken {
 
     /* Public variables of the token */
 
     string public name;
     uint8 public decimals;
     string public symbol;
-    string public version = 'H1.0'; 
+    string public version = 'H1.0';
     uint256 public unitsOneEthCanBuy;
-    uint256 public totalEthInWei; 
+    uint256 public totalEthInWei;
     address payable public fundsWallet;
 
-    //constructor function 
+    //constructor function
     constructor() public {
         balances[msg.sender] = 10000000000000000000000000000;
         totalSupply = 10000000000000000000000000000;
@@ -122,7 +122,7 @@ contract Bittelux is StandardToken {
         emit Transfer(fundsWallet, msg.sender, amount); // Broadcast a message to the blockchain
 
         //Transfer ether to fundsWallet
-        fundsWallet.transfer(msg.value);                               
+        fundsWallet.transfer(msg.value);
     }
 
     /* Approves and then calls the receiving contract */

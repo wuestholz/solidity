@@ -3,7 +3,7 @@
 */
 
 pragma solidity >=0.5.0;
- 
+
 interface ERC20 {
 	//ERC-20 Token Standard https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20-token-standard.md
 	
@@ -21,8 +21,8 @@ interface ERC20 {
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 }
 
-interface TokenRecipient { 
-	function receiveApproval(address _from, uint256 _value, address _token, bytes calldata _extraData) external; 
+interface TokenRecipient {
+	function receiveApproval(address _from, uint256 _value, address _token, bytes calldata _extraData) external;
 }
 
 interface ERC223Receiver {
