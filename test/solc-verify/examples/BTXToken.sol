@@ -1,260 +1,140 @@
 /**
- *Submitted for verification at Etherscan.io on 2018-08-06
+ *Submitted for verification at Etherscan.io on 2018-07-05
 */
 
 pragma solidity >=0.5.0;
 
-contract ERC20Basic {
-  function totalSupply() public view returns (uint256);
-  function balanceOf(address who) public view returns (uint256);
-  function transfer(address to, uint256 value) public returns (bool);
-  event Transfer(address indexed from, address indexed to, uint256 value);
+interface Token {
+
+    /// @return total amount of tokens
+    function totalSupply() view external returns (uint256 supply);
+
+    /// @param _owner The address from which the balance will be retrieved
+    /// @return The balance
+    function balanceOf(address _owner) view external returns (uint256 balance);
+
+    /// @notice send `_value` token to `_to` from `msg.sender`
+    /// @param _to The address of the recipient
+    /// @param _value The amount of token to be transferred
+    /// @return Whether the transfer was successful or not
+    function transfer(address _to, uint256 _value) external returns (bool success);
+
+    /// @notice send `_value` token to `_to` from `_from` on the condition it is approved by `_from`
+    /// @param _from The address of the sender
+    /// @param _to The address of the recipient
+    /// @param _value The amount of token to be transferred
+    /// @return Whether the transfer was successful or not
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool success);
+
+    /// @notice `msg.sender` approves `_addr` to spend `_value` tokens
+    /// @param _spender The address of the account able to transfer the tokens
+    /// @param _value The amount of wei to be approved for transfer
+    /// @return Whether the approval was successful or not
+    function approve(address _spender, uint256 _value) external returns (bool success);
+
+    /// @param _owner The address of the account owning tokens
+    /// @param _spender The address of the account able to transfer the tokens
+    /// @return Amount of remaining tokens allowed to spent
+    function allowance(address _owner, address _spender) view external returns (uint256 remaining);
+
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+    event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+
 }
 
-library SafeMath {
+contract StandardToken is Token {
 
-  function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-    if (a == 0) {
-      return 0;
+    function transfer(address _to, uint256 _value) public returns (bool success) {
+        //Default assumes totalSupply can't be over max (2^256 - 1).
+        //If your token leaves out totalSupply and can issue more tokens as time goes on, you need to check if it doesn't wrap.
+        //Replace the if with this one instead.
+        //if (balances[msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
+        if (balances[msg.sender] >= _value && _value > 0) {
+            balances[msg.sender] -= _value;
+            balances[_to] += _value;
+            emit Transfer(msg.sender, _to, _value);
+            return true;
+        } else { return false; }
     }
 
-    c = a * b;
-    require(c / a == b);
-    return c;
-  }
-
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    return a / b;
-  }
-
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    require(b <= a);
-    return a - b;
-  }
-
-  function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-    c = a + b;
-    require(c >= a);
-    return c;
-  }
-}
-
-contract BasicToken is ERC20Basic {
-  using SafeMath for uint256;
-
-  mapping(address => uint256) balances;
-
-  uint256 totalSupply_;
-
-  function totalSupply() public view returns (uint256) {
-    return totalSupply_;
-  }
-
-  function transfer(address _to, uint256 _value) public returns (bool) {
-    require(_to != address(0));
-    require(_value <= balances[msg.sender]);
-
-    balances[msg.sender] = balances[msg.sender].sub(_value);
-    balances[_to] = balances[_to].add(_value);
-    emit Transfer(msg.sender, _to, _value);
-    return true;
-  }
-
-  function balanceOf(address _owner) public view returns (uint256) {
-    return balances[_owner];
-  }
-
-}
-
-contract ERC20 is ERC20Basic {
-  function allowance(address owner, address spender)
-    public view returns (uint256);
-
-  function transferFrom(address from, address to, uint256 value)
-    public returns (bool);
-
-  function approve(address spender, uint256 value) public returns (bool);
-  event Approval(
-    address indexed owner,
-    address indexed spender,
-    uint256 value
-  );
-}
-
-contract StandardToken is ERC20, BasicToken {
-
-  mapping (address => mapping (address => uint256)) internal allowed;
-
-
-  function transferFrom(
-    address _from,
-    address _to,
-    uint256 _value
-  )
-    public
-    returns (bool)
-  {
-    require(_to != address(0));
-    require(_value <= balances[_from]);
-    require(_value <= allowed[_from][msg.sender]);
-
-    balances[_from] = balances[_from].sub(_value);
-    balances[_to] = balances[_to].add(_value);
-    allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
-    emit Transfer(_from, _to, _value);
-    return true;
-  }
-
-  function approve(address _spender, uint256 _value) public returns (bool) {
-    allowed[msg.sender][_spender] = _value;
-    emit Approval(msg.sender, _spender, _value);
-    return true;
-  }
-
-  function allowance(
-    address _owner,
-    address _spender
-   )
-    public
-    view
-    returns (uint256)
-  {
-    return allowed[_owner][_spender];
-  }
-
-  function increaseApproval(
-    address _spender,
-    uint _addedValue
-  )
-    public
-    returns (bool)
-  {
-    allowed[msg.sender][_spender] = (
-      allowed[msg.sender][_spender].add(_addedValue));
-    emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
-    return true;
-  }
-
-  function decreaseApproval(
-    address _spender,
-    uint _subtractedValue
-  )
-    public
-    returns (bool)
-  {
-    uint oldValue = allowed[msg.sender][_spender];
-    if (_subtractedValue > oldValue) {
-      allowed[msg.sender][_spender] = 0;
-    } else {
-      allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        //same as above. Replace this line with the following if you want to protect against wrapping uints.
+        //if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
+        if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && _value > 0) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            allowed[_from][msg.sender] -= _value;
+            emit Transfer(_from, _to, _value);
+            return true;
+        } else { return false; }
     }
-    emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
-    return true;
-  }
 
+    function balanceOf(address _owner) view public returns (uint256 balance) {
+        return balances[_owner];
+    }
+
+    function approve(address _spender, uint256 _value) public returns (bool success) {
+        allowed[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+
+    function allowance(address _owner, address _spender) view public returns (uint256 remaining) {
+      return allowed[_owner][_spender];
+    }
+
+    mapping (address => uint256) balances;
+    mapping (address => mapping (address => uint256)) allowed;
+    uint256 public totalSupply;
 }
 
- contract BurnableToken is StandardToken {
+contract Bittelux is StandardToken { 
 
-   event Burn(address indexed burner, uint256 value);
+    /* Public variables of the token */
 
-   function burn(uint256 _value) public {
-     _burn(msg.sender, _value);
-   }
+    string public name;
+    uint8 public decimals;
+    string public symbol;
+    string public version = 'H1.0'; 
+    uint256 public unitsOneEthCanBuy;
+    uint256 public totalEthInWei; 
+    address payable public fundsWallet;
 
-   function _burn(address _who, uint256 _value) internal {
-     require(_value <= balances[_who]);
+    //constructor function 
+    constructor() public {
+        balances[msg.sender] = 10000000000000000000000000000;
+        totalSupply = 10000000000000000000000000000;
+        name = "Bittelux";
+        decimals = 18;
+        symbol = "BTX";
+        unitsOneEthCanBuy = 22500;
+        fundsWallet = msg.sender;
+    }
 
-     balances[_who] = balances[_who].sub(_value);
-     totalSupply_ = totalSupply_.sub(_value);
-     emit Burn(_who, _value);
-     emit Transfer(_who, address(0), _value);
-   }
- }
+    function() payable external {
+        totalEthInWei = totalEthInWei + msg.value;
+        uint256 amount = msg.value * unitsOneEthCanBuy;
+        require(balances[fundsWallet] >= amount);
 
- contract Ownable {
-   address public owner;
+        balances[fundsWallet] = balances[fundsWallet] - amount;
+        balances[msg.sender] = balances[msg.sender] + amount;
 
-   event OwnershipRenounced(address indexed previousOwner);
-   event OwnershipTransferred(
-     address indexed previousOwner,
-     address indexed newOwner
-   );
+        emit Transfer(fundsWallet, msg.sender, amount); // Broadcast a message to the blockchain
 
-   constructor() public {
-     owner = msg.sender;
-   }
+        //Transfer ether to fundsWallet
+        fundsWallet.transfer(msg.value);                               
+    }
 
-   modifier onlyOwner() {
-     require(msg.sender == owner);
-     _;
-   }
+    /* Approves and then calls the receiving contract */
+    function approveAndCall(address _spender, uint256 _value, bytes memory _extraData) public returns (bool success) {
+        allowed[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
 
-   function renounceOwnership() public onlyOwner {
-     emit OwnershipRenounced(owner);
-     owner = address(0);
-   }
-
-   function transferOwnership(address _newOwner) public onlyOwner {
-     _transferOwnership(_newOwner);
-   }
-
-   function _transferOwnership(address _newOwner) internal {
-     require(_newOwner != address(0));
-     emit OwnershipTransferred(owner, _newOwner);
-     owner = _newOwner;
-   }
- }
-
- contract MintableToken is StandardToken, Ownable {
-   event Mint(address indexed to, uint256 amount);
-   event MintFinished();
-
-   bool public mintingFinished = false;
-
-
-   modifier canMint() {
-     require(!mintingFinished);
-     _;
-   }
-
-   modifier hasMintPermission() {
-     require(msg.sender == owner);
-     _;
-   }
-
-   function mint(
-     address _to,
-     uint256 _amount
-   )
-     hasMintPermission
-     canMint
-     public
-     returns (bool)
-   {
-     totalSupply_ = totalSupply_.add(_amount);
-     balances[_to] = balances[_to].add(_amount);
-     emit Mint(_to, _amount);
-     emit Transfer(address(0), _to, _amount);
-     return true;
-   }
-
-   function finishMinting() onlyOwner canMint public returns (bool) {
-     mintingFinished = true;
-     emit MintFinished();
-     return true;
-   }
- }
-
-
-contract BTX is BurnableToken, MintableToken {
-  string public name = "BTX";
-  string public symbol = "BTX";
-  uint public decimals = 6;
-  uint public INITIAL_SUPPLY = 20000000 * (10 ** decimals);
-
-  constructor() public {
-    totalSupply_ = INITIAL_SUPPLY;
-    balances[msg.sender] = INITIAL_SUPPLY;
-  }
+        //call the receiveApproval function on the contract you want to be notified. This crafts the function signature manually so one doesn't have to include a contract in here just for this.
+        //receiveApproval(address _from, uint256 _value, address _tokenContract, bytes _extraData)
+        //it is assumed that when does this that the call *should* succeed, otherwise one would use vanilla approve instead.
+        (bool ok,) = _spender.call(abi.encode(bytes4(bytes32(keccak256("receiveApproval(address,uint256,address,bytes)"))), msg.sender, _value, this, _extraData));
+        if(!ok) { revert(); }
+        return true;
+    }
 }
