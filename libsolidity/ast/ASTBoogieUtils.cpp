@@ -638,14 +638,6 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 	case Type::Category::FixedBytes:
 	case Type::Category::Enum:
 		return true;
-	case Type::Category::Tuple:
-	{
-		auto tupleType = dynamic_cast<TupleType const*>(type);
-		for (auto e: tupleType->components())
-			if (e && !isBitPreciseType(e))
-				return false;
-		return true;
-	}
 	default:
 		return false;
 	}
@@ -682,28 +674,6 @@ bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, Type
 {
 	solAssert(exprType, "");
 	solAssert(targetType, "");
-
-	// If tuples, do it element-wise
-	if (targetType->category() == Type::Category::Tuple)
-	{
-		vector<bg::Expr::Ref> elements;
-
-		auto targetTupleType = dynamic_cast<TupleType const*>(targetType);
-		auto exprTypleType = dynamic_cast<TupleType const*>(exprType);
-		auto exprTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(expr);
-
-		for (size_t i = 0; i < targetTupleType->components().size(); i ++)
-		{
-			auto expr_i = exprTuple->elements()[i];
-			auto exprType_i = exprTypleType->components()[i];
-			auto targetType_i = targetTupleType->components()[i];
-			auto result_i = targetType_i ?
-					checkImplicitBvConversion(expr_i, exprType_i, targetType_i, context) : nullptr;
-			elements.push_back(result_i);
-		}
-
-		return bg::Expr::tuple(elements);
-	}
 
 	if (isBitPreciseType(targetType))
 	{
@@ -1007,6 +977,8 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 	auto rhsTupleExpr = dynamic_cast<TupleExpression const*>(rhs.expr);
 	auto lhsType = dynamic_cast<TupleType const*>(lhs.type);
 	solAssert(lhsType, "Expected tuple type for LHS");
+	auto rhsType = dynamic_cast<TupleType const*>(rhs.type);
+	solAssert(rhsType, "Expected tuple type for RHS");
 	auto const& lhsElems = lhsTuple->elements();
 	auto const& rhsElems = rhsTuple->elements();
 
@@ -1017,28 +989,44 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 		if (lhsElems[i])
 		{
 			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
-			auto elemType = lhsType->components().at(i);
-			auto tmp = context.freshTempVar(context.toBoogieType(elemType, assocNode));
+			auto rhsElemType = rhsType->components().at(i);
+			// Temp variable has the type of LHS by default, so that implicit conversions can happen
+			auto tmpVarType = lhsType->components().at(i);
+			// For reference types in storage, it should be local storage pointer
+			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
+			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
+				tmpVarType = TypeProvider::withLocation(rhsRef,DataLocation::Storage, true);
+
+			auto tmp = context.freshTempVar(context.toBoogieType(tmpVarType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
 			makeAssignInternal(
-					AssignParam{tmp->getRefTo(), elemType, nullptr },
-					AssignParam{rhsElems[i], elemType, rhsElem },
+					AssignParam{tmp->getRefTo(), tmpVarType, nullptr },
+					AssignParam{rhsElems[i], rhsElemType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
 		else
 			tmpVars.push_back(nullptr);
 	}
 
-	for (unsigned i = 0; i < lhsElems.size(); ++i)
+	for (int i = lhsElems.size() - 1; i >= 0; --i)
 	{
 		if (lhsElems[i])
 		{
 			auto const lhsElem = lhsTupleExpr ? lhsTupleExpr->components().at(i).get() : nullptr;
-			auto elemType = lhsType->components().at(i);
+			auto lhsElemType = lhsType->components().at(i);
+			auto rhsElemType = rhsType->components().at(i);
+			// Temp variable has the type of LHS by default
+			auto tmpVarType = lhsElemType;
+			// For reference types in storage, it should be local storage pointer
+			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
+			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
+				tmpVarType = TypeProvider::withLocation(rhsRef, DataLocation::Storage, true);
+
+			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			makeAssignInternal(
-					AssignParam{lhsElems[i], elemType, lhsElem },
-					AssignParam{tmpVars[i]->getRefTo(), elemType, nullptr },
+					AssignParam{lhsElems[i], lhsElemType, lhsElem },
+					AssignParam{tmpVars[i]->getRefTo(), tmpVarType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
 	}
