@@ -71,6 +71,15 @@ void ASTBoogieConverter::createImplicitConstructor(ContractDefinition const& _no
 		auto attrs = ASTBoogieUtils::createAttrs(_node.location(), "State variable initializers might violate invariant '" + invar.exprStr + "'.", *m_context.currentScanner());
 		procDecl->getEnsures().push_back(bg::Specification::spec(invar.expr, attrs));
 	}
+	// Overflow condition for the code comes first because if there are more errors, this one gets reported
+	if (m_context.overflow())
+	{
+		auto noOverflow = bg::Expr::not_(bg::Expr::id(ASTBoogieUtils::VERIFIER_OVERFLOW));
+		procDecl->getRequires().push_back(bg::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "An overflow can occur before calling function", *m_context.currentScanner())));
+		procDecl->getEnsures().push_back(bg::Specification::spec(noOverflow,
+				ASTBoogieUtils::createAttrs(_node.location(), "Function can terminate with overflow", *m_context.currentScanner())));
+	}
 	auto attrs = ASTBoogieUtils::createAttrs(_node.location(),  _node.name() + "::[implicit_constructor]", *m_context.currentScanner());
 	procDecl->addAttrs(attrs);
 	m_context.addDecl(procDecl);
