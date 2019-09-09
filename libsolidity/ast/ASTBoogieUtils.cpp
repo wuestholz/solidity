@@ -638,14 +638,6 @@ bool ASTBoogieUtils::isBitPreciseType(TypePointer type)
 	case Type::Category::FixedBytes:
 	case Type::Category::Enum:
 		return true;
-	case Type::Category::Tuple:
-	{
-		auto tupleType = dynamic_cast<TupleType const*>(type);
-		for (auto e: tupleType->components())
-			if (e && !isBitPreciseType(e))
-				return false;
-		return true;
-	}
 	default:
 		return false;
 	}
@@ -682,28 +674,6 @@ bg::Expr::Ref ASTBoogieUtils::checkImplicitBvConversion(bg::Expr::Ref expr, Type
 {
 	solAssert(exprType, "");
 	solAssert(targetType, "");
-
-	// If tuples, do it element-wise
-	if (targetType->category() == Type::Category::Tuple)
-	{
-		vector<bg::Expr::Ref> elements;
-
-		auto targetTupleType = dynamic_cast<TupleType const*>(targetType);
-		auto exprTypleType = dynamic_cast<TupleType const*>(exprType);
-		auto exprTuple = std::dynamic_pointer_cast<bg::TupleExpr const>(expr);
-
-		for (size_t i = 0; i < targetTupleType->components().size(); i ++)
-		{
-			auto expr_i = exprTuple->elements()[i];
-			auto exprType_i = exprTypleType->components()[i];
-			auto targetType_i = targetTupleType->components()[i];
-			auto result_i = targetType_i ?
-					checkImplicitBvConversion(expr_i, exprType_i, targetType_i, context) : nullptr;
-			elements.push_back(result_i);
-		}
-
-		return bg::Expr::tuple(elements);
-	}
 
 	if (isBitPreciseType(targetType))
 	{
@@ -1020,15 +990,13 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 		{
 			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			auto rhsElemType = rhsType->components().at(i);
-			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
-			if (isBitPreciseType(lhsType->components().at(i)))
-				rhsElemType = lhsType->components().at(i);
-
-			auto tmpVarType = rhsElemType;
-
+			// Temp variable has the type of LHS by default, so that implicit conversions can happen
+			auto tmpVarType = lhsType->components().at(i);
+			// For reference types in storage, it should be local storage pointer
 			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
 			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
 				tmpVarType = TypeProvider::withLocation(rhsRef,DataLocation::Storage, true);
+
 			auto tmp = context.freshTempVar(context.toBoogieType(tmpVarType, assocNode));
 			result.newDecls.push_back(tmp);
 			tmpVars.push_back(tmp);
@@ -1048,16 +1016,17 @@ void ASTBoogieUtils::makeTupleAssign(AssignParam lhs, AssignParam rhs, ASTNode c
 			auto const lhsElem = lhsTupleExpr ? lhsTupleExpr->components().at(i).get() : nullptr;
 			auto lhsElemType = lhsType->components().at(i);
 			auto rhsElemType = rhsType->components().at(i);
-			// For bit-precise types use LHS type due to conversion of literals (TODO better solution)
-			if (isBitPreciseType(lhsElemType))
-				rhsElemType = lhsElemType;
+			// Temp variable has the type of LHS by default
+			auto tmpVarType = lhsElemType;
+			// For reference types in storage, it should be local storage pointer
 			auto rhsRef = dynamic_cast<ReferenceType const*>(rhsElemType);
 			if (rhsRef && rhsElemType->dataStoredIn(DataLocation::Storage))
-				rhsElemType = TypeProvider::withLocation(rhsRef, DataLocation::Storage, true);
+				tmpVarType = TypeProvider::withLocation(rhsRef, DataLocation::Storage, true);
+
 			auto rhsElem = rhsTupleExpr ? rhsTupleExpr->components().at(i).get() : nullptr;
 			makeAssignInternal(
 					AssignParam{lhsElems[i], lhsElemType, lhsElem },
-					AssignParam{tmpVars[i]->getRefTo(), rhsElemType, rhsElem },
+					AssignParam{tmpVars[i]->getRefTo(), tmpVarType, rhsElem },
 					Token::Assign, assocNode, context, result);
 		}
 	}
